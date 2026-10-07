@@ -76,8 +76,9 @@ generated Rust envelope/query types, and the local `@scoplen/api` TypeScript pac
 The internal `spl.gateway.v1.Control` and `spl.agent.v1.Agent` protobuf source contracts are
 also checked in under `crates/scoplen-api/proto`. The built-in Cedar schema and role policies are
 parsed and strictly validated in the API crate's tests. The API crate now generates bounded Rust
-message bindings and publishes the internal descriptor set; TypeScript bindings, runtime policy
-evaluation, and concrete gRPC services remain open.
+message bindings and publishes the internal descriptor set, plus deterministic TypeScript message,
+oneof, enum, and service metadata bindings at `@scoplen/api/proto`; runtime policy evaluation and
+concrete mTLS gRPC services remain open.
 
 ## Repository shape
 
