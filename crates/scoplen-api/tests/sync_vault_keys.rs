@@ -27,6 +27,24 @@ fn shared_vault_key_response_round_trips_and_accepts_extensions() {
     fields.push((Value::Text("future".into()), Value::UInt(1)));
     let extended = cbor::encode(&Value::Map(fields)).expect("response extension");
     assert_eq!(SyncVaultKeysResponse::from_cbor(&extended).expect("extension decode"), source);
+
+    let Value::Map(mut fields) = cbor::decode(&encoded).expect("nested response map") else {
+        panic!("response must be a map");
+    };
+    let Some((_, Value::Array(keys))) =
+        fields.iter_mut().find(|(key, _)| key == &Value::Text("keys".into()))
+    else {
+        panic!("keys array is missing");
+    };
+    let Value::Map(first_key) = &mut keys[0] else {
+        panic!("key entry must be a map");
+    };
+    first_key.push((Value::Text("future".into()), Value::UInt(1)));
+    let nested_extended = cbor::encode(&Value::Map(fields)).expect("nested extension");
+    assert_eq!(
+        SyncVaultKeysResponse::from_cbor(&nested_extended).expect("nested extension decode"),
+        source
+    );
 }
 
 #[test]

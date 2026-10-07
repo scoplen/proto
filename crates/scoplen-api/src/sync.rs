@@ -378,9 +378,6 @@ impl SyncVaultKey {
             epoch: take_uint(&mut fields, "epoch")?,
             wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
         };
-        if !fields.is_empty() {
-            return Err(invalid("unknown shared-vault key field"));
-        }
         key.validate()?;
         Ok(key)
     }
