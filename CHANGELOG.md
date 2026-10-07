@@ -4,6 +4,9 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Added bounded K-4 shared-vault member-addition request and response codecs with exact epoch-wrap
+  coverage, strict UUIDv7/order/count/body validation, deterministic vectors, and failure-path
+  tests.
 - Added bounded K-4 shared-vault epoch-publication request and response codecs with sorted
   per-member opaque wraps, strict UUIDv7 and size validation, deterministic vectors, and
   malformed, duplicate, ordering, and body-limit failure paths.

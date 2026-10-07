@@ -38,6 +38,10 @@ pub const MAX_SYNC_VAULT_KEYS_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
 pub const MAX_SYNC_VAULT_EPOCH_WRAPS: usize = 1_000;
 /// Maximum encoded size of a shared-vault epoch publication request or response.
 pub const MAX_SYNC_VAULT_EPOCH_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
+/// Maximum number of currently served epochs accepted for a new member.
+pub const MAX_SYNC_VAULT_MEMBER_EPOCHS: usize = MAX_SYNC_VAULT_KEY_EPOCHS;
+/// Maximum encoded size of a shared-vault member request or response.
+pub const MAX_SYNC_VAULT_MEMBER_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
 
 /// Errors at the K-4 sync wire boundary.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -626,6 +630,131 @@ impl SyncPublishVaultEpochResponse {
         enforce_vault_epoch_body_limit(input)?;
         let mut fields = decode_map(input)?;
         let response = Self { epoch: take_uint(&mut fields, "epoch")? };
+        response.validate()?;
+        Ok(response)
+    }
+}
+
+/// Request body for `POST /sync/v1/vaults/{vault}/members`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncAddVaultMemberRequest {
+    /// Account being added to the vault.
+    pub account_id: Uuid,
+    /// One wrap for every currently served epoch, sorted by epoch.
+    pub wrapped_keys: Vec<SyncVaultKey>,
+}
+
+impl SyncAddVaultMemberRequest {
+    /// Validate the target account and exact-shape epoch list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid account, an empty or oversized list, invalid wraps, or
+    /// duplicate or unsorted epochs.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.account_id, "account_id")?;
+        if self.wrapped_keys.is_empty() || self.wrapped_keys.len() > MAX_SYNC_VAULT_MEMBER_EPOCHS {
+            return Err(invalid(format!(
+                "wrapped_keys must contain 1..{MAX_SYNC_VAULT_MEMBER_EPOCHS} entries"
+            )));
+        }
+        let mut previous = 0;
+        for key in &self.wrapped_keys {
+            key.validate()?;
+            if key.epoch <= previous {
+                return Err(invalid("wrapped_keys epochs must be strictly ascending"));
+            }
+            previous = key.epoch;
+        }
+        Ok(())
+    }
+
+    /// Encode the deterministic member-addition request map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation fails, canonical encoding fails, or the body exceeds its
+    /// bound.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![
+            ("account_id", Value::Bytes(self.account_id.as_bytes().to_vec())),
+            (
+                "wrapped_keys",
+                Value::Array(
+                    self.wrapped_keys.iter().cloned().map(SyncVaultKey::into_value).collect(),
+                ),
+            ),
+        ])?;
+        enforce_vault_member_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a strict member-addition request. Unknown fields are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed CBOR, unknown fields, invalid values, or an oversized body.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_member_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let account_id = take_uuid(&mut fields, "account_id")?;
+        let wrapped_keys = match fields.remove("wrapped_keys") {
+            Some(Value::Array(values)) => values
+                .into_iter()
+                .map(SyncVaultKey::from_value)
+                .collect::<Result<Vec<_>, SyncCodecError>>()?,
+            Some(_) => return Err(invalid("wrapped_keys must be an array")),
+            None => return Err(invalid("missing wrapped_keys")),
+        };
+        if !fields.is_empty() {
+            return Err(invalid("unknown shared-vault member field"));
+        }
+        let request = Self { account_id, wrapped_keys };
+        request.validate()?;
+        Ok(request)
+    }
+}
+
+/// Successful response from `POST /sync/v1/vaults/{vault}/members`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncAddVaultMemberResponse {
+    /// Account added to the vault.
+    pub account_id: Uuid,
+}
+
+impl SyncAddVaultMemberResponse {
+    /// Validate the added account identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-UUIDv7 identifier.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.account_id, "account_id")
+    }
+
+    /// Encode the deterministic `{account_id}` response map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation or canonical encoding fails.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded =
+            encode_map(vec![("account_id", Value::Bytes(self.account_id.as_bytes().to_vec()))])?;
+        enforce_vault_member_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a response while ignoring additive extension fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed CBOR, a missing or invalid account id, or an oversized body.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_member_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let response = Self { account_id: take_uuid(&mut fields, "account_id")? };
         response.validate()?;
         Ok(response)
     }
@@ -1934,6 +2063,15 @@ fn enforce_vault_epoch_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
     if input.len() > MAX_SYNC_VAULT_EPOCH_BODY_BYTES {
         return Err(invalid(format!(
             "shared-vault epoch body exceeds {MAX_SYNC_VAULT_EPOCH_BODY_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn enforce_vault_member_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
+    if input.len() > MAX_SYNC_VAULT_MEMBER_BODY_BYTES {
+        return Err(invalid(format!(
+            "shared-vault member body exceeds {MAX_SYNC_VAULT_MEMBER_BODY_BYTES} bytes"
         )));
     }
     Ok(())

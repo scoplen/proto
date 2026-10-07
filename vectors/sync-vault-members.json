@@ -1,0 +1,18 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "sync-vaults-members-add-request-v1",
+      "kind": "sync.vaults.members.add.request",
+      "input": "{\"account_id\":\"00000000-0000-7000-8000-000000000003\",\"wrapped_keys\":[{\"epoch\":1,\"wrapped_vault_key\":\"0102\"},{\"epoch\":2,\"wrapped_vault_key\":\"0304\"}]}",
+      "expected": "a26a6163636f756e745f696450000000000000700080000000000000036c777261707065645f6b65797382a26565706f63680171777261707065645f7661756c745f6b6579420102a26565706f63680271777261707065645f7661756c745f6b6579420304"
+    },
+    {
+      "id": "sync-vaults-members-add-response-v1",
+      "kind": "sync.vaults.members.add.response",
+      "input": "{\"account_id\":\"00000000-0000-7000-8000-000000000003\"}",
+      "expected": "a16a6163636f756e745f69645000000000000070008000000000000003"
+    }
+  ]
+}
