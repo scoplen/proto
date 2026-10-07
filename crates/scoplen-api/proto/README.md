@@ -10,5 +10,8 @@ the field comment. Runtime implementations must enforce those limits before
 allocation and must authenticate the mTLS peer before accepting a request.
 
 The API crate generates Rust message bindings with the pinned Prost toolchain and exposes the
-compiled `FileDescriptorSet` for internal consumers. TypeScript bindings and concrete tonic service
-implementations remain separate work after the source contract is reviewed.
+compiled `FileDescriptorSet` for internal consumers. `openapi/generate-proto.mjs` generates the
+TypeScript message, enum, oneof, and service metadata bindings from these same sources; run
+`pnpm --dir crates/scoplen-api/openapi check-proto` to reject drift. The generated package is
+available as `@scoplen/api/proto`. These bindings describe the wire contract only; concrete mTLS
+gRPC service implementations remain a separate server workstream.
