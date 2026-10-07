@@ -635,6 +635,49 @@ impl SyncPublishVaultEpochResponse {
     }
 }
 
+/// Successful response from `POST /sync/v1/vaults/{vault}/epochs/{epoch}/retire`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncRetireVaultEpochResponse {
+    /// The retired shared-vault key epoch.
+    pub epoch: u64,
+}
+
+impl SyncRetireVaultEpochResponse {
+    /// Validate the retired epoch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the epoch is zero.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        positive(self.epoch, "epoch")
+    }
+
+    /// Encode the deterministic `{epoch}` response map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation or canonical CBOR encoding fails.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![("epoch", Value::UInt(self.epoch))])?;
+        enforce_vault_epoch_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a response while ignoring additive extension fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed or oversized CBOR, a missing epoch, or a zero epoch.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_epoch_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let response = Self { epoch: take_uint(&mut fields, "epoch")? };
+        response.validate()?;
+        Ok(response)
+    }
+}
+
 /// Request body for `POST /sync/v1/vaults/{vault}/members`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyncAddVaultMemberRequest {

@@ -13,6 +13,12 @@
       "kind": "sync.vaults.epochs.publish.response",
       "input": "{\"epoch\":2}",
       "expected": "a16565706f636802"
+    },
+    {
+      "id": "sync-vaults-epochs-retire-response-v1",
+      "kind": "sync.vaults.epochs.retire.response",
+      "input": "{\"epoch\":1}",
+      "expected": "a16565706f636801"
     }
   ]
 }

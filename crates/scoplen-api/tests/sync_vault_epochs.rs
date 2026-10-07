@@ -2,7 +2,7 @@
 
 use scoplen_api::sync::{
     MAX_SYNC_VAULT_EPOCH_BODY_BYTES, MAX_SYNC_VAULT_EPOCH_WRAPS, SyncPublishVaultEpochRequest,
-    SyncPublishVaultEpochResponse, SyncVaultEpochWrap,
+    SyncPublishVaultEpochResponse, SyncRetireVaultEpochResponse, SyncVaultEpochWrap,
 };
 use scoplen_model::cbor::{self, Value};
 use serde_json::Value as JsonValue;
@@ -38,6 +38,13 @@ fn shared_vault_epoch_codecs_round_trip_and_accept_response_extensions() {
     assert_eq!(
         SyncPublishVaultEpochResponse::from_cbor(&extended).expect("extension decode"),
         response
+    );
+
+    let retired = SyncRetireVaultEpochResponse { epoch: 1 };
+    let encoded = retired.to_cbor().expect("encode retirement response");
+    assert_eq!(
+        SyncRetireVaultEpochResponse::from_cbor(&encoded).expect("decode retirement response"),
+        retired
     );
 }
 
@@ -90,6 +97,10 @@ fn shared_vault_epoch_codecs_reject_invalid_order_fields_and_bounds() {
             .is_err(),
         "oversized request"
     );
+    assert!(
+        SyncRetireVaultEpochResponse { epoch: 0 }.to_cbor().is_err(),
+        "retirement response must reject zero epoch"
+    );
 
     let encoded = request().to_cbor().expect("encode request");
     let Value::Map(mut fields) = cbor::decode(&encoded).expect("request map") else {
@@ -110,7 +121,7 @@ fn published_shared_vault_epoch_vectors_match_public_codecs() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../vectors/sync-vault-epochs.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vectors");
-    assert_eq!(document.vectors.len(), 2);
+    assert_eq!(document.vectors.len(), 3);
     for vector in &document.vectors {
         let expected = decode_hex(&vector.expected);
         match vector.kind.as_str() {
@@ -144,6 +155,14 @@ fn published_shared_vault_epoch_vectors_match_public_codecs() {
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
                 assert_eq!(
                     SyncPublishVaultEpochResponse::from_cbor(&expected).expect("decode"),
+                    source
+                );
+            }
+            "sync.vaults.epochs.retire.response" => {
+                let source = SyncRetireVaultEpochResponse { epoch: 1 };
+                assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
+                assert_eq!(
+                    SyncRetireVaultEpochResponse::from_cbor(&expected).expect("decode"),
                     source
                 );
             }
