@@ -13,6 +13,12 @@
       "kind": "sync.vaults.members.add.response",
       "input": "{\"account_id\":\"00000000-0000-7000-8000-000000000003\"}",
       "expected": "a16a6163636f756e745f69645000000000000070008000000000000003"
+    },
+    {
+      "id": "sync-vaults-members-remove-response-v1",
+      "kind": "sync.vaults.members.remove.response",
+      "input": "{\"account_id\":\"00000000-0000-7000-8000-000000000003\",\"rotation_pending\":true}",
+      "expected": "a26a6163636f756e745f6964500000000000007000800000000000000370726f746174696f6e5f70656e64696e67f5"
     }
   ]
 }

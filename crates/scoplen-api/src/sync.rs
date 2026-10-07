@@ -760,6 +760,62 @@ impl SyncAddVaultMemberResponse {
     }
 }
 
+/// Successful response from `DELETE /sync/v1/vaults/{vault}/members/{account}`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncRemoveVaultMemberResponse {
+    /// Account removed from the vault.
+    pub account_id: Uuid,
+    /// Whether the vault needs a new key epoch before normal sync resumes.
+    pub rotation_pending: bool,
+}
+
+impl SyncRemoveVaultMemberResponse {
+    /// Validate the removed account and pending marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-UUIDv7 account identifier or a false pending marker.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.account_id, "account_id")?;
+        if !self.rotation_pending {
+            return Err(invalid("rotation_pending must be true"));
+        }
+        Ok(())
+    }
+
+    /// Encode the deterministic removal response map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation or canonical encoding fails.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![
+            ("account_id", Value::Bytes(self.account_id.as_bytes().to_vec())),
+            ("rotation_pending", Value::Bool(self.rotation_pending)),
+        ])?;
+        enforce_vault_member_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a response while ignoring additive extension fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed CBOR, a missing or invalid account id, a false pending
+    /// marker, or an oversized body.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_member_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let response = Self {
+            account_id: take_uuid(&mut fields, "account_id")?,
+            rotation_pending: take_bool(&mut fields, "rotation_pending")?,
+        };
+        response.validate()?;
+        Ok(response)
+    }
+}
+
 /// Response body for `POST /sync/v1/session`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyncSessionResponse {

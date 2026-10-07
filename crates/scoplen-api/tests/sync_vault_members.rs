@@ -2,7 +2,7 @@
 
 use scoplen_api::sync::{
     MAX_SYNC_VAULT_MEMBER_BODY_BYTES, MAX_SYNC_VAULT_MEMBER_EPOCHS, SyncAddVaultMemberRequest,
-    SyncAddVaultMemberResponse, SyncVaultKey,
+    SyncAddVaultMemberResponse, SyncRemoveVaultMemberResponse, SyncVaultKey,
 };
 use scoplen_model::cbor::{self, Value};
 use serde_json::Value as JsonValue;
@@ -38,6 +38,18 @@ fn shared_vault_member_codecs_round_trip_and_accept_response_extensions() {
         SyncAddVaultMemberResponse::from_cbor(&extended).expect("decode extension"),
         response
     );
+
+    let removal = SyncRemoveVaultMemberResponse { account_id: account(3), rotation_pending: true };
+    let encoded = removal.to_cbor().expect("encode removal response");
+    let Value::Map(mut fields) = cbor::decode(&encoded).expect("removal response map") else {
+        panic!("removal response must be a map");
+    };
+    fields.push((Value::Text("future".into()), Value::UInt(1)));
+    let extended = cbor::encode(&Value::Map(fields)).expect("removal extension");
+    assert_eq!(
+        SyncRemoveVaultMemberResponse::from_cbor(&extended).expect("decode removal extension"),
+        removal
+    );
 }
 
 #[test]
@@ -54,6 +66,9 @@ fn shared_vault_member_codecs_reject_invalid_order_fields_and_bounds() {
     invalid = request();
     invalid.account_id = Uuid::nil();
     assert!(invalid.to_cbor().is_err(), "invalid account");
+    let invalid_removal =
+        SyncRemoveVaultMemberResponse { account_id: account(3), rotation_pending: false };
+    assert!(invalid_removal.to_cbor().is_err(), "false rotation marker");
     invalid = SyncAddVaultMemberRequest {
         account_id: account(3),
         wrapped_keys: (1..=MAX_SYNC_VAULT_MEMBER_EPOCHS as u64 + 1)
@@ -83,7 +98,7 @@ fn published_shared_vault_member_vectors_match_public_codecs() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../vectors/sync-vault-members.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vectors");
-    assert_eq!(document.vectors.len(), 2);
+    assert_eq!(document.vectors.len(), 3);
     for vector in &document.vectors {
         let expected = decode_hex(&vector.expected);
         match vector.kind.as_str() {
@@ -115,6 +130,17 @@ fn published_shared_vault_member_vectors_match_public_codecs() {
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
                 assert_eq!(
                     SyncAddVaultMemberResponse::from_cbor(&expected).expect("decode"),
+                    source
+                );
+            }
+            "sync.vaults.members.remove.response" => {
+                let source = SyncRemoveVaultMemberResponse {
+                    account_id: account(3),
+                    rotation_pending: true,
+                };
+                assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
+                assert_eq!(
+                    SyncRemoveVaultMemberResponse::from_cbor(&expected).expect("decode"),
                     source
                 );
             }
