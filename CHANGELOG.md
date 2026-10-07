@@ -4,6 +4,9 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Added the bounded K-4 shared-vault key-retrieval response codec for ascending epoch wraps,
+  deterministic vectors, additive response extensions, and malformed, ordering, count, and body
+  limit failure paths. The authenticated route and durable lookup remain owned by `scoplen-server`.
 - Added the K-4 shared-vault creation request and response codecs with bounded opaque key wraps,
   strict UUIDv7 and initial-state validation, published deterministic vectors, and failure-path
   coverage. The authenticated storage and HTTP route remain owned by `scoplen-server`.

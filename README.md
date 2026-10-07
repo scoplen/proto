@@ -69,7 +69,7 @@ interoperability until those workstreams are implemented and tested.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, acknowledgement, snapshot, version-history, content-free notification, account
-key-bundle, and shared-vault creation codecs in JSON and deterministic CBOR. K-6 now includes the bounded gateway client-hello
+key-bundle, shared-vault creation, and shared-vault key-retrieval codecs in JSON and deterministic CBOR. K-6 now includes the bounded gateway client-hello
 frame (`ticket` and `dpop_proof`) with a published vector and failure-path coverage. OpenAPI
 resources now have an authored OpenAPI 3.1 document at `crates/scoplen-api/openapi/v1.yaml`,
 generated Rust envelope/query types, and the local `@scoplen/api` TypeScript package surface.
@@ -86,8 +86,9 @@ The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
 in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-problem.json`,
-`vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`, and
-`vectors/sync-notifications.json`, `vectors/sync-keys.json`, and `vectors/gateway.json`. The shared
+`vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
+`vectors/sync-notifications.json`, `vectors/sync-keys.json`, `vectors/sync-vaults.json`,
+`vectors/sync-vault-keys.json`, and `vectors/gateway.json`. The shared
 loader is usable by both workstreams.
 
 ## Development

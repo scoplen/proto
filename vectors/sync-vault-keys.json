@@ -1,0 +1,12 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "sync-vaults-keys-response-v1",
+      "kind": "sync.vaults.keys.response",
+      "input": "{\"keys\":[{\"epoch\":1,\"wrapped_vault_key\":\"0102\"},{\"epoch\":2,\"wrapped_vault_key\":\"0304\"}]}",
+      "expected": "a1646b65797382a26565706f63680171777261707065645f7661756c745f6b6579420102a26565706f63680271777261707065645f7661756c745f6b6579420304"
+    }
+  ]
+}

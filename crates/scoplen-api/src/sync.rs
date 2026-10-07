@@ -30,6 +30,10 @@ pub const SYNC_KEYS_SIGNATURE_DOMAIN: &[u8] = b"spl-sync-keys-v1";
 pub const MAX_SYNC_VAULT_KEY_BYTES: usize = 64 * 1024;
 /// Maximum encoded size of a shared-vault creation request.
 pub const MAX_SYNC_VAULT_CREATE_BODY_BYTES: usize = MAX_SYNC_VAULT_KEY_BYTES + 256;
+/// Maximum number of non-retired shared-vault key epochs returned by one response.
+pub const MAX_SYNC_VAULT_KEY_EPOCHS: usize = 64;
+/// Maximum encoded size of a shared-vault key retrieval response.
+pub const MAX_SYNC_VAULT_KEYS_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
 
 /// Errors at the K-4 sync wire boundary.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -341,6 +345,100 @@ impl SyncCreateVaultResponse {
                 fields.remove("vault").ok_or_else(|| invalid("missing vault"))?,
             )?,
         };
+        response.validate()?;
+        Ok(response)
+    }
+}
+
+/// One opaque account wrap for a shared-vault key epoch.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncVaultKey {
+    /// Positive non-retired key epoch.
+    pub epoch: u64,
+    /// Account-bound opaque wrap of the vault key for this epoch.
+    pub wrapped_vault_key: Vec<u8>,
+}
+
+impl SyncVaultKey {
+    fn validate(&self) -> Result<(), SyncCodecError> {
+        positive(self.epoch, "epoch")?;
+        validate_key_artifact(&self.wrapped_vault_key, "wrapped_vault_key")
+    }
+
+    fn into_value(self) -> Value {
+        map(vec![
+            ("epoch", Value::UInt(self.epoch)),
+            ("wrapped_vault_key", Value::Bytes(self.wrapped_vault_key)),
+        ])
+    }
+
+    fn from_value(value: Value) -> Result<Self, SyncCodecError> {
+        let mut fields = expect_map(value)?;
+        let key = Self {
+            epoch: take_uint(&mut fields, "epoch")?,
+            wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
+        };
+        if !fields.is_empty() {
+            return Err(invalid("unknown shared-vault key field"));
+        }
+        key.validate()?;
+        Ok(key)
+    }
+}
+
+/// Successful response from `GET /sync/v1/vaults/{vault}/keys`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncVaultKeysResponse {
+    /// Non-retired wrapped keys, sorted by ascending epoch.
+    pub keys: Vec<SyncVaultKey>,
+}
+
+impl SyncVaultKeysResponse {
+    /// Validate bounds and strict epoch ordering.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        if self.keys.is_empty() {
+            return Err(invalid("shared-vault key response must contain at least one key"));
+        }
+        if self.keys.len() > MAX_SYNC_VAULT_KEY_EPOCHS {
+            return Err(invalid(format!(
+                "shared-vault key response exceeds {MAX_SYNC_VAULT_KEY_EPOCHS} entries"
+            )));
+        }
+        let mut previous = 0;
+        for key in &self.keys {
+            key.validate()?;
+            if key.epoch <= previous {
+                return Err(invalid("shared-vault key epochs must be strictly ascending"));
+            }
+            previous = key.epoch;
+        }
+        Ok(())
+    }
+
+    /// Encode the deterministic `{keys}` response map.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![(
+            "keys",
+            Value::Array(self.keys.iter().cloned().map(SyncVaultKey::into_value).collect()),
+        )])?;
+        enforce_vault_keys_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a response while ignoring additive extension fields.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_keys_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let keys = match fields.remove("keys") {
+            Some(Value::Array(values)) => values
+                .into_iter()
+                .map(SyncVaultKey::from_value)
+                .collect::<Result<Vec<_>, SyncCodecError>>()?,
+            Some(_) => return Err(invalid("keys must be an array")),
+            None => return Err(invalid("missing keys")),
+        };
+        let response = Self { keys };
         response.validate()?;
         Ok(response)
     }
@@ -1631,6 +1729,15 @@ fn enforce_vault_create_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
     if input.len() > MAX_SYNC_VAULT_CREATE_BODY_BYTES {
         return Err(invalid(format!(
             "shared-vault creation body exceeds {MAX_SYNC_VAULT_CREATE_BODY_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn enforce_vault_keys_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
+    if input.len() > MAX_SYNC_VAULT_KEYS_BODY_BYTES {
+        return Err(invalid(format!(
+            "shared-vault key response exceeds {MAX_SYNC_VAULT_KEYS_BODY_BYTES} bytes"
         )));
     }
     Ok(())
