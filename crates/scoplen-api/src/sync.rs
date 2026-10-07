@@ -395,6 +395,11 @@ pub struct SyncVaultKeysResponse {
 
 impl SyncVaultKeysResponse {
     /// Validate bounds and strict epoch ordering.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the response is empty, exceeds the epoch count, contains an invalid
+    /// wrap, or is not strictly ordered by epoch.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
         if self.keys.is_empty() {
             return Err(invalid("shared-vault key response must contain at least one key"));
@@ -416,6 +421,11 @@ impl SyncVaultKeysResponse {
     }
 
     /// Encode the deterministic `{keys}` response map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation fails, canonical CBOR encoding fails, or the body exceeds
+    /// its bound.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
         self.validate()?;
         let encoded = encode_map(vec![(
@@ -427,6 +437,11 @@ impl SyncVaultKeysResponse {
     }
 
     /// Decode a response while ignoring additive extension fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed CBOR, missing or invalid keys, non-canonical input, or an
+    /// oversized response body.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
         enforce_vault_keys_body_limit(input)?;
         let mut fields = decode_map(input)?;
