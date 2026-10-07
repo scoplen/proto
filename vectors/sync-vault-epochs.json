@@ -1,0 +1,18 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "sync-vaults-epochs-publish-request-v1",
+      "kind": "sync.vaults.epochs.publish.request",
+      "input": "{\"epoch\":2,\"wrapped_keys\":[{\"account_id\":\"00000000-0000-7000-8000-000000000001\",\"wrapped_vault_key\":\"0102\"},{\"account_id\":\"00000000-0000-7000-8000-000000000002\",\"wrapped_vault_key\":\"0304\"}]}",
+      "expected": "a26565706f6368026c777261707065645f6b65797382a26a6163636f756e745f6964500000000000007000800000000000000171777261707065645f7661756c745f6b6579420102a26a6163636f756e745f6964500000000000007000800000000000000271777261707065645f7661756c745f6b6579420304"
+    },
+    {
+      "id": "sync-vaults-epochs-publish-response-v1",
+      "kind": "sync.vaults.epochs.publish.response",
+      "input": "{\"epoch\":2}",
+      "expected": "a16565706f636802"
+    }
+  ]
+}

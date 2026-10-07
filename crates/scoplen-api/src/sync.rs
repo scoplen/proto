@@ -34,6 +34,10 @@ pub const MAX_SYNC_VAULT_CREATE_BODY_BYTES: usize = MAX_SYNC_VAULT_KEY_BYTES + 2
 pub const MAX_SYNC_VAULT_KEY_EPOCHS: usize = 64;
 /// Maximum encoded size of a shared-vault key retrieval response.
 pub const MAX_SYNC_VAULT_KEYS_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
+/// Maximum number of member wraps accepted when publishing one shared-vault epoch.
+pub const MAX_SYNC_VAULT_EPOCH_WRAPS: usize = 1_000;
+/// Maximum encoded size of a shared-vault epoch publication request or response.
+pub const MAX_SYNC_VAULT_EPOCH_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
 
 /// Errors at the K-4 sync wire boundary.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -451,6 +455,177 @@ impl SyncVaultKeysResponse {
             None => return Err(invalid("missing keys")),
         };
         let response = Self { keys };
+        response.validate()?;
+        Ok(response)
+    }
+}
+
+/// One member-specific opaque wrap in a shared-vault epoch publication.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncVaultEpochWrap {
+    /// Current member account identifier.
+    pub account_id: Uuid,
+    /// Account-bound opaque wrap of the new vault key.
+    pub wrapped_vault_key: Vec<u8>,
+}
+
+impl SyncVaultEpochWrap {
+    fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.account_id, "account_id")?;
+        validate_key_artifact(&self.wrapped_vault_key, "wrapped_vault_key")
+    }
+
+    fn into_value(self) -> Value {
+        map(vec![
+            ("account_id", Value::Bytes(self.account_id.as_bytes().to_vec())),
+            ("wrapped_vault_key", Value::Bytes(self.wrapped_vault_key)),
+        ])
+    }
+
+    fn from_value(value: Value) -> Result<Self, SyncCodecError> {
+        let mut fields = expect_map(value)?;
+        let wrap = Self {
+            account_id: take_uuid(&mut fields, "account_id")?,
+            wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
+        };
+        if !fields.is_empty() {
+            return Err(invalid("unknown shared-vault epoch wrap field"));
+        }
+        wrap.validate()?;
+        Ok(wrap)
+    }
+}
+
+/// Request body for `POST /sync/v1/vaults/{vault}/epochs`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncPublishVaultEpochRequest {
+    /// The next shared-vault key epoch.
+    pub epoch: u64,
+    /// Exactly one wrap for every current member, sorted by account id.
+    pub wrapped_keys: Vec<SyncVaultEpochWrap>,
+}
+
+impl SyncPublishVaultEpochRequest {
+    /// Validate the epoch and exact-shape member wraps.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a zero epoch, an empty or oversized wrap list, invalid wraps, or
+    /// duplicate or unsorted account identifiers.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        positive(self.epoch, "epoch")?;
+        if self.wrapped_keys.is_empty() {
+            return Err(invalid("wrapped_keys must not be empty"));
+        }
+        if self.wrapped_keys.len() > MAX_SYNC_VAULT_EPOCH_WRAPS {
+            return Err(invalid(format!(
+                "wrapped_keys exceeds {MAX_SYNC_VAULT_EPOCH_WRAPS} entries"
+            )));
+        }
+        let mut previous = None;
+        for wrap in &self.wrapped_keys {
+            wrap.validate()?;
+            if let Some(previous) = previous {
+                match wrap.account_id.as_bytes().cmp(previous) {
+                    std::cmp::Ordering::Greater => {}
+                    std::cmp::Ordering::Equal => {
+                        return Err(invalid("wrapped_keys contains duplicate account_id"));
+                    }
+                    std::cmp::Ordering::Less => {
+                        return Err(invalid("wrapped_keys must be sorted by account_id"));
+                    }
+                }
+            }
+            previous = Some(wrap.account_id.as_bytes());
+        }
+        Ok(())
+    }
+
+    /// Encode the deterministic epoch publication request map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation fails, canonical CBOR encoding fails, or the body exceeds
+    /// its bound.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![
+            ("epoch", Value::UInt(self.epoch)),
+            (
+                "wrapped_keys",
+                Value::Array(
+                    self.wrapped_keys.iter().cloned().map(SyncVaultEpochWrap::into_value).collect(),
+                ),
+            ),
+        ])?;
+        enforce_vault_epoch_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a strict epoch publication request. Unknown request fields are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed or non-canonical CBOR, unknown fields, invalid wraps, or an
+    /// oversized request body.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_epoch_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let wrapped_keys = match fields.remove("wrapped_keys") {
+            Some(Value::Array(values)) => values
+                .into_iter()
+                .map(SyncVaultEpochWrap::from_value)
+                .collect::<Result<Vec<_>, SyncCodecError>>()?,
+            Some(_) => return Err(invalid("wrapped_keys must be an array")),
+            None => return Err(invalid("missing wrapped_keys")),
+        };
+        let request = Self { epoch: take_uint(&mut fields, "epoch")?, wrapped_keys };
+        if !fields.is_empty() {
+            return Err(invalid("unknown shared-vault epoch request field"));
+        }
+        request.validate()?;
+        Ok(request)
+    }
+}
+
+/// Successful response from `POST /sync/v1/vaults/{vault}/epochs`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncPublishVaultEpochResponse {
+    /// The committed epoch.
+    pub epoch: u64,
+}
+
+impl SyncPublishVaultEpochResponse {
+    /// Validate the committed epoch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the epoch is zero.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        positive(self.epoch, "epoch")
+    }
+
+    /// Encode the deterministic `{epoch}` response map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation or canonical CBOR encoding fails.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![("epoch", Value::UInt(self.epoch))])?;
+        enforce_vault_epoch_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a response while ignoring additive extension fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed or oversized CBOR, a missing epoch, or a zero epoch.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_epoch_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let response = Self { epoch: take_uint(&mut fields, "epoch")? };
         response.validate()?;
         Ok(response)
     }
@@ -1750,6 +1925,15 @@ fn enforce_vault_keys_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
     if input.len() > MAX_SYNC_VAULT_KEYS_BODY_BYTES {
         return Err(invalid(format!(
             "shared-vault key response exceeds {MAX_SYNC_VAULT_KEYS_BODY_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn enforce_vault_epoch_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
+    if input.len() > MAX_SYNC_VAULT_EPOCH_BODY_BYTES {
+        return Err(invalid(format!(
+            "shared-vault epoch body exceeds {MAX_SYNC_VAULT_EPOCH_BODY_BYTES} bytes"
         )));
     }
     Ok(())
