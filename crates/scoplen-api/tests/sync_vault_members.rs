@@ -94,6 +94,65 @@ fn shared_vault_member_codecs_reject_invalid_order_fields_and_bounds() {
 }
 
 #[test]
+fn removal_response_rejects_missing_invalid_and_oversized_fields() {
+    let response = SyncRemoveVaultMemberResponse { account_id: account(3), rotation_pending: true };
+    let encoded = response.to_cbor().expect("valid removal response");
+    let Value::Map(fields) = cbor::decode(&encoded).expect("response map") else {
+        panic!("removal response must be a map");
+    };
+    for missing in ["account_id", "rotation_pending"] {
+        let incomplete =
+            fields.iter().filter(|(key, _)| *key != Value::Text(missing.into())).cloned().collect();
+        assert!(
+            SyncRemoveVaultMemberResponse::from_cbor(
+                &cbor::encode(&Value::Map(incomplete)).expect("incomplete map")
+            )
+            .is_err(),
+            "missing {missing}"
+        );
+    }
+    let false_marker = fields
+        .iter()
+        .map(|(key, value)| {
+            if *key == Value::Text("rotation_pending".into()) {
+                (key.clone(), Value::Bool(false))
+            } else {
+                (key.clone(), value.clone())
+            }
+        })
+        .collect();
+    assert!(
+        SyncRemoveVaultMemberResponse::from_cbor(
+            &cbor::encode(&Value::Map(false_marker)).expect("false marker map")
+        )
+        .is_err(),
+        "false pending marker"
+    );
+    let wrong_account = fields
+        .iter()
+        .map(|(key, value)| {
+            if *key == Value::Text("account_id".into()) {
+                (key.clone(), Value::Bytes(Uuid::nil().into_bytes().to_vec()))
+            } else {
+                (key.clone(), value.clone())
+            }
+        })
+        .collect();
+    assert!(
+        SyncRemoveVaultMemberResponse::from_cbor(
+            &cbor::encode(&Value::Map(wrong_account)).expect("wrong account map")
+        )
+        .is_err(),
+        "invalid account"
+    );
+    assert!(
+        SyncRemoveVaultMemberResponse::from_cbor(&vec![0; MAX_SYNC_VAULT_MEMBER_BODY_BYTES + 1])
+            .is_err(),
+        "oversized response"
+    );
+}
+
+#[test]
 fn published_shared_vault_member_vectors_match_public_codecs() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../vectors/sync-vault-members.json");
