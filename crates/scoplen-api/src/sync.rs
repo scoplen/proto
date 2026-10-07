@@ -26,6 +26,10 @@ pub const MAX_SYNC_KEY_BODY_BYTES: usize = 4 * 1024 * 1024;
 pub const SYNC_KEY_SIGNATURE_BYTES: usize = 64;
 /// Domain separator covered by an account-key update signature.
 pub const SYNC_KEYS_SIGNATURE_DOMAIN: &[u8] = b"spl-sync-keys-v1";
+/// Maximum size of the opaque wrapped shared-vault key in the creation request.
+pub const MAX_SYNC_VAULT_KEY_BYTES: usize = 64 * 1024;
+/// Maximum encoded size of a shared-vault creation request.
+pub const MAX_SYNC_VAULT_CREATE_BODY_BYTES: usize = MAX_SYNC_VAULT_KEY_BYTES + 256;
 
 /// Errors at the K-4 sync wire boundary.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -224,6 +228,121 @@ impl SessionVault {
         };
         vault.validate()?;
         Ok(vault)
+    }
+}
+
+/// Request body for `POST /sync/v1/vaults`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncCreateVaultRequest {
+    /// Client-chosen shared-vault identifier.
+    pub vault_id: Uuid,
+    /// Opaque account-bound wrap of the epoch-1 vault key.
+    pub wrapped_vault_key: Vec<u8>,
+}
+
+impl SyncCreateVaultRequest {
+    /// Validate the UUID and bounded opaque key wrap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-UUIDv7 identifier, an empty wrap, or an oversized wrap.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.vault_id, "vault id")?;
+        if self.wrapped_vault_key.is_empty() {
+            return Err(invalid("wrapped_vault_key must not be empty"));
+        }
+        if self.wrapped_vault_key.len() > MAX_SYNC_VAULT_KEY_BYTES {
+            return Err(invalid(format!(
+                "wrapped_vault_key exceeds {MAX_SYNC_VAULT_KEY_BYTES} bytes"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Encode the exact request map as deterministic CBOR.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when validation fails or the encoded body exceeds its bound.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![
+            ("vault_id", Value::Bytes(self.vault_id.as_bytes().to_vec())),
+            ("wrapped_vault_key", Value::Bytes(self.wrapped_vault_key.clone())),
+        ])?;
+        enforce_vault_create_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a strict deterministic request map. Unknown request fields are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed CBOR, unknown fields, or invalid values.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_vault_create_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let request = Self {
+            vault_id: take_uuid(&mut fields, "vault_id")?,
+            wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
+        };
+        if !fields.is_empty() {
+            return Err(invalid("unknown shared-vault creation field"));
+        }
+        request.validate()?;
+        Ok(request)
+    }
+}
+
+/// Successful response from `POST /sync/v1/vaults`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncCreateVaultResponse {
+    /// The newly-created shared vault at epoch 1.
+    pub vault: SessionVault,
+}
+
+impl SyncCreateVaultResponse {
+    /// Validate the initial shared-vault descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the descriptor is not the required epoch-1 shared-vault state.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.vault.validate()?;
+        if !matches!(self.vault.kind, VaultKind::Shared)
+            || self.vault.seq != 0
+            || self.vault.key_epoch != 1
+            || self.vault.rotation_pending
+        {
+            return Err(invalid("shared-vault creation response has invalid initial state"));
+        }
+        Ok(())
+    }
+
+    /// Encode the response as `{vault}` with deterministic nested descriptor fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the descriptor is invalid or CBOR encoding fails.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        encode_map(vec![("vault", self.vault.clone().into_value())])
+    }
+
+    /// Decode the response, ignoring additive extension fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed CBOR, a missing descriptor, or an invalid initial state.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        let mut fields = decode_map(input)?;
+        let response = Self {
+            vault: SessionVault::from_value(
+                fields.remove("vault").ok_or_else(|| invalid("missing vault"))?,
+            )?,
+        };
+        response.validate()?;
+        Ok(response)
     }
 }
 
@@ -1508,6 +1627,15 @@ fn enforce_key_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
     Ok(())
 }
 
+fn enforce_vault_create_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
+    if input.len() > MAX_SYNC_VAULT_CREATE_BODY_BYTES {
+        return Err(invalid(format!(
+            "shared-vault creation body exceeds {MAX_SYNC_VAULT_CREATE_BODY_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
 fn take_key_artifact(
     fields: &mut BTreeMap<String, Value>,
     key: &str,
@@ -1519,6 +1647,13 @@ fn take_key_artifact(
     };
     validate_key_artifact(&value, key)?;
     Ok(value)
+}
+
+fn take_bytes(fields: &mut BTreeMap<String, Value>, key: &str) -> Result<Vec<u8>, SyncCodecError> {
+    match fields.remove(key) {
+        Some(Value::Bytes(value)) => Ok(value),
+        _ => Err(invalid(format!("{key} must be a byte string"))),
+    }
 }
 
 fn take_exact_bytes(

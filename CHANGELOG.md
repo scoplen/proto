@@ -4,6 +4,9 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Added the K-4 shared-vault creation request and response codecs with bounded opaque key wraps,
+  strict UUIDv7 and initial-state validation, published deterministic vectors, and failure-path
+  coverage. The authenticated storage and HTTP route remain owned by `scoplen-server`.
 - Added reproducible Prost-generated Rust bindings and a published `FileDescriptorSet` for the
   internal gateway and host-agent protobuf contracts, plus deterministic TypeScript message,
   enum, oneof, and service metadata bindings at `@scoplen/api/proto`; drift checks and generated
