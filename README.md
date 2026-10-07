@@ -69,8 +69,8 @@ interoperability until those workstreams are implemented and tested.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, acknowledgement, snapshot, version-history, content-free notification, account
-key-bundle, shared-vault creation, key retrieval, epoch-publication, and member-addition codecs in JSON and
-deterministic CBOR. K-6 now includes the bounded gateway client-hello
+key-bundle, shared-vault creation, key retrieval, epoch-publication, member-addition, and epoch-retirement response
+codecs in JSON and deterministic CBOR. K-6 now includes the bounded gateway client-hello
 frame (`ticket` and `dpop_proof`) with a published vector and failure-path coverage. OpenAPI
 resources now have an authored OpenAPI 3.1 document at `crates/scoplen-api/openapi/v1.yaml`,
 generated Rust envelope/query types, and the local `@scoplen/api` TypeScript package surface.
