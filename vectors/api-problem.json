@@ -7,6 +7,18 @@
       "kind": "api.problem.cbor",
       "input": "{\"type\":\"about:blank\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"Retry.\",\"instance\":\"r1\",\"code\":\"sync.conflict\",\"changed\":false,\"retryable\":true}",
       "expected": "a864636f64656d73796e632e636f6e666c69637464747970656b61626f75743a626c616e6b657469746c6568436f6e666c6963746664657461696c6652657472792e66737461747573190199676368616e676564f468696e7374616e636562723169726574727961626c65f5"
+    },
+    {
+      "id": "api-problem-sync-quota-exceeded-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Sync quota exceeded\",\"status\":413,\"detail\":\"Reduce usage before retrying.\",\"instance\":\"quota-1\",\"code\":\"sync.quota_exceeded\",\"changed\":false,\"retryable\":false}",
+      "expected": "a864636f64657373796e632e71756f74615f657863656564656464747970656b61626f75743a626c616e6b657469746c657353796e632071756f74612065786365656465646664657461696c781d526564756365207573616765206265666f7265207265747279696e672e6673746174757319019d676368616e676564f468696e7374616e63656771756f74612d3169726574727961626c65f4"
+    },
+    {
+      "id": "api-problem-sync-rate-limited-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Sync write rate exceeded\",\"status\":429,\"detail\":\"Retry after one second.\",\"instance\":\"rate-1\",\"code\":\"sync.rate_limited\",\"changed\":false,\"retryable\":true}",
+      "expected": "a864636f64657173796e632e726174655f6c696d6974656464747970656b61626f75743a626c616e6b657469746c65781853796e6320777269746520726174652065786365656465646664657461696c775265747279206166746572206f6e65207365636f6e642e667374617475731901ad676368616e676564f468696e7374616e636566726174652d3169726574727961626c65f5"
     }
   ]
 }

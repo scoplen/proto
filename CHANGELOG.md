@@ -4,6 +4,8 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Registered K-4 `sync.quota_exceeded` and `sync.rate_limited` problem codes with deterministic
+  CBOR vectors for cardinality and per-device write-rate failures (D-64).
 - Added bounded K-4 shared-vault member-addition request and response codecs with exact epoch-wrap
   coverage, strict UUIDv7/order/count/body validation, deterministic vectors, and failure-path
   tests.

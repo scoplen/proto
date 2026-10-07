@@ -82,9 +82,10 @@ fixed ciphertexts. The test suite separately exercises sealing and tamper reject
 database wrapper vector uses 8 MiB and one pass to keep CI practical; production defaults remain
 256 MiB, three passes, and four lanes.
 
-`api-problem.json` contains an `api.problem.cbor` vector. Its `input` is the JSON form of an RFC
-9457 problem with all eight required Scoplen fields; `expected` is the deterministic CBOR body in
-lowercase hexadecimal. The `scoplen-api` tests exercise the public JSON and CBOR contract, including
+`api-problem.json` contains `api.problem.cbor` vectors, including quota and rate failures. Each
+`input` is the JSON form of an RFC 9457 problem with all eight required Scoplen fields; `expected`
+is the deterministic CBOR body in lowercase hexadecimal. The `scoplen-api` tests exercise the
+public JSON and CBOR contract, including
 unknown error-code preservation and malformed-body rejection.
 
 `api-auth.json` contains the K-3 JSON vectors. Challenge responses use a 32-byte lowercase
