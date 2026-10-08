@@ -80,7 +80,9 @@ interoperability still requires a Windows Pageant installation and remains outsi
 matrix. `SftpChannel`
 now composes the bounded v3 handshake and packet framing over an accepted SSH `session` channel
 with bounded subsystem failure and truncation mapping; `SftpSession` adds bounded pipelining and
-request correlation, resume-by-offset uploads/downloads, and progress callbacks on that channel.
+request correlation, negotiates `limits@openssh.com`, caps transfer chunks to the peer's read and
+write limits, and supports resume-by-offset uploads/downloads with progress callbacks on that
+channel.
 The concrete adapter also forwards bounded environment and signal requests and accepts
 server-opened `auth-agent@openssh.com` channels. `ForwardedChannel::serve_agent` reassembles
 russh channel fragments, applies the fail-closed forwarding policy, and returns bounded agent

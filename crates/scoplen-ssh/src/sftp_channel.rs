@@ -71,6 +71,7 @@ pub struct SftpChannel {
 pub struct SftpSession {
     channel: SftpChannel,
     client: SftpClient,
+    limits: Option<SftpLimits>,
 }
 
 impl SftpSession {
@@ -90,7 +91,9 @@ impl SftpSession {
             version: 3,
             extensions: channel.extensions.clone(),
         })?;
-        Ok(Self { channel, client })
+        let mut session = Self { channel, client, limits: None };
+        session.limits = session.request_limits().await?;
+        Ok(session)
     }
 
     /// Return the bounded extensions advertised by the server.
@@ -111,6 +114,13 @@ impl SftpSession {
         self.client.pending_requests()
     }
 
+    /// Return the transfer limits negotiated during [`Self::open`], when the server advertised
+    /// `limits@openssh.com`.
+    #[must_use]
+    pub fn limits(&self) -> Option<SftpLimits> {
+        self.limits
+    }
+
     /// Request the server's bounded transfer limits when it advertised the OpenSSH extension.
     ///
     /// A server that does not advertise `limits@openssh.com` returns `Ok(None)` without sending
@@ -123,12 +133,15 @@ impl SftpSession {
     /// references an unknown request, or the peer returns a malformed limits body.
     pub async fn request_limits(&mut self) -> Result<Option<SftpLimits>, SftpChannelError> {
         if !self.extensions().iter().any(|extension| extension.name == LIMITS_EXTENSION) {
+            self.limits = None;
             return Ok(None);
         }
         let request = self.client.request_limits()?;
         self.send_request(&request).await?;
         let response = self.read_response().await?;
-        Ok(Some(response.limits_response()?))
+        let limits = response.limits_response()?;
+        self.limits = Some(limits);
+        Ok(Some(limits))
     }
 
     /// Send a request previously built by [`Self::client_mut`].
@@ -191,6 +204,7 @@ impl SftpSession {
         if total.is_some_and(|end| end < start_offset) {
             return Err(SftpError::InvalidValue("transfer range").into());
         }
+        let chunk_size = effective_chunk_size(chunk_size, self.limits, true)?;
         validate_transfer(handle, chunk_size, pipeline, self.pending_requests())?;
         let result = self
             .download_to_inner(handle, start_offset, total, chunk_size, pipeline, sink, progress)
@@ -308,6 +322,7 @@ impl SftpSession {
         start_offset
             .checked_add(data.len() as u64)
             .ok_or(SftpError::InvalidValue("transfer length"))?;
+        let chunk_size = effective_chunk_size(chunk_size, self.limits, false)?;
         validate_transfer(handle, chunk_size, pipeline, self.pending_requests())?;
         let result =
             self.upload_inner(handle, start_offset, data, chunk_size, pipeline, progress).await;
@@ -383,6 +398,23 @@ impl SftpSession {
         }
         Ok(transferred)
     }
+}
+
+fn effective_chunk_size(
+    requested: u32,
+    limits: Option<SftpLimits>,
+    read: bool,
+) -> Result<u32, SftpChannelError> {
+    let server_limit = limits.map_or(
+        u64::try_from(MAX_SFTP_PACKET - 64).expect("SFTP packet bound fits u64"),
+        |limits| {
+            if read { limits.max_read_length } else { limits.max_write_length }
+        },
+    );
+    let bounded = u64::from(requested)
+        .min(server_limit)
+        .min(u64::try_from(MAX_SFTP_PACKET - 64).expect("SFTP packet bound fits u64"));
+    u32::try_from(bounded).map_err(|_| SftpError::InvalidValue("transfer chunk size").into())
 }
 
 fn validate_transfer(
@@ -512,6 +544,22 @@ mod tests {
         buffer: Vec<u8>,
         file: Vec<u8>,
         advertise_limits: bool,
+    }
+
+    #[test]
+    fn transfer_chunks_respect_negotiated_read_and_write_limits() {
+        let limits = Some(SftpLimits {
+            max_packet_length: 256 * 1024,
+            max_read_length: 128,
+            max_write_length: 64,
+            max_open_handles: 8,
+        });
+        assert_eq!(effective_chunk_size(4096, limits, true).unwrap(), 128);
+        assert_eq!(effective_chunk_size(4096, limits, false).unwrap(), 64);
+        assert_eq!(
+            effective_chunk_size(u32::try_from(MAX_SFTP_PACKET).unwrap(), None, true).unwrap(),
+            u32::try_from(MAX_SFTP_PACKET - 64).unwrap()
+        );
     }
 
     impl russh::server::Handler for SftpServer {
@@ -669,6 +717,7 @@ mod tests {
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
         assert_eq!(session.extensions().len(), 1);
+        assert!(session.limits().is_some());
         assert_eq!(
             session.request_limits().await.expect("request limits"),
             Some(SftpLimits {
