@@ -4,6 +4,11 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Added concrete `russh` integration for server-opened `auth-agent@openssh.com` channels. The
+  `ForwardedChannelKind::Agent` wrapper and `ForwardedChannel::serve_agent` reassemble fragmented
+  channel data, apply the fail-closed per-signature forwarding policy, and return bounded agent
+  responses. An in-process russh round trip covers the lifecycle; external OpenSSH/Pageant
+  interoperability and broader channel scheduling remain unverified.
 - Added `GatewayTransport`, which validates and writes exactly one bounded K-6 client-hello frame
   over an established byte transport before exposing it to the SSH engine. Partial writes, invalid
   hello values, zero-length writes, and transport delegation are covered; TLS/ALPN negotiation and

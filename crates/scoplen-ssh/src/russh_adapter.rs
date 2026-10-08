@@ -31,11 +31,12 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
 use zeroize::Zeroize;
 
 use crate::{
-    CertificateValidationPolicy, ExtendedDataType, HostKeyVerificationError, HostKeyVerifier,
-    HttpConnectTransport, MAX_CHANNEL_ADDRESS, MAX_CHANNEL_TEXT, ProxyCredentials,
-    ProxyTransportError, PtyRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
-    Signal, SignatureAlgorithm, Signer, SignerError, Socks5Transport, WindowChangeRequest,
-    verify_host_key,
+    AgentError, AgentForwardingAdapter, AgentForwardingAuthorizer, AgentForwardingPolicy,
+    AgentKeyStore, AgentServer, CertificateValidationPolicy, ExtendedDataType,
+    HostKeyVerificationError, HostKeyVerifier, HttpConnectTransport, MAX_CHANNEL_ADDRESS,
+    MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest, PublicKeyAuthContext,
+    PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm, Signer, SignerError,
+    Socks5Transport, WindowChangeRequest, verify_host_key,
 };
 
 const MAX_CLIENT_HOST: usize = 4096;
@@ -305,6 +306,9 @@ pub enum ClientError {
     /// A channel operation could not be delivered or completed.
     #[error("SSH channel operation failed")]
     Channel,
+    /// A forwarded SSH agent request or lifecycle event failed the bounded agent boundary.
+    #[error("SSH forwarded agent channel failed: {0}")]
+    Agent(#[from] AgentError),
     /// The configured number of simultaneous channels is already open.
     #[error("SSH channel limit of {max} has been reached")]
     ChannelLimitReached { max: usize },
@@ -698,6 +702,8 @@ pub enum ForwardedChannelKind {
         /// Socket path that accepted the forwarded connection.
         socket_path: String,
     },
+    /// An OpenSSH `auth-agent@openssh.com` channel opened by the server.
+    Agent,
 }
 
 /// A bounded server-opened channel delivered for a remote forwarding listener.
@@ -741,6 +747,47 @@ impl ForwardedChannel {
     #[must_use]
     pub fn into_channel(self) -> ClientChannel {
         self.channel
+    }
+
+    /// Serve one server-opened `auth-agent@openssh.com` channel.
+    ///
+    /// The shared bounded adapter remains the sole request parser and applies the supplied
+    /// fail-closed forwarding policy to every signature. Channel data is reassembled across russh
+    /// fragments, bounded responses are written back to the same channel, and EOF or close is
+    /// mapped to clean versus truncated agent-stream outcomes.
+    pub async fn serve_agent<S, A>(
+        mut self,
+        server: AgentServer<S>,
+        policy: AgentForwardingPolicy<A>,
+    ) -> Result<(), ClientError>
+    where
+        S: AgentKeyStore,
+        A: AgentForwardingAuthorizer,
+    {
+        if !matches!(self.kind, ForwardedChannelKind::Agent) {
+            return Err(ClientError::InvalidInput("channel is not an auth-agent channel"));
+        }
+        let response_channel = self.channel.id();
+        let mut adapter = AgentForwardingAdapter::new(server, policy, response_channel);
+        loop {
+            match self.channel.next_event().await? {
+                Some(ChannelEvent::Data(data)) => {
+                    for response in adapter.push(&data)? {
+                        self.channel.send_data(&response.data).await?;
+                    }
+                }
+                Some(ChannelEvent::Eof) => {
+                    adapter.finish()?;
+                    self.channel.close().await?;
+                    return Ok(());
+                }
+                Some(ChannelEvent::Close) | None => {
+                    adapter.finish()?;
+                    return Ok(());
+                }
+                Some(_) => return Err(ClientError::UnexpectedChannelEvent),
+            }
+        }
     }
 }
 
@@ -1274,6 +1321,14 @@ impl ClientHandler {
     ) {
         self.queue_forwarded_streamlocal(channel, socket_path, reply).await;
     }
+
+    async fn forwarded_agent_callback(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        reply: russh::client::ChannelOpenHandle,
+    ) {
+        self.deliver_forwarded_channel(channel, ForwardedChannelKind::Agent, reply).await;
+    }
 }
 
 impl Handler for ClientHandler {
@@ -1330,6 +1385,16 @@ impl Handler for ClientHandler {
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
         self.forwarded_streamlocal_callback(channel, socket_path, reply).await;
+        Ok(())
+    }
+
+    async fn server_channel_open_agent_forward(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        self.forwarded_agent_callback(channel, reply).await;
         Ok(())
     }
 }
@@ -1447,8 +1512,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        Ed25519SshSigner, HostKey, P256SshSigner, ProxyError, ProxyOperation, ProxyProtocol,
-        ProxyTransportError, RsaSshSigner,
+        AgentError, AgentForwardingAuthorizer, AgentForwardingPolicy, AgentKeyStore, AgentMessage,
+        AgentServer, Ed25519SshSigner, HostKey, P256SshSigner, ProxyError, ProxyOperation,
+        ProxyProtocol, ProxyTransportError, RsaSshSigner,
     };
 
     #[derive(Clone)]
@@ -1594,6 +1660,92 @@ mod tests {
                 session.channel_failure(channel)?;
             }
             Ok(self.allow)
+        }
+    }
+
+    #[derive(Clone)]
+    struct ForwardedAgentServer {
+        responses: mpsc::Sender<Vec<u8>>,
+    }
+
+    impl russh::server::Handler for ForwardedAgentServer {
+        type Error = russh::Error;
+
+        async fn auth_password(
+            &mut self,
+            _user: &str,
+            _password: &str,
+        ) -> Result<russh::server::Auth, Self::Error> {
+            Ok(russh::server::Auth::Accept)
+        }
+
+        async fn channel_open_session(
+            &mut self,
+            _channel: russh::Channel<russh::server::Msg>,
+            reply: russh::server::ChannelOpenHandle,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            reply.accept().await;
+            Ok(())
+        }
+
+        async fn agent_request(
+            &mut self,
+            channel: russh::ChannelId,
+            session: &mut russh::server::Session,
+        ) -> Result<bool, Self::Error> {
+            session.channel_success(channel)?;
+            let handle = session.handle();
+            let responses = self.responses.clone();
+            tokio::spawn(async move {
+                let Ok(mut agent) = handle.channel_open_agent().await else {
+                    return;
+                };
+                let Ok(request) = AgentMessage::RequestIdentities.encode_frame() else {
+                    return;
+                };
+                if agent.data_bytes(request).await.is_err() {
+                    return;
+                }
+                while let Some(message) = agent.wait().await {
+                    match message {
+                        russh::ChannelMsg::Data { data } => {
+                            let _ = responses.send(data.to_vec()).await;
+                            break;
+                        }
+                        russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
+                        _ => {}
+                    }
+                }
+                let _ = agent.eof().await;
+            });
+            Ok(true)
+        }
+    }
+
+    #[derive(Clone)]
+    struct EmptyAgentStore;
+
+    impl AgentKeyStore for EmptyAgentStore {
+        fn identities(&self) -> Result<Vec<crate::AgentIdentity>, AgentError> {
+            Ok(Vec::new())
+        }
+
+        fn sign(&self, _key_blob: &[u8], _data: &[u8], _flags: u32) -> Result<Vec<u8>, AgentError> {
+            Err(AgentError::AgentFailure)
+        }
+    }
+
+    struct AllowAgent;
+
+    impl AgentForwardingAuthorizer for AllowAgent {
+        fn authorize_signature(
+            &self,
+            _key_blob: &[u8],
+            _data: &[u8],
+            _flags: u32,
+        ) -> Result<(), AgentError> {
+            Ok(())
         }
     }
 
@@ -2336,6 +2488,61 @@ mod tests {
     async fn agent_forward_request_surfaces_server_success_and_failure() {
         assert_eq!(agent_forward_request_case(true).await, ChannelEvent::Success);
         assert_eq!(agent_forward_request_case(false).await, ChannelEvent::Failure);
+    }
+
+    #[tokio::test]
+    async fn forwarded_agent_channel_uses_bounded_adapter_and_returns_response() {
+        let (responses, mut received) = mpsc::channel(1);
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let server_config = Arc::new(server_config);
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ = russh::server::run_stream(
+                server_config,
+                stream,
+                ForwardedAgentServer { responses },
+            )
+            .await;
+        });
+
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        connection.authenticate_password("user", b"password").await.expect("authenticate client");
+        let channel = connection.open_session().await.expect("open session");
+        channel.request_agent_forward(true).await.expect("request agent forwarding");
+
+        let forwarded = timeout(Duration::from_secs(5), connection.next_forwarded_channel())
+            .await
+            .expect("forwarded channel callback")
+            .expect("forwarded agent channel");
+        assert_eq!(forwarded.kind(), &ForwardedChannelKind::Agent);
+        forwarded
+            .serve_agent(
+                AgentServer::new(EmptyAgentStore),
+                AgentForwardingPolicy::enabled(AllowAgent),
+            )
+            .await
+            .expect("serve forwarded agent");
+
+        let response = timeout(Duration::from_secs(5), received.recv())
+            .await
+            .expect("agent response")
+            .expect("agent response frame");
+        assert_eq!(
+            AgentMessage::decode_frame(&response).expect("decode response"),
+            AgentMessage::IdentitiesAnswer { identities: Vec::new() }
+        );
+        connection.disconnect().await.expect("disconnect client");
     }
 
     #[tokio::test]

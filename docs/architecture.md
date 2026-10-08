@@ -61,8 +61,13 @@ handshakes on blocking workers, upgrade the resulting nonblocking sockets to the
 stream boundary, and preserve typed proxy rejection and timeout errors. `GatewayTransport` writes
 and flushes one validated K-6 client-hello frame over an established byte transport before handing
 the stream to the SSH engine, including partial-write and typed failure handling. TLS/ALPN
-negotiation and interoperability with other SSH engines remain open.
-The native Pageant backend remains open.
+negotiation and interoperability with other SSH engines remain open. The concrete adapter accepts
+server-opened `auth-agent@openssh.com` channels through `ForwardedChannelKind::Agent`; callers can
+serve them with `ForwardedChannel::serve_agent`, which reassembles channel fragments, applies the
+fail-closed signature authorizer, and bounds every response. An in-process russh round trip covers
+the open, data, response, and close lifecycle; external OpenSSH/Pageant interoperability and
+broader channel scheduling remain unverified.
+Native Pageant interoperability remains unverified because hosted CI has no Pageant installation.
 The agent server can consume
 multiple bounded frames from a blocking stream through clean peer close while applying the same
 malformed and oversized-frame checks.
