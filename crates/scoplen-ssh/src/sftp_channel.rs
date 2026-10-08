@@ -121,17 +121,21 @@ impl SftpSession {
         self.limits
     }
 
-    /// Request the server's bounded transfer limits when it advertised the OpenSSH extension.
+    /// Return the server's bounded transfer limits, requesting them once when advertised.
     ///
-    /// A server that does not advertise `limits@openssh.com` returns `Ok(None)` without sending
-    /// an extension request. An advertised extension must answer with one exact, bounded limits
-    /// body; malformed or unexpected responses are returned as protocol errors.
+    /// A previously negotiated value is returned from the session cache. A server that does not
+    /// advertise `limits@openssh.com` returns `Ok(None)` without sending an extension request. An
+    /// advertised extension must answer with one exact, bounded limits body; malformed or
+    /// unexpected responses are returned as protocol errors.
     ///
     /// # Errors
     ///
     /// Returns an error when the request cannot be queued, the channel I/O fails, the response
     /// references an unknown request, or the peer returns a malformed limits body.
     pub async fn request_limits(&mut self) -> Result<Option<SftpLimits>, SftpChannelError> {
+        if self.limits.is_some() {
+            return Ok(self.limits);
+        }
         if !self.extensions().iter().any(|extension| extension.name == LIMITS_EXTENSION) {
             self.limits = None;
             return Ok(None);
@@ -735,7 +739,7 @@ mod tests {
         session.send_request(&request).await.expect("write realpath");
         assert!(matches!(
             session.read_response().await.expect("read realpath"),
-            SftpPacket::Name { entries, .. } if entries[0].filename == b"/srv"
+            SftpPacket::Name { id: 2, entries } if entries[0].filename == b"/srv"
         ));
         connection.disconnect().await.expect("disconnect client");
     }
