@@ -3513,6 +3513,13 @@ mod tests {
     async fn publickey_authentication_completes_against_real_russh_server() {
         let signer =
             Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
+        assert_real_publickey_authentication(&signer).await;
+    }
+
+    async fn assert_real_publickey_authentication<S>(signer: &S)
+    where
+        S: Signer + Sync,
+    {
         let expected_key = signer.public_key_blob().expect("signer public key");
         let mut server_config = russh::server::Config::default();
         server_config.keys.push(
@@ -3536,7 +3543,7 @@ mod tests {
         let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("SSH config");
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection
-            .authenticate_publickey("alice", &signer)
+            .authenticate_publickey("alice", signer)
             .await
             .expect("public-key authentication");
         connection.disconnect().await.expect("disconnect client");
@@ -3544,6 +3551,21 @@ mod tests {
             .await
             .expect("SSH server task")
             .expect("SSH server");
+    }
+
+    #[tokio::test]
+    async fn publickey_authentication_completes_for_p256_and_rsa_sha2() {
+        let p256 = P256SshSigner::new(P256SigningKey::from_bytes(&[1; 32]).expect("P-256 key"));
+        assert_real_publickey_authentication(&p256).await;
+
+        let mut rng = ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng);
+        let rsa_key = PrivateKey::random(&mut rng, Algorithm::Rsa { hash: None }).expect("RSA key");
+        let rsa_sha256 = RsaSshSigner::new(rsa_key.clone(), SignatureAlgorithm::RsaSha2_256)
+            .expect("RSA SHA-256 signer");
+        assert_real_publickey_authentication(&rsa_sha256).await;
+        let rsa_sha512 = RsaSshSigner::new(rsa_key, SignatureAlgorithm::RsaSha2_512)
+            .expect("RSA SHA-512 signer");
+        assert_real_publickey_authentication(&rsa_sha512).await;
     }
 
     #[tokio::test]
