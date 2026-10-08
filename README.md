@@ -94,6 +94,10 @@ responses; an in-process russh round trip covers the concrete lifecycle. Externa
 Pageant interoperability, live gateway interoperability, and broader channel scheduling remain
 unverified. The agent-backed signer also completes the concrete public-key authentication flow
 against the in-process russh server; platform agent interoperability remains unverified.
+The `openssh_interop` example provides a disposable external-server smoke test when
+`SCOPLEN_OPENSSH_PASSWORD` and `SCOPLEN_OPENSSH_HOST_KEY` (the server's OpenSSH public-key line)
+and the optional host, port, and username variables are supplied; it verifies the pinned host key,
+password authentication, and a session command.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, acknowledgement, snapshot, version-history, content-free notification, account
