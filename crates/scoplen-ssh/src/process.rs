@@ -304,6 +304,17 @@ impl AsyncWrite for ProxyCommandStream {
     }
 }
 
+impl Drop for ProxyCommandStream {
+    fn drop(&mut self) {
+        // A blocking worker may still own a clone of `inner` after its JoinHandle is dropped.
+        // Close both pipes and terminate the child here so cancellation cannot leave a
+        // ProxyCommand process behind waiting on an unread or unwritten pipe.
+        self.inner.take_stdin();
+        self.inner.take_stdout();
+        let _ = self.inner.kill_child();
+    }
+}
+
 impl Transport for ProxyCommandTransport {
     fn read(&mut self, buffer: &mut [u8]) -> Result<usize, TransportError> {
         self.read_shared(buffer).map_err(|error| TransportError::Io {
