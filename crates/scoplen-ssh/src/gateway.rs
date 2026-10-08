@@ -81,6 +81,12 @@ impl<T: Transport> GatewayTransport<T> {
 fn write_all<T: Transport>(transport: &mut T, mut buffer: &[u8]) -> Result<(), TransportError> {
     while !buffer.is_empty() {
         let written = transport.write(buffer)?;
+        if written > buffer.len() {
+            return Err(TransportError::Io {
+                operation: TransportOperation::Write,
+                kind: io::ErrorKind::InvalidData,
+            });
+        }
         if written == 0 {
             return Err(TransportError::Io {
                 operation: TransportOperation::Write,
@@ -146,6 +152,7 @@ mod tests {
         max_write: usize,
         flushes: usize,
         zero_write: bool,
+        over_report: bool,
     }
 
     impl FakeTransport {
@@ -156,6 +163,7 @@ mod tests {
                 max_write,
                 flushes: 0,
                 zero_write: false,
+                over_report: false,
             }
         }
     }
@@ -171,6 +179,9 @@ mod tests {
         fn write(&mut self, buffer: &[u8]) -> Result<usize, TransportError> {
             if self.zero_write {
                 return Ok(0);
+            }
+            if self.over_report {
+                return Ok(buffer.len() + 1);
             }
             let count = buffer.len().min(self.max_write);
             self.written.extend_from_slice(&buffer[..count]);
@@ -230,6 +241,20 @@ mod tests {
             GatewayTransportError::Transport(TransportError::Io {
                 operation: TransportOperation::Write,
                 kind: ErrorKind::WriteZero,
+            })
+        );
+    }
+
+    #[test]
+    fn over_reporting_write_is_typed_without_panicking() {
+        let mut transport = FakeTransport::new(16);
+        transport.over_report = true;
+        let error = GatewayTransport::handshake(transport, &hello()).expect_err("write failure");
+        assert_eq!(
+            error,
+            GatewayTransportError::Transport(TransportError::Io {
+                operation: TransportOperation::Write,
+                kind: ErrorKind::InvalidData,
             })
         );
     }
