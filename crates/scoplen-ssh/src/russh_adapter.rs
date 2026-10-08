@@ -28,6 +28,7 @@ use scoplen_crypto::SecretVec;
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
+use tokio::time::timeout as async_timeout;
 use zeroize::Zeroize;
 
 use crate::{
@@ -319,6 +320,9 @@ pub enum ClientError {
     /// The gateway TLS or ALPN handshake failed.
     #[error("SSH gateway TLS connection failed: {0}")]
     GatewayTls(#[from] GatewayTlsConnectError),
+    /// The gateway TLS, K-6 prelude, or SSH handshake exceeded its timeout.
+    #[error("SSH gateway handshake timed out after {timeout:?}")]
+    GatewayHandshakeTimeout { timeout: Duration },
     /// A forwarded SSH agent request or lifecycle event failed the bounded agent boundary.
     #[error("SSH forwarded agent channel failed: {0}")]
     Agent(#[from] AgentError),
@@ -455,7 +459,9 @@ impl ClientConnection {
     ///
     /// The edge TCP connection uses the same bounded Happy Eyeballs and socket policy as direct
     /// SSH transport. The blocking resolver and connect work runs off the async runtime; TLS,
-    /// gateway framing, and SSH remain ordered on the returned stream.
+    /// gateway framing, and SSH remain ordered on the returned stream. The timeout applies to
+    /// the TCP dial and again to the combined TLS, prelude, and SSH handshake, so an accepted edge
+    /// that stops responding cannot leave the connection attempt pending indefinitely.
     pub async fn connect_via_gateway(
         config: ClientConfig,
         edge_host: &str,
@@ -476,8 +482,12 @@ impl ClientConnection {
         .map_err(ClientError::GatewayTcp)?;
         stream.set_nonblocking(true).map_err(ClientError::Transport)?;
         let stream = tokio::net::TcpStream::from_std(stream).map_err(ClientError::Transport)?;
-        let stream = tls.connect_and_handshake(stream, hello).await?;
-        Self::connect_stream(config, stream).await
+        async_timeout(timeout, async {
+            let stream = tls.connect_and_handshake(stream, hello).await?;
+            Self::connect_stream(config, stream).await
+        })
+        .await
+        .map_err(|_| ClientError::GatewayHandshakeTimeout { timeout })?
     }
 
     /// Connect through a SOCKS5 proxy and complete the SSH handshake over the resulting stream.

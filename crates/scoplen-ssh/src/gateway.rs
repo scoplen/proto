@@ -362,6 +362,7 @@ mod tests {
     use std::{io::ErrorKind, sync::Arc};
     use tokio::io::{AsyncReadExt, AsyncWriteExt, duplex};
     use tokio::net::{TcpListener, TcpStream};
+    use tokio::time::sleep;
     use tokio_rustls::TlsAcceptor;
 
     mod test_certs {
@@ -701,6 +702,30 @@ mod tests {
             result,
             Err(ClientError::Protocol | ClientError::ConnectionClosed | ClientError::Transport(_))
         ));
+        server.await.expect("server task");
+    }
+
+    #[tokio::test]
+    async fn client_connection_gateway_route_times_out_stalled_tls_handshake() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (_stream, _) = listener.accept().await.expect("accept");
+            sleep(std::time::Duration::from_millis(500)).await;
+        });
+        let verifier =
+            |_host: &str, _key: &HostKey| -> Result<(), HostKeyVerificationError> { Ok(()) };
+        let ssh = ClientConfig::new("localhost", 22, verifier).expect("SSH config");
+        let result = ClientConnection::connect_via_gateway(
+            ssh,
+            "127.0.0.1",
+            address.port(),
+            std::time::Duration::from_millis(50),
+            &client_config(),
+            &hello(),
+        )
+        .await;
+        assert!(matches!(result, Err(ClientError::GatewayHandshakeTimeout { .. })));
         server.await.expect("server task");
     }
 }

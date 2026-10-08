@@ -36,7 +36,8 @@ handling partial writes and typed failures before the SSH engine consumes the st
 checking, and the client hello before the SSH version exchange. `ClientConnection::connect_via_gateway`
 now composes bounded edge TCP dialing, TLS, the K-6 prelude, and the SSH handshake; the stream-level
 `AsyncGatewayTransport` and `connect_via_gateway_stream` remain available when a caller owns the TLS
-stream.
+stream. The direct route applies a bounded timeout to the gateway handshake and maps a stalled edge
+to a typed failure.
 Software Ed25519, P-256, and
 RSA/SHA-2 signers, FIDO2 security-key hooks, RFC 4252 `none`, password and keyboard-interactive
 codecs, certificate validation, and host-verification callbacks are available. The concrete client
