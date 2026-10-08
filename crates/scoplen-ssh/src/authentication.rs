@@ -8,11 +8,15 @@
 
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
-use std::{collections::BTreeSet, fmt, net::IpAddr};
+use std::{collections::BTreeSet, fmt, net::IpAddr, sync::Mutex};
 
 use scoplen_crypto::{Ed25519SigningKey, P256SigningKey, PrimitiveError, SecretVec};
 use ssh_key::{Certificate, HashAlg, PublicKey};
 use thiserror::Error;
+
+use crate::agent::{
+    AGENT_SIGN_FLAG_RSA_SHA2_256, AGENT_SIGN_FLAG_RSA_SHA2_512, AgentChannel, AgentClient,
+};
 
 const USERAUTH_REQUEST: u8 = 50;
 const USERAUTH_METHOD: &[u8] = b"publickey";
@@ -177,6 +181,67 @@ pub trait Signer {
     /// Sign the exact RFC 4252 session-bound payload and return the algorithm-specific signature
     /// blob. The outer `string(algorithm) || string(signature)` wrapper is added by this crate.
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignerError>;
+}
+
+/// A public-key signer backed by an external SSH agent.
+///
+/// The agent owns the private key and returns a complete SSH signature blob. This adapter keeps
+/// only the bounded public-key blob and unwraps the agent's algorithm wrapper after checking it
+/// matches the selected [`SignatureAlgorithm`].
+pub struct AgentSshSigner<C> {
+    algorithm: SignatureAlgorithm,
+    key_blob: Vec<u8>,
+    client: Mutex<AgentClient<C>>,
+}
+
+impl<C: AgentChannel + Send> AgentSshSigner<C> {
+    /// Construct an agent-backed signer for one exact public-key identity.
+    pub fn new(
+        client: AgentClient<C>,
+        algorithm: SignatureAlgorithm,
+        key_blob: impl Into<Vec<u8>>,
+    ) -> Result<Self, SignerError> {
+        let key_blob = key_blob.into();
+        PublicKeyIdentity::new(algorithm.name(), key_blob.clone())?;
+        Ok(Self { algorithm, key_blob, client: Mutex::new(client) })
+    }
+}
+
+impl<C: AgentChannel + Send + 'static> Signer for AgentSshSigner<C> {
+    fn algorithm(&self) -> SignatureAlgorithm {
+        self.algorithm
+    }
+
+    fn public_key_blob(&self) -> Result<Vec<u8>, SignerError> {
+        Ok(self.key_blob.clone())
+    }
+
+    fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignerError> {
+        let flags = match self.algorithm {
+            SignatureAlgorithm::RsaSha2_256 => AGENT_SIGN_FLAG_RSA_SHA2_256,
+            SignatureAlgorithm::RsaSha2_512 => AGENT_SIGN_FLAG_RSA_SHA2_512,
+            SignatureAlgorithm::Ed25519 | SignatureAlgorithm::EcdsaSha2Nistp256 => 0,
+        };
+        let signature = self
+            .client
+            .lock()
+            .map_err(|_| SignerError::Signing("SSH agent signer lock poisoned".to_owned()))?
+            .sign(&self.key_blob, message, flags)
+            .map_err(|error| SignerError::Signing(error.to_string()))?;
+        let (algorithm, rest) = read_string(&signature)
+            .ok_or(SignerError::InvalidInput("agent returned malformed signature"))?;
+        if algorithm != self.algorithm.name().as_bytes() {
+            return Err(SignerError::InvalidInput(
+                "agent returned a mismatched signature algorithm",
+            ));
+        }
+        let (signature, trailing) = read_string(rest)
+            .ok_or(SignerError::InvalidInput("agent returned malformed signature"))?;
+        if !trailing.is_empty() || signature.is_empty() || signature.len() > MAX_SIGNATURE {
+            return Err(SignerError::InvalidInput("agent returned an invalid signature"));
+        }
+        Ok(signature.to_vec())
+    }
 }
 
 /// A validated SSH public-key identity used in an authentication request.
@@ -1433,7 +1498,10 @@ fn encode_mpint(value: &[u8]) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
+    use crate::agent::AgentMessage;
     use scoplen_crypto::{ed25519_verify, p256_verify};
     use ssh_key::{
         Algorithm, HashAlg, PrivateKey, PublicKey, certificate, getrandom::SysRng,
@@ -1451,6 +1519,97 @@ mod tests {
         let (blob, trailing) = read_string(rest).expect("signature blob");
         assert!(trailing.is_empty());
         (algorithm, blob)
+    }
+
+    struct FakeAgent {
+        signature: Vec<u8>,
+        flags: Option<u32>,
+        key_blob: Vec<u8>,
+        data: Vec<u8>,
+    }
+
+    struct SharedFakeAgent(std::sync::Arc<std::sync::Mutex<FakeAgent>>);
+
+    impl AgentChannel for SharedFakeAgent {
+        fn exchange(&mut self, request: &[u8]) -> Result<Vec<u8>, crate::AgentError> {
+            self.0.lock().expect("fake agent lock").exchange(request)
+        }
+    }
+
+    impl AgentChannel for FakeAgent {
+        fn exchange(&mut self, request: &[u8]) -> Result<Vec<u8>, crate::AgentError> {
+            let AgentMessage::SignRequest { key_blob, data, flags } =
+                AgentMessage::decode_frame(request)?
+            else {
+                return Err(crate::AgentError::UnexpectedResponse);
+            };
+            self.key_blob = key_blob;
+            self.data = data;
+            self.flags = Some(flags);
+            AgentMessage::SignResponse { signature: self.signature.clone() }
+                .encode_frame()
+                .map_err(|_| crate::AgentError::MalformedFrame("fake signature"))
+        }
+    }
+
+    fn ssh_signature(algorithm: &[u8], signature: &[u8]) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        write_string(&mut encoded, algorithm).expect("signature algorithm");
+        write_string(&mut encoded, signature).expect("signature bytes");
+        encoded
+    }
+
+    #[test]
+    fn agent_signer_unwraps_and_binds_agent_signature() {
+        let software =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
+        let key_blob = software.public_key_blob().expect("key blob");
+        let agent = FakeAgent {
+            signature: ssh_signature(b"ssh-ed25519", &[7; 64]),
+            flags: None,
+            key_blob: Vec::new(),
+            data: Vec::new(),
+        };
+        let state = std::sync::Arc::new(std::sync::Mutex::new(agent));
+        let signer = AgentSshSigner::new(
+            AgentClient::new(SharedFakeAgent(Arc::clone(&state))),
+            SignatureAlgorithm::Ed25519,
+            key_blob.clone(),
+        )
+        .expect("agent signer");
+        let message = b"session-bound payload";
+        assert_eq!(signer.sign(message).expect("agent signature"), vec![7; 64]);
+        let state = state.lock().expect("fake agent lock");
+        assert_eq!(state.key_blob, key_blob);
+        assert_eq!(state.data, message);
+        assert_eq!(state.flags, Some(0));
+    }
+
+    #[test]
+    fn agent_signer_sets_rsa_sha2_flags_and_rejects_mismatched_wrapper() {
+        let mut rng = UnwrapErr(SysRng);
+        let key = PrivateKey::random(&mut rng, Algorithm::Rsa { hash: None }).expect("RSA key");
+        let key_blob = key.public_key().to_bytes().expect("RSA key blob");
+        let state = std::sync::Arc::new(std::sync::Mutex::new(FakeAgent {
+            signature: ssh_signature(b"rsa-sha2-512", &[8; 64]),
+            flags: None,
+            key_blob: Vec::new(),
+            data: Vec::new(),
+        }));
+        let signer = AgentSshSigner::new(
+            AgentClient::new(SharedFakeAgent(Arc::clone(&state))),
+            SignatureAlgorithm::RsaSha2_256,
+            key_blob,
+        )
+        .expect("agent signer");
+        assert_eq!(
+            signer.sign(&[1]),
+            Err(SignerError::InvalidInput("agent returned a mismatched signature algorithm"))
+        );
+        assert_eq!(
+            state.lock().expect("fake agent lock").flags,
+            Some(AGENT_SIGN_FLAG_RSA_SHA2_256)
+        );
     }
 
     fn mpint_to_fixed(value: &[u8], width: usize) -> Vec<u8> {

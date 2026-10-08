@@ -49,7 +49,8 @@ keyboard-interactive challenge rounds with prompt and response validation before
 to the SSH engine. It also authenticates with validated OpenSSH user certificates through the
 shared signer boundary, checking the requested principal and subject key before dispatch. Agent support
 includes bounded Unix-socket and Windows named-pipe streams, Pageant named-pipe compatibility,
-identity and signing requests, add/remove/lock/smart-card management, opaque extensions, and
+identity and signing requests, an `AgentSshSigner` that binds agent signatures to the concrete
+public-key authentication session, add/remove/lock/smart-card management, opaque extensions, and
 fail-closed forwarding policy.
 Bounded RFC 4254 channel codecs cover session and forwarding requests. The engine-independent
 `AuthAgentChannel` composes the `auth-agent@openssh.com` channel lifecycle with bounded agent

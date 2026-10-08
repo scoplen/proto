@@ -50,13 +50,13 @@ pub use agent::{
     connect_windows_agent,
 };
 pub use authentication::{
-    AuthMethodError, CertificateKind, CertificateValidationError, CertificateValidationPolicy,
-    Ed25519SshSigner, HostKey, HostKeyVerificationError, HostKeyVerifier,
-    KeyboardInteractiveInfoRequest, KeyboardInteractivePrompt, KeyboardInteractiveRequest,
-    KeyboardInteractiveResponse, NoneAuthRequest, P256SshSigner, PasswordAuthRequest,
-    PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity, RsaSshSigner,
-    SignatureAlgorithm, Signer, SignerError, SshCertificate, UserAuthContext, UserCertificate,
-    verify_host_key,
+    AgentSshSigner, AuthMethodError, CertificateKind, CertificateValidationError,
+    CertificateValidationPolicy, Ed25519SshSigner, HostKey, HostKeyVerificationError,
+    HostKeyVerifier, KeyboardInteractiveInfoRequest, KeyboardInteractivePrompt,
+    KeyboardInteractiveRequest, KeyboardInteractiveResponse, NoneAuthRequest, P256SshSigner,
+    PasswordAuthRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
+    RsaSshSigner, SignatureAlgorithm, Signer, SignerError, SshCertificate, UserAuthContext,
+    UserCertificate, verify_host_key,
 };
 pub use channels::{
     ChannelClose, ChannelCodecError, ChannelData, ChannelEof, ChannelExtendedData, ChannelFailure,
