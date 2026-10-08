@@ -52,3 +52,10 @@ path = "fuzz_targets/sftp_decoder.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "ssh_protocol"
+path = "fuzz_targets/ssh_protocol.rs"
+test = false
+doc = false
+bench = false

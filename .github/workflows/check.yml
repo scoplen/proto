@@ -35,6 +35,7 @@ jobs:
           cargo +nightly fuzz build crypto_decoders
           cargo +nightly fuzz build agent_decoder
           cargo +nightly fuzz build sftp_decoder
+          cargo +nightly fuzz build ssh_protocol
 
   dependency-audit:
     name: Dependency policy
