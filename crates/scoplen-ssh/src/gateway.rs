@@ -354,6 +354,7 @@ impl<T: Transport> io::Write for GatewayTransport<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{ClientConfig, ClientConnection, ClientError, HostKey, HostKeyVerificationError};
     use rustls::{
         RootCertStore, ServerConfig, ServerConnection,
         pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
@@ -660,5 +661,46 @@ mod tests {
             config.connect_and_handshake(stream, &hello()).await.expect_err("name mismatch");
         assert!(matches!(error, GatewayTlsConnectError::Tls(_)));
         let _ = server.await.expect("server task");
+    }
+
+    #[tokio::test]
+    async fn client_connection_gateway_route_orders_tcp_tls_prelude_and_ssh() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept");
+            let acceptor = TlsAcceptor::from(server_config());
+            let mut tls = acceptor.accept(stream).await.expect("TLS");
+            let (_, connection): (&TcpStream, &ServerConnection) = tls.get_ref();
+            assert_eq!(connection.alpn_protocol(), Some(GATEWAY_ALPN));
+            let mut prefix = [0; 4];
+            tls.read_exact(&mut prefix).await.expect("prefix");
+            let length = u32::from_be_bytes(prefix) as usize;
+            let mut body = vec![0; length];
+            tls.read_exact(&mut body).await.expect("body");
+            let mut frame = prefix.to_vec();
+            frame.extend_from_slice(&body);
+            assert_eq!(GatewayClientHello::from_frame(&frame).expect("hello"), hello());
+            tls.write_all(b"not-ssh\r\n").await.expect("banner");
+            tls.flush().await.expect("flush");
+        });
+
+        let verifier =
+            |_host: &str, _key: &HostKey| -> Result<(), HostKeyVerificationError> { Ok(()) };
+        let ssh = ClientConfig::new("localhost", 22, verifier).expect("SSH config");
+        let result = ClientConnection::connect_via_gateway(
+            ssh,
+            "127.0.0.1",
+            address.port(),
+            std::time::Duration::from_secs(2),
+            &client_config(),
+            &hello(),
+        )
+        .await;
+        assert!(matches!(
+            result,
+            Err(ClientError::Protocol | ClientError::ConnectionClosed | ClientError::Transport(_))
+        ));
+        server.await.expect("server task");
     }
 }

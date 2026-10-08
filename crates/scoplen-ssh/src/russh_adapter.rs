@@ -33,11 +33,11 @@ use zeroize::Zeroize;
 use crate::{
     AgentError, AgentForwardingAdapter, AgentForwardingAuthorizer, AgentForwardingPolicy,
     AgentKeyStore, AgentServer, AsyncGatewayTransport, AsyncGatewayTransportError,
-    CertificateValidationPolicy, ExtendedDataType, HostKeyVerificationError, HostKeyVerifier,
-    HttpConnectTransport, MAX_CHANNEL_ADDRESS, MAX_CHANNEL_TEXT, ProxyCredentials,
-    ProxyTransportError, PtyRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
-    Signal, SignatureAlgorithm, Signer, SignerError, Socks5Transport, WindowChangeRequest,
-    verify_host_key,
+    CertificateValidationPolicy, ExtendedDataType, GatewayTlsClientConfig, GatewayTlsConnectError,
+    HostKeyVerificationError, HostKeyVerifier, HttpConnectTransport, MAX_CHANNEL_ADDRESS,
+    MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest, PublicKeyAuthContext,
+    PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm, Signer, SignerError,
+    Socks5Transport, TcpTransport, TransportError, WindowChangeRequest, verify_host_key,
 };
 
 const MAX_CLIENT_HOST: usize = 4096;
@@ -310,6 +310,12 @@ pub enum ClientError {
     /// The gateway client hello could not be composed over the caller's stream.
     #[error("SSH gateway prelude failed: {0}")]
     Gateway(#[from] AsyncGatewayTransportError),
+    /// The gateway edge TCP connection failed before TLS could start.
+    #[error("SSH gateway TCP connection failed: {0}")]
+    GatewayTcp(#[from] TransportError),
+    /// The gateway TLS or ALPN handshake failed.
+    #[error("SSH gateway TLS connection failed: {0}")]
+    GatewayTls(#[from] GatewayTlsConnectError),
     /// A forwarded SSH agent request or lifecycle event failed the bounded agent boundary.
     #[error("SSH forwarded agent channel failed: {0}")]
     Agent(#[from] AgentError),
@@ -428,6 +434,36 @@ impl ClientConnection {
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         let stream = AsyncGatewayTransport::handshake(stream, hello).await?;
+        Self::connect_stream(config, stream).await
+    }
+
+    /// Connect directly to a gateway edge, negotiate TLS 1.3 and `spl-gw/1`, send the bounded
+    /// K-6 client hello, and complete the SSH handshake on the resulting stream.
+    ///
+    /// The edge TCP connection uses the same bounded Happy Eyeballs and socket policy as direct
+    /// SSH transport. The blocking resolver and connect work runs off the async runtime; TLS,
+    /// gateway framing, and SSH remain ordered on the returned stream.
+    pub async fn connect_via_gateway(
+        config: ClientConfig,
+        edge_host: &str,
+        edge_port: u16,
+        timeout: Duration,
+        tls: &GatewayTlsClientConfig,
+        hello: &scoplen_api::gateway::GatewayClientHello,
+    ) -> Result<Self, ClientError> {
+        if edge_port == 0 {
+            return Err(ClientError::InvalidInput("gateway edge port must be non-zero"));
+        }
+        let edge_host = edge_host.to_owned();
+        let stream = tokio::task::spawn_blocking(move || {
+            TcpTransport::connect(&edge_host, edge_port, timeout).map(TcpTransport::into_stream)
+        })
+        .await
+        .map_err(|_| ClientError::Transport(io::Error::other("gateway TCP route task stopped")))?
+        .map_err(ClientError::GatewayTcp)?;
+        stream.set_nonblocking(true).map_err(ClientError::Transport)?;
+        let stream = tokio::net::TcpStream::from_std(stream).map_err(ClientError::Transport)?;
+        let stream = tls.connect_and_handshake(stream, hello).await?;
         Self::connect_stream(config, stream).await
     }
 
