@@ -1744,6 +1744,25 @@ mod tests {
         accept_none: bool,
     }
 
+    #[derive(Clone)]
+    struct PublicKeyServer {
+        expected_key: Vec<u8>,
+    }
+
+    impl russh::server::Handler for PublicKeyServer {
+        type Error = russh::Error;
+
+        async fn auth_publickey(
+            &mut self,
+            _user: &str,
+            key: &ssh_key::PublicKey,
+        ) -> Result<russh::server::Auth, Self::Error> {
+            let accepted =
+                key.to_bytes().map(|encoded| encoded == self.expected_key).unwrap_or(false);
+            Ok(if accepted { russh::server::Auth::Accept } else { russh::server::Auth::reject() })
+        }
+    }
+
     impl russh::server::Handler for KeyboardServer {
         type Error = russh::Error;
 
@@ -3488,6 +3507,43 @@ mod tests {
         assert_publickey_adapter_round_trip(&ed25519).await;
         let p256 = P256SshSigner::new(P256SigningKey::from_bytes(&[1; 32]).expect("P-256 key"));
         assert_publickey_adapter_round_trip(&p256).await;
+    }
+
+    #[tokio::test]
+    async fn publickey_authentication_completes_against_real_russh_server() {
+        let signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
+        let expected_key = signer.public_key_blob().expect("signer public key");
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let server_config = Arc::new(server_config);
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ =
+                russh::server::run_stream(server_config, stream, PublicKeyServer { expected_key })
+                    .await;
+        });
+
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("SSH config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        connection
+            .authenticate_publickey("alice", &signer)
+            .await
+            .expect("public-key authentication");
+        connection.disconnect().await.expect("disconnect client");
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("SSH server task")
+            .expect("SSH server");
     }
 
     #[tokio::test]
