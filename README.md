@@ -41,8 +41,9 @@ framing, per-signature forwarding authorization, peer packet limits, and clean/t
 outcomes.
 
 Legacy Pageant `WM_COPYDATA` has a bounded, fail-closed protocol adapter with deterministic
-mapping names and an injectable platform backend; the crate keeps native Win32 FFI out of its safe
-protocol boundary.
+mapping names and an injectable platform backend. On Windows, `connect_native_pageant_agent`
+uses the native Win32 transport through the pinned Pageant adapter; the safe protocol boundary
+still validates every request and response before returning it.
 
 A bounded SFTP v3 packet boundary covers negotiation, core file, directory/path, and metadata
 requests and responses, bounded
@@ -59,9 +60,9 @@ depth while retaining each parent connection. One connection multiplexes session
 channels with a configurable simultaneous-channel cap; channel or stream drop releases a slot.
 The adapter keeps the engine types out of the public API. A bounded SOCKS4a/SOCKS5 dynamic
 listener now composes the handshake with `direct-tcpip`, including cancellation, concurrency
-limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping. A native
-Win32 backend for the injected Pageant
-discovery adapter and interoperability work remain open. `SftpChannel`
+limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping. Pageant
+interoperability still requires a Windows Pageant installation and remains outside the hosted CI
+matrix. `SftpChannel`
 now composes the bounded v3 handshake and packet framing over an accepted SSH `session` channel
 with bounded subsystem failure and truncation mapping; `SftpSession` adds bounded pipelining and
 request correlation, resume-by-offset uploads/downloads, and progress callbacks on that channel. The auth-agent channel boundary does not claim concrete engine scheduling or wire

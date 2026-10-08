@@ -7,6 +7,10 @@ All notable changes to `scoplen-proto` will be recorded here.
 - Added the bounded K-4 shared-vault epoch-retirement response codec with deterministic CBOR,
   a published vector, and zero-epoch failure coverage; the authenticated route and retirement
   storage remain owned by `scoplen-server`.
+- Added the native Windows legacy Pageant `WM_COPYDATA` agent channel. It derives the documented
+  current-thread mapping name, raises the mapping limit to 262,144 bytes, validates response
+  lengths before reading, and exposes `connect_native_pageant_agent` while preserving the
+  transport-neutral agent API.
 - Registered K-4 `sync.quota_exceeded` and `sync.rate_limited` problem codes with deterministic
   CBOR vectors for cardinality and per-device write-rate failures (D-64).
 - Added bounded K-4 shared-vault member-addition request and response codecs with exact epoch-wrap

@@ -44,7 +44,10 @@ pub use agent::{
     validate_pageant_wm_copydata_mapping_name,
 };
 #[cfg(windows)]
-pub use agent::{connect_pageant_agent, connect_windows_agent};
+pub use agent::{
+    NativePageantAgentChannel, connect_native_pageant_agent, connect_pageant_agent,
+    connect_windows_agent,
+};
 pub use authentication::{
     AuthMethodError, CertificateKind, CertificateValidationError, CertificateValidationPolicy,
     Ed25519SshSigner, HostKey, HostKeyVerificationError, HostKeyVerifier,

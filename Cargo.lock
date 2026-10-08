@@ -2782,6 +2782,7 @@ dependencies = [
 name = "scoplen-ssh"
 version = "0.1.0"
 dependencies = [
+ "pageant",
  "russh",
  "scoplen-crypto",
  "signature 3.0.0",

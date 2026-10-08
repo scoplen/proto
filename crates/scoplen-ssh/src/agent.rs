@@ -567,6 +567,43 @@ impl<S: Read + Write> AgentChannel for PageantAgentChannel<S> {
     }
 }
 
+/// Native legacy Pageant `WM_COPYDATA` channel on Windows.
+///
+/// The platform dependency owns the Win32 window and mapping handles. This channel keeps the
+/// standard agent framing and validation in `scoplen-ssh`, while the dependency derives the
+/// documented `PageantRequest%08x` name from the current Win32 thread ID for every synchronous
+/// request.
+#[cfg(windows)]
+#[derive(Debug, Default)]
+pub struct NativePageantAgentChannel;
+
+#[cfg(windows)]
+impl NativePageantAgentChannel {
+    /// Construct a channel that resolves the Pageant window on its first exchange.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+#[cfg(windows)]
+impl AgentChannel for NativePageantAgentChannel {
+    fn exchange(&mut self, request: &[u8]) -> Result<Vec<u8>, AgentError> {
+        if request.len() > PAGEANT_WM_COPYDATA_MAX_MSGLEN {
+            return Err(AgentError::FrameTooLarge);
+        }
+        AgentMessage::decode_frame(request)?;
+
+        let response = pageant::wmmessage::query_pageant(request)
+            .map_err(|error| AgentError::Transport(error.to_string()))?;
+        if response.len() > PAGEANT_WM_COPYDATA_MAX_MSGLEN {
+            return Err(AgentError::FrameTooLarge);
+        }
+        AgentMessage::decode_frame(&response)?;
+        Ok(response)
+    }
+}
+
 /// Validate a legacy Pageant mapping name.
 ///
 /// Pageant receives the name through an untrusted `COPYDATASTRUCT`. The legacy endpoint requires
@@ -813,6 +850,12 @@ pub fn connect_pageant_agent(
 ) -> std::io::Result<AgentClient<PageantAgentChannel<std::fs::File>>> {
     let stream = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
     Ok(AgentClient::new(PageantAgentChannel::new(stream)))
+}
+
+/// Connect to the native legacy Pageant `WM_COPYDATA` endpoint on Windows.
+#[cfg(windows)]
+pub fn connect_native_pageant_agent() -> std::io::Result<AgentClient<NativePageantAgentChannel>> {
+    Ok(AgentClient::new(NativePageantAgentChannel::new()))
 }
 
 /// SSH agent client operations shared by Unix, Windows, and Pageant adapters.
@@ -2504,6 +2547,20 @@ mod tests {
             (u32::try_from(MAX_AGENT_FRAME).expect("test limit") + 1).to_be_bytes().to_vec();
         let mut oversized = PageantAgentChannel::new(ScriptedStream::new(oversized, 1));
         assert_eq!(oversized.exchange(&request), Err(AgentError::FrameTooLarge));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_pageant_channel_rejects_untrusted_frames_before_window_lookup() {
+        let mut channel = NativePageantAgentChannel::new();
+        assert_eq!(
+            channel.exchange(&[0, 0, 0, 0]),
+            Err(AgentError::MalformedFrame("empty agent payload"))
+        );
+
+        let oversized =
+            (u32::try_from(MAX_AGENT_FRAME).expect("test limit") + 1).to_be_bytes().to_vec();
+        assert_eq!(channel.exchange(&oversized), Err(AgentError::FrameTooLarge));
     }
 
     #[test]

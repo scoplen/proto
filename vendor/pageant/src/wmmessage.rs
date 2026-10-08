@@ -14,6 +14,7 @@ use windows::Win32::System::Memory::{
     CreateFileMappingW, FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, PAGE_READWRITE,
     UnmapViewOfFile,
 };
+use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, SendMessageA, WM_COPYDATA};
 use windows::core::HSTRING;
 
@@ -28,7 +29,7 @@ pub struct PageantStream {
 
 impl PageantStream {
     pub async fn new() -> Result<Self, Error> {
-        let (one, mut two) = tokio::io::duplex(_AGENT_MAX_MSGLEN * 100);
+        let (one, mut two) = tokio::io::duplex(PAGEANT_STREAM_BUFFER);
 
         let cookie = rand::random::<u64>().to_string();
         tokio::spawn(async move {
@@ -158,11 +159,11 @@ impl MemoryMap {
     }
 
     fn read(&mut self, n: usize) -> Vec<u8> {
-        let out = vec![0; n];
+        let mut out = vec![0; n];
         unsafe {
             std::ptr::copy_nonoverlapping(
                 self.view.Value.add(self.pos) as *const u8,
-                out.as_ptr() as *mut u8,
+                out.as_mut_ptr(),
                 n,
             );
         }
@@ -189,7 +190,12 @@ fn find_pageant_window() -> Result<HWND, Error> {
 }
 
 const _AGENT_COPYDATA_ID: u64 = 0x804E50BA;
-const _AGENT_MAX_MSGLEN: usize = 8192;
+/// Maximum complete SSH agent frame accepted by the legacy Pageant mapping.
+///
+/// The mapping includes the four-byte SSH agent length prefix. Keep this in sync with the
+/// protocol-core boundary so large but valid extension requests are not silently truncated.
+pub const AGENT_MAX_MSGLEN: usize = 262_144;
+const PAGEANT_STREAM_BUFFER: usize = 8192 * 100;
 
 pub fn is_pageant_running() -> bool {
     find_pageant_window().is_ok()
@@ -197,10 +203,20 @@ pub fn is_pageant_running() -> bool {
 
 /// Send a one-off query to Pageant and return a response.
 pub fn query_pageant_direct(cookie: String, msg: &[u8]) -> Result<Vec<u8>, Error> {
+    if msg.len() > AGENT_MAX_MSGLEN {
+        return Err(Error::Overflow);
+    }
+    if msg.len() < 4 {
+        return Err(Error::NoResponse);
+    }
+    let request_len = u32::from_be_bytes([msg[0], msg[1], msg[2], msg[3]]) as usize;
+    if request_len == 0 || request_len != msg.len() - 4 {
+        return Err(Error::NoResponse);
+    }
     let hwnd = find_pageant_window()?;
     let map_name = format!("PageantRequest{cookie}");
 
-    let mut map: MemoryMap = MemoryMap::new(map_name.clone(), _AGENT_MAX_MSGLEN)?;
+    let mut map: MemoryMap = MemoryMap::new(map_name.clone(), AGENT_MAX_MSGLEN)?;
     map.write(msg)?;
 
     let char_buffer = CString::new(map_name.as_bytes()).map_err(|_| Error::InvalidCookie)?;
@@ -231,7 +247,18 @@ pub fn query_pageant_direct(cookie: String, msg: &[u8]) -> Result<Vec<u8>, Error
     }
     #[allow(clippy::indexing_slicing)] // length checked
     let size = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+    if size > AGENT_MAX_MSGLEN.saturating_sub(4) {
+        return Err(Error::Overflow);
+    }
     buf.extend(map.read(size));
 
     Ok(buf)
+}
+
+/// Send one request using the documented current-thread Pageant mapping name.
+pub fn query_pageant(msg: &[u8]) -> Result<Vec<u8>, Error> {
+    // The legacy protocol derives the mapping from the caller's thread ID. The message is
+    // synchronous, so one request per thread cannot overlap its mapping.
+    let thread_id = unsafe { GetCurrentThreadId() };
+    query_pageant_direct(format!("{thread_id:08x}"), msg)
 }
