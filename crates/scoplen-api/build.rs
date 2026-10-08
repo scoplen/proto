@@ -13,11 +13,16 @@ fn main() {
     println!("cargo:rerun-if-changed={}", gateway.display());
     println!("cargo:rerun-if-changed={}", agent.display());
 
-    let mut config = prost_build::Config::new();
-    config
-        .protoc_executable(protoc_bin_vendored::protoc_bin_path().expect("bundled protoc"))
-        .file_descriptor_set_path(descriptor);
-    config
+    let mut prost = prost_build::Config::new();
+    prost.protoc_executable(protoc_bin_vendored::protoc_bin_path().expect("bundled protoc"));
+    prost.file_descriptor_set_path(descriptor);
+    let tonic = tonic_build::configure()
+        .build_client(true)
+        .build_server(true)
+        .client_mod_attribute(".", "#[allow(clippy::all, clippy::pedantic)]")
+        .server_mod_attribute(".", "#[allow(clippy::all, clippy::pedantic)]");
+    prost.service_generator(tonic.service_generator());
+    prost
         .compile_protos(&[gateway, agent], &[proto_root.clone()])
         .expect("internal protobuf contracts compile");
 }
