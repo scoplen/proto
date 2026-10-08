@@ -38,9 +38,10 @@ use crate::{
     CertificateValidationPolicy, ExtendedDataType, GatewayTlsClientConfig, GatewayTlsConnectError,
     HostKeyVerificationError, HostKeyVerifier, HttpConnectTransport,
     KeyboardInteractiveInfoRequest, KeyboardInteractivePrompt, KeyboardInteractiveResponse,
-    MAX_CHANNEL_ADDRESS, MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest,
-    PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm,
-    Signer, SignerError, Socks5Transport, TcpTransport, TransportError, WindowChangeRequest,
+    MAX_CHANNEL_ADDRESS, MAX_CHANNEL_STRING, MAX_CHANNEL_TEXT, ProxyCredentials,
+    ProxyTransportError, PtyRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
+    Signal, SignatureAlgorithm, Signer, SignerError, Socks5Transport, TcpTransport, TransportError,
+    WindowChangeRequest,
     process::{ProxyCommandError, ProxyCommandStream, ProxyCommandTransport},
     verify_host_key,
 };
@@ -1148,9 +1149,15 @@ impl ClientChannel {
         self.channel.exec(want_reply, command.to_vec()).await.map_err(ClientError::from)
     }
 
-    /// Send one data chunk to the remote channel.
+    /// Send channel data in bounded packet-sized chunks.
+    ///
+    /// Each chunk is copied into the engine queue only after the previous chunk has been
+    /// accepted. This keeps the caller-facing path bounded even when a large buffer is supplied.
     pub async fn send_data(&self, data: &[u8]) -> Result<(), ClientError> {
-        self.channel.data_bytes(data.to_vec()).await.map_err(ClientError::from)
+        for chunk in data.chunks(MAX_CHANNEL_STRING) {
+            self.channel.data_bytes(chunk.to_vec()).await.map_err(ClientError::from)?;
+        }
+        Ok(())
     }
 
     /// Send channel EOF.
@@ -2691,6 +2698,40 @@ mod tests {
     async fn proxy_routes_complete_real_russh_handshake_and_data_round_trip() {
         proxy_route_round_trip(RouteProxyKind::Socks5).await;
         proxy_route_round_trip(RouteProxyKind::HttpConnect).await;
+    }
+
+    #[tokio::test]
+    async fn channel_data_is_fragmented_before_engine_queueing() {
+        let (target, server_task) = start_echo_server().await;
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", target.port(), verifier).expect("SSH config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        connection.authenticate_password("user", b"password").await.expect("authenticate client");
+        let mut channel = connection.open_session().await.expect("open session");
+        let payload: Vec<u8> = (0..(MAX_CHANNEL_STRING * 2 + 17))
+            .map(|index| u8::try_from(index % 251).expect("payload pattern fits in one byte"))
+            .collect();
+        channel.send_data(&payload).await.expect("send fragmented data");
+
+        let mut received = Vec::with_capacity(payload.len());
+        while received.len() < payload.len() {
+            match timeout(Duration::from_secs(5), channel.next_event())
+                .await
+                .expect("echo response")
+                .expect("echo event")
+            {
+                Some(ChannelEvent::Data(data)) => received.extend(data),
+                Some(event) => panic!("unexpected echo event: {event:?}"),
+                None => panic!("echo channel closed before all data arrived"),
+            }
+        }
+        assert_eq!(received, payload);
+        channel.close().await.expect("close session");
+        connection.disconnect().await.expect("disconnect client");
+        timeout(Duration::from_secs(5), server_task)
+            .await
+            .expect("SSH server task")
+            .expect("SSH server");
     }
 
     #[tokio::test]
