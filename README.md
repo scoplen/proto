@@ -92,7 +92,8 @@ server-opened `auth-agent@openssh.com` channels. `ForwardedChannel::serve_agent`
 russh channel fragments, applies the fail-closed forwarding policy, and returns bounded agent
 responses; an in-process russh round trip covers the concrete lifecycle. External OpenSSH and
 Pageant interoperability, live gateway interoperability, and broader channel scheduling remain
-unverified.
+unverified. The agent-backed signer also completes the concrete public-key authentication flow
+against the in-process russh server; platform agent interoperability remains unverified.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, acknowledgement, snapshot, version-history, content-free notification, account

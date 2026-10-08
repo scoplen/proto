@@ -1895,9 +1895,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        AgentError, AgentForwardingAuthorizer, AgentForwardingPolicy, AgentKeyStore, AgentMessage,
-        AgentServer, Ed25519SshSigner, HostKey, P256SshSigner, ProxyError, ProxyOperation,
-        ProxyProtocol, ProxyTransportError, RsaSshSigner,
+        AgentChannel, AgentClient, AgentError, AgentForwardingAuthorizer, AgentForwardingPolicy,
+        AgentKeyStore, AgentMessage, AgentServer, AgentSshSigner, Ed25519SshSigner, HostKey,
+        P256SshSigner, ProxyError, ProxyOperation, ProxyProtocol, ProxyTransportError,
+        RsaSshSigner,
     };
 
     #[derive(Clone)]
@@ -1909,6 +1910,33 @@ mod tests {
     #[derive(Clone)]
     struct PublicKeyServer {
         expected_key: Vec<u8>,
+    }
+
+    struct SigningAgent {
+        key: Ed25519SigningKey,
+        key_blob: Vec<u8>,
+    }
+
+    impl AgentChannel for SigningAgent {
+        fn exchange(&mut self, request: &[u8]) -> Result<Vec<u8>, AgentError> {
+            let AgentMessage::SignRequest { key_blob, data, .. } =
+                AgentMessage::decode_frame(request)?
+            else {
+                return Err(AgentError::UnexpectedResponse);
+            };
+            if key_blob != self.key_blob {
+                return Err(AgentError::AgentFailure);
+            }
+            let signature = self.key.sign(&data);
+            let mut ssh_signature = Vec::with_capacity(4 + 11 + 4 + signature.len());
+            ssh_signature.extend_from_slice(&11_u32.to_be_bytes());
+            ssh_signature.extend_from_slice(b"ssh-ed25519");
+            ssh_signature.extend_from_slice(
+                &(u32::try_from(signature.len()).expect("signature length")).to_be_bytes(),
+            );
+            ssh_signature.extend_from_slice(&signature);
+            AgentMessage::SignResponse { signature: ssh_signature }.encode_frame()
+        }
     }
 
     impl russh::server::Handler for PublicKeyServer {
@@ -3728,6 +3756,23 @@ mod tests {
         let signer =
             Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
         assert_real_publickey_authentication(&signer).await;
+    }
+
+    #[tokio::test]
+    async fn agent_signer_authentication_completes_against_real_russh_server() {
+        let software_key = Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key");
+        let software_signer = Ed25519SshSigner::new(software_key);
+        let key_blob = software_signer.public_key_blob().expect("agent key blob");
+        let agent = AgentSshSigner::new(
+            AgentClient::new(SigningAgent {
+                key: Ed25519SigningKey::from_bytes(&[9; 32]).expect("agent key"),
+                key_blob: key_blob.clone(),
+            }),
+            SignatureAlgorithm::Ed25519,
+            key_blob,
+        )
+        .expect("agent signer");
+        assert_real_publickey_authentication(&agent).await;
     }
 
     async fn assert_real_publickey_authentication<S>(signer: &S)
