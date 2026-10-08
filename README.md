@@ -39,7 +39,9 @@ now composes bounded edge TCP dialing, TLS, the K-6 prelude, and the SSH handsha
 stream.
 Software Ed25519, P-256, and
 RSA/SHA-2 signers, FIDO2 security-key hooks, RFC 4252 `none`, password and keyboard-interactive
-codecs, certificate validation, and host-verification callbacks are available. Agent support
+codecs, certificate validation, and host-verification callbacks are available. The concrete client
+now handles bounded keyboard-interactive challenge rounds with prompt and response validation
+before sending answers to the SSH engine. Agent support
 includes bounded Unix-socket and Windows named-pipe streams, Pageant named-pipe compatibility,
 identity and signing requests, add/remove/lock/smart-card management, opaque extensions, and
 fail-closed forwarding policy.

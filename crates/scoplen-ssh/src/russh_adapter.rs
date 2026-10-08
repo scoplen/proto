@@ -34,15 +34,18 @@ use crate::{
     AgentError, AgentForwardingAdapter, AgentForwardingAuthorizer, AgentForwardingPolicy,
     AgentKeyStore, AgentServer, AsyncGatewayTransport, AsyncGatewayTransportError,
     CertificateValidationPolicy, ExtendedDataType, GatewayTlsClientConfig, GatewayTlsConnectError,
-    HostKeyVerificationError, HostKeyVerifier, HttpConnectTransport, MAX_CHANNEL_ADDRESS,
-    MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest, PublicKeyAuthContext,
-    PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm, Signer, SignerError,
-    Socks5Transport, TcpTransport, TransportError, WindowChangeRequest, verify_host_key,
+    HostKeyVerificationError, HostKeyVerifier, HttpConnectTransport,
+    KeyboardInteractiveInfoRequest, KeyboardInteractivePrompt, KeyboardInteractiveResponse,
+    MAX_CHANNEL_ADDRESS, MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest,
+    PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm,
+    Signer, SignerError, Socks5Transport, TcpTransport, TransportError, WindowChangeRequest,
+    verify_host_key,
 };
 
 const MAX_CLIENT_HOST: usize = 4096;
 const MAX_CERTIFICATE_PRINCIPAL: usize = 4096;
 const MAX_PUBLICKEY_AUTH_PAYLOAD: usize = 256 * 1024;
+const MAX_KEYBOARD_SUBMETHODS: usize = 4096;
 const DEFAULT_CLIENT_CHANNEL_LIMIT: usize = 64;
 /// Maximum number of channels that one client connection may keep open.
 pub const MAX_CLIENT_CHANNEL_LIMIT: usize = 256;
@@ -625,6 +628,97 @@ impl ClientConnection {
             russh::client::AuthResult::Failure { partial_success, .. } => {
                 Err(ClientError::AuthenticationRejected { partial_success })
             }
+        }
+    }
+
+    /// Authenticate with RFC 4256 keyboard-interactive prompts.
+    ///
+    /// The responder is called once for each bounded server information request. Prompt text and
+    /// response strings are validated through the shared K-7 authentication boundary before any
+    /// response is sent to `russh`; prompt order and response count are preserved exactly.
+    pub async fn authenticate_keyboard_interactive<F>(
+        &mut self,
+        username: &str,
+        submethods: Option<&str>,
+        mut responder: F,
+    ) -> Result<(), ClientError>
+    where
+        F: FnMut(&KeyboardInteractiveInfoRequest) -> Result<Vec<String>, ClientError> + Send,
+    {
+        validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
+            .map_err(ClientError::Config)?;
+        if let Some(submethods) = submethods {
+            validate_text(
+                submethods.as_bytes(),
+                MAX_KEYBOARD_SUBMETHODS,
+                "keyboard submethods",
+                false,
+            )
+            .map_err(ClientError::Config)?;
+        }
+        let mut reply = self
+            .handle
+            .authenticate_keyboard_interactive_start(
+                username.to_owned(),
+                submethods.map(str::to_owned),
+            )
+            .await
+            .map_err(ClientError::from)?;
+        loop {
+            reply = match reply {
+                russh::client::KeyboardInteractiveAuthResponse::Success => return Ok(()),
+                russh::client::KeyboardInteractiveAuthResponse::Failure {
+                    partial_success, ..
+                } => {
+                    return Err(ClientError::AuthenticationRejected { partial_success });
+                }
+                russh::client::KeyboardInteractiveAuthResponse::InfoRequest {
+                    name,
+                    instructions,
+                    prompts,
+                } => {
+                    let prompts = prompts
+                        .into_iter()
+                        .map(|prompt| {
+                            KeyboardInteractivePrompt::new(prompt.prompt.into_bytes(), prompt.echo)
+                                .map_err(|_| {
+                                    ClientError::InvalidInput("keyboard prompt is invalid")
+                                })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let info = KeyboardInteractiveInfoRequest::new(
+                        name.into_bytes(),
+                        instructions.into_bytes(),
+                        Vec::new(),
+                        prompts,
+                    )
+                    .map_err(|_| {
+                        ClientError::InvalidInput("keyboard information request is invalid")
+                    })?;
+                    info.encode().map_err(|_| {
+                        ClientError::InvalidInput("keyboard information request is invalid")
+                    })?;
+                    let responses = responder(&info)?;
+                    if responses.len() != info.prompts().len() {
+                        return Err(ClientError::InvalidInput(
+                            "keyboard response count does not match prompts",
+                        ));
+                    }
+                    let response_bytes = responses
+                        .iter()
+                        .map(|response| response.as_bytes().to_vec())
+                        .collect::<Vec<_>>();
+                    KeyboardInteractiveResponse::new(response_bytes)
+                        .and_then(|response| response.encode())
+                        .map_err(|_| {
+                            ClientError::InvalidInput("keyboard response count or size is invalid")
+                        })?;
+                    self.handle
+                        .authenticate_keyboard_interactive_respond(responses)
+                        .await
+                        .map_err(ClientError::from)?
+                }
+            };
         }
     }
 
@@ -1575,6 +1669,48 @@ mod tests {
     };
 
     #[derive(Clone)]
+    struct KeyboardServer {
+        round: u8,
+    }
+
+    impl russh::server::Handler for KeyboardServer {
+        type Error = russh::Error;
+
+        async fn auth_keyboard_interactive<'a>(
+            &'a mut self,
+            user: &str,
+            submethods: &str,
+            response: Option<russh::server::Response<'a>>,
+        ) -> Result<russh::server::Auth, Self::Error> {
+            if user != "user" || submethods != "otp" {
+                return Ok(russh::server::Auth::reject());
+            }
+            if let Some(mut response) = response {
+                let expected =
+                    if self.round == 0 { b"123456".as_slice() } else { b"yes".as_slice() };
+                if response.next().is_none_or(|answer| answer.as_ref() != expected)
+                    || response.next().is_some()
+                {
+                    return Ok(russh::server::Auth::reject());
+                }
+                if self.round == 1 {
+                    return Ok(russh::server::Auth::Accept);
+                }
+                self.round += 1;
+            }
+            Ok(russh::server::Auth::Partial {
+                name: Cow::Borrowed("Scoplen test"),
+                instructions: Cow::Borrowed("Enter the one-time code"),
+                prompts: if self.round == 0 {
+                    Cow::Borrowed(&[(Cow::Borrowed("Code: "), false)])
+                } else {
+                    Cow::Borrowed(&[(Cow::Borrowed("Continue? "), true)])
+                },
+            })
+        }
+    }
+
+    #[derive(Clone)]
     struct ResizeServer {
         changes: mpsc::Sender<WindowChangeRequest>,
     }
@@ -2267,6 +2403,96 @@ mod tests {
             result,
             Err(ClientError::Protocol | ClientError::ConnectionClosed | ClientError::Transport(_))
         ));
+    }
+
+    async fn keyboard_server() -> (ClientConnection, tokio::task::JoinHandle<()>) {
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("server listener");
+        let address = listener.local_addr().expect("server address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ = russh::server::run_stream(
+                Arc::new(server_config),
+                stream,
+                KeyboardServer { round: 0 },
+            )
+            .await;
+        });
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("SSH config");
+        (ClientConnection::connect(config).await.expect("connect client"), server)
+    }
+
+    #[tokio::test]
+    async fn keyboard_interactive_authenticates_and_bounds_responses() {
+        let (mut connection, server) = keyboard_server().await;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+        connection
+            .authenticate_keyboard_interactive("user", Some("otp"), move |info| {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(info.prompts().len(), 1);
+                let round = callback_calls.load(Ordering::SeqCst);
+                if round == 1 {
+                    assert_eq!(info.prompts()[0].text(), b"Code: ");
+                    assert!(!info.prompts()[0].echo());
+                    Ok(vec!["123456".to_owned()])
+                } else {
+                    assert_eq!(round, 2);
+                    assert_eq!(info.prompts()[0].text(), b"Continue? ");
+                    assert!(info.prompts()[0].echo());
+                    Ok(vec!["yes".to_owned()])
+                }
+            })
+            .await
+            .expect("keyboard authentication");
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        connection.disconnect().await.expect("disconnect");
+        server.await.expect("server task");
+
+        let (mut connection, server) = keyboard_server().await;
+        let error = connection
+            .authenticate_keyboard_interactive("user", Some("otp"), |_| Ok(Vec::new()))
+            .await
+            .expect_err("wrong response count");
+        assert!(matches!(
+            error,
+            ClientError::InvalidInput("keyboard response count does not match prompts")
+        ));
+        connection.disconnect().await.expect("disconnect");
+        server.await.expect("server task");
+
+        let (mut connection, server) = keyboard_server().await;
+        let error = connection
+            .authenticate_keyboard_interactive("user", Some("otp"), |_| {
+                Ok(vec!["x".repeat(65_537)])
+            })
+            .await
+            .expect_err("oversized response");
+        assert!(matches!(
+            error,
+            ClientError::InvalidInput("keyboard response count or size is invalid")
+        ));
+        connection.disconnect().await.expect("disconnect");
+        server.await.expect("server task");
+
+        let (mut connection, server) = keyboard_server().await;
+        let error = connection
+            .authenticate_keyboard_interactive("user", Some("otp"), |_| {
+                Ok(vec!["wrong".to_owned()])
+            })
+            .await
+            .expect_err("rejected response");
+        assert!(matches!(error, ClientError::AuthenticationRejected { .. }));
+        connection.disconnect().await.expect("disconnect");
+        server.await.expect("server task");
     }
 
     async fn proxy_route_round_trip(kind: RouteProxyKind) {
