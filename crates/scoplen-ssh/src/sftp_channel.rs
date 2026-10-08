@@ -7,8 +7,10 @@ use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::{
     ChannelEvent, ClientChannelStream, ClientConnection, ClientError, MAX_SFTP_PACKET, SftpClient,
-    SftpError, SftpExtension, SftpPacket,
+    SftpError, SftpExtension, SftpLimits, SftpPacket,
 };
+
+const LIMITS_EXTENSION: &[u8] = b"limits@openssh.com";
 
 /// Errors raised while opening or using an SFTP SSH channel.
 #[derive(Debug, Error)]
@@ -107,6 +109,26 @@ impl SftpSession {
     #[must_use]
     pub fn pending_requests(&self) -> usize {
         self.client.pending_requests()
+    }
+
+    /// Request the server's bounded transfer limits when it advertised the OpenSSH extension.
+    ///
+    /// A server that does not advertise `limits@openssh.com` returns `Ok(None)` without sending
+    /// an extension request. An advertised extension must answer with one exact, bounded limits
+    /// body; malformed or unexpected responses are returned as protocol errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the request cannot be queued, the channel I/O fails, the response
+    /// references an unknown request, or the peer returns a malformed limits body.
+    pub async fn request_limits(&mut self) -> Result<Option<SftpLimits>, SftpChannelError> {
+        if !self.extensions().iter().any(|extension| extension.name == LIMITS_EXTENSION) {
+            return Ok(None);
+        }
+        let request = self.client.request_limits()?;
+        self.send_request(&request).await?;
+        let response = self.read_response().await?;
+        Ok(Some(response.limits_response()?))
     }
 
     /// Send a request previously built by [`Self::client_mut`].
@@ -489,6 +511,7 @@ mod tests {
     struct SftpServer {
         buffer: Vec<u8>,
         file: Vec<u8>,
+        advertise_limits: bool,
     }
 
     impl russh::server::Handler for SftpServer {
@@ -547,7 +570,12 @@ mod tests {
                 };
                 let response = match packet {
                     SftpPacket::Init { .. } => {
-                        SftpPacket::Version { version: 3, extensions: Vec::new() }
+                        let extensions = if self.advertise_limits {
+                            vec![SftpExtension::new(b"limits@openssh.com", b"1").unwrap()]
+                        } else {
+                            Vec::new()
+                        };
+                        SftpPacket::Version { version: 3, extensions }
                     }
                     SftpPacket::Realpath { id, .. } => SftpPacket::Name {
                         id,
@@ -588,6 +616,20 @@ mod tests {
                             language: Vec::new(),
                         }
                     }
+                    SftpPacket::Extended { id, name, .. }
+                        if name == b"limits@openssh.com" && self.advertise_limits =>
+                    {
+                        SftpPacket::ExtendedReply {
+                            id,
+                            data: SftpLimits {
+                                max_packet_length: 256 * 1024,
+                                max_read_length: 128 * 1024,
+                                max_write_length: 64 * 1024,
+                                max_open_handles: 128,
+                            }
+                            .encode(),
+                        }
+                    }
                     _ => continue,
                 };
                 let Ok(encoded) = response.encode() else {
@@ -616,7 +658,7 @@ mod tests {
             let _ = russh::server::run_stream(
                 server_config,
                 stream,
-                SftpServer { buffer: Vec::new(), file: Vec::new() },
+                SftpServer { buffer: Vec::new(), file: Vec::new(), advertise_limits: true },
             )
             .await;
         });
@@ -625,15 +667,22 @@ mod tests {
         let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
-        let mut channel = SftpChannel::open(&connection).await.expect("open sftp");
-        assert!(channel.extensions().is_empty());
-        channel
-            .write_packet(&SftpPacket::Realpath { id: 1, path: b".".to_vec() })
-            .await
-            .expect("write realpath");
+        let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
+        assert_eq!(session.extensions().len(), 1);
+        assert_eq!(
+            session.request_limits().await.expect("request limits"),
+            Some(SftpLimits {
+                max_packet_length: 256 * 1024,
+                max_read_length: 128 * 1024,
+                max_write_length: 64 * 1024,
+                max_open_handles: 128,
+            })
+        );
+        let request = session.client_mut().realpath(b".").expect("realpath request");
+        session.send_request(&request).await.expect("write realpath");
         assert!(matches!(
-            channel.read_packet().await.expect("read realpath"),
-            SftpPacket::Name { id: 1, entries } if entries[0].filename == b"/srv"
+            session.read_response().await.expect("read realpath"),
+            SftpPacket::Name { entries, .. } if entries[0].filename == b"/srv"
         ));
         connection.disconnect().await.expect("disconnect client");
     }
@@ -656,7 +705,7 @@ mod tests {
             let _ = russh::server::run_stream(
                 server_config,
                 stream,
-                SftpServer { buffer: Vec::new(), file: Vec::new() },
+                SftpServer { buffer: Vec::new(), file: Vec::new(), advertise_limits: false },
             )
             .await;
         });
@@ -666,6 +715,7 @@ mod tests {
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
+        assert_eq!(session.request_limits().await.expect("limits absence"), None);
         let first = session.client_mut().realpath(b"/first").expect("first request");
         let second = session.client_mut().realpath(b"/second").expect("second request");
         assert!(matches!(
@@ -705,7 +755,11 @@ mod tests {
             let _ = russh::server::run_stream(
                 server_config,
                 stream,
-                SftpServer { buffer: Vec::new(), file: b"abcdef".to_vec() },
+                SftpServer {
+                    buffer: Vec::new(),
+                    file: b"abcdef".to_vec(),
+                    advertise_limits: false,
+                },
             )
             .await;
         });
