@@ -4,6 +4,8 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Aligned the standalone fuzz workspace with the local MSRV-compatible Pageant patch so all five
+  nightly fuzz targets resolve the same agent adapter and build on Windows as well as Linux CI.
 - Added concrete `russh` integration for server-opened `auth-agent@openssh.com` channels. The
   `ForwardedChannelKind::Agent` wrapper and `ForwardedChannel::serve_agent` reassemble fragmented
   channel data, apply the fail-closed per-signature forwarding policy, and return bounded agent

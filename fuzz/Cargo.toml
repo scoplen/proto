@@ -7,6 +7,10 @@ publish = false
 [package.metadata]
 cargo-fuzz = true
 
+[patch.crates-io]
+# Keep fuzz builds on the same MSRV-compatible Pageant adapter as the main workspace.
+pageant = { path = "../vendor/pageant" }
+
 [dependencies]
 libfuzzer-sys = "0.4.7"
 scoplen-test-vectors = { path = "../crates/scoplen-test-vectors" }
