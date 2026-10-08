@@ -342,6 +342,16 @@ pub enum ClientError {
     UnexpectedChannelEvent,
 }
 
+/// Result of an RFC 4252 `none` probe. The server may accept `none` or advertise further
+/// methods. Advertised method names are kept in the server's order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NoneAuthOutcome {
+    /// The server accepted `none`; the connection is authenticated.
+    Authenticated,
+    /// The server rejected `none` and supplied its remaining methods.
+    Rejected { methods: Vec<String>, partial_success: bool },
+}
+
 /// Errors raised while adapting the engine-independent signer to `russh`.
 #[derive(Debug, Error)]
 pub enum PublicKeyAuthError {
@@ -627,6 +637,27 @@ impl ClientConnection {
             russh::client::AuthResult::Success => Ok(()),
             russh::client::AuthResult::Failure { partial_success, .. } => {
                 Err(ClientError::AuthenticationRejected { partial_success })
+            }
+        }
+    }
+
+    /// Probe RFC 4252 `none` without attempting a credential method.
+    ///
+    /// A rejection is returned as data so callers can select one of the server-advertised methods
+    /// without treating the probe as a failed connection.
+    pub async fn probe_authentication(
+        &mut self,
+        username: &str,
+    ) -> Result<NoneAuthOutcome, ClientError> {
+        validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
+            .map_err(ClientError::Config)?;
+        match self.handle.authenticate_none(username.to_owned()).await.map_err(ClientError::from)? {
+            russh::client::AuthResult::Success => Ok(NoneAuthOutcome::Authenticated),
+            russh::client::AuthResult::Failure { remaining_methods, partial_success } => {
+                Ok(NoneAuthOutcome::Rejected {
+                    methods: remaining_methods.iter().map(String::from).collect(),
+                    partial_success,
+                })
             }
         }
     }
@@ -1671,10 +1702,21 @@ mod tests {
     #[derive(Clone)]
     struct KeyboardServer {
         round: u8,
+        accept_none: bool,
     }
 
     impl russh::server::Handler for KeyboardServer {
         type Error = russh::Error;
+
+        async fn auth_none(&mut self, _user: &str) -> Result<russh::server::Auth, Self::Error> {
+            if self.accept_none {
+                return Ok(russh::server::Auth::Accept);
+            }
+            Ok(russh::server::Auth::Reject {
+                proceed_with_methods: Some((&[russh::MethodKind::KeyboardInteractive][..]).into()),
+                partial_success: false,
+            })
+        }
 
         async fn auth_keyboard_interactive<'a>(
             &'a mut self,
@@ -2405,7 +2447,7 @@ mod tests {
         ));
     }
 
-    async fn keyboard_server() -> (ClientConnection, tokio::task::JoinHandle<()>) {
+    async fn keyboard_server(accept_none: bool) -> (ClientConnection, tokio::task::JoinHandle<()>) {
         let mut server_config = russh::server::Config::default();
         server_config.keys.push(
             PrivateKey::random(
@@ -2421,7 +2463,7 @@ mod tests {
             let _ = russh::server::run_stream(
                 Arc::new(server_config),
                 stream,
-                KeyboardServer { round: 0 },
+                KeyboardServer { round: 0, accept_none },
             )
             .await;
         });
@@ -2432,7 +2474,7 @@ mod tests {
 
     #[tokio::test]
     async fn keyboard_interactive_authenticates_and_bounds_responses() {
-        let (mut connection, server) = keyboard_server().await;
+        let (mut connection, server) = keyboard_server(false).await;
         let calls = Arc::new(AtomicUsize::new(0));
         let callback_calls = Arc::clone(&calls);
         connection
@@ -2457,7 +2499,7 @@ mod tests {
         connection.disconnect().await.expect("disconnect");
         server.await.expect("server task");
 
-        let (mut connection, server) = keyboard_server().await;
+        let (mut connection, server) = keyboard_server(false).await;
         let error = connection
             .authenticate_keyboard_interactive("user", Some("otp"), |_| Ok(Vec::new()))
             .await
@@ -2469,7 +2511,7 @@ mod tests {
         connection.disconnect().await.expect("disconnect");
         server.await.expect("server task");
 
-        let (mut connection, server) = keyboard_server().await;
+        let (mut connection, server) = keyboard_server(false).await;
         let error = connection
             .authenticate_keyboard_interactive("user", Some("otp"), |_| {
                 Ok(vec!["x".repeat(65_537)])
@@ -2483,7 +2525,7 @@ mod tests {
         connection.disconnect().await.expect("disconnect");
         server.await.expect("server task");
 
-        let (mut connection, server) = keyboard_server().await;
+        let (mut connection, server) = keyboard_server(false).await;
         let error = connection
             .authenticate_keyboard_interactive("user", Some("otp"), |_| {
                 Ok(vec!["wrong".to_owned()])
@@ -2491,6 +2533,39 @@ mod tests {
             .await
             .expect_err("rejected response");
         assert!(matches!(error, ClientError::AuthenticationRejected { .. }));
+        connection.disconnect().await.expect("disconnect");
+        server.await.expect("server task");
+    }
+
+    #[tokio::test]
+    async fn none_probe_reports_advertised_methods_without_authenticating() {
+        let (mut connection, server) = keyboard_server(false).await;
+        let outcome = connection.probe_authentication("user").await.expect("none probe");
+        assert_eq!(
+            outcome,
+            NoneAuthOutcome::Rejected {
+                methods: vec!["keyboard-interactive".to_owned()],
+                partial_success: false,
+            }
+        );
+        connection
+            .authenticate_keyboard_interactive("user", Some("otp"), |info| {
+                if info.prompts()[0].text() == b"Code: " {
+                    Ok(vec!["123456".to_owned()])
+                } else {
+                    Ok(vec!["yes".to_owned()])
+                }
+            })
+            .await
+            .expect("authenticate after probe");
+        connection.disconnect().await.expect("disconnect");
+        server.await.expect("server task");
+
+        let (mut connection, server) = keyboard_server(true).await;
+        assert_eq!(
+            connection.probe_authentication("user").await.expect("accepted none probe"),
+            NoneAuthOutcome::Authenticated
+        );
         connection.disconnect().await.expect("disconnect");
         server.await.expect("server task");
     }
