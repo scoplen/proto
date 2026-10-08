@@ -11,13 +11,20 @@
 use std::{
     ffi::OsStr,
     fmt,
+    future::Future,
     io::{self, Read, Write},
     net::{Shutdown, SocketAddr},
+    pin::Pin,
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
-    sync::Mutex,
+    sync::{Arc, Mutex},
+    task::{Context, Poll},
 };
 
 use thiserror::Error;
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    task::JoinHandle,
+};
 
 use crate::tcp::{Transport, TransportError, TransportOperation};
 
@@ -134,49 +141,186 @@ impl ProxyCommandTransport {
         }
         child.wait().map(|_| ())
     }
+
+    fn read_shared(&self, buffer: &mut [u8]) -> io::Result<usize> {
+        let mut stdout = self.stdout.lock().map_err(|_| Self::lock_error())?;
+        let stdout = stdout.as_mut().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::BrokenPipe, "ProxyCommand stdout is closed")
+        })?;
+        stdout.read(buffer)
+    }
+
+    fn write_shared(&self, buffer: &[u8]) -> io::Result<usize> {
+        let mut stdin = self.stdin.lock().map_err(|_| Self::lock_error())?;
+        let stdin = stdin.as_mut().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::BrokenPipe, "ProxyCommand stdin is closed")
+        })?;
+        stdin.write(buffer)
+    }
+
+    fn flush_shared(&self) -> io::Result<()> {
+        let mut stdin = self.stdin.lock().map_err(|_| Self::lock_error())?;
+        let stdin = stdin.as_mut().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::BrokenPipe, "ProxyCommand stdin is closed")
+        })?;
+        stdin.flush()
+    }
+}
+
+/// An asynchronous stream adapter for a bounded [`ProxyCommandTransport`].
+///
+/// The child process owns blocking standard pipes, so each operation runs on a blocking worker.
+/// Read and write use separate internal locks and can make progress concurrently while the SSH
+/// engine waits for the peer. Each copied operation buffer is bounded.
+pub(crate) struct ProxyCommandStream {
+    inner: Arc<ProxyCommandTransport>,
+    read_task: Option<JoinHandle<io::Result<Vec<u8>>>>,
+    write_task: Option<JoinHandle<io::Result<usize>>>,
+    flush_task: Option<JoinHandle<io::Result<()>>>,
+    shutdown_task: Option<JoinHandle<io::Result<()>>>,
+}
+
+impl fmt::Debug for ProxyCommandStream {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("ProxyCommandStream").finish_non_exhaustive()
+    }
+}
+
+impl ProxyCommandStream {
+    const MAX_ASYNC_IO: usize = 64 * 1024;
+
+    pub(crate) fn new(inner: ProxyCommandTransport) -> Self {
+        Self {
+            inner: Arc::new(inner),
+            read_task: None,
+            write_task: None,
+            flush_task: None,
+            shutdown_task: None,
+        }
+    }
+
+    fn join_error(error: &tokio::task::JoinError) -> io::Error {
+        io::Error::other(format!("ProxyCommand I/O worker stopped: {error}"))
+    }
+}
+
+impl AsyncRead for ProxyCommandStream {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if buffer.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+        if self.read_task.is_none() {
+            let inner = Arc::clone(&self.inner);
+            let capacity = buffer.remaining().min(Self::MAX_ASYNC_IO);
+            self.read_task = Some(tokio::task::spawn_blocking(move || {
+                let mut data = vec![0; capacity];
+                let length = inner.read_shared(&mut data)?;
+                data.truncate(length);
+                Ok(data)
+            }));
+        }
+        let task = self.read_task.as_mut().expect("read task is present");
+        match Pin::new(task).poll(context) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(result) => {
+                self.read_task = None;
+                let data = match result {
+                    Ok(result) => result?,
+                    Err(error) => return Poll::Ready(Err(Self::join_error(&error))),
+                };
+                buffer.put_slice(&data);
+                Poll::Ready(Ok(()))
+            }
+        }
+    }
+}
+
+impl AsyncWrite for ProxyCommandStream {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        if self.write_task.is_none() {
+            let inner = Arc::clone(&self.inner);
+            let data = buffer[..buffer.len().min(Self::MAX_ASYNC_IO)].to_vec();
+            self.write_task = Some(tokio::task::spawn_blocking(move || inner.write_shared(&data)));
+        }
+        let task = self.write_task.as_mut().expect("write task is present");
+        match Pin::new(task).poll(context) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(result) => {
+                self.write_task = None;
+                match result {
+                    Ok(result) => Poll::Ready(result),
+                    Err(error) => Poll::Ready(Err(Self::join_error(&error))),
+                }
+            }
+        }
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
+        if self.flush_task.is_none() {
+            let inner = Arc::clone(&self.inner);
+            self.flush_task = Some(tokio::task::spawn_blocking(move || inner.flush_shared()));
+        }
+        let task = self.flush_task.as_mut().expect("flush task is present");
+        match Pin::new(task).poll(context) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(result) => {
+                self.flush_task = None;
+                match result {
+                    Ok(result) => Poll::Ready(result),
+                    Err(error) => Poll::Ready(Err(Self::join_error(&error))),
+                }
+            }
+        }
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
+        if self.shutdown_task.is_none() {
+            let inner = Arc::clone(&self.inner);
+            self.shutdown_task = Some(tokio::task::spawn_blocking(move || {
+                inner
+                    .kill_child()
+                    .map_err(|error| io::Error::new(error.kind(), "ProxyCommand shutdown failed"))
+            }));
+        }
+        let task = self.shutdown_task.as_mut().expect("shutdown task is present");
+        match Pin::new(task).poll(context) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(result) => {
+                self.shutdown_task = None;
+                match result {
+                    Ok(result) => Poll::Ready(result),
+                    Err(error) => Poll::Ready(Err(Self::join_error(&error))),
+                }
+            }
+        }
+    }
 }
 
 impl Transport for ProxyCommandTransport {
     fn read(&mut self, buffer: &mut [u8]) -> Result<usize, TransportError> {
-        let mut stdout = self.stdout.lock().map_err(|_| TransportError::Io {
-            operation: TransportOperation::Read,
-            kind: io::ErrorKind::Other,
-        })?;
-        let stdout = stdout.as_mut().ok_or(TransportError::Io {
-            operation: TransportOperation::Read,
-            kind: io::ErrorKind::BrokenPipe,
-        })?;
-        stdout.read(buffer).map_err(|error| TransportError::Io {
+        self.read_shared(buffer).map_err(|error| TransportError::Io {
             operation: TransportOperation::Read,
             kind: error.kind(),
         })
     }
 
     fn write(&mut self, buffer: &[u8]) -> Result<usize, TransportError> {
-        let mut stdin = self.stdin.lock().map_err(|_| TransportError::Io {
-            operation: TransportOperation::Write,
-            kind: io::ErrorKind::Other,
-        })?;
-        let stdin = stdin.as_mut().ok_or(TransportError::Io {
-            operation: TransportOperation::Write,
-            kind: io::ErrorKind::BrokenPipe,
-        })?;
-        stdin.write(buffer).map_err(|error| TransportError::Io {
+        self.write_shared(buffer).map_err(|error| TransportError::Io {
             operation: TransportOperation::Write,
             kind: error.kind(),
         })
     }
 
     fn flush(&mut self) -> Result<(), TransportError> {
-        let mut stdin = self.stdin.lock().map_err(|_| TransportError::Io {
-            operation: TransportOperation::Flush,
-            kind: io::ErrorKind::Other,
-        })?;
-        let stdin = stdin.as_mut().ok_or(TransportError::Io {
-            operation: TransportOperation::Flush,
-            kind: io::ErrorKind::BrokenPipe,
-        })?;
-        stdin.flush().map_err(|error| TransportError::Io {
+        self.flush_shared().map_err(|error| TransportError::Io {
             operation: TransportOperation::Flush,
             kind: error.kind(),
         })
@@ -265,6 +409,8 @@ fn reap_child(child: &mut Child) {
 mod tests {
     use super::*;
     use std::ffi::OsString;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::time::{Duration, timeout};
 
     fn echo_command() -> (OsString, Vec<OsString>) {
         #[cfg(windows)]
@@ -297,6 +443,26 @@ mod tests {
                 kind: io::ErrorKind::NotConnected
             })
         ));
+    }
+
+    #[tokio::test]
+    async fn async_process_stream_round_trips_bounded_io() {
+        let (program, args) = echo_command();
+        let transport = ProxyCommandTransport::spawn(program, args).expect("spawn echo");
+        let mut stream = ProxyCommandStream::new(transport);
+        stream.write_all(b"proxy-command\n").await.expect("write input");
+        stream.flush().await.expect("flush input");
+        let mut response = [0; 64];
+        let length = timeout(Duration::from_secs(5), stream.read(&mut response))
+            .await
+            .expect("bounded read")
+            .expect("read response");
+        assert!(
+            response[..length]
+                .windows(b"proxy-command".len())
+                .any(|window| { window == b"proxy-command" })
+        );
+        stream.shutdown().await.expect("shutdown process");
     }
 
     #[test]

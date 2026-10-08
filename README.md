@@ -29,6 +29,9 @@ bounded direct child-process stdin/stdout composition without shell interpolatio
 child on shutdown or drop.
 `ClientConnection::connect_via_socks5` and `connect_via_http_connect` compose the existing bounded
 proxy handshakes with the concrete async SSH client, preserving proxy rejection and timeout errors.
+`ClientConnection::connect_via_proxy_command` composes a directly spawned, bounded desktop
+ProxyCommand with the same async SSH handoff; command arguments are passed without shell
+interpolation and the child is reaped on shutdown or drop.
 `GatewayTransport` composes the bounded K-6 client-hello frame over an established byte transport,
 handling partial writes and typed failures before the SSH engine consumes the stream.
 `GatewayTlsClientConfig` builds a TLS 1.3 client with deployment or OS roots and the required

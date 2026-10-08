@@ -9,6 +9,7 @@
 
 use std::{
     borrow::Cow,
+    ffi::{OsStr, OsString},
     fmt, io,
     net::TcpStream as StdTcpStream,
     pin::Pin,
@@ -40,6 +41,7 @@ use crate::{
     MAX_CHANNEL_ADDRESS, MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest,
     PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm,
     Signer, SignerError, Socks5Transport, TcpTransport, TransportError, WindowChangeRequest,
+    process::{ProxyCommandError, ProxyCommandStream, ProxyCommandTransport},
     verify_host_key,
 };
 
@@ -305,6 +307,9 @@ pub enum ClientError {
     /// A SOCKS5 or HTTP CONNECT route failed before the SSH stream was opened.
     #[error("SSH proxy route failed: {0}")]
     Proxy(#[from] ProxyTransportError),
+    /// A desktop `ProxyCommand` could not be started or configured.
+    #[error("SSH ProxyCommand failed: {0}")]
+    ProxyCommand(#[from] ProxyCommandError),
     /// The peer refused a channel open request.
     #[error("SSH channel open failed ({code}): {reason}")]
     ChannelOpen { code: u32, reason: String },
@@ -554,6 +559,23 @@ impl ClientConnection {
         .map_err(|_| ClientError::Transport(io::Error::other("SSH proxy route task stopped")))?
         .map_err(ClientError::Proxy)?;
         Self::connect_via_proxy_socket(config, stream).await
+    }
+
+    /// Spawn a bounded desktop `ProxyCommand` and complete the SSH handshake over its standard
+    /// input and output. Arguments are passed directly without shell interpolation.
+    pub async fn connect_via_proxy_command(
+        config: ClientConfig,
+        program: impl AsRef<OsStr>,
+        args: &[OsString],
+    ) -> Result<Self, ClientError> {
+        let program = program.as_ref().to_os_string();
+        let args = args.to_vec();
+        let transport =
+            tokio::task::spawn_blocking(move || ProxyCommandTransport::spawn(program, args))
+                .await
+                .map_err(|_| ClientError::Transport(io::Error::other("ProxyCommand task stopped")))?
+                .map_err(ClientError::ProxyCommand)?;
+        Self::connect_stream(config, ProxyCommandStream::new(transport)).await
     }
 
     async fn connect_via_proxy_socket(
@@ -2418,6 +2440,37 @@ mod tests {
             result,
             Err(ClientError::Protocol | ClientError::ConnectionClosed | ClientError::Transport(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn proxy_command_route_reaches_ssh_engine() {
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("host.example", 22, verifier).expect("config");
+        let (program, args) = proxy_command_echo();
+        let result = timeout(
+            Duration::from_secs(5),
+            ClientConnection::connect_via_proxy_command(config, program, &args),
+        )
+        .await
+        .expect("bounded ProxyCommand handshake");
+        assert!(matches!(
+            result,
+            Err(ClientError::Protocol | ClientError::ConnectionClosed | ClientError::Transport(_))
+        ));
+    }
+
+    fn proxy_command_echo() -> (OsString, Vec<OsString>) {
+        #[cfg(windows)]
+        {
+            (
+                std::env::var_os("ComSpec").unwrap_or_else(|| OsString::from("cmd.exe")),
+                vec![OsString::from("/C"), OsString::from("more")],
+            )
+        }
+        #[cfg(not(windows))]
+        {
+            (OsString::from("/bin/sh"), vec![OsString::from("-c"), OsString::from("cat")])
+        }
     }
 
     #[tokio::test]
