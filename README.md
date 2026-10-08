@@ -70,7 +70,9 @@ request correlation, and the OpenSSH `limits@openssh.com`, `posix-rename@openssh
 handles and extension data. A concrete `russh` adapter now owns TCP or caller-supplied stream
 handshakes, validates raw keys and host certificates before invoking the trust callback, supports
 password authentication, and exposes opaque session and `direct-tcpip` channels with PTY, shell,
-exec, window-change, bounded data, EOF, close, and peer-event operations. A `ClientChannelStream`
+exec, window-change, bounded data, EOF, close, and peer-event operations. `ClientConfig` carries
+the per-Host `HostAlgorithmPolicy` into russh's ordered concrete offers, appending explicitly
+enabled legacy algorithms only when supported by the selected engine. A `ClientChannelStream`
 can carry a target handshake through a jump host with
 `ClientConnection::connect_via_direct_tcpip`; repeating the operation composes arbitrary jump
 depth while retaining each parent connection. One connection multiplexes session and forwarding

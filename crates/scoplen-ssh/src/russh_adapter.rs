@@ -34,14 +34,15 @@ use zeroize::Zeroize;
 
 use crate::{
     AgentError, AgentForwardingAdapter, AgentForwardingAuthorizer, AgentForwardingPolicy,
-    AgentKeyStore, AgentServer, AsyncGatewayTransport, AsyncGatewayTransportError,
-    CertificateValidationPolicy, ExtendedDataType, GatewayTlsClientConfig, GatewayTlsConnectError,
-    HostKeyVerificationError, HostKeyVerifier, HttpConnectTransport,
-    KeyboardInteractiveInfoRequest, KeyboardInteractivePrompt, KeyboardInteractiveResponse,
-    MAX_CHANNEL_ADDRESS, MAX_CHANNEL_STRING, MAX_CHANNEL_TEXT, ProxyCredentials,
-    ProxyTransportError, PtyRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
-    Signal, SignatureAlgorithm, Signer, SignerError, Socks5Transport, TcpTransport, TransportError,
-    UserCertificate, WindowChangeRequest,
+    AgentKeyStore, AgentServer, AlgorithmCategory, AsyncGatewayTransport,
+    AsyncGatewayTransportError, CertificateValidationPolicy, ExtendedDataType,
+    GatewayTlsClientConfig, GatewayTlsConnectError, HostAlgorithmPolicy, HostKeyVerificationError,
+    HostKeyVerifier, HttpConnectTransport, KeyboardInteractiveInfoRequest,
+    KeyboardInteractivePrompt, KeyboardInteractiveResponse, MAX_CHANNEL_ADDRESS,
+    MAX_CHANNEL_STRING, MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest,
+    PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm,
+    Signer, SignerError, Socks5Transport, TcpTransport, TransportError, UserCertificate,
+    WindowChangeRequest,
     process::{ProxyCommandError, ProxyCommandStream, ProxyCommandTransport},
     verify_host_key,
 };
@@ -119,6 +120,7 @@ pub struct ClientConfig {
     keepalive_interval: Option<Duration>,
     keepalive_max: usize,
     channel_limit: usize,
+    algorithm_policy: HostAlgorithmPolicy,
 }
 
 impl fmt::Debug for ClientConfig {
@@ -132,6 +134,7 @@ impl fmt::Debug for ClientConfig {
             .field("keepalive_interval", &self.keepalive_interval)
             .field("keepalive_max", &self.keepalive_max)
             .field("channel_limit", &self.channel_limit)
+            .field("algorithm_policy", &self.algorithm_policy)
             .finish_non_exhaustive()
     }
 }
@@ -147,6 +150,7 @@ impl Clone for ClientConfig {
             keepalive_interval: self.keepalive_interval,
             keepalive_max: self.keepalive_max,
             channel_limit: self.channel_limit,
+            algorithm_policy: self.algorithm_policy.clone(),
         }
     }
 }
@@ -176,6 +180,7 @@ impl ClientConfig {
             keepalive_interval: None,
             keepalive_max: 3,
             channel_limit: DEFAULT_CLIENT_CHANNEL_LIMIT,
+            algorithm_policy: HostAlgorithmPolicy::default(),
         })
     }
 
@@ -210,6 +215,19 @@ impl ClientConfig {
         Ok(self)
     }
 
+    /// Replace the per-Host algorithm policy used by the concrete SSH engine.
+    #[must_use]
+    pub fn with_algorithm_policy(mut self, policy: HostAlgorithmPolicy) -> Self {
+        self.algorithm_policy = policy;
+        self
+    }
+
+    /// Return the per-Host algorithm policy used by this connection.
+    #[must_use]
+    pub fn algorithm_policy(&self) -> &HostAlgorithmPolicy {
+        &self.algorithm_policy
+    }
+
     /// Return the configured host name.
     #[must_use]
     pub fn host(&self) -> &str {
@@ -227,45 +245,54 @@ impl ClientConfig {
         // algorithms implemented by russh.  In particular, sntrup and umac remain in the shared
         // policy but are not advertised here because this russh release cannot negotiate them.
         let preferred = russh::Preferred {
-            kex: Cow::Owned(vec![
-                russh::kex::MLKEM768X25519_SHA256,
-                russh::kex::CURVE25519,
-                russh::kex::ECDH_SHA2_NISTP256,
-                russh::kex::ECDH_SHA2_NISTP384,
-                russh::kex::ECDH_SHA2_NISTP521,
-                russh::kex::DH_G16_SHA512,
-                russh::kex::DH_G18_SHA512,
-                russh::kex::EXTENSION_SUPPORT_AS_CLIENT,
-                russh::kex::EXTENSION_OPENSSH_STRICT_KEX_AS_CLIENT,
-            ]),
-            key: Cow::Owned(vec![
-                Algorithm::Ed25519,
-                Algorithm::Ecdsa { curve: EcdsaCurve::NistP256 },
-                Algorithm::Ecdsa { curve: EcdsaCurve::NistP384 },
-                Algorithm::Ecdsa { curve: EcdsaCurve::NistP521 },
-                Algorithm::Rsa { hash: Some(HashAlg::Sha512) },
-                Algorithm::Rsa { hash: Some(HashAlg::Sha256) },
-            ]),
-            cipher: Cow::Owned(vec![
-                russh::cipher::CHACHA20_POLY1305,
-                russh::cipher::AES_256_GCM,
-                russh::cipher::AES_128_GCM,
-                russh::cipher::AES_256_CTR,
-                russh::cipher::AES_192_CTR,
-                russh::cipher::AES_128_CTR,
-            ]),
-            mac: Cow::Owned(vec![russh::mac::HMAC_SHA512_ETM, russh::mac::HMAC_SHA256_ETM]),
-            compression: Cow::Owned(vec![russh::compression::NONE, russh::compression::ZLIB]),
+            kex: Cow::Owned(
+                self.algorithm_policy
+                    .offers(AlgorithmCategory::KeyExchange)
+                    .iter()
+                    .filter_map(|name| russh_kex(name))
+                    .chain([
+                        russh::kex::EXTENSION_SUPPORT_AS_CLIENT,
+                        russh::kex::EXTENSION_OPENSSH_STRICT_KEX_AS_CLIENT,
+                    ])
+                    .collect(),
+            ),
+            key: Cow::Owned(
+                self.algorithm_policy
+                    .offers(AlgorithmCategory::HostKey)
+                    .iter()
+                    .filter_map(|name| russh_key(name))
+                    .collect(),
+            ),
+            cipher: Cow::Owned(
+                self.algorithm_policy
+                    .offers(AlgorithmCategory::Cipher)
+                    .iter()
+                    .filter_map(|name| russh_cipher(name))
+                    .collect(),
+            ),
+            mac: Cow::Owned(
+                self.algorithm_policy
+                    .offers(AlgorithmCategory::Mac)
+                    .iter()
+                    .filter_map(|name| russh_mac(name))
+                    .collect(),
+            ),
+            compression: Cow::Owned(
+                self.algorithm_policy
+                    .offers(AlgorithmCategory::Compression)
+                    .iter()
+                    .filter_map(|name| russh_compression(name))
+                    .collect(),
+            ),
             // Certificate algorithms precede raw keys on the wire (D-42).  russh derives the
             // certificate names from this separate list.
-            host_key_certificates: Cow::Owned(vec![
-                Algorithm::Ed25519,
-                Algorithm::Ecdsa { curve: EcdsaCurve::NistP256 },
-                Algorithm::Ecdsa { curve: EcdsaCurve::NistP384 },
-                Algorithm::Ecdsa { curve: EcdsaCurve::NistP521 },
-                Algorithm::Rsa { hash: Some(HashAlg::Sha512) },
-                Algorithm::Rsa { hash: Some(HashAlg::Sha256) },
-            ]),
+            host_key_certificates: Cow::Owned(
+                self.algorithm_policy
+                    .offers(AlgorithmCategory::HostKey)
+                    .iter()
+                    .filter_map(|name| russh_certificate(name))
+                    .collect(),
+            ),
         };
         client::Config {
             preferred,
@@ -275,6 +302,90 @@ impl ClientConfig {
             nodelay: true,
             ..client::Config::default()
         }
+    }
+}
+
+fn russh_kex(name: &str) -> Option<russh::kex::Name> {
+    match name {
+        "mlkem768x25519-sha256" => Some(russh::kex::MLKEM768X25519_SHA256),
+        "curve25519-sha256" => Some(russh::kex::CURVE25519),
+        "ecdh-sha2-nistp256" => Some(russh::kex::ECDH_SHA2_NISTP256),
+        "ecdh-sha2-nistp384" => Some(russh::kex::ECDH_SHA2_NISTP384),
+        "ecdh-sha2-nistp521" => Some(russh::kex::ECDH_SHA2_NISTP521),
+        "diffie-hellman-group16-sha512" => Some(russh::kex::DH_G16_SHA512),
+        "diffie-hellman-group18-sha512" => Some(russh::kex::DH_G18_SHA512),
+        "diffie-hellman-group14-sha256" => Some(russh::kex::DH_G14_SHA256),
+        "diffie-hellman-group14-sha1" => Some(russh::kex::DH_G14_SHA1),
+        "diffie-hellman-group-exchange-sha256" => Some(russh::kex::DH_GEX_SHA256),
+        "diffie-hellman-group-exchange-sha1" => Some(russh::kex::DH_GEX_SHA1),
+        _ => None,
+    }
+}
+
+fn russh_key(name: &str) -> Option<Algorithm> {
+    match name {
+        "ssh-ed25519" => Some(Algorithm::Ed25519),
+        "ecdsa-sha2-nistp256" => Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP256 }),
+        "ecdsa-sha2-nistp384" => Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP384 }),
+        "ecdsa-sha2-nistp521" => Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP521 }),
+        "rsa-sha2-512" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha512) }),
+        "rsa-sha2-256" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha256) }),
+        "ssh-rsa" => Some(Algorithm::Rsa { hash: None }),
+        _ => None,
+    }
+}
+
+fn russh_certificate(name: &str) -> Option<Algorithm> {
+    match name {
+        "ssh-ed25519-cert-v01@openssh.com" => Some(Algorithm::Ed25519),
+        "ecdsa-sha2-nistp256-cert-v01@openssh.com" => {
+            Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP256 })
+        }
+        "ecdsa-sha2-nistp384-cert-v01@openssh.com" => {
+            Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP384 })
+        }
+        "ecdsa-sha2-nistp521-cert-v01@openssh.com" => {
+            Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP521 })
+        }
+        "rsa-sha2-512-cert-v01@openssh.com" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha512) }),
+        "rsa-sha2-256-cert-v01@openssh.com" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha256) }),
+        "ssh-rsa-cert-v01@openssh.com" => Some(Algorithm::Rsa { hash: None }),
+        _ => None,
+    }
+}
+
+fn russh_cipher(name: &str) -> Option<russh::cipher::Name> {
+    match name {
+        "chacha20-poly1305@openssh.com" => Some(russh::cipher::CHACHA20_POLY1305),
+        "aes256-gcm@openssh.com" => Some(russh::cipher::AES_256_GCM),
+        "aes128-gcm@openssh.com" => Some(russh::cipher::AES_128_GCM),
+        "aes256-ctr" => Some(russh::cipher::AES_256_CTR),
+        "aes192-ctr" => Some(russh::cipher::AES_192_CTR),
+        "aes128-ctr" => Some(russh::cipher::AES_128_CTR),
+        "aes256-cbc" => Some(russh::cipher::AES_256_CBC),
+        "aes192-cbc" => Some(russh::cipher::AES_192_CBC),
+        "aes128-cbc" => Some(russh::cipher::AES_128_CBC),
+        _ => None,
+    }
+}
+
+fn russh_mac(name: &str) -> Option<russh::mac::Name> {
+    match name {
+        "hmac-sha2-512-etm@openssh.com" => Some(russh::mac::HMAC_SHA512_ETM),
+        "hmac-sha2-256-etm@openssh.com" => Some(russh::mac::HMAC_SHA256_ETM),
+        "hmac-sha2-512" => Some(russh::mac::HMAC_SHA512),
+        "hmac-sha2-256" => Some(russh::mac::HMAC_SHA256),
+        "hmac-sha1" => Some(russh::mac::HMAC_SHA1),
+        _ => None,
+    }
+}
+
+fn russh_compression(name: &str) -> Option<russh::compression::Name> {
+    match name {
+        "none" => Some(russh::compression::NONE),
+        "zlib@openssh.com" => Some(russh::compression::ZLIB_LEGACY),
+        "zlib" => Some(russh::compression::ZLIB),
+        _ => None,
     }
 }
 
@@ -2462,6 +2573,48 @@ mod tests {
             config.with_channel_limit(MAX_CLIENT_CHANNEL_LIMIT + 1),
             Err(ClientConfigError::InvalidChannelLimit)
         ));
+    }
+
+    #[test]
+    fn algorithm_policy_controls_russh_preference_lists() {
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("example.test", 22, verifier).expect("config");
+        let preferred = config.russh_config().preferred;
+        assert!(preferred.kex.iter().any(|name| name.as_ref() == "curve25519-sha256"));
+        assert!(!preferred.kex.iter().any(|name| name.as_ref() == "diffie-hellman-group14-sha256"));
+        assert!(
+            preferred
+                .host_key_certificates
+                .iter()
+                .any(|algorithm| algorithm.to_certificate_type()
+                    == "ssh-ed25519-cert-v01@openssh.com")
+        );
+        assert!(preferred.compression.iter().any(|name| name.as_ref() == "zlib@openssh.com"));
+
+        let policy = HostAlgorithmPolicy::with_legacy(&[
+            (AlgorithmCategory::KeyExchange, "diffie-hellman-group14-sha256"),
+            (AlgorithmCategory::HostKey, "ssh-rsa"),
+            (AlgorithmCategory::Cipher, "aes256-cbc"),
+            (AlgorithmCategory::Mac, "hmac-sha1"),
+            (AlgorithmCategory::Compression, "zlib"),
+        ])
+        .expect("legacy policy");
+        let preferred = config.with_algorithm_policy(policy).russh_config().preferred;
+        let modern_kex = preferred
+            .kex
+            .iter()
+            .position(|name| name.as_ref() == "curve25519-sha256")
+            .expect("modern kex");
+        let legacy_kex = preferred
+            .kex
+            .iter()
+            .position(|name| name.as_ref() == "diffie-hellman-group14-sha256")
+            .expect("legacy kex");
+        assert!(modern_kex < legacy_kex);
+        assert!(preferred.key.iter().any(|algorithm| algorithm.as_str() == "ssh-rsa"));
+        assert!(preferred.cipher.iter().any(|name| name.as_ref() == "aes256-cbc"));
+        assert!(preferred.mac.iter().any(|name| name.as_ref() == "hmac-sha1"));
+        assert!(preferred.compression.iter().any(|name| name.as_ref() == "zlib"));
     }
 
     #[test]
