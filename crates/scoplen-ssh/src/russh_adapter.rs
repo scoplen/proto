@@ -328,6 +328,8 @@ fn russh_key(name: &str) -> Option<Algorithm> {
         "ecdsa-sha2-nistp256" => Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP256 }),
         "ecdsa-sha2-nistp384" => Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP384 }),
         "ecdsa-sha2-nistp521" => Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP521 }),
+        "sk-ssh-ed25519@openssh.com" => Some(Algorithm::SkEd25519),
+        "sk-ecdsa-sha2-nistp256@openssh.com" => Some(Algorithm::SkEcdsaSha2NistP256),
         "rsa-sha2-512" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha512) }),
         "rsa-sha2-256" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha256) }),
         "ssh-rsa" => Some(Algorithm::Rsa { hash: None }),
@@ -347,6 +349,8 @@ fn russh_certificate(name: &str) -> Option<Algorithm> {
         "ecdsa-sha2-nistp521-cert-v01@openssh.com" => {
             Some(Algorithm::Ecdsa { curve: EcdsaCurve::NistP521 })
         }
+        "sk-ssh-ed25519-cert-v01@openssh.com" => Some(Algorithm::SkEd25519),
+        "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com" => Some(Algorithm::SkEcdsaSha2NistP256),
         "rsa-sha2-512-cert-v01@openssh.com" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha512) }),
         "rsa-sha2-256-cert-v01@openssh.com" => Some(Algorithm::Rsa { hash: Some(HashAlg::Sha256) }),
         "ssh-rsa-cert-v01@openssh.com" => Some(Algorithm::Rsa { hash: None }),
@@ -2617,6 +2621,15 @@ mod tests {
                 .any(|algorithm| algorithm.to_certificate_type()
                     == "ssh-ed25519-cert-v01@openssh.com")
         );
+        assert!(
+            preferred
+                .key
+                .iter()
+                .any(|algorithm| algorithm.as_str() == "sk-ssh-ed25519@openssh.com")
+        );
+        assert!(preferred.host_key_certificates.iter().any(|algorithm| {
+            algorithm.to_certificate_type() == "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+        }));
         assert!(preferred.compression.iter().any(|name| name.as_ref() == "zlib@openssh.com"));
 
         let policy = HostAlgorithmPolicy::with_legacy(&[
