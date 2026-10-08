@@ -3017,12 +3017,14 @@ version = "0.1.0"
 dependencies = [
  "pageant",
  "russh",
+ "rustls",
  "scoplen-api",
  "scoplen-crypto",
  "signature 3.0.0",
  "ssh-key",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "zeroize",
 ]
 

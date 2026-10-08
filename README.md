@@ -30,10 +30,11 @@ child on shutdown or drop.
 `ClientConnection::connect_via_socks5` and `connect_via_http_connect` compose the existing bounded
 proxy handshakes with the concrete async SSH client, preserving proxy rejection and timeout errors.
 `GatewayTransport` composes the bounded K-6 client-hello frame over an established byte transport,
-handling partial writes and typed failures before the SSH engine consumes the stream. TLS/ALPN
-negotiation and live gateway interoperability remain outside this adapter. `AsyncGatewayTransport`
-and `ClientConnection::connect_via_gateway_stream` provide the same one-shot framing over an
-already negotiated async TLS/ALPN stream before the SSH version exchange.
+handling partial writes and typed failures before the SSH engine consumes the stream.
+`GatewayTlsClientConfig` builds a TLS 1.3 client with deployment or OS roots and the required
+`spl-gw/1` ALPN, and `connect_and_handshake` performs certificate verification, strict ALPN
+checking, and the client hello before the SSH version exchange. `AsyncGatewayTransport` and
+`ClientConnection::connect_via_gateway_stream` remain available when a caller owns the TLS stream.
 Software Ed25519, P-256, and
 RSA/SHA-2 signers, FIDO2 security-key hooks, RFC 4252 `none`, password and keyboard-interactive
 codecs, certificate validation, and host-verification callbacks are available. Agent support
@@ -75,7 +76,7 @@ The concrete adapter also forwards bounded environment and signal requests and a
 server-opened `auth-agent@openssh.com` channels. `ForwardedChannel::serve_agent` reassembles
 russh channel fragments, applies the fail-closed forwarding policy, and returns bounded agent
 responses; an in-process russh round trip covers the concrete lifecycle. External OpenSSH and
-Pageant interoperability, TLS/ALPN gateway negotiation, and broader channel scheduling remain
+Pageant interoperability, live gateway interoperability, and broader channel scheduling remain
 unverified.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,

@@ -9,14 +9,133 @@ use std::{
     fmt, io,
     net::{Shutdown, SocketAddr},
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
 };
 
+use rustls::{ClientConfig, RootCertStore, pki_types::ServerName};
 use scoplen_api::gateway::{GatewayClientHello, GatewayCodecError};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
+use tokio_rustls::{TlsConnector, client::TlsStream};
 
 use crate::tcp::{Transport, TransportError, TransportOperation};
+
+/// ALPN protocol advertised by a Scoplen gateway edge.
+pub const GATEWAY_ALPN: &[u8] = b"spl-gw/1";
+
+const MAX_TLS_DOMAIN_BYTES: usize = 253;
+
+/// Errors raised while building a gateway TLS client configuration.
+#[derive(Debug, Error)]
+pub enum GatewayTlsConfigError {
+    /// A required configuration value was empty.
+    #[error("gateway TLS {0} must not be empty")]
+    Empty(&'static str),
+    /// The server name is not a valid DNS name or IP address for rustls.
+    #[error("gateway TLS server name is invalid")]
+    InvalidServerName,
+    /// The server name exceeded the DNS wire bound.
+    #[error("gateway TLS server name exceeds 253 bytes")]
+    DomainTooLong,
+}
+
+/// Errors raised while connecting to a gateway over TLS.
+#[derive(Debug, Error)]
+pub enum GatewayTlsConnectError {
+    /// The TLS handshake failed.
+    #[error("gateway TLS handshake failed: {0}")]
+    Tls(#[source] io::Error),
+    /// The edge did not negotiate the required `spl-gw/1` ALPN protocol.
+    #[error("gateway TLS ALPN is not spl-gw/1")]
+    AlpnMismatch,
+    /// The gateway hello could not be written after TLS completed.
+    #[error("gateway hello failed: {0}")]
+    Prelude(#[from] AsyncGatewayTransportError),
+}
+
+/// TLS 1.3 client configuration for the gateway edge.
+#[derive(Clone)]
+pub struct GatewayTlsClientConfig {
+    config: Arc<ClientConfig>,
+    server_name: ServerName<'static>,
+}
+
+impl fmt::Debug for GatewayTlsClientConfig {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("GatewayTlsClientConfig").finish_non_exhaustive()
+    }
+}
+
+impl GatewayTlsClientConfig {
+    /// Build a client configuration that requires trusted edge certificate roots.
+    ///
+    /// The resulting config enables only TLS 1.3 and advertises exactly `spl-gw/1` through
+    /// ALPN. `roots` must contain the deployment or operating-system trust anchors selected by
+    /// the caller; no implicit public CA set is installed here. Client-to-edge TLS is one-way;
+    /// the internal gateway links use mutual TLS separately.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when roots or the server name is missing or invalid.
+    pub fn new(roots: RootCertStore, domain: &str) -> Result<Self, GatewayTlsConfigError> {
+        if roots.is_empty() {
+            return Err(GatewayTlsConfigError::Empty("root certificates"));
+        }
+        if domain.is_empty() {
+            return Err(GatewayTlsConfigError::Empty("server name"));
+        }
+        if domain.len() > MAX_TLS_DOMAIN_BYTES {
+            return Err(GatewayTlsConfigError::DomainTooLong);
+        }
+        let server_name = ServerName::try_from(domain.to_owned())
+            .map_err(|_| GatewayTlsConfigError::InvalidServerName)?;
+        let mut config = ClientConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        config.alpn_protocols = vec![GATEWAY_ALPN.to_vec()];
+        Ok(Self { config: Arc::new(config), server_name })
+    }
+
+    /// Connect and complete the TLS 1.3 handshake over an established byte stream.
+    ///
+    /// The returned stream has negotiated and verified the configured server name and CA. It is
+    /// ready for [`AsyncGatewayTransport::handshake`] to write the K-6 client hello.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GatewayTlsConnectError::Tls`] if the handshake or certificate verification fails.
+    pub async fn connect<IO>(&self, stream: IO) -> Result<TlsStream<IO>, GatewayTlsConnectError>
+    where
+        IO: AsyncRead + AsyncWrite + Unpin,
+    {
+        let tls = TlsConnector::from(self.config.clone())
+            .connect(self.server_name.clone(), stream)
+            .await
+            .map_err(GatewayTlsConnectError::Tls)?;
+        if tls.get_ref().1.alpn_protocol() != Some(GATEWAY_ALPN) {
+            return Err(GatewayTlsConnectError::AlpnMismatch);
+        }
+        Ok(tls)
+    }
+
+    /// Connect with TLS 1.3 and write the bounded K-6 gateway client hello.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed TLS or prelude error if either step fails.
+    pub async fn connect_and_handshake<IO>(
+        &self,
+        stream: IO,
+        hello: &GatewayClientHello,
+    ) -> Result<AsyncGatewayTransport<TlsStream<IO>>, GatewayTlsConnectError>
+    where
+        IO: AsyncRead + AsyncWrite + Unpin,
+    {
+        let tls = self.connect(stream).await?;
+        AsyncGatewayTransport::handshake(tls, hello).await.map_err(GatewayTlsConnectError::Prelude)
+    }
+}
 
 /// Errors raised while composing a gateway stream.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -235,8 +354,18 @@ impl<T: Transport> io::Write for GatewayTransport<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::ErrorKind;
+    use rustls::{
+        RootCertStore, ServerConfig, ServerConnection,
+        pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
+    };
+    use std::{io::ErrorKind, sync::Arc};
     use tokio::io::{AsyncReadExt, AsyncWriteExt, duplex};
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio_rustls::TlsAcceptor;
+
+    mod test_certs {
+        include!("gateway_test_certs.rs");
+    }
 
     #[derive(Debug)]
     struct FakeTransport {
@@ -302,6 +431,31 @@ mod tests {
     fn hello() -> GatewayClientHello {
         GatewayClientHello::new("header.payload.signature", "proof.body.signature")
             .expect("valid hello")
+    }
+
+    fn certs(pem: &str) -> Vec<CertificateDer<'static>> {
+        CertificateDer::pem_slice_iter(pem.as_bytes())
+            .collect::<Result<Vec<_>, _>>()
+            .expect("certificates")
+    }
+
+    fn private_key(pem: &str) -> PrivateKeyDer<'static> {
+        PrivateKeyDer::from_pem_slice(pem.as_bytes()).expect("private key")
+    }
+
+    fn server_config() -> Arc<ServerConfig> {
+        let mut config = ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+            .with_no_client_auth()
+            .with_single_cert(certs(test_certs::SERVER_CERT), private_key(test_certs::SERVER_KEY))
+            .expect("server config");
+        config.alpn_protocols = vec![GATEWAY_ALPN.to_vec()];
+        Arc::new(config)
+    }
+
+    fn client_config() -> GatewayTlsClientConfig {
+        let mut roots = RootCertStore::empty();
+        roots.add(certs(test_certs::CA_CERT).remove(0)).expect("CA");
+        GatewayTlsClientConfig::new(roots, "localhost").expect("client config")
     }
 
     #[test]
@@ -394,5 +548,117 @@ mod tests {
         let mut outgoing = [0; 5];
         peer.read_exact(&mut outgoing).await.expect("peer read");
         assert_eq!(&outgoing, b"reply");
+    }
+
+    #[tokio::test]
+    async fn tls_connector_negotiates_tls13_alpn_before_prelude() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept");
+            let acceptor = TlsAcceptor::from(server_config());
+            let mut tls = acceptor.accept(stream).await.expect("TLS");
+            let (_, connection): (&TcpStream, &ServerConnection) = tls.get_ref();
+            assert_eq!(connection.protocol_version(), Some(rustls::version::TLS13.version));
+            assert_eq!(connection.alpn_protocol(), Some(GATEWAY_ALPN));
+            let mut prefix = [0; 4];
+            tls.read_exact(&mut prefix).await.expect("prefix");
+            let length = u32::from_be_bytes(prefix) as usize;
+            let mut body = vec![0; length];
+            tls.read_exact(&mut body).await.expect("body");
+            let mut frame = prefix.to_vec();
+            frame.extend_from_slice(&body);
+            assert_eq!(GatewayClientHello::from_frame(&frame).expect("hello"), hello());
+            tls.write_all(b"ssh-server-banner").await.expect("banner");
+            tls.flush().await.expect("flush");
+        });
+
+        let config = client_config();
+        let stream = TcpStream::connect(address).await.expect("connect");
+        let mut gateway = config.connect_and_handshake(stream, &hello()).await.expect("gateway");
+        let (_, connection) = gateway.get_ref().get_ref();
+        assert_eq!(connection.protocol_version(), Some(rustls::version::TLS13.version));
+        assert_eq!(connection.alpn_protocol(), Some(GATEWAY_ALPN));
+        let mut banner = [0; 17];
+        gateway.read_exact(&mut banner).await.expect("banner");
+        assert_eq!(&banner, b"ssh-server-banner");
+        server.await.expect("server task");
+    }
+
+    #[test]
+    fn tls_client_configuration_rejects_empty_roots_and_invalid_names() {
+        let error = GatewayTlsClientConfig::new(RootCertStore::empty(), "localhost")
+            .expect_err("empty roots");
+        assert!(matches!(error, GatewayTlsConfigError::Empty("root certificates")));
+
+        let mut roots = RootCertStore::empty();
+        roots.add(certs(test_certs::CA_CERT).remove(0)).expect("CA");
+        let error = GatewayTlsClientConfig::new(roots, &"a".repeat(MAX_TLS_DOMAIN_BYTES + 1))
+            .expect_err("long name");
+        assert!(matches!(error, GatewayTlsConfigError::DomainTooLong));
+    }
+
+    #[tokio::test]
+    async fn tls_connector_rejects_wrong_alpn_before_hello() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept");
+            let mut config = (*server_config()).clone();
+            config.alpn_protocols = vec![b"h2".to_vec()];
+            let acceptor = TlsAcceptor::from(Arc::new(config));
+            acceptor.accept(stream).await
+        });
+
+        let stream = TcpStream::connect(address).await.expect("connect");
+        let error = client_config()
+            .connect_and_handshake(stream, &hello())
+            .await
+            .expect_err("ALPN mismatch");
+        assert!(matches!(
+            error,
+            GatewayTlsConnectError::AlpnMismatch | GatewayTlsConnectError::Tls(_)
+        ));
+        let _ = server.await.expect("server task");
+    }
+
+    #[tokio::test]
+    async fn tls_connector_rejects_absent_alpn_before_hello() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept");
+            let mut config = (*server_config()).clone();
+            config.alpn_protocols.clear();
+            TlsAcceptor::from(Arc::new(config)).accept(stream).await
+        });
+
+        let stream = TcpStream::connect(address).await.expect("connect");
+        let error = client_config()
+            .connect_and_handshake(stream, &hello())
+            .await
+            .expect_err("ALPN missing");
+        assert!(matches!(error, GatewayTlsConnectError::AlpnMismatch));
+        let _ = server.await.expect("server task");
+    }
+
+    #[tokio::test]
+    async fn tls_connector_rejects_wrong_server_name_before_hello() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept");
+            TlsAcceptor::from(server_config()).accept(stream).await
+        });
+
+        let mut roots = RootCertStore::empty();
+        roots.add(certs(test_certs::CA_CERT).remove(0)).expect("CA");
+        let config =
+            GatewayTlsClientConfig::new(roots, "not-localhost.test").expect("client config");
+        let stream = TcpStream::connect(address).await.expect("connect");
+        let error =
+            config.connect_and_handshake(stream, &hello()).await.expect_err("name mismatch");
+        assert!(matches!(error, GatewayTlsConnectError::Tls(_)));
+        let _ = server.await.expect("server task");
     }
 }

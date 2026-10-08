@@ -67,7 +67,8 @@ pub use channels::{
     MAX_CHANNEL_STRING, MAX_CHANNEL_TEXT, MAX_PTY_MODES, PtyRequest, Signal, WindowChangeRequest,
 };
 pub use gateway::{
-    AsyncGatewayTransport, AsyncGatewayTransportError, GatewayTransport, GatewayTransportError,
+    AsyncGatewayTransport, AsyncGatewayTransportError, GATEWAY_ALPN, GatewayTlsClientConfig,
+    GatewayTlsConfigError, GatewayTlsConnectError, GatewayTransport, GatewayTransportError,
 };
 pub use policy::{AlgorithmCategory, AlgorithmPolicyError, HostAlgorithmPolicy};
 pub use process::{
