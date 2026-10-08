@@ -405,15 +405,12 @@ fn effective_chunk_size(
     limits: Option<SftpLimits>,
     read: bool,
 ) -> Result<u32, SftpChannelError> {
-    let server_limit = limits.map_or(
-        u64::try_from(MAX_SFTP_PACKET - 64).expect("SFTP packet bound fits u64"),
-        |limits| {
-            if read { limits.max_read_length } else { limits.max_write_length }
-        },
-    );
-    let bounded = u64::from(requested)
-        .min(server_limit)
-        .min(u64::try_from(MAX_SFTP_PACKET - 64).expect("SFTP packet bound fits u64"));
+    let local_limit = u64::try_from(MAX_SFTP_PACKET - 64).expect("SFTP packet bound fits u64");
+    let server_limit = limits.map_or(local_limit, |limits| {
+        let packet_limit = limits.max_packet_length.saturating_sub(64);
+        packet_limit.min(if read { limits.max_read_length } else { limits.max_write_length })
+    });
+    let bounded = u64::from(requested).min(server_limit).min(local_limit);
     u32::try_from(bounded).map_err(|_| SftpError::InvalidValue("transfer chunk size").into())
 }
 
@@ -556,6 +553,13 @@ mod tests {
         });
         assert_eq!(effective_chunk_size(4096, limits, true).unwrap(), 128);
         assert_eq!(effective_chunk_size(4096, limits, false).unwrap(), 64);
+        let packet_limited = Some(SftpLimits {
+            max_packet_length: 128,
+            max_read_length: 4096,
+            max_write_length: 4096,
+            max_open_handles: 8,
+        });
+        assert_eq!(effective_chunk_size(4096, packet_limited, true).unwrap(), 64);
         assert_eq!(
             effective_chunk_size(u32::try_from(MAX_SFTP_PACKET).unwrap(), None, true).unwrap(),
             u32::try_from(MAX_SFTP_PACKET - 64).unwrap()
