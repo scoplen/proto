@@ -66,7 +66,9 @@ pub use channels::{
     GlobalRequestType, MAX_CHANNEL_ADDRESS, MAX_CHANNEL_MESSAGE, MAX_CHANNEL_NAME,
     MAX_CHANNEL_STRING, MAX_CHANNEL_TEXT, MAX_PTY_MODES, PtyRequest, Signal, WindowChangeRequest,
 };
-pub use gateway::{GatewayTransport, GatewayTransportError};
+pub use gateway::{
+    AsyncGatewayTransport, AsyncGatewayTransportError, GatewayTransport, GatewayTransportError,
+};
 pub use policy::{AlgorithmCategory, AlgorithmPolicyError, HostAlgorithmPolicy};
 pub use process::{
     MAX_PROXY_COMMAND_ARGUMENT, MAX_PROXY_COMMAND_ARGUMENTS, MAX_PROXY_COMMAND_PROGRAM,

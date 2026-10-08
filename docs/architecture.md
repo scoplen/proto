@@ -61,7 +61,9 @@ handshakes on blocking workers, upgrade the resulting nonblocking sockets to the
 stream boundary, and preserve typed proxy rejection and timeout errors. `GatewayTransport` writes
 and flushes one validated K-6 client-hello frame over an established byte transport before handing
 the stream to the SSH engine, including partial-write and typed failure handling. TLS/ALPN
-negotiation and interoperability with other SSH engines remain open. The concrete adapter accepts
+negotiation and interoperability with other SSH engines remain open. `AsyncGatewayTransport` and
+`ClientConnection::connect_via_gateway_stream` compose the same one-shot frame over an already
+negotiated async TLS/ALPN stream before the SSH version exchange. The concrete adapter accepts
 server-opened `auth-agent@openssh.com` channels through `ForwardedChannelKind::Agent`; callers can
 serve them with `ForwardedChannel::serve_agent`, which reassembles channel fragments, applies the
 fail-closed signature authorizer, and bounds every response. An in-process russh round trip covers

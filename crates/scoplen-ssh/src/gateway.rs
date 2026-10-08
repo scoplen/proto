@@ -8,10 +8,13 @@
 use std::{
     fmt, io,
     net::{Shutdown, SocketAddr},
+    pin::Pin,
+    task::{Context, Poll},
 };
 
 use scoplen_api::gateway::{GatewayClientHello, GatewayCodecError};
 use thiserror::Error;
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 use crate::tcp::{Transport, TransportError, TransportOperation};
 
@@ -26,6 +29,17 @@ pub enum GatewayTransportError {
     Transport(#[from] TransportError),
 }
 
+/// Errors raised while composing a gateway stream over an asynchronous transport.
+#[derive(Debug, Error)]
+pub enum AsyncGatewayTransportError {
+    /// The hello failed K-6 validation or could not be encoded.
+    #[error("gateway client hello is invalid: {0}")]
+    Codec(#[from] GatewayCodecError),
+    /// The underlying asynchronous stream rejected the hello write or flush.
+    #[error("gateway client hello transport failed: {0}")]
+    Io(#[source] io::Error),
+}
+
 /// A byte transport after the bounded K-6 client hello has been sent.
 ///
 /// The constructor writes exactly one length-prefixed `GatewayClientHello`, handling partial
@@ -35,9 +49,20 @@ pub struct GatewayTransport<T> {
     inner: T,
 }
 
+/// An asynchronous byte transport after the bounded K-6 client hello has been sent.
+pub struct AsyncGatewayTransport<T> {
+    inner: T,
+}
+
 impl<T> fmt::Debug for GatewayTransport<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("GatewayTransport").finish_non_exhaustive()
+    }
+}
+
+impl<T> fmt::Debug for AsyncGatewayTransport<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("AsyncGatewayTransport").finish_non_exhaustive()
     }
 }
 
@@ -75,6 +100,73 @@ impl<T: Transport> GatewayTransport<T> {
     #[must_use]
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.inner
+    }
+}
+
+impl<T: AsyncRead + AsyncWrite + Unpin> AsyncGatewayTransport<T> {
+    /// Write and flush one validated K-6 client hello over `inner`.
+    ///
+    /// TLS 1.3 and ALPN must already have been negotiated by the caller. The returned stream is
+    /// ready for the SSH engine to perform its version exchange.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AsyncGatewayTransportError::Codec`] for an invalid hello or
+    /// [`AsyncGatewayTransportError::Io`] when the stream rejects the frame or flush.
+    pub async fn handshake(
+        mut inner: T,
+        hello: &GatewayClientHello,
+    ) -> Result<Self, AsyncGatewayTransportError> {
+        let frame = hello.encode_frame()?;
+        inner.write_all(&frame).await.map_err(AsyncGatewayTransportError::Io)?;
+        inner.flush().await.map_err(AsyncGatewayTransportError::Io)?;
+        Ok(Self { inner })
+    }
+
+    /// Return the underlying asynchronous transport after the gateway prelude has been sent.
+    #[must_use]
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+
+    /// Borrow the underlying asynchronous transport.
+    #[must_use]
+    pub fn get_ref(&self) -> &T {
+        &self.inner
+    }
+
+    /// Mutably borrow the underlying asynchronous transport.
+    #[must_use]
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+}
+
+impl<T: AsyncRead + AsyncWrite + Unpin> AsyncRead for AsyncGatewayTransport<T> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(cx, buffer)
+    }
+}
+
+impl<T: AsyncRead + AsyncWrite + Unpin> AsyncWrite for AsyncGatewayTransport<T> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.inner).poll_write(cx, buffer)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
@@ -144,6 +236,7 @@ impl<T: Transport> io::Write for GatewayTransport<T> {
 mod tests {
     use super::*;
     use std::io::ErrorKind;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, duplex};
 
     #[derive(Debug)]
     struct FakeTransport {
@@ -270,5 +363,36 @@ mod tests {
         assert_eq!(wrapped.read(&mut bytes).expect("read"), 4);
         assert_eq!(&bytes, b"ssh-");
         assert_eq!(wrapped.write(b"next").expect("write"), 4);
+    }
+
+    #[tokio::test]
+    async fn async_handshake_writes_frame_and_delegates_bytes() {
+        let hello = hello();
+        let (client, mut peer) = duplex(4096);
+        let expected = hello.clone();
+        let handshake = tokio::spawn(async move {
+            AsyncGatewayTransport::handshake(client, &hello).await.expect("handshake")
+        });
+
+        let mut prefix = [0; 4];
+        peer.read_exact(&mut prefix).await.expect("frame prefix");
+        let length = u32::from_be_bytes(prefix) as usize;
+        let mut body = vec![0; length];
+        peer.read_exact(&mut body).await.expect("frame body");
+        let mut frame = prefix.to_vec();
+        frame.extend_from_slice(&body);
+        assert_eq!(GatewayClientHello::from_frame(&frame).expect("frame"), expected);
+
+        peer.write_all(b"ssh").await.expect("peer write");
+        peer.flush().await.expect("peer flush");
+        let mut wrapped = handshake.await.expect("join");
+        let mut incoming = [0; 3];
+        wrapped.read_exact(&mut incoming).await.expect("wrapped read");
+        assert_eq!(&incoming, b"ssh");
+        wrapped.write_all(b"reply").await.expect("wrapped write");
+        wrapped.flush().await.expect("wrapped flush");
+        let mut outgoing = [0; 5];
+        peer.read_exact(&mut outgoing).await.expect("peer read");
+        assert_eq!(&outgoing, b"reply");
     }
 }

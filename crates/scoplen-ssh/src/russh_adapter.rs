@@ -32,11 +32,12 @@ use zeroize::Zeroize;
 
 use crate::{
     AgentError, AgentForwardingAdapter, AgentForwardingAuthorizer, AgentForwardingPolicy,
-    AgentKeyStore, AgentServer, CertificateValidationPolicy, ExtendedDataType,
-    HostKeyVerificationError, HostKeyVerifier, HttpConnectTransport, MAX_CHANNEL_ADDRESS,
-    MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest, PublicKeyAuthContext,
-    PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm, Signer, SignerError,
-    Socks5Transport, WindowChangeRequest, verify_host_key,
+    AgentKeyStore, AgentServer, AsyncGatewayTransport, AsyncGatewayTransportError,
+    CertificateValidationPolicy, ExtendedDataType, HostKeyVerificationError, HostKeyVerifier,
+    HttpConnectTransport, MAX_CHANNEL_ADDRESS, MAX_CHANNEL_TEXT, ProxyCredentials,
+    ProxyTransportError, PtyRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
+    Signal, SignatureAlgorithm, Signer, SignerError, Socks5Transport, WindowChangeRequest,
+    verify_host_key,
 };
 
 const MAX_CLIENT_HOST: usize = 4096;
@@ -306,6 +307,9 @@ pub enum ClientError {
     /// A channel operation could not be delivered or completed.
     #[error("SSH channel operation failed")]
     Channel,
+    /// The gateway client hello could not be composed over the caller's stream.
+    #[error("SSH gateway prelude failed: {0}")]
+    Gateway(#[from] AsyncGatewayTransportError),
     /// A forwarded SSH agent request or lifecycle event failed the bounded agent boundary.
     #[error("SSH forwarded agent channel failed: {0}")]
     Agent(#[from] AgentError),
@@ -408,6 +412,23 @@ impl ClientConnection {
         let handle =
             client::connect_stream(Arc::new(config.russh_config()), stream, handler).await?;
         Ok(Self { handle, channel_slots, channel_limit: config.channel_limit, forwarded_channels })
+    }
+
+    /// Write the K-6 gateway client hello over an already negotiated TLS/ALPN stream, then start
+    /// the SSH client on the same stream.
+    ///
+    /// The caller owns TLS certificate verification and ALPN selection. This method only composes
+    /// the bounded one-shot gateway prelude before the ordinary SSH version exchange.
+    pub async fn connect_via_gateway_stream<S>(
+        config: ClientConfig,
+        stream: S,
+        hello: &scoplen_api::gateway::GatewayClientHello,
+    ) -> Result<Self, ClientError>
+    where
+        S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    {
+        let stream = AsyncGatewayTransport::handshake(stream, hello).await?;
+        Self::connect_stream(config, stream).await
     }
 
     /// Connect through a SOCKS5 proxy and complete the SSH handshake over the resulting stream.
@@ -2169,6 +2190,43 @@ mod tests {
         drop(peer);
         let result =
             timeout(Duration::from_secs(5), task).await.expect("bounded handshake").expect("join");
+        assert!(matches!(
+            result,
+            Err(ClientError::Protocol | ClientError::ConnectionClosed | ClientError::Transport(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn gateway_stream_writes_prelude_before_ssh_handoff() {
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("host.example", 22, verifier).expect("config");
+        let hello = scoplen_api::gateway::GatewayClientHello::new(
+            "header.payload.signature",
+            "proof.body.signature",
+        )
+        .expect("hello");
+        let expected = hello.clone();
+        let (client, mut peer) = duplex(4096);
+        let task = tokio::spawn(async move {
+            ClientConnection::connect_via_gateway_stream(config, client, &hello).await
+        });
+
+        let mut prefix = [0; 4];
+        peer.read_exact(&mut prefix).await.expect("gateway prefix");
+        let body_length = u32::from_be_bytes(prefix) as usize;
+        let mut body = vec![0; body_length];
+        peer.read_exact(&mut body).await.expect("gateway body");
+        let mut frame = prefix.to_vec();
+        frame.extend_from_slice(&body);
+        assert_eq!(
+            scoplen_api::gateway::GatewayClientHello::from_frame(&frame).expect("frame"),
+            expected
+        );
+
+        peer.write_all(b"not-ssh\r\n").await.expect("server banner");
+        drop(peer);
+        let result =
+            timeout(Duration::from_secs(5), task).await.expect("bounded handoff").expect("join");
         assert!(matches!(
             result,
             Err(ClientError::Protocol | ClientError::ConnectionClosed | ClientError::Transport(_))

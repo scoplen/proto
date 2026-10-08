@@ -4,6 +4,9 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Added `AsyncGatewayTransport` and `ClientConnection::connect_via_gateway_stream` to write and
+  flush the bounded K-6 client hello over an already negotiated async TLS/ALPN stream before SSH
+  starts. TLS/ALPN setup and live edge interoperability remain caller-owned and unverified.
 - Aligned the standalone fuzz workspace with the local MSRV-compatible Pageant patch so all five
   nightly fuzz targets resolve the same agent adapter and build on Windows as well as Linux CI.
 - Added concrete `russh` integration for server-opened `auth-agent@openssh.com` channels. The
