@@ -34,7 +34,8 @@ use crate::{
     CertificateValidationPolicy, ExtendedDataType, HostKeyVerificationError, HostKeyVerifier,
     HttpConnectTransport, MAX_CHANNEL_ADDRESS, MAX_CHANNEL_TEXT, ProxyCredentials,
     ProxyTransportError, PtyRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
-    SignatureAlgorithm, Signer, SignerError, Socks5Transport, WindowChangeRequest, verify_host_key,
+    Signal, SignatureAlgorithm, Signer, SignerError, Socks5Transport, WindowChangeRequest,
+    verify_host_key,
 };
 
 const MAX_CLIENT_HOST: usize = 4096;
@@ -828,6 +829,29 @@ impl ClientChannel {
         self.channel.request_shell(want_reply).await.map_err(ClientError::from)
     }
 
+    /// Set one bounded remote environment variable before starting a session.
+    pub async fn set_env(
+        &self,
+        name: &[u8],
+        value: &[u8],
+        want_reply: bool,
+    ) -> Result<(), ClientError> {
+        validate_text(name, MAX_CHANNEL_TEXT, "environment name", true)
+            .map_err(ClientError::Config)?;
+        validate_text(value, MAX_CHANNEL_TEXT, "environment value", false)
+            .map_err(ClientError::Config)?;
+        let name = str::from_utf8(name)
+            .map_err(|_| ClientError::InvalidInput("environment name must be UTF-8"))?;
+        let value = str::from_utf8(value)
+            .map_err(|_| ClientError::InvalidInput("environment value must be UTF-8"))?;
+        self.channel.set_env(want_reply, name, value).await.map_err(ClientError::from)
+    }
+
+    /// Send one RFC 4254 signal to the remote session.
+    pub async fn signal(&self, signal: Signal) -> Result<(), ClientError> {
+        self.channel.signal(to_russh_signal(signal)).await.map_err(ClientError::from)
+    }
+
     /// Start a bounded subsystem on this session channel.
     pub async fn request_subsystem(&self, name: &str, want_reply: bool) -> Result<(), ClientError> {
         validate_text(name.as_bytes(), MAX_CHANNEL_TEXT, "subsystem", true)
@@ -1358,6 +1382,28 @@ fn signal_name_text(signal: &russh::Sig) -> &str {
     }
 }
 
+fn to_russh_signal(signal: Signal) -> russh::Sig {
+    match signal {
+        Signal::Abrt => russh::Sig::ABRT,
+        Signal::Alrm => russh::Sig::ALRM,
+        Signal::Fpe => russh::Sig::FPE,
+        Signal::Hup => russh::Sig::HUP,
+        Signal::Ill => russh::Sig::ILL,
+        Signal::Int => russh::Sig::INT,
+        Signal::Kill => russh::Sig::KILL,
+        Signal::Pipe => russh::Sig::PIPE,
+        Signal::Quit => russh::Sig::QUIT,
+        Signal::Segv => russh::Sig::SEGV,
+        Signal::Term => russh::Sig::TERM,
+        Signal::Usr1 => russh::Sig::USR1,
+        Signal::Usr2 => russh::Sig::Custom("USR2".to_owned()),
+        Signal::Stop => russh::Sig::Custom("STOP".to_owned()),
+        Signal::Tstp => russh::Sig::Custom("TSTP".to_owned()),
+        Signal::Ttin => russh::Sig::Custom("TTIN".to_owned()),
+        Signal::Ttou => russh::Sig::Custom("TTOU".to_owned()),
+    }
+}
+
 fn validate_text(
     value: &[u8],
     limit: usize,
@@ -1455,6 +1501,57 @@ mod tests {
             session: &mut russh::server::Session,
         ) -> Result<(), Self::Error> {
             session.data(channel, data.to_vec())
+        }
+    }
+
+    #[derive(Clone)]
+    struct SessionRequestServer {
+        environments: mpsc::Sender<(String, String)>,
+        signals: mpsc::Sender<String>,
+    }
+
+    impl russh::server::Handler for SessionRequestServer {
+        type Error = russh::Error;
+
+        async fn auth_password(
+            &mut self,
+            _user: &str,
+            _password: &str,
+        ) -> Result<russh::server::Auth, Self::Error> {
+            Ok(russh::server::Auth::Accept)
+        }
+
+        async fn channel_open_session(
+            &mut self,
+            _channel: russh::Channel<russh::server::Msg>,
+            reply: russh::server::ChannelOpenHandle,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            reply.accept().await;
+            Ok(())
+        }
+
+        async fn env_request(
+            &mut self,
+            channel: russh::ChannelId,
+            variable_name: &str,
+            variable_value: &str,
+            session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            let _ =
+                self.environments.send((variable_name.to_owned(), variable_value.to_owned())).await;
+            session.channel_success(channel)?;
+            Ok(())
+        }
+
+        async fn signal(
+            &mut self,
+            _channel: russh::ChannelId,
+            signal: russh::Sig,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            let _ = self.signals.send(signal_name_text(&signal).to_owned()).await;
+            Ok(())
         }
     }
 
@@ -2128,6 +2225,65 @@ mod tests {
             .expect("resize callback")
             .expect("resize event");
         assert_eq!(observed, expected);
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn session_environment_and_signal_requests_reach_server() {
+        let (environment_tx, mut environments) = mpsc::channel(1);
+        let (signal_tx, mut signals) = mpsc::channel(1);
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let server_config = Arc::new(server_config);
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ = russh::server::run_stream(
+                server_config,
+                stream,
+                SessionRequestServer { environments: environment_tx, signals: signal_tx },
+            )
+            .await;
+        });
+
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        connection.authenticate_password("user", b"password").await.expect("authenticate client");
+        let mut channel = connection.open_session().await.expect("open session");
+
+        channel.set_env(b"LANG", b"C.UTF-8", true).await.expect("set environment");
+        assert_eq!(
+            timeout(Duration::from_secs(5), environments.recv())
+                .await
+                .expect("environment callback")
+                .expect("environment event"),
+            ("LANG".to_owned(), "C.UTF-8".to_owned())
+        );
+        assert_eq!(
+            timeout(Duration::from_secs(5), channel.next_event())
+                .await
+                .expect("environment response")
+                .expect("environment response result")
+                .expect("environment response event"),
+            ChannelEvent::Success
+        );
+
+        channel.signal(Signal::Tstp).await.expect("send signal");
+        assert_eq!(
+            timeout(Duration::from_secs(5), signals.recv())
+                .await
+                .expect("signal callback")
+                .expect("signal event"),
+            "TSTP"
+        );
         connection.disconnect().await.expect("disconnect client");
     }
 

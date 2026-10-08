@@ -65,7 +65,8 @@ interoperability still requires a Windows Pageant installation and remains outsi
 matrix. `SftpChannel`
 now composes the bounded v3 handshake and packet framing over an accepted SSH `session` channel
 with bounded subsystem failure and truncation mapping; `SftpSession` adds bounded pipelining and
-request correlation, resume-by-offset uploads/downloads, and progress callbacks on that channel. The auth-agent channel boundary does not claim concrete engine scheduling or wire
+request correlation, resume-by-offset uploads/downloads, and progress callbacks on that channel.
+The concrete adapter also forwards bounded environment and signal requests. The auth-agent channel boundary does not claim concrete engine scheduling or wire
 interoperability until those workstreams are implemented and tested.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
