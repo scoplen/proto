@@ -29,6 +29,9 @@ bounded direct child-process stdin/stdout composition without shell interpolatio
 child on shutdown or drop.
 `ClientConnection::connect_via_socks5` and `connect_via_http_connect` compose the existing bounded
 proxy handshakes with the concrete async SSH client, preserving proxy rejection and timeout errors.
+`GatewayTransport` composes the bounded K-6 client-hello frame over an established byte transport,
+handling partial writes and typed failures before the SSH engine consumes the stream. TLS/ALPN
+negotiation and live gateway interoperability remain outside this adapter.
 Software Ed25519, P-256, and
 RSA/SHA-2 signers, FIDO2 security-key hooks, RFC 4252 `none`, password and keyboard-interactive
 codecs, certificate validation, and host-verification callbacks are available. Agent support

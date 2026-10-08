@@ -2784,6 +2784,7 @@ version = "0.1.0"
 dependencies = [
  "pageant",
  "russh",
+ "scoplen-api",
  "scoplen-crypto",
  "signature 3.0.0",
  "ssh-key",

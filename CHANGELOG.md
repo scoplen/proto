@@ -4,6 +4,10 @@ All notable changes to `scoplen-proto` will be recorded here.
 
 ## Unreleased
 
+- Added `GatewayTransport`, which validates and writes exactly one bounded K-6 client-hello frame
+  over an established byte transport before exposing it to the SSH engine. Partial writes, invalid
+  hello values, zero-length writes, and transport delegation are covered; TLS/ALPN negotiation and
+  live gateway interoperability remain outside this adapter.
 - Added the bounded K-4 shared-vault epoch-retirement response codec with deterministic CBOR,
   a published vector, and zero-epoch failure coverage; the authenticated route and retirement
   storage remain owned by `scoplen-server`.

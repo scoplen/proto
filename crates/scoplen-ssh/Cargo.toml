@@ -10,6 +10,7 @@ description = "Scoplen's shared SSH protocol core."
 workspace = true
 
 [dependencies]
+scoplen-api = { path = "../scoplen-api", version = "0.1.0" }
 scoplen-crypto = { path = "../scoplen-crypto", version = "0.1.0" }
 russh = { version = "=0.63.1", default-features = false, features = ["flate2", "ring", "rsa"] }
 pageant = "=0.2.2"

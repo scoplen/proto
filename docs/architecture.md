@@ -58,8 +58,10 @@ SOCKS5 and HTTP CONNECT transports compose bounded proxy handshakes over `Transp
 bounded direct child process over stdin/stdout without a shell and reaps it on shutdown or drop.
 `ClientConnection::connect_via_socks5` and `connect_via_http_connect` run those bounded proxy
 handshakes on blocking workers, upgrade the resulting nonblocking sockets to the async `russh`
-stream boundary, and preserve typed proxy rejection and timeout errors. Gateway framing and
-interoperability with other SSH engines remain open.
+stream boundary, and preserve typed proxy rejection and timeout errors. `GatewayTransport` writes
+and flushes one validated K-6 client-hello frame over an established byte transport before handing
+the stream to the SSH engine, including partial-write and typed failure handling. TLS/ALPN
+negotiation and interoperability with other SSH engines remain open.
 The native Pageant backend remains open.
 The agent server can consume
 multiple bounded frames from a blocking stream through clean peer close while applying the same
