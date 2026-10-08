@@ -46,7 +46,8 @@ RSA/SHA-2 signers, FIDO2 security-key hooks, RFC 4252 `none`, password and keybo
 codecs, certificate validation, and host-verification callbacks are available. The concrete client
 exposes a `none` probe that reports the server's remaining methods, and handles bounded
 keyboard-interactive challenge rounds with prompt and response validation before sending answers
-to the SSH engine. Agent support
+to the SSH engine. It also authenticates with validated OpenSSH user certificates through the
+shared signer boundary, checking the requested principal and subject key before dispatch. Agent support
 includes bounded Unix-socket and Windows named-pipe streams, Pageant named-pipe compatibility,
 identity and signing requests, add/remove/lock/smart-card management, opaque extensions, and
 fail-closed forwarding policy.

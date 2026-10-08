@@ -41,7 +41,7 @@ use crate::{
     MAX_CHANNEL_ADDRESS, MAX_CHANNEL_STRING, MAX_CHANNEL_TEXT, ProxyCredentials,
     ProxyTransportError, PtyRequest, PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity,
     Signal, SignatureAlgorithm, Signer, SignerError, Socks5Transport, TcpTransport, TransportError,
-    WindowChangeRequest,
+    UserCertificate, WindowChangeRequest,
     process::{ProxyCommandError, ProxyCommandStream, ProxyCommandTransport},
     verify_host_key,
 };
@@ -638,6 +638,55 @@ impl ClientConnection {
         let result = self
             .handle
             .authenticate_publickey_with(username.to_owned(), key, hash_alg, &mut adapter)
+            .await
+            .map_err(ClientError::PublicKey)?;
+        match result {
+            russh::client::AuthResult::Success => Ok(()),
+            russh::client::AuthResult::Failure { partial_success, .. } => {
+                Err(ClientError::AuthenticationRejected { partial_success })
+            }
+        }
+    }
+
+    /// Authenticate with a previously validated OpenSSH user certificate.
+    ///
+    /// Certificate parsing, CA validation, validity, principals, and critical options are
+    /// completed by [`UserCertificate`] before this method is called. The private subject key
+    /// remains behind [`Signer`], while the concrete engine receives only the validated
+    /// certificate bytes and a session-bound signing callback.
+    pub async fn authenticate_certificate<S>(
+        &mut self,
+        username: &str,
+        user_certificate: &UserCertificate,
+        signer: &S,
+    ) -> Result<(), ClientError>
+    where
+        S: Signer + Sync,
+    {
+        validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
+            .map_err(ClientError::Config)?;
+        if !user_certificate
+            .certificate()
+            .principals()
+            .iter()
+            .any(|principal| principal == username)
+        {
+            return Err(ClientError::InvalidInput("certificate principal does not match username"));
+        }
+        let identity = user_certificate.identity();
+        if PublicKeyIdentity::from_signer(signer).map_err(PublicKeyAuthError::Signer)?.key_blob()
+            != identity.signing_key_blob()
+        {
+            return Err(ClientError::PublicKey(PublicKeyAuthError::KeyMismatch));
+        }
+        let certificate =
+            ssh_key::Certificate::from_bytes(user_certificate.certificate().as_bytes())
+                .map_err(|_| PublicKeyAuthError::MalformedPayload("user certificate"))?;
+        let hash_alg = rsa_hash_algorithm(signer.algorithm());
+        let mut adapter = RusshSignerAdapter { signer, identity, username: username.to_owned() };
+        let result = self
+            .handle
+            .authenticate_certificate_with(username.to_owned(), certificate, hash_alg, &mut adapter)
             .await
             .map_err(ClientError::PublicKey)?;
         match result {
@@ -1294,10 +1343,12 @@ impl<S: Signer + Sync> RusshSignerAdapter<'_, S> {
         if context.username() != self.username || context.service() != "ssh-connection" {
             return Err(PublicKeyAuthError::MalformedPayload("authentication context changed"));
         }
-        if identity != self.identity {
+        if identity.algorithm() != self.identity.algorithm()
+            || identity.key_blob() != self.identity.key_blob()
+        {
             return Err(PublicKeyAuthError::KeyMismatch);
         }
-        let request = PublicKeyAuthRequest::signed(context, identity, self.signer)?;
+        let request = PublicKeyAuthRequest::signed(context, self.identity.clone(), self.signer)?;
         if request.signature_payload() != payload {
             return Err(PublicKeyAuthError::MalformedPayload("session-bound payload changed"));
         }
@@ -1725,7 +1776,7 @@ mod tests {
 
     use russh::keys::PrivateKey;
     use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
-    use ssh_key::Algorithm;
+    use ssh_key::{Algorithm, certificate};
     use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional, duplex};
     use tokio::net::{TcpListener, TcpStream};
     use tokio::sync::mpsc;
@@ -1759,6 +1810,16 @@ mod tests {
         ) -> Result<russh::server::Auth, Self::Error> {
             let accepted =
                 key.to_bytes().map(|encoded| encoded == self.expected_key).unwrap_or(false);
+            Ok(if accepted { russh::server::Auth::Accept } else { russh::server::Auth::reject() })
+        }
+
+        async fn auth_openssh_certificate(
+            &mut self,
+            _user: &str,
+            certificate: &ssh_key::Certificate,
+        ) -> Result<russh::server::Auth, Self::Error> {
+            let accepted =
+                certificate.to_bytes().map(|encoded| encoded == self.expected_key).unwrap_or(false);
             Ok(if accepted { russh::server::Auth::Accept } else { russh::server::Auth::reject() })
         }
     }
@@ -3566,6 +3627,73 @@ mod tests {
         let rsa_sha512 = RsaSshSigner::new(rsa_key, SignatureAlgorithm::RsaSha2_512)
             .expect("RSA SHA-512 signer");
         assert_real_publickey_authentication(&rsa_sha512).await;
+    }
+
+    #[tokio::test]
+    async fn user_certificate_authentication_completes_against_real_russh_server() {
+        let signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
+        let subject =
+            ssh_key::PublicKey::from_bytes(&signer.public_key_blob().expect("subject public key"))
+                .expect("subject key");
+        let mut rng = ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng);
+        let ca = PrivateKey::random(&mut rng, Algorithm::Ed25519).expect("CA key");
+        let now = unix_time_seconds();
+        let mut builder = certificate::Builder::new(vec![8; 16], subject, now - 60, now + 60)
+            .expect("certificate builder");
+        builder.cert_type(certificate::CertType::User).expect("user certificate");
+        builder.valid_principal("alice").expect("certificate principal");
+        let certificate = builder.sign(&ca).expect("signed certificate");
+        let encoded_certificate = certificate.to_bytes().expect("certificate bytes");
+        let user_certificate = UserCertificate::parse_and_validate(
+            &encoded_certificate,
+            &CertificateValidationPolicy::user("alice", now),
+        )
+        .expect("validated user certificate");
+
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let server_config = Arc::new(server_config);
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ = russh::server::run_stream(
+                server_config,
+                stream,
+                PublicKeyServer { expected_key: encoded_certificate },
+            )
+            .await;
+        });
+
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("SSH config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        assert!(matches!(
+            connection.authenticate_certificate("bob", &user_certificate, &signer).await,
+            Err(ClientError::InvalidInput("certificate principal does not match username"))
+        ));
+        let wrong_signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[8; 32]).expect("other key"));
+        assert!(matches!(
+            connection.authenticate_certificate("alice", &user_certificate, &wrong_signer).await,
+            Err(ClientError::PublicKey(PublicKeyAuthError::KeyMismatch))
+        ));
+        connection
+            .authenticate_certificate("alice", &user_certificate, &signer)
+            .await
+            .expect("certificate authentication");
+        connection.disconnect().await.expect("disconnect client");
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("SSH server task")
+            .expect("SSH server");
     }
 
     #[tokio::test]
