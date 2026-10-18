@@ -108,6 +108,12 @@ limits, a missing-file response with released request state, pipelined upload in
 resumed download with progress and byte comparison, handle closure, and removal of the unique
 temporary remote file. It passed against the local `linuxserver/openssh-server` image; other
 server implementations and platforms remain unverified.
+Set `SCOPLEN_OPENSSH_FORWARD=1` to verify an RFC 4254 `direct-tcpip` channel to the disposable
+server's own SSH listener at `127.0.0.1:2222`, then a refused connection to port 1 and a fresh
+session open. The `linuxserver/openssh-server` image disables TCP forwarding by default; this
+smoke test passed after setting `AllowTcpForwarding yes` in the disposable container's
+`/config/sshd/sshd_config` and reloading its SSH listener. Other forwarding directions,
+targets, servers, and platforms remain unverified.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, acknowledgement, snapshot, version-history, content-free notification, account

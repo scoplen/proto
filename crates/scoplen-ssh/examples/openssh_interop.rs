@@ -4,8 +4,8 @@ use std::{
 };
 
 use scoplen_ssh::{
-    ChannelEvent, ClientConfig, ClientConnection, HostKey, HostKeyVerificationError, RsaSshSigner,
-    SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm,
+    ChannelEvent, ClientConfig, ClientConnection, ClientError, HostKey, HostKeyVerificationError,
+    RsaSshSigner, SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm,
 };
 use ssh_key::{PrivateKey, PublicKey};
 use tokio::time::timeout;
@@ -61,8 +61,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if env::var("SCOPLEN_OPENSSH_SFTP").as_deref() == Ok("1") {
         timeout(Duration::from_secs(30), verify_sftp(&connection)).await??;
     }
+    if env::var("SCOPLEN_OPENSSH_FORWARD").as_deref() == Ok("1") {
+        timeout(Duration::from_secs(10), verify_forwarding(&connection)).await??;
+    }
     connection.disconnect().await?;
     println!("openssh interop ok");
+    Ok(())
+}
+
+async fn verify_forwarding(
+    connection: &ClientConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut channel = connection.open_direct_tcpip("127.0.0.1", 2222, "127.0.0.1", 0).await?;
+    let mut banner = Vec::new();
+    while !banner.contains(&b'\n') && banner.len() < 256 {
+        match channel.next_event().await? {
+            Some(ChannelEvent::Data(data)) => {
+                if banner.len().saturating_add(data.len()) > 256 {
+                    return Err("forwarded OpenSSH banner exceeded 256 bytes".into());
+                }
+                banner.extend_from_slice(&data);
+            }
+            other => return Err(format!("unexpected forwarding event: {other:?}").into()),
+        }
+    }
+    if !banner.starts_with(b"SSH-2.0-OpenSSH_") || !banner.contains(&b'\n') {
+        return Err("forwarded OpenSSH banner was missing or invalid".into());
+    }
+    channel.close().await?;
+    drop(channel);
+
+    match connection.open_direct_tcpip("127.0.0.1", 1, "127.0.0.1", 0).await {
+        Err(ClientError::ChannelOpen { .. }) => {}
+        Ok(_) => return Err("forwarding to a closed port unexpectedly succeeded".into()),
+        Err(error) => return Err(format!("unexpected forwarding failure: {error}").into()),
+    }
+    let channel = connection.open_session().await?;
+    channel.close().await?;
+    println!("openssh forwarding interop ok");
     Ok(())
 }
 
