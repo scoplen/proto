@@ -9,7 +9,8 @@ $testVariables = @(
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_HOST_KEY', 'SCOPLEN_OPENSSH_HOST_CA_KEY',
     'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY',
     'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY',
-    'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_FORWARD'
+    'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_FORWARD',
+    'SCOPLEN_OPENSSH_JUMP_TARGET_PORT'
 )
 foreach ($name in $testVariables) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 
@@ -54,6 +55,7 @@ try {
     $env:SCOPLEN_OPENSSH_HOST_KEY = $hostKey
     $env:SCOPLEN_OPENSSH_SFTP = '1'
     $env:SCOPLEN_OPENSSH_FORWARD = '1'
+    $env:SCOPLEN_OPENSSH_JUMP_TARGET_PORT = '2222'
 
     cargo run --quiet --locked -p scoplen-ssh --example openssh_interop
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH SFTP or forwarding interop failed' }
@@ -61,11 +63,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH ProxyCommand interop failed' }
     cargo run --quiet --locked -p scoplen-ssh --example dynamic_socks_interop
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH dynamic SOCKS interop failed' }
+    cargo run --quiet --locked -p scoplen-ssh --example jump_chain_interop
+    if ($LASTEXITCODE -ne 0) { throw 'OpenSSH nested jump interop failed' }
 
     $env:SCOPLEN_OPENSSH_PASSWORD = 'wrong-password'
     cargo run --quiet --locked -p scoplen-ssh --example openssh_interop 2>$null
     if ($LASTEXITCODE -eq 0) { throw 'OpenSSH accepted an incorrect password' }
-    Write-Output 'OpenSSH SFTP, forwarding, ProxyCommand, SOCKS, and wrong-password interop passed'
+    Write-Output 'OpenSSH SFTP, forwarding, ProxyCommand, SOCKS, nested jump, and wrong-password interop passed'
 }
 finally {
     if ($started) { docker stop $container | Out-Null }

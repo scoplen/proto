@@ -118,9 +118,16 @@ test account password; optional `SCOPLEN_OPENSSH_HOST`, `SCOPLEN_OPENSSH_PORT`, 
 authentication, command output and exit status, wrong-pin rejection, a missing or failed child,
 and handshake timeout with child cleanup. It passed from Windows against a disposable Linux
 OpenSSH container; Unix hosts and other server implementations remain unverified for this route.
+`cargo run -p scoplen-ssh --example jump_chain_interop` verifies two nested `direct-tcpip`
+handshakes through an authenticated OpenSSH server with TCP forwarding enabled. Set the same host
+key, password, host, port, and user variables, plus `SCOPLEN_OPENSSH_JUMP_TARGET_PORT` to the
+server's SSH port as seen from inside the server. It checks the host pin and password at every
+hop, session commands on each connection, wrong-pin and closed-target rejection, and parent
+connection reuse after the failures. The disposable OpenSSH script below runs this example.
 `pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH server and runs
-the direct SFTP/forwarding and ProxyCommand examples, plus wrong-password rejection. The Linux CI
-workflow runs the same script on each change; the container is stopped afterward.
+the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump examples, plus wrong-password
+rejection. The Linux CI workflow runs the same script on each change; the container is stopped
+afterward.
 For host-certificate mode, the concrete adapter checks the certificate signature, host principal,
 validity, and critical options before the callback checks the CA pin. A disposable
 `linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and
