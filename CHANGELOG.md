@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Unified the control-plane and shared Rust problem-details types, requiring the same eight
+  validated error fields in JSON, CBOR, OpenAPI, and TypeScript. Unknown response fields and valid
+  future error codes remain accepted. The OpenAPI generator now emits the TypeScript problem
+  declaration and checks generated output drift in CI.
 - Released the concrete SSH handle lock while a keyboard-interactive responder waits for input.
   The elapsed rekey timer may request an exchange during a prompt, but the current engine does not
   process that request. It can begin an exchange after authentication resumes and checks elapsed

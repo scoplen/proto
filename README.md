@@ -233,6 +233,10 @@ codecs in JSON and deterministic CBOR. K-6 now includes the bounded gateway clie
 frame (`ticket` and `dpop_proof`) with a published vector and failure-path coverage. OpenAPI
 resources now have an authored OpenAPI 3.1 document at `crates/scoplen-api/openapi/v1.yaml`,
 generated Rust envelope/query types, and the local `@scoplen/api` TypeScript package surface.
+The control-plane and shared `ProblemDetails` Rust paths use the same validated eight-field
+JSON/CBOR error type. The OpenAPI schema and generated TypeScript declaration require `type`,
+`title`, `status`, `detail`, `instance`, `code`, `changed`, and `retryable`; decoders accept unknown
+response fields and syntactically valid future error codes.
 The internal `spl.gateway.v1.Control` and `spl.agent.v1.Agent` protobuf source contracts are
 also checked in under `crates/scoplen-api/proto`. The built-in Cedar schema and role policies are
 parsed and strictly validated in the API crate's tests. The API crate now generates bounded Rust
@@ -266,7 +270,12 @@ Rust 1.85.0 is pinned in `rust-toolchain.toml`.
 cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets --all-features -- -D warnings
+node crates/scoplen-api/openapi/generate.mjs --check
 ```
+
+The OpenAPI generator checks the authored error schema and detects drift in the generated path
+list and TypeScript problem declaration. Run it without `--check` to regenerate those sections;
+the Rust CI matrix runs the drift check on every supported desktop runner.
 
 For a paired same-host comparison with OpenSSH under the two required S4 ciphers, run
 `pwsh ./scripts/ssh-throughput.ps1`. The setup, measurement method, local results, and limits are
