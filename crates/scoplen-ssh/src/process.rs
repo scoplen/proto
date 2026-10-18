@@ -134,10 +134,10 @@ impl ProxyCommandTransport {
 
     fn kill_child(&self) -> io::Result<()> {
         let mut child = self.child.lock().map_err(|_| Self::lock_error())?;
-        match child.kill() {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::InvalidInput => return Ok(()),
-            Err(error) => return Err(error),
+        if let Err(error) = child.kill() {
+            if error.kind() != io::ErrorKind::InvalidInput {
+                return Err(error);
+            }
         }
         child.wait().map(|_| ())
     }
@@ -180,6 +180,24 @@ pub(crate) struct ProxyCommandStream {
     shutdown_task: Option<JoinHandle<io::Result<()>>>,
 }
 
+pub(crate) struct ProxyCommandTerminationGuard {
+    inner: Option<Arc<ProxyCommandTransport>>,
+}
+
+impl ProxyCommandTerminationGuard {
+    pub(crate) fn disarm(&mut self) {
+        self.inner = None;
+    }
+}
+
+impl Drop for ProxyCommandTerminationGuard {
+    fn drop(&mut self) {
+        if let Some(inner) = &self.inner {
+            let _ = inner.kill_child();
+        }
+    }
+}
+
 impl fmt::Debug for ProxyCommandStream {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("ProxyCommandStream").finish_non_exhaustive()
@@ -197,6 +215,10 @@ impl ProxyCommandStream {
             flush_task: None,
             shutdown_task: None,
         }
+    }
+
+    pub(crate) fn termination_guard(&self) -> ProxyCommandTerminationGuard {
+        ProxyCommandTerminationGuard { inner: Some(Arc::clone(&self.inner)) }
     }
 
     fn join_error(error: &tokio::task::JoinError) -> io::Error {
@@ -307,11 +329,10 @@ impl AsyncWrite for ProxyCommandStream {
 impl Drop for ProxyCommandStream {
     fn drop(&mut self) {
         // A blocking worker may still own a clone of `inner` after its JoinHandle is dropped.
-        // Close both pipes and terminate the child here so cancellation cannot leave a
-        // ProxyCommand process behind waiting on an unread or unwritten pipe.
+        // Kill first: a blocking read or write may hold a pipe lock until the child exits.
+        let _ = self.inner.kill_child();
         self.inner.take_stdin();
         self.inner.take_stdout();
-        let _ = self.inner.kill_child();
     }
 }
 
@@ -342,12 +363,12 @@ impl Transport for ProxyCommandTransport {
             Shutdown::Read => self.take_stdout(),
             Shutdown::Write => self.take_stdin(),
             Shutdown::Both => {
-                self.take_stdin();
-                self.take_stdout();
                 self.kill_child().map_err(|error| TransportError::Io {
                     operation: TransportOperation::Shutdown,
                     kind: error.kind(),
                 })?;
+                self.take_stdin();
+                self.take_stdout();
             }
         }
         Ok(())
@@ -435,6 +456,41 @@ mod tests {
         {
             (OsString::from("/bin/sh"), vec![OsString::from("-c"), OsString::from("cat")])
         }
+    }
+
+    fn stalled_command() -> (OsString, Vec<OsString>) {
+        #[cfg(windows)]
+        {
+            (
+                OsString::from("powershell.exe"),
+                vec![
+                    OsString::from("-NoProfile"),
+                    OsString::from("-NonInteractive"),
+                    OsString::from("-Command"),
+                    OsString::from("$null = [Console]::In.ReadToEnd()"),
+                ],
+            )
+        }
+        #[cfg(not(windows))]
+        {
+            (
+                OsString::from("/bin/sh"),
+                vec![OsString::from("-c"), OsString::from("while IFS= read -r line; do :; done")],
+            )
+        }
+    }
+
+    #[test]
+    fn termination_guard_reaps_the_running_child() {
+        let (program, args) = stalled_command();
+        let transport = ProxyCommandTransport::spawn(program, args).expect("spawn stalled child");
+        let stream = ProxyCommandStream::new(transport);
+        let child = Arc::clone(&stream.inner);
+        drop(stream.termination_guard());
+        assert!(
+            child.child.lock().expect("child lock").try_wait().expect("child status").is_some()
+        );
+        drop(stream);
     }
 
     #[test]

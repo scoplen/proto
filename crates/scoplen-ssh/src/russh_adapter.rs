@@ -430,6 +430,9 @@ pub enum ClientError {
     /// A desktop `ProxyCommand` could not be started or configured.
     #[error("SSH ProxyCommand failed: {0}")]
     ProxyCommand(#[from] ProxyCommandError),
+    /// The `ProxyCommand` started, but the SSH handshake did not finish in time.
+    #[error("SSH handshake through ProxyCommand timed out after {timeout:?}")]
+    ProxyCommandHandshakeTimeout { timeout: Duration },
     /// The peer refused a channel open request.
     #[error("SSH channel open failed ({code}): {reason}")]
     ChannelOpen { code: u32, reason: String },
@@ -697,12 +700,19 @@ impl ClientConnection {
     }
 
     /// Spawn a bounded desktop `ProxyCommand` and complete the SSH handshake over its standard
-    /// input and output. Arguments are passed directly without shell interpolation.
+    /// input and output. Arguments are passed directly without shell interpolation. `timeout`
+    /// bounds the SSH handshake after the process starts; a stalled child is terminated and reaped.
     pub async fn connect_via_proxy_command(
         config: ClientConfig,
         program: impl AsRef<OsStr>,
         args: &[OsString],
+        timeout: Duration,
     ) -> Result<Self, ClientError> {
+        if timeout.is_zero() {
+            return Err(ClientError::InvalidInput(
+                "ProxyCommand handshake timeout must be non-zero",
+            ));
+        }
         let program = program.as_ref().to_os_string();
         let args = args.to_vec();
         let transport =
@@ -710,7 +720,16 @@ impl ClientConnection {
                 .await
                 .map_err(|_| ClientError::Transport(io::Error::other("ProxyCommand task stopped")))?
                 .map_err(ClientError::ProxyCommand)?;
-        Self::connect_stream(config, ProxyCommandStream::new(transport)).await
+        let stream = ProxyCommandStream::new(transport);
+        let mut termination_guard = stream.termination_guard();
+        match async_timeout(timeout, Self::connect_stream(config, stream)).await {
+            Ok(Ok(connection)) => {
+                termination_guard.disarm();
+                Ok(connection)
+            }
+            Ok(Err(error)) => Err(error),
+            Err(_) => Err(ClientError::ProxyCommandHandshakeTimeout { timeout }),
+        }
     }
 
     async fn connect_via_proxy_socket(
@@ -2953,7 +2972,12 @@ mod tests {
         let (program, args) = proxy_command_echo();
         let result = timeout(
             Duration::from_secs(5),
-            ClientConnection::connect_via_proxy_command(config, program, &args),
+            ClientConnection::connect_via_proxy_command(
+                config,
+                program,
+                &args,
+                Duration::from_secs(2),
+            ),
         )
         .await
         .expect("bounded ProxyCommand handshake");
@@ -2975,6 +2999,90 @@ mod tests {
         {
             (OsString::from("/bin/sh"), vec![OsString::from("-c"), OsString::from("cat")])
         }
+    }
+
+    fn proxy_command_stalled_ssh() -> (OsString, Vec<OsString>) {
+        #[cfg(windows)]
+        {
+            (
+                OsString::from("powershell.exe"),
+                vec![
+                    OsString::from("-NoProfile"),
+                    OsString::from("-NonInteractive"),
+                    OsString::from("-Command"),
+                    OsString::from(
+                        "$null = [Console]::In.ReadLine(); [Console]::Out.WriteLine('SSH-2.0-stalled-proxy-command'); $null = [Console]::In.ReadToEnd()",
+                    ),
+                ],
+            )
+        }
+        #[cfg(not(windows))]
+        {
+            (
+                OsString::from("/bin/sh"),
+                vec![
+                    OsString::from("-c"),
+                    OsString::from(
+                        "IFS= read -r banner; printf 'SSH-2.0-stalled-proxy-command\\r\\n'; while IFS= read -r line; do :; done",
+                    ),
+                ],
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn proxy_command_route_times_out_stalled_ssh_handshake() {
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("host.example", 22, verifier).expect("config");
+        let (program, args) = proxy_command_stalled_ssh();
+        assert!(matches!(
+            ClientConnection::connect_via_proxy_command(
+                config.clone(),
+                &program,
+                &args,
+                Duration::ZERO,
+            )
+            .await,
+            Err(ClientError::InvalidInput("ProxyCommand handshake timeout must be non-zero"))
+        ));
+
+        let handshake_timeout = Duration::from_millis(250);
+        let error = timeout(
+            Duration::from_secs(5),
+            ClientConnection::connect_via_proxy_command(config, program, &args, handshake_timeout),
+        )
+        .await
+        .expect("ProxyCommand handshake deadline")
+        .expect_err("stalled SSH handshake");
+        assert!(matches!(
+            error,
+            ClientError::ProxyCommandHandshakeTimeout { timeout } if timeout == handshake_timeout
+        ));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn canceling_proxy_command_handshake_stops_the_child() {
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("host.example", 22, verifier).expect("config");
+        let (program, args) = proxy_command_stalled_ssh();
+        let connection = tokio::spawn(async move {
+            ClientConnection::connect_via_proxy_command(
+                config,
+                program,
+                &args,
+                Duration::from_secs(5),
+            )
+            .await
+        });
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        connection.abort();
+        assert!(
+            timeout(Duration::from_secs(5), connection)
+                .await
+                .expect("cancellation completes")
+                .expect_err("connection task was canceled")
+                .is_cancelled()
+        );
     }
 
     #[tokio::test]
