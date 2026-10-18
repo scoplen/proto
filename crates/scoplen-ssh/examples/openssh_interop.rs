@@ -768,6 +768,97 @@ async fn verify_posix_rename(
     Ok(())
 }
 
+async fn verify_standard_rename(
+    session: &mut SftpSession,
+    path: &[u8],
+    missing_path: &[u8],
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let renamed_path = [path, b"-standard-renamed"].concat();
+    let existing_path = [path, b"-standard-existing"].concat();
+    let missing_destination = [path, b"-standard-missing"].concat();
+    let missing =
+        session.client_mut().rename(missing_path.to_vec(), missing_destination.clone())?;
+    if !matches!(sftp_response(session, missing).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename did not reject a missing source cleanly".into());
+    }
+    let absent = session.client_mut().open(missing_destination, 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, absent).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename created a destination for a missing source".into());
+    }
+
+    let previous = b"previous standard destination contents";
+    let create =
+        session.client_mut().open(existing_path.clone(), 0x1a, SftpAttributes::default())?;
+    let handle = match sftp_response(session, create).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected standard rename setup: {other:?}").into()),
+    };
+    if session.upload(&handle, 0, previous, 4096, 4, |_| {}).await? != previous.len() as u64
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename destination setup failed".into());
+    }
+    let close = session.client_mut().close(handle)?;
+    if !matches!(sftp_response(session, close).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename destination close failed".into());
+    }
+    let no_replace = session.client_mut().rename(path.to_vec(), existing_path.clone())?;
+    if !matches!(sftp_response(session, no_replace).await?, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename replaced an existing destination".into());
+    }
+    verify_sftp_bytes(session, path, data).await?;
+    verify_sftp_bytes(session, &existing_path, previous).await?;
+    let remove = session.client_mut().remove(existing_path.clone())?;
+    if !matches!(sftp_response(session, remove).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename destination cleanup failed".into());
+    }
+    let gone = session.client_mut().open(existing_path, 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, gone).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename destination remained after cleanup".into());
+    }
+
+    let rename = session.client_mut().rename(path.to_vec(), renamed_path.clone())?;
+    if !matches!(sftp_response(session, rename).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename failed or retained a request slot".into());
+    }
+    let old = session.client_mut().open(path.to_vec(), 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, old).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename left the source path behind".into());
+    }
+    verify_sftp_bytes(session, &renamed_path, data).await?;
+    let restore = session.client_mut().rename(renamed_path.clone(), path.to_vec())?;
+    if !matches!(sftp_response(session, restore).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename could not restore the source path".into());
+    }
+    let gone = session.client_mut().open(renamed_path, 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, gone).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP standard rename left a temporary path behind".into());
+    }
+    verify_sftp_bytes(session, path, data).await?;
+    Ok(())
+}
+
 fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::error::Error>> {
     if session.limits().is_none() {
         return Err("OpenSSH did not advertise SFTP transfer limits".into());
@@ -888,6 +979,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     }
     verify_hardlink(&mut session, &path, &linked_path, &missing_path, &data).await?;
     verify_expand_path(&mut session, &path, &missing_path, &data).await?;
+    verify_standard_rename(&mut session, &path, &missing_path, &data).await?;
     verify_posix_rename(&mut session, &path, &missing_path, &data).await?;
     println!("openssh sftp interop ok");
     Ok(())

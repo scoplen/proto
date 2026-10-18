@@ -178,6 +178,9 @@ The same run verifies `REALPATH` resolves the current directory and normalizes b
 file's `./` path and a missing final component to the expected absolute bytes. Resolving through a
 regular file fails, and every request slot is released; the authenticated in-process server covers
 those success and failure responses too.
+The standard SFTP v3 `RENAME` request separately checks missing-source rejection, refusal to
+replace an existing file, byte-preserving moves in both directions, request-slot release, and
+cleanup. The authenticated in-process server covers the same lifecycle.
 The same SFTP run creates a unique directory and file, reads directory entries until EOF, rejects
 a missing directory, a nonempty directory removal, and a read from a closed directory handle,
 then removes both paths and checks that the directory is gone. Each response releases its request

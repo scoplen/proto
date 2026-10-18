@@ -987,6 +987,27 @@ mod tests {
             SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
         }
 
+        fn standard_rename_response(
+            &mut self,
+            id: u32,
+            old_path: &[u8],
+            new_path: &[u8],
+        ) -> SftpPacket {
+            let code = match (old_path, new_path, self.rename_phase) {
+                (b"missing", b"missing-renamed", _) => 2,
+                (b"file", b"renamed", Some(RenamePhase::Original)) => {
+                    self.rename_phase = Some(RenamePhase::Renamed);
+                    0
+                }
+                (b"renamed", b"file", Some(RenamePhase::Renamed)) => {
+                    self.rename_phase = Some(RenamePhase::Original);
+                    0
+                }
+                _ => 4,
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
         fn expand_path_response(&self, id: u32, data: &[u8]) -> SftpPacket {
             let leaf: &[u8] = if data == b"\0\0\0\x04file" {
                 b"file"
@@ -1097,6 +1118,16 @@ mod tests {
                 ],
             }
         }
+
+        fn path_response(&mut self, packet: &SftpPacket) -> Option<SftpPacket> {
+            match packet {
+                SftpPacket::Realpath { id, path } => Some(Self::realpath_response(*id, path)),
+                SftpPacket::Rename { id, old_path, new_path } if self.rename_phase.is_some() => {
+                    Some(self.standard_rename_response(*id, old_path, new_path))
+                }
+                _ => None,
+            }
+        }
     }
 
     #[test]
@@ -1177,7 +1208,9 @@ mod tests {
                     return Ok(());
                 };
                 let is_read = matches!(packet, SftpPacket::Read { .. });
-                let response = if let Some(response) = self.directory_response(&packet) {
+                let response = if let Some(response) =
+                    self.directory_response(&packet).or_else(|| self.path_response(&packet))
+                {
                     response
                 } else {
                     match packet {
@@ -1192,7 +1225,6 @@ mod tests {
                         {
                             self.close_extension_handle(id, &handle)
                         }
-                        SftpPacket::Realpath { id, path } => Self::realpath_response(id, &path),
                         SftpPacket::Lstat { id, path } if self.lsetstat_link_mtime.is_some() => {
                             self.link_attributes(id, false, &path)
                         }
@@ -1531,6 +1563,21 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
     }
 
+    async fn assert_standard_rename_status(
+        session: &mut SftpSession,
+        old: &[u8],
+        new: &[u8],
+        code: u32,
+    ) {
+        let request = session.client_mut().rename(old, new).expect("standard rename request");
+        session.send_request(&request).await.expect("send standard rename");
+        assert!(matches!(
+            session.read_response().await.expect("read standard rename"),
+            SftpPacket::Status { code: actual, .. } if actual == code
+        ));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
     async fn assert_file_bytes(session: &mut SftpSession, path: &[u8], expected: &[u8]) {
         let open =
             session.client_mut().open(path, 1, SftpAttributes::default()).expect("open file");
@@ -1620,6 +1667,20 @@ mod tests {
         ));
         assert_eq!(session.pending_requests(), 0);
         assert_missing_file(session, b"replacement").await;
+    }
+
+    async fn assert_standard_rename(session: &mut SftpSession) {
+        assert_standard_rename_status(session, b"missing", b"missing-renamed", 2).await;
+        assert_missing_file(session, b"missing-renamed").await;
+        assert_standard_rename_status(session, b"file", b"replacement", 4).await;
+        assert_file_bytes(session, b"file", b"linked bytes").await;
+        assert_file_bytes(session, b"replacement", b"previous destination contents").await;
+        assert_standard_rename_status(session, b"file", b"renamed", 0).await;
+        assert_missing_file(session, b"file").await;
+        assert_file_bytes(session, b"renamed", b"linked bytes").await;
+        assert_standard_rename_status(session, b"renamed", b"file", 0).await;
+        assert_missing_file(session, b"renamed").await;
+        assert_file_bytes(session, b"file", b"linked bytes").await;
     }
 
     async fn assert_missing_statvfs(session: &mut SftpSession) {
@@ -1938,6 +1999,7 @@ mod tests {
         assert_hardlink(&mut session).await;
         assert_expand_path(&mut session).await;
         assert_lsetstat(&mut session).await;
+        assert_standard_rename(&mut session).await;
         assert_posix_rename(&mut session).await;
 
         assert_missing_statvfs(&mut session).await;
