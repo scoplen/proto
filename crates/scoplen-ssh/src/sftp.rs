@@ -28,6 +28,7 @@ const FXP_MKDIR: u8 = 14;
 const FXP_RMDIR: u8 = 15;
 const FXP_REALPATH: u8 = 16;
 const FXP_STAT: u8 = 17;
+const FXP_RENAME: u8 = 18;
 const FXP_READLINK: u8 = 19;
 const FXP_SYMLINK: u8 = 20;
 const FXP_STATUS: u8 = 101;
@@ -425,6 +426,8 @@ pub enum SftpPacket {
     Mkdir { id: u32, path: Vec<u8>, attrs: SftpAttributes },
     /// Remove one directory.
     Rmdir { id: u32, path: Vec<u8> },
+    /// Rename a path using SFTP v3 semantics.
+    Rename { id: u32, old_path: Vec<u8>, new_path: Vec<u8> },
     /// Resolve a path to its canonical server representation.
     Realpath { id: u32, path: Vec<u8> },
     /// Read the target of a symbolic link.
@@ -549,6 +552,14 @@ impl SftpPacket {
             }
             Self::Rmdir { id, path } => {
                 encode_path_request(&mut encoder, FXP_RMDIR, *id, path)?;
+            }
+            Self::Rename { id, old_path, new_path } => {
+                validate_string(old_path, "old path", false)?;
+                validate_string(new_path, "new path", false)?;
+                encoder.u8(FXP_RENAME);
+                encoder.u32(*id);
+                encoder.string(old_path, MAX_SFTP_STRING, "old path")?;
+                encoder.string(new_path, MAX_SFTP_STRING, "new path")?;
             }
             Self::Realpath { id, path } => {
                 encode_path_request(&mut encoder, FXP_REALPATH, *id, path)?;
@@ -731,6 +742,11 @@ impl SftpPacket {
                 path: reader.bytes(MAX_SFTP_STRING, "path", false)?,
                 attrs: SftpAttributes::decode_from(&mut reader)?,
             },
+            FXP_RENAME => Self::Rename {
+                id: reader.u32("request id")?,
+                old_path: reader.bytes(MAX_SFTP_STRING, "old path", false)?,
+                new_path: reader.bytes(MAX_SFTP_STRING, "new path", false)?,
+            },
             FXP_SYMLINK => Self::Symlink {
                 id: reader.u32("request id")?,
                 link_path: reader.bytes(MAX_SFTP_STRING, "link path", false)?,
@@ -801,6 +817,7 @@ impl SftpPacket {
             | Self::Remove { id, .. }
             | Self::Mkdir { id, .. }
             | Self::Rmdir { id, .. }
+            | Self::Rename { id, .. }
             | Self::Realpath { id, .. }
             | Self::Readlink { id, .. }
             | Self::Symlink { id, .. }
@@ -1105,6 +1122,19 @@ impl SftpClient {
     /// Queue an RMDIR request with a tracked request id.
     pub fn rmdir(&mut self, path: impl Into<Vec<u8>>) -> Result<SftpPacket, SftpError> {
         self.queue(|id| SftpPacket::Rmdir { id, path: path.into() })
+    }
+
+    /// Queue a standard SFTP v3 RENAME request with a tracked request id.
+    pub fn rename(
+        &mut self,
+        old_path: impl Into<Vec<u8>>,
+        new_path: impl Into<Vec<u8>>,
+    ) -> Result<SftpPacket, SftpError> {
+        self.queue(|id| SftpPacket::Rename {
+            id,
+            old_path: old_path.into(),
+            new_path: new_path.into(),
+        })
     }
 
     /// Queue a REALPATH request with a tracked request id.
@@ -1517,6 +1547,45 @@ mod tests {
             let wire = packet.encode().unwrap();
             assert_eq!(SftpPacket::decode(&wire).unwrap(), packet);
         }
+    }
+
+    #[test]
+    fn standard_rename_preserves_wire_order_and_releases_invalid_requests() {
+        let packet = SftpPacket::Rename { id: 7, old_path: b"a".to_vec(), new_path: b"b".to_vec() };
+        let wire = packet.encode().unwrap();
+        assert_eq!(wire, b"\0\0\0\x0f\x12\0\0\0\x07\0\0\0\x01a\0\0\0\x01b");
+        assert_eq!(SftpPacket::decode(&wire), Ok(packet));
+
+        let mut truncated_field = wire.clone();
+        truncated_field[14..18].copy_from_slice(&2u32.to_be_bytes());
+        assert_eq!(SftpPacket::decode(&truncated_field), Err(SftpError::Malformed("new path")));
+        let mut oversized_field = wire.clone();
+        oversized_field[9..13]
+            .copy_from_slice(&u32::try_from(MAX_SFTP_STRING + 1).unwrap().to_be_bytes());
+        assert_eq!(SftpPacket::decode(&oversized_field), Err(SftpError::FieldTooLarge("old path")));
+        let mut client = SftpClient::new(1).unwrap();
+        client.accept_version(&SftpPacket::Version { version: 3, extensions: Vec::new() }).unwrap();
+        assert_eq!(client.rename(Vec::new(), b"b"), Err(SftpError::InvalidValue("old path")));
+        assert_eq!(client.rename(b"a", Vec::new()), Err(SftpError::InvalidValue("new path")));
+        assert_eq!(client.rename(b"a\0", b"b"), Err(SftpError::InvalidValue("old path")));
+        assert_eq!(client.rename(b"a", b"b\0"), Err(SftpError::InvalidValue("new path")));
+        assert_eq!(
+            client.rename(b"a", vec![b'b'; MAX_SFTP_STRING + 1]),
+            Err(SftpError::FieldTooLarge("new path"))
+        );
+        assert_eq!(client.pending_requests(), 0);
+        let request = client.rename(b"a", b"b").unwrap();
+        let id = request.request_id().unwrap();
+        assert_eq!(client.pending_requests(), 1);
+        client
+            .accept_response(&SftpPacket::Status {
+                id,
+                code: 0,
+                message: Vec::new(),
+                language: Vec::new(),
+            })
+            .unwrap();
+        assert_eq!(client.pending_requests(), 0);
     }
 
     #[test]
