@@ -581,6 +581,7 @@ mod tests {
         advertise_limits: bool,
         advertise_statvfs: bool,
         extension_handle_open: Option<bool>,
+        hardlink_created: Option<bool>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
@@ -598,6 +599,9 @@ mod tests {
             if self.extension_handle_open.is_some() {
                 extensions.push(SftpExtension::new(b"fsync@openssh.com", b"1").unwrap());
                 extensions.push(SftpExtension::new(b"fstatvfs@openssh.com", b"2").unwrap());
+            }
+            if self.hardlink_created.is_some() {
+                extensions.push(SftpExtension::new(b"hardlink@openssh.com", b"1").unwrap());
             }
             SftpPacket::Version { version: 3, extensions }
         }
@@ -648,6 +652,14 @@ mod tests {
             SftpPacket::Handle { id, handle: b"h".to_vec() }
         }
 
+        fn open_response(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+            if path == b"file" || (path == b"link" && self.hardlink_created == Some(true)) {
+                self.open_extension_handle(id)
+            } else {
+                SftpPacket::Status { id, code: 2, message: Vec::new(), language: Vec::new() }
+            }
+        }
+
         fn close_extension_handle(&mut self, id: u32, handle: &[u8]) -> SftpPacket {
             let code = if handle == b"h" && self.extension_handle_open == Some(true) {
                 self.extension_handle_open = Some(false);
@@ -672,6 +684,54 @@ mod tests {
                 Self::filesystem_stats(id)
             } else {
                 SftpPacket::Status { id, code: 4, message: Vec::new(), language: Vec::new() }
+            }
+        }
+
+        fn hardlink_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
+            let code = if data == b"\0\0\0\x07missing\0\0\0\x0cmissing-link" {
+                2
+            } else if data == b"\0\0\0\x04file\0\0\0\x04link"
+                && self.hardlink_created == Some(false)
+            {
+                self.hardlink_created = Some(true);
+                0
+            } else {
+                4
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn remove_hardlink(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+            let code = if path == b"link" && self.hardlink_created == Some(true) {
+                self.hardlink_created = Some(false);
+                0
+            } else {
+                2
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn read_response(&self, id: u32, handle: &[u8], offset: u64, length: u32) -> SftpPacket {
+            if self.extension_handle_open.is_some()
+                && (handle != b"h" || self.extension_handle_open != Some(true))
+            {
+                return SftpPacket::Status {
+                    id,
+                    code: 4,
+                    message: Vec::new(),
+                    language: Vec::new(),
+                };
+            }
+            match usize::try_from(offset) {
+                Ok(start) if start < self.file.len() => {
+                    let end = start
+                        .saturating_add(
+                            self.read_reply_limit.unwrap_or(length as usize).min(length as usize),
+                        )
+                        .min(self.file.len());
+                    SftpPacket::Data { id, data: self.file[start..end].to_vec() }
+                }
+                _ => SftpPacket::Status { id, code: 1, message: Vec::new(), language: Vec::new() },
             }
         }
 
@@ -766,31 +826,19 @@ mod tests {
                 let is_read = matches!(packet, SftpPacket::Read { .. });
                 let response = match packet {
                     SftpPacket::Init { .. } => self.version_response(),
-                    SftpPacket::Open { id, .. } if self.extension_handle_open.is_some() => {
-                        self.open_extension_handle(id)
+                    SftpPacket::Open { id, path, .. } if self.extension_handle_open.is_some() => {
+                        self.open_response(id, &path)
                     }
                     SftpPacket::Close { id, handle } if self.extension_handle_open.is_some() => {
                         self.close_extension_handle(id, &handle)
                     }
                     SftpPacket::Realpath { id, .. } => Self::realpath_response(id),
-                    SftpPacket::Read { id, offset, length, .. } => match usize::try_from(offset) {
-                        Ok(start) if start < self.file.len() => {
-                            let end = start
-                                .saturating_add(
-                                    self.read_reply_limit
-                                        .unwrap_or(length as usize)
-                                        .min(length as usize),
-                                )
-                                .min(self.file.len());
-                            SftpPacket::Data { id, data: self.file[start..end].to_vec() }
-                        }
-                        _ => SftpPacket::Status {
-                            id,
-                            code: 1,
-                            message: Vec::new(),
-                            language: Vec::new(),
-                        },
-                    },
+                    SftpPacket::Read { id, handle, offset, length } => {
+                        self.read_response(id, &handle, offset, length)
+                    }
+                    SftpPacket::Remove { id, path } if self.hardlink_created.is_some() => {
+                        self.remove_hardlink(id, &path)
+                    }
                     SftpPacket::Write { id, offset, data, .. } => {
                         let Ok(start) = usize::try_from(offset) else {
                             return Ok(());
@@ -827,6 +875,11 @@ mod tests {
                             && self.extension_handle_open.is_some() =>
                     {
                         self.fstatvfs_response(id, &data)
+                    }
+                    SftpPacket::Extended { id, name, data }
+                        if name == b"hardlink@openssh.com" && self.hardlink_created.is_some() =>
+                    {
+                        self.hardlink_response(id, &data)
                     }
                     _ => continue,
                 };
@@ -873,6 +926,7 @@ mod tests {
                     advertise_limits: false,
                     advertise_statvfs: false,
                     extension_handle_open: None,
+                    hardlink_created: None,
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -946,6 +1000,74 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
     }
 
+    async fn assert_hardlink(session: &mut SftpSession) {
+        let missing = session
+            .client_mut()
+            .hardlink(b"missing", b"missing-link")
+            .expect("missing-source hardlink request");
+        session.send_request(&missing).await.expect("send missing-source hardlink");
+        assert!(matches!(
+            session.read_response().await.expect("read missing-source hardlink"),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+
+        let link = session.client_mut().hardlink(b"file", b"link").expect("hardlink request");
+        session.send_request(&link).await.expect("send hardlink");
+        assert!(matches!(
+            session.read_response().await.expect("read hardlink"),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let existing = session.client_mut().hardlink(b"file", b"link").expect("existing hardlink");
+        session.send_request(&existing).await.expect("send existing hardlink");
+        assert!(matches!(
+            session.read_response().await.expect("read existing hardlink"),
+            SftpPacket::Status { code: 4, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+
+        let open = session
+            .client_mut()
+            .open(b"link", 1, SftpAttributes::default())
+            .expect("open linked file");
+        session.send_request(&open).await.expect("send linked-file open");
+        let handle = match session.read_response().await.expect("read linked-file open") {
+            SftpPacket::Handle { handle, .. } => handle,
+            other => panic!("unexpected linked-file open response: {other:?}"),
+        };
+        let read = session.client_mut().read(handle.clone(), 0, 12).expect("read linked file");
+        session.send_request(&read).await.expect("send linked-file read");
+        assert!(matches!(
+            session.read_response().await.expect("read linked-file data"),
+            SftpPacket::Data { data, .. } if data == b"linked bytes"
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let close = session.client_mut().close(handle).expect("close linked file");
+        session.send_request(&close).await.expect("send linked-file close");
+        assert!(matches!(
+            session.read_response().await.expect("read linked-file close"),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        let remove = session.client_mut().remove(b"link").expect("remove linked file");
+        session.send_request(&remove).await.expect("send linked-file remove");
+        assert!(matches!(
+            session.read_response().await.expect("read linked-file remove"),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let absent = session
+            .client_mut()
+            .open(b"link", 1, SftpAttributes::default())
+            .expect("open removed link");
+        session.send_request(&absent).await.expect("send removed-link open");
+        assert!(matches!(
+            session.read_response().await.expect("read removed-link open"),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
     #[tokio::test]
     async fn opens_subsystem_negotiates_v3_and_round_trips_packets() {
         let mut server_config = russh::server::Config::default();
@@ -966,10 +1088,11 @@ mod tests {
                 stream,
                 SftpServer {
                     buffer: Vec::new(),
-                    file: Vec::new(),
+                    file: b"linked bytes".to_vec(),
                     advertise_limits: true,
                     advertise_statvfs: true,
                     extension_handle_open: Some(false),
+                    hardlink_created: Some(false),
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -983,7 +1106,7 @@ mod tests {
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
-        assert_eq!(session.extensions().len(), 4);
+        assert_eq!(session.extensions().len(), 5);
         assert!(session.limits().is_some());
         assert_eq!(
             session.request_limits().await.expect("request limits"),
@@ -1040,6 +1163,7 @@ mod tests {
         ));
         assert_eq!(session.pending_requests(), 0);
         assert_fstatvfs(&mut session, &handle, false).await;
+        assert_hardlink(&mut session).await;
 
         let missing = session.client_mut().statvfs(b"missing").expect("missing statvfs request");
         session.send_request(&missing).await.expect("send missing statvfs");
@@ -1075,6 +1199,7 @@ mod tests {
                     advertise_limits: false,
                     advertise_statvfs: false,
                     extension_handle_open: None,
+                    hardlink_created: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1134,6 +1259,7 @@ mod tests {
                     advertise_limits: false,
                     advertise_statvfs: false,
                     extension_handle_open: None,
+                    hardlink_created: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
