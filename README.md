@@ -112,6 +112,11 @@ trust pin, authentication, and a session command. Password,
 both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
 wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
+`pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners with one modern
+algorithm set and one legacy-only set. The `algorithm_interop` example verifies an authenticated
+command on the modern set, handshake rejection by the default policy on the legacy set, a working
+command after per-Host legacy opt-in, and rejection by another default Host. This covers the
+selected algorithms only; the full transport and strict-KEX interoperability matrix remains open.
 With a disposable OpenSSH server, `cargo run -p scoplen-ssh --example proxy_command_interop`
 exercises a real SSH handshake through a child process's standard streams. Set
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's public-key line and `SCOPLEN_OPENSSH_PASSWORD` to the
