@@ -172,6 +172,10 @@ The link setup follows OpenSSH's reversed `SYMLINK` wire order relative to the S
 It also checks `READLINK` returns the exact target bytes, rejects a missing link and the removed
 link, and releases each request slot. The authenticated in-process server exercises the SFTP v3
 draft's `SYMLINK` argument order; the external OpenSSH run exercises its reversed wire order.
+The same run verifies `REALPATH` resolves the current directory and normalizes both an existing
+file's `./` path and a missing final component to the expected absolute bytes. Resolving through a
+regular file fails, and every request slot is released; the authenticated in-process server covers
+those success and failure responses too.
 The same SFTP run creates a unique directory and file, reads directory entries until EOF, rejects
 a missing directory, a nonempty directory removal, and a read from a closed directory handle,
 then removes both paths and checks that the directory is gone. Each response releases its request

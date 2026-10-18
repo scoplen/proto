@@ -1075,12 +1075,25 @@ mod tests {
             }
         }
 
-        fn realpath_response(id: u32) -> SftpPacket {
+        fn realpath_response(id: u32, path: &[u8]) -> SftpPacket {
+            let resolved = match path {
+                b"." => b"/srv".to_vec(),
+                b"file" | b"./file" => b"/srv/file".to_vec(),
+                b"missing" => b"/srv/missing".to_vec(),
+                b"/first" | b"/second" => path.to_vec(),
+                _ => {
+                    return SftpPacket::Status {
+                        id,
+                        code: 2,
+                        message: Vec::new(),
+                        language: Vec::new(),
+                    };
+                }
+            };
             SftpPacket::Name {
                 id,
                 entries: vec![
-                    SftpNameEntry::new(b"/srv".to_vec(), Vec::new(), SftpAttributes::default())
-                        .unwrap(),
+                    SftpNameEntry::new(resolved, Vec::new(), SftpAttributes::default()).unwrap(),
                 ],
             }
         }
@@ -1179,7 +1192,7 @@ mod tests {
                         {
                             self.close_extension_handle(id, &handle)
                         }
-                        SftpPacket::Realpath { id, .. } => Self::realpath_response(id),
+                        SftpPacket::Realpath { id, path } => Self::realpath_response(id, &path),
                         SftpPacket::Lstat { id, path } if self.lsetstat_link_mtime.is_some() => {
                             self.link_attributes(id, false, &path)
                         }
@@ -1712,8 +1725,34 @@ mod tests {
         session.send_request(&request).await.expect("write realpath");
         assert!(matches!(
             session.read_response().await.expect("read realpath"),
-            SftpPacket::Name { id: 2, entries } if entries[0].filename == b"/srv"
+            SftpPacket::Name { id: 2, entries }
+                if entries.len() == 1 && entries[0].filename == b"/srv"
         ));
+        assert_eq!(session.pending_requests(), 0);
+        let file = session.client_mut().realpath(b"./file").expect("file realpath request");
+        session.send_request(&file).await.expect("write file realpath");
+        assert!(matches!(
+            session.read_response().await.expect("read file realpath"),
+            SftpPacket::Name { entries, .. }
+                if entries.len() == 1 && entries[0].filename == b"/srv/file"
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let missing = session.client_mut().realpath(b"missing").expect("missing realpath request");
+        session.send_request(&missing).await.expect("write missing realpath");
+        assert!(matches!(
+            session.read_response().await.expect("read missing realpath"),
+            SftpPacket::Name { entries, .. }
+                if entries.len() == 1 && entries[0].filename == b"/srv/missing"
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let invalid =
+            session.client_mut().realpath(b"file/child").expect("invalid realpath request");
+        session.send_request(&invalid).await.expect("write invalid realpath");
+        assert!(matches!(
+            session.read_response().await.expect("read invalid realpath"),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
         let statvfs = session.client_mut().statvfs(b".").expect("statvfs request");
         session.send_request(&statvfs).await.expect("send statvfs");
         let stats =

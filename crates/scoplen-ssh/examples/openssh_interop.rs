@@ -499,6 +499,67 @@ async fn verify_lsetstat(
     Ok(())
 }
 
+async fn verify_realpath(
+    session: &mut SftpSession,
+    path: &[u8],
+    missing_path: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let cwd = session.client_mut().realpath(b".")?;
+    let cwd = match sftp_response(session, cwd).await? {
+        SftpPacket::Name { entries, .. }
+            if entries.len() == 1 && entries[0].filename.starts_with(b"/") =>
+        {
+            entries[0].filename.clone()
+        }
+        _ => return Err("SFTP realpath did not resolve the current directory".into()),
+    };
+    if session.pending_requests() != 0 {
+        return Err("SFTP realpath retained a current-directory request slot".into());
+    }
+    let mut expected = cwd.clone();
+    if !expected.ends_with(b"/") {
+        expected.push(b'/');
+    }
+    expected.extend_from_slice(path);
+
+    let relative = [b"./".as_slice(), path].concat();
+    let resolved = session.client_mut().realpath(relative)?;
+    if !matches!(
+        sftp_response(session, resolved).await?,
+        SftpPacket::Name { entries, .. }
+            if entries.len() == 1 && entries[0].filename == expected
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP realpath did not canonicalize the existing file cleanly".into());
+    }
+
+    let mut expected_missing = cwd;
+    if !expected_missing.ends_with(b"/") {
+        expected_missing.push(b'/');
+    }
+    expected_missing.extend_from_slice(missing_path);
+    let missing = session.client_mut().realpath(missing_path.to_vec())?;
+    if !matches!(
+        sftp_response(session, missing).await?,
+        SftpPacket::Name { entries, .. }
+            if entries.len() == 1 && entries[0].filename == expected_missing
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP realpath did not normalize a missing final component".into());
+    }
+
+    let invalid = [path, b"/child"].concat();
+    let request = session.client_mut().realpath(invalid)?;
+    if !matches!(sftp_response(session, request).await?, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err(
+            "SFTP realpath accepted a file as a directory or retained a request slot".into()
+        );
+    }
+    Ok(())
+}
+
 async fn verify_directory(
     session: &mut SftpSession,
     path: &[u8],
@@ -788,6 +849,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     }
     verify_fsync(&mut session, &write_handle, false).await?;
     verify_fstatvfs(&mut session, &write_handle, false).await?;
+    verify_realpath(&mut session, &path, &missing_path).await?;
     verify_lsetstat(&mut session, &path, &missing_path).await?;
 
     let read = session.client_mut().open(path.clone(), 1, SftpAttributes::default())?;
