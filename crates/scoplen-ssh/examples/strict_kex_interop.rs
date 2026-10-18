@@ -8,7 +8,7 @@ use std::{
     io::{self, ErrorKind},
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -139,8 +139,17 @@ async fn connect_with_ignore(
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let relay_port = listener.local_addr()?.port();
     let stream = timeout(DEADLINE, TcpStream::connect(("127.0.0.1", relay_port))).await??;
+    let injection_written = Arc::new(AtomicBool::new(false));
+    let relay_injection_written = Arc::clone(&injection_written);
     let mut relay = tokio::spawn(async move {
-        relay_ignore_at_kexinit(listener, upstream_port, server_advertises_strict, point).await
+        relay_ignore_at_kexinit(
+            listener,
+            upstream_port,
+            server_advertises_strict,
+            point,
+            relay_injection_written,
+        )
+        .await
     });
     let connection = match timeout(DEADLINE, ClientConnection::connect_stream(config, stream)).await
     {
@@ -162,12 +171,27 @@ async fn connect_with_ignore(
         },
         Err(error) => Err(error),
     };
-    match timeout(DEADLINE, &mut relay).await {
-        Ok(result) => result??,
+    let relay_result = match timeout(DEADLINE, &mut relay).await {
+        Ok(result) => result?,
         Err(error) => {
             relay.abort();
             let _ = relay.await;
             return Err(error.into());
+        }
+    };
+    if let Err(error) = relay_result {
+        // Windows can report WSAECONNABORTED when either verified client outcome closes the relay.
+        if !is_expected_relay_abort(
+            &error,
+            injection_written.load(Ordering::SeqCst),
+            server_advertises_strict,
+            &outcome,
+        ) {
+            return Err(io::Error::new(
+                error.kind(),
+                format!("strict={server_advertises_strict}, point={point:?}: {error}"),
+            )
+            .into());
         }
     }
     Ok(outcome)
@@ -178,27 +202,33 @@ async fn relay_ignore_at_kexinit(
     upstream_port: u16,
     server_advertises_strict: bool,
     point: InjectionPoint,
+    injection_written: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let (client, _) = listener.accept().await?;
     let server = TcpStream::connect(("127.0.0.1", upstream_port)).await?;
     let (mut client_reader, mut client_writer) = client.into_split();
     let (mut server_reader, mut server_writer) = server.into_split();
     let client_to_server = async {
-        peer_close(copy(&mut client_reader, &mut server_writer).await)?;
-        peer_close(server_writer.shutdown().await)
+        relay_stage("client copy", peer_close(copy(&mut client_reader, &mut server_writer).await))?;
+        relay_stage("server shutdown", peer_close(server_writer.shutdown().await))
     };
     let server_to_client = async {
-        let banner = read_banner(&mut server_reader).await?;
-        client_writer.write_all(&banner).await?;
-        let packet = read_first_kexinit(&mut server_reader, server_advertises_strict).await?;
+        let banner = relay_stage("server banner", read_banner(&mut server_reader).await)?;
+        relay_stage("banner write", client_writer.write_all(&banner).await)?;
+        let packet = relay_stage(
+            "server KEXINIT",
+            read_first_kexinit(&mut server_reader, server_advertises_strict).await,
+        )?;
         if matches!(point, InjectionPoint::BeforeKexInit) {
-            client_writer.write_all(&IGNORE_PACKET).await?;
+            relay_stage("before injection", client_writer.write_all(&IGNORE_PACKET).await)?;
+            injection_written.store(true, Ordering::SeqCst);
         }
-        client_writer.write_all(&packet).await?;
+        relay_stage("KEXINIT write", client_writer.write_all(&packet).await)?;
         if matches!(point, InjectionPoint::AfterKexInit) {
-            client_writer.write_all(&IGNORE_PACKET).await?;
+            relay_stage("after injection", client_writer.write_all(&IGNORE_PACKET).await)?;
+            injection_written.store(true, Ordering::SeqCst);
         }
-        peer_close(copy(&mut server_reader, &mut client_writer).await)
+        relay_stage("server copy", peer_close(copy(&mut server_reader, &mut client_writer).await))
     };
     tokio::pin!(client_to_server, server_to_client);
     tokio::select! {
@@ -208,6 +238,10 @@ async fn relay_ignore_at_kexinit(
             server_to_client.await
         }
     }
+}
+
+fn relay_stage<T>(stage: &'static str, result: io::Result<T>) -> io::Result<T> {
+    result.map_err(|error| io::Error::new(error.kind(), format!("{stage}: {error}")))
 }
 
 fn peer_close<T>(result: io::Result<T>) -> io::Result<()> {
@@ -223,6 +257,20 @@ fn peer_close<T>(result: io::Result<T>) -> io::Result<()> {
         }
         Err(error) => Err(error),
     }
+}
+
+fn is_expected_relay_abort(
+    error: &io::Error,
+    injection_written: bool,
+    server_advertises_strict: bool,
+    outcome: &Result<(), ClientError>,
+) -> bool {
+    error.kind() == ErrorKind::ConnectionAborted
+        && injection_written
+        && matches!(
+            (server_advertises_strict, outcome),
+            (true, Err(ClientError::Protocol)) | (false, Ok(()))
+        )
 }
 
 async fn read_banner<R: AsyncRead + Unpin>(reader: &mut R) -> io::Result<Vec<u8>> {
@@ -330,7 +378,11 @@ async fn verify_command(
 
 #[cfg(test)]
 mod tests {
-    use super::{STRICT_SERVER_MARKER, kexinit_offers_strict};
+    use std::io::{self, ErrorKind};
+
+    use super::{
+        ClientError, STRICT_SERVER_MARKER, is_expected_relay_abort, kexinit_offers_strict,
+    };
 
     fn kexinit_payload(names: &[u8], extra: &[u8]) -> Vec<u8> {
         let mut payload = vec![20];
@@ -359,5 +411,20 @@ mod tests {
         let mut payload = kexinit_payload(b"curve25519-sha256", &[]);
         payload[17..21].copy_from_slice(&100u32.to_be_bytes());
         assert!(kexinit_offers_strict(&payload).is_err());
+    }
+
+    #[test]
+    fn connection_abort_requires_delivered_injection_and_expected_client_outcome() {
+        let aborted = io::Error::new(ErrorKind::ConnectionAborted, "peer closed");
+        let invalid = io::Error::new(ErrorKind::InvalidData, "relay failed");
+        let strict_rejection = Err(ClientError::Protocol);
+        let control_success = Ok(());
+        assert!(is_expected_relay_abort(&aborted, true, true, &strict_rejection));
+        assert!(is_expected_relay_abort(&aborted, true, false, &control_success));
+        assert!(!is_expected_relay_abort(&aborted, false, true, &strict_rejection));
+        assert!(!is_expected_relay_abort(&aborted, false, false, &control_success));
+        assert!(!is_expected_relay_abort(&aborted, true, true, &control_success));
+        assert!(!is_expected_relay_abort(&aborted, true, false, &strict_rejection));
+        assert!(!is_expected_relay_abort(&invalid, true, true, &strict_rejection));
     }
 }
