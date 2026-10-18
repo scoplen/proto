@@ -86,6 +86,8 @@ exec /usr/sbin/sshd -D -e -f /tmp/legacy.conf
     $env:SCOPLEN_ALGORITHM_PASSWORD = 'scoplen-test-password'
     cargo run --quiet --locked -p scoplen-ssh --example algorithm_interop
     if ($LASTEXITCODE -ne 0) { throw 'Constrained OpenSSH algorithm interop failed' }
+    cargo run --quiet --locked -p scoplen-ssh --example strict_kex_interop
+    if ($LASTEXITCODE -ne 0) { throw 'OpenSSH strict KEX interop failed' }
 }
 catch {
     if ($started) {
