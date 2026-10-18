@@ -3269,37 +3269,46 @@
           "type",
           "title",
           "status",
-          "code"
+          "detail",
+          "instance",
+          "code",
+          "changed",
+          "retryable"
         ],
         "properties": {
           "type": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "status": {
             "type": "integer",
-            "minimum": 400,
+            "minimum": 100,
             "maximum": 599
           },
-          "code": {
-            "type": "string"
-          },
           "detail": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "instance": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
           },
           "changed": {
             "type": "boolean"
           },
-          "extensions": {
-            "type": "object",
-            "additionalProperties": true
+          "retryable": {
+            "type": "boolean"
           }
-        }
+        },
+        "additionalProperties": true
       },
       "DecisionRequest": {
         "type": "object",

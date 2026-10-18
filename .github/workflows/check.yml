@@ -21,6 +21,8 @@ jobs:
         run: rustup show active-toolchain
       - name: Format
         run: cargo fmt --all -- --check
+      - name: Check OpenAPI generated types
+        run: node crates/scoplen-api/openapi/generate.mjs --check
       - name: Test
         run: cargo test --workspace --all-targets
       - name: Clippy

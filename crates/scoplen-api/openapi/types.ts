@@ -57,11 +57,19 @@ export interface Resource {
   data: Record<string, unknown>;
 }
 export interface ResourcePage { items: Resource[]; next_cursor: string | null; }
+// BEGIN GENERATED ProblemDetails
 export interface ProblemDetails {
-  type: string; title: string; status: number; code: string;
-  detail?: string; instance?: string; changed?: boolean;
+  type: string;
+  title: string;
+  status: number;
+  detail: string;
+  instance: string;
+  code: string;
+  changed: boolean;
+  retryable: boolean;
   [extension: string]: unknown;
 }
+// END GENERATED ProblemDetails
 export interface ListQuery { limit?: number; cursor?: string; filter?: string; sort?: string; }
 export interface WriteRequest { data: Record<string, unknown>; }
 export interface DecisionRequest { decision: "approve" | "deny"; reason?: string; }
