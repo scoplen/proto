@@ -593,6 +593,7 @@ mod tests {
         rename_phase: Option<RenamePhase>,
         expand_path_prefix: Option<&'static [u8]>,
         copy_data_target: Option<Vec<u8>>,
+        lsetstat_link_mtime: Option<u32>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
@@ -622,6 +623,9 @@ mod tests {
             }
             if self.copy_data_target.is_some() {
                 extensions.push(SftpExtension::new(b"copy-data", b"1").unwrap());
+            }
+            if self.lsetstat_link_mtime.is_some() {
+                extensions.push(SftpExtension::new(b"lsetstat@openssh.com", b"1").unwrap());
             }
             SftpPacket::Version { version: 3, extensions }
         }
@@ -739,6 +743,47 @@ mod tests {
             SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
         }
 
+        fn lsetstat_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
+            let attrs = SftpAttributes {
+                access_time: Some(1_600_000_000),
+                modify_time: Some(1_600_000_000),
+                ..SftpAttributes::default()
+            };
+            let expected = SftpPacket::lsetstat_request(id, b"symlink", &attrs).unwrap();
+            let missing = SftpPacket::lsetstat_request(id, b"missing", &attrs).unwrap();
+            let code = if matches!(expected, SftpPacket::Extended { data: expected, .. } if data == expected)
+            {
+                self.lsetstat_link_mtime = Some(1_600_000_000);
+                0
+            } else if matches!(missing, SftpPacket::Extended { data: missing, .. } if data == missing)
+            {
+                2
+            } else {
+                4
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn link_attributes(&self, id: u32, follow: bool, path: &[u8]) -> SftpPacket {
+            if path != b"symlink" {
+                return SftpPacket::Status {
+                    id,
+                    code: 2,
+                    message: Vec::new(),
+                    language: Vec::new(),
+                };
+            }
+            let mtime = if follow { 1_700_000_000 } else { self.lsetstat_link_mtime.unwrap() };
+            SftpPacket::Attrs {
+                id,
+                attrs: SftpAttributes {
+                    access_time: Some(mtime),
+                    modify_time: Some(mtime),
+                    ..SftpAttributes::default()
+                },
+            }
+        }
+
         fn hardlink_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
             let code = if data == b"\0\0\0\x07missing\0\0\0\x0cmissing-link" {
                 2
@@ -828,6 +873,8 @@ mod tests {
                 Some(self.expand_path_response(id, data))
             } else if name == b"copy-data" && self.copy_data_target.is_some() {
                 Some(self.copy_data_response(id, data))
+            } else if name == b"lsetstat@openssh.com" && self.lsetstat_link_mtime.is_some() {
+                Some(self.lsetstat_response(id, data))
             } else {
                 None
             }
@@ -969,6 +1016,12 @@ mod tests {
                         self.close_extension_handle(id, &handle)
                     }
                     SftpPacket::Realpath { id, .. } => Self::realpath_response(id),
+                    SftpPacket::Lstat { id, path } if self.lsetstat_link_mtime.is_some() => {
+                        self.link_attributes(id, false, &path)
+                    }
+                    SftpPacket::Stat { id, path } if self.lsetstat_link_mtime.is_some() => {
+                        self.link_attributes(id, true, &path)
+                    }
                     SftpPacket::Read { id, handle, offset, length } => {
                         self.read_response(id, &handle, offset, length)
                     }
@@ -1048,6 +1101,7 @@ mod tests {
                     rename_phase: None,
                     expand_path_prefix: None,
                     copy_data_target: None,
+                    lsetstat_link_mtime: None,
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -1300,6 +1354,73 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
     }
 
+    async fn assert_lsetstat(session: &mut SftpSession) {
+        assert!(
+            session.extensions().iter().any(|extension| extension.name == b"lsetstat@openssh.com")
+        );
+        let attrs = SftpAttributes {
+            access_time: Some(1_600_000_000),
+            modify_time: Some(1_600_000_000),
+            ..SftpAttributes::default()
+        };
+        let missing = session.client_mut().lsetstat(b"missing", &attrs).unwrap();
+        session.send_request(&missing).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+
+        let request = session.client_mut().lsetstat(b"symlink", &attrs).unwrap();
+        session.send_request(&request).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let link = session.client_mut().lstat(b"symlink").unwrap();
+        session.send_request(&link).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Attrs { attrs, .. } if attrs.modify_time == Some(1_600_000_000)
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let target = session.client_mut().stat(b"symlink").unwrap();
+        session.send_request(&target).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Attrs { attrs, .. } if attrs.modify_time == Some(1_700_000_000)
+        ));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
+    async fn assert_initial_requests(session: &mut SftpSession) {
+        assert_eq!(session.extensions().len(), 8);
+        assert!(session.limits().is_some());
+        assert_eq!(
+            session.request_limits().await.expect("request limits"),
+            Some(SftpLimits {
+                max_packet_length: 256 * 1024,
+                max_read_length: 128 * 1024,
+                max_write_length: 64 * 1024,
+                max_open_handles: 128,
+            })
+        );
+        let request = session.client_mut().realpath(b".").expect("realpath request");
+        session.send_request(&request).await.expect("write realpath");
+        assert!(matches!(
+            session.read_response().await.expect("read realpath"),
+            SftpPacket::Name { id: 2, entries } if entries[0].filename == b"/srv"
+        ));
+        let statvfs = session.client_mut().statvfs(b".").expect("statvfs request");
+        session.send_request(&statvfs).await.expect("send statvfs");
+        let stats =
+            session.read_response().await.expect("read statvfs").statvfs_response().unwrap();
+        assert_eq!(stats.block_size, 4096);
+        assert_eq!(stats.name_max, 255);
+        assert_eq!(session.pending_requests(), 0);
+    }
+
     #[tokio::test]
     async fn copy_data_round_trips_over_authenticated_channel() {
         let mut server_config = russh::server::Config::default();
@@ -1327,6 +1448,7 @@ mod tests {
                     rename_phase: None,
                     expand_path_prefix: None,
                     copy_data_target: Some(b"0123456789".to_vec()),
+                    lsetstat_link_mtime: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1420,6 +1542,7 @@ mod tests {
                     rename_phase: Some(RenamePhase::Original),
                     expand_path_prefix: Some(b"/srv/"),
                     copy_data_target: None,
+                    lsetstat_link_mtime: Some(1_700_000_001),
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1433,30 +1556,7 @@ mod tests {
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
-        assert_eq!(session.extensions().len(), 7);
-        assert!(session.limits().is_some());
-        assert_eq!(
-            session.request_limits().await.expect("request limits"),
-            Some(SftpLimits {
-                max_packet_length: 256 * 1024,
-                max_read_length: 128 * 1024,
-                max_write_length: 64 * 1024,
-                max_open_handles: 128,
-            })
-        );
-        let request = session.client_mut().realpath(b".").expect("realpath request");
-        session.send_request(&request).await.expect("write realpath");
-        assert!(matches!(
-            session.read_response().await.expect("read realpath"),
-            SftpPacket::Name { id: 2, entries } if entries[0].filename == b"/srv"
-        ));
-        let statvfs = session.client_mut().statvfs(b".").expect("statvfs request");
-        session.send_request(&statvfs).await.expect("send statvfs");
-        let stats =
-            session.read_response().await.expect("read statvfs").statvfs_response().unwrap();
-        assert_eq!(stats.block_size, 4096);
-        assert_eq!(stats.name_max, 255);
-        assert_eq!(session.pending_requests(), 0);
+        assert_initial_requests(&mut session).await;
 
         let open = session
             .client_mut()
@@ -1492,6 +1592,7 @@ mod tests {
         assert_fstatvfs(&mut session, &handle, false).await;
         assert_hardlink(&mut session).await;
         assert_expand_path(&mut session).await;
+        assert_lsetstat(&mut session).await;
         assert_posix_rename(&mut session).await;
 
         assert_missing_statvfs(&mut session).await;
@@ -1526,6 +1627,7 @@ mod tests {
                     rename_phase: None,
                     expand_path_prefix: None,
                     copy_data_target: None,
+                    lsetstat_link_mtime: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1589,6 +1691,7 @@ mod tests {
                     rename_phase: None,
                     expand_path_prefix: None,
                     copy_data_target: None,
+                    lsetstat_link_mtime: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,

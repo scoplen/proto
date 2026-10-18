@@ -157,7 +157,11 @@ replacement of an existing destination with different contents, `expand-path@ope
 an absolute path to the existing file with matching bytes and an absolute path for a missing file
 (whose subsequent open fails), and `copy-data` between open handles with source and destination
 offsets, byte comparison, invalid-source and closed-destination rejection, request-slot release,
-and cleanup of the unique remote paths.
+and cleanup of the unique remote paths. It also verifies `lsetstat@openssh.com` on a file and a
+symbolic link: the link's changed timestamp is visible through `LSTAT` while `STAT` shows the
+target's timestamp unchanged. A missing path is rejected, request slots are released, and the
+temporary link is removed.
+The link setup follows OpenSSH's reversed `SYMLINK` wire order relative to the SFTP v3 draft.
 It passed against a disposable
 `linuxserver/openssh-server` container; other SFTP extensions, server implementations, and
 platforms remain unverified.

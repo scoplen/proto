@@ -1050,6 +1050,16 @@ impl SftpClient {
         self.queue(|id| SftpPacket::Close { id, handle: handle.into() })
     }
 
+    /// Queue a STAT request with a tracked request id.
+    pub fn stat(&mut self, path: impl Into<Vec<u8>>) -> Result<SftpPacket, SftpError> {
+        self.queue(|id| SftpPacket::Stat { id, path: path.into() })
+    }
+
+    /// Queue an LSTAT request with a tracked request id.
+    pub fn lstat(&mut self, path: impl Into<Vec<u8>>) -> Result<SftpPacket, SftpError> {
+        self.queue(|id| SftpPacket::Lstat { id, path: path.into() })
+    }
+
     /// Queue a SETSTAT request with a tracked request id.
     pub fn setstat(
         &mut self,
@@ -1774,19 +1784,23 @@ mod tests {
     fn client_metadata_builders_correlate_and_release_invalid_ids() {
         let mut client = SftpClient::new(8).unwrap();
         client.accept_version(&SftpPacket::Version { version: 3, extensions: Vec::new() }).unwrap();
+        assert_eq!(client.stat(b"/tmp/a").unwrap().request_id(), Some(1));
+        assert_eq!(client.lstat(b"/tmp/link").unwrap().request_id(), Some(2));
         assert_eq!(
             client.setstat(b"/tmp/a", SftpAttributes::default()).unwrap().request_id(),
-            Some(1)
+            Some(3)
         );
-        assert_eq!(client.fsetstat(b"h", SftpAttributes::default()).unwrap().request_id(), Some(2));
-        assert_eq!(client.readlink(b"/tmp/link").unwrap().request_id(), Some(3));
-        assert_eq!(client.symlink(b"/tmp/link", b"/tmp/target").unwrap().request_id(), Some(4));
+        assert_eq!(client.fsetstat(b"h", SftpAttributes::default()).unwrap().request_id(), Some(4));
+        assert_eq!(client.readlink(b"/tmp/link").unwrap().request_id(), Some(5));
+        assert_eq!(client.symlink(b"/tmp/link", b"/tmp/target").unwrap().request_id(), Some(6));
+        assert_eq!(client.stat(Vec::new()), Err(SftpError::InvalidValue("path")));
+        assert_eq!(client.lstat(Vec::new()), Err(SftpError::InvalidValue("path")));
         assert_eq!(client.readlink(Vec::new()), Err(SftpError::InvalidValue("path")));
         assert_eq!(
             client.fsetstat(Vec::new(), SftpAttributes::default()),
             Err(SftpError::InvalidValue("handle"))
         );
-        assert_eq!(client.pending_requests(), 4);
+        assert_eq!(client.pending_requests(), 6);
     }
 
     #[test]
