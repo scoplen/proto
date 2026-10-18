@@ -20,7 +20,7 @@ All notable changes to the `proto` repository will be recorded here.
   live gateway interoperability remain outside this adapter.
 - Added the bounded K-4 shared-vault epoch-retirement response codec with deterministic CBOR,
   a published vector, and zero-epoch failure coverage; the authenticated route and retirement
-  storage remain owned by `scoplen-server`.
+  storage remain owned by `server`.
 - Added the native Windows legacy Pageant `WM_COPYDATA` agent channel. It derives the documented
   current-thread mapping name, raises the mapping limit to 262,144 bytes, validates response
   lengths before reading, and exposes `connect_native_pageant_agent` while preserving the
@@ -37,10 +37,10 @@ All notable changes to the `proto` repository will be recorded here.
   malformed, duplicate, ordering, and body-limit failure paths.
 - Added the bounded K-4 shared-vault key-retrieval response codec for ascending epoch wraps,
   deterministic vectors, additive response extensions, and malformed, ordering, count, and body
-  limit failure paths. The authenticated route and durable lookup remain owned by `scoplen-server`.
+  limit failure paths. The authenticated route and durable lookup remain owned by `server`.
 - Added the K-4 shared-vault creation request and response codecs with bounded opaque key wraps,
   strict UUIDv7 and initial-state validation, published deterministic vectors, and failure-path
-  coverage. The authenticated storage and HTTP route remain owned by `scoplen-server`.
+  coverage. The authenticated storage and HTTP route remain owned by `server`.
 - Added reproducible Prost-generated Rust bindings and a published `FileDescriptorSet` for the
   internal gateway and host-agent protobuf contracts, plus deterministic TypeScript message,
   enum, oneof, and service metadata bindings at `@scoplen/api/proto`; drift checks and generated
