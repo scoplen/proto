@@ -214,10 +214,11 @@ impl SocksCancellation {
 
     async fn cancelled(&self) {
         loop {
+            let notified = self.state.notify.notified();
             if self.is_cancelled() {
                 return;
             }
-            self.state.notify.notified().await;
+            notified.await;
         }
     }
 }
@@ -445,8 +446,24 @@ async fn forward_bytes(
     mut buffer: Vec<u8>,
     cancellation: SocksCancellation,
 ) -> Result<(), SocksForwardError> {
+    let result = tokio::select! {
+        () = cancellation.cancelled() => Err(SocksForwardError::Cancelled),
+        result = forward_bytes_until_end(&mut stream, channel.as_mut(), &trailing, &mut buffer) => result,
+    };
+    if matches!(result, Err(SocksForwardError::Cancelled)) {
+        return close_after_cancel(channel).await;
+    }
+    result
+}
+
+async fn forward_bytes_until_end(
+    stream: &mut TcpStream,
+    channel: &mut dyn SocksChannel,
+    trailing: &[u8],
+    buffer: &mut [u8],
+) -> Result<(), SocksForwardError> {
     if !trailing.is_empty() {
-        channel.send_data(&trailing).await?;
+        channel.send_data(trailing).await?;
     }
     let mut local_eof = false;
     let mut remote_eof = false;
@@ -454,23 +471,17 @@ async fn forward_bytes(
 
     while !(local_eof && remote_eof) {
         if local_eof {
-            let event = tokio::select! {
-                () = cancellation.cancelled() => return close_after_cancel(channel).await,
-                event = channel.next_event() => event?,
-            };
-            if apply_remote_event(&mut stream, event, &mut remote_eof).await? {
+            let event = channel.next_event().await?;
+            if apply_remote_event(stream, event, &mut remote_eof).await? {
                 break;
             }
             continue;
         }
         if remote_eof {
-            let read = tokio::select! {
-                () = cancellation.cancelled() => return close_after_cancel(channel).await,
-                result = stream.read(&mut buffer) => result.map_err(|source| SocksForwardError::Io {
-                    operation: "read",
-                    source,
-                })?,
-            };
+            let read = stream
+                .read(&mut *buffer)
+                .await
+                .map_err(|source| SocksForwardError::Io { operation: "read", source })?;
             if read == 0 {
                 local_eof = true;
                 if !channel_eof_sent {
@@ -484,8 +495,7 @@ async fn forward_bytes(
         }
 
         tokio::select! {
-            () = cancellation.cancelled() => return close_after_cancel(channel).await,
-            result = stream.read(&mut buffer) => {
+            result = stream.read(&mut *buffer) => {
                 let read = result.map_err(|source| SocksForwardError::Io {
                     operation: "read",
                     source,
@@ -501,7 +511,7 @@ async fn forward_bytes(
                 }
             }
             event = channel.next_event() => {
-                if apply_remote_event(&mut stream, event?, &mut remote_eof).await? {
+                if apply_remote_event(stream, event?, &mut remote_eof).await? {
                     break;
                 }
             }
@@ -536,7 +546,8 @@ async fn apply_remote_event(
 }
 
 async fn close_after_cancel(channel: Box<dyn SocksChannel>) -> Result<(), SocksForwardError> {
-    let _ = channel.close().await;
+    // A full engine queue can also stall CLOSE after a send has been cancelled.
+    let _ = tokio::time::timeout(Duration::from_secs(1), channel.close()).await;
     Ok(())
 }
 
@@ -659,6 +670,53 @@ mod tests {
         input: mpsc::Sender<FakeInput>,
         events: mpsc::Receiver<SocksChannelEvent>,
         closed: Arc<AtomicBool>,
+    }
+
+    struct StalledChannel {
+        entered: mpsc::UnboundedSender<Vec<u8>>,
+        closed: Arc<AtomicBool>,
+    }
+
+    impl SocksChannel for StalledChannel {
+        fn send_data<'a>(&'a self, data: &'a [u8]) -> SocksChannelFuture<'a, ()> {
+            Box::pin(async move {
+                let _ = self.entered.send(data.to_vec());
+                std::future::pending().await
+            })
+        }
+
+        fn send_eof(&self) -> SocksChannelFuture<'_, ()> {
+            Box::pin(async { Ok(()) })
+        }
+
+        fn close(&self) -> SocksChannelFuture<'_, ()> {
+            self.closed.store(true, Ordering::SeqCst);
+            Box::pin(std::future::pending())
+        }
+
+        fn next_event(&mut self) -> SocksChannelFuture<'_, Option<SocksChannelEvent>> {
+            Box::pin(std::future::pending())
+        }
+    }
+
+    struct StalledConnector {
+        entered: mpsc::UnboundedSender<Vec<u8>>,
+        closed: Arc<AtomicBool>,
+    }
+
+    impl SocksConnector for StalledConnector {
+        fn open_socks_direct_tcpip(
+            self: Arc<Self>,
+            _request: SocksConnectRequest,
+            _originator: SocketAddr,
+        ) -> SocksConnectorFuture {
+            Box::pin(async move {
+                Ok(Box::new(StalledChannel {
+                    entered: self.entered.clone(),
+                    closed: Arc::clone(&self.closed),
+                }) as Box<dyn SocksChannel>)
+            })
+        }
     }
 
     impl SocksChannel for FakeChannel {
@@ -866,5 +924,36 @@ mod tests {
             .expect("listener cancellation timeout")
             .expect("listener task")
             .expect("listener result");
+    }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_stalled_channel_send_and_close() {
+        let (entered_tx, mut entered_rx) = mpsc::unbounded_channel();
+        let closed = Arc::new(AtomicBool::new(false));
+        let connector =
+            Arc::new(StalledConnector { entered: entered_tx, closed: Arc::clone(&closed) });
+        let mut config = listener_config(1);
+        config.io_buffer_size = 1;
+        let (address, cancellation, mut task) = spawn_listener(connector, config).await;
+        let mut peer = TcpStream::connect(address).await.expect("connect listener");
+        peer.write_all(&[5, 1, 0, 5, 1, 0, 1, 127, 0, 0, 1, 0, 80]).await.expect("SOCKS request");
+        assert_eq!(read_response(&mut peer, 2).await, vec![5, 0]);
+        assert_eq!(read_response(&mut peer, 10).await, vec![5, 0, 0, 1, 0, 0, 0, 0, 0, 0]);
+        peer.write_all(b"ab").await.expect("write local bytes");
+        assert_eq!(
+            timeout(Duration::from_secs(2), entered_rx.recv()).await.expect("send entered"),
+            Some(vec![b'a'])
+        );
+        assert!(entered_rx.try_recv().is_err(), "sender must not read another fragment");
+        cancellation.cancel();
+        let result = timeout(Duration::from_secs(5), &mut task).await;
+        if result.is_err() {
+            task.abort();
+        }
+        result
+            .expect("stalled channel must stop after cancellation")
+            .expect("listener task")
+            .expect("listener result");
+        assert!(closed.load(Ordering::SeqCst));
     }
 }

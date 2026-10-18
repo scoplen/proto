@@ -80,8 +80,10 @@ depth while retaining each parent connection. One connection multiplexes session
 channels with a configurable simultaneous-channel cap; channel or stream drop releases a slot.
 The adapter keeps the engine types out of the public API. A bounded SOCKS4a/SOCKS5 dynamic
 listener now composes the handshake with `direct-tcpip`, including cancellation, concurrency
-limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping. Pageant
-interoperability still requires a Windows Pageant installation and remains outside the hosted CI
+limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping.
+Cancellation interrupts stalled channel sends and bounds the best-effort close wait, so listener
+shutdown is not held open by a peer that stops accepting data. Pageant interoperability still
+requires a Windows Pageant installation and remains outside the hosted CI
 matrix. `SftpChannel`
 now composes the bounded v3 handshake and packet framing over an accepted SSH `session` channel
 with bounded subsystem failure and truncation mapping; `SftpSession` adds bounded pipelining and
