@@ -4,6 +4,14 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Released the concrete SSH handle lock while a keyboard-interactive responder waits for input.
+  The elapsed rekey timer may request an exchange during a prompt, but the current engine does not
+  process that request. It can begin an exchange after authentication resumes and checks elapsed
+  time again. Regression coverage checks lock availability, the subsequent exchange, and exact
+  channel bytes; timer tests now compare completed exchange times.
+- Added an idle elapsed-time rekey timer for every concrete SSH connection route. It rearms after
+  completed exchanges, stops on disconnect and drop, and leaves authenticated channel bytes intact
+  across idle rekeys. Incoming-byte thresholds and full OpenSSH default compatibility remain open.
 - Added a strict-KEX interoperability harness to the disposable OpenSSH algorithm check. It
   verifies a pinned-key authenticated command, rejection of injected `SSH_MSG_IGNORE` before and
   after the server's first KEXINIT, and acceptance by a non-strict in-process control. The relay
@@ -12,7 +20,7 @@ All notable changes to the `proto` repository will be recorded here.
 - Added per-Host outgoing SSH payload-byte and elapsed-time rekey configuration, preserving the engine's
   one-GiB/one-hour defaults and validating overrides before passing them to the engine.
   Authenticated echo tests verify exact channel bytes across both triggers. Incoming-byte
-  thresholds and an idle timer remain outside the current engine's implementation.
+  thresholds remain outside the current engine's implementation.
 - Updated rustls to 0.23.46 in the SSH crate and both Cargo lockfiles, addressing
   RUSTSEC-2026-0346 through RUSTSEC-2026-0349 without suppressing the advisory checks.
 - Normalize expired SOCKS5 and HTTP CONNECT handshake socket deadlines to `TimedOut` on Unix,
