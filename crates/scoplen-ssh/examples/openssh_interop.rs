@@ -433,6 +433,13 @@ async fn verify_lsetstat(
         return Err("SFTP lsetstat timestamp was not visible through lstat".into());
     }
 
+    let missing_link = session.client_mut().readlink(missing_path.to_vec())?;
+    if !matches!(sftp_response(session, missing_link).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP readlink did not reject a missing link cleanly".into());
+    }
+
     let link_path = [path, b"-symlink"].concat();
     // OpenSSH reverses the SFTP v3 draft's linkpath/targetpath wire order.
     let link = session.client_mut().symlink(path.to_vec(), link_path.clone())?;
@@ -440,6 +447,15 @@ async fn verify_lsetstat(
         || session.pending_requests() != 0
     {
         return Err("SFTP symlink setup failed or retained a request slot".into());
+    }
+    let read_link = session.client_mut().readlink(link_path.clone())?;
+    if !matches!(
+        sftp_response(session, read_link).await?,
+        SftpPacket::Name { entries, .. }
+            if entries.len() == 1 && entries[0].filename == path
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP readlink target mismatch or retained a request slot".into());
     }
     let link_attrs = SftpAttributes {
         access_time: Some(1_500_000_000),
@@ -468,11 +484,17 @@ async fn verify_lsetstat(
     {
         return Err("SFTP lsetstat changed the symlink target timestamp".into());
     }
-    let remove = session.client_mut().remove(link_path)?;
+    let remove = session.client_mut().remove(link_path.clone())?;
     if !matches!(sftp_response(session, remove).await?, SftpPacket::Status { code: 0, .. })
         || session.pending_requests() != 0
     {
         return Err("SFTP symlink cleanup failed or retained a request slot".into());
+    }
+    let after_cleanup = session.client_mut().readlink(link_path)?;
+    if !matches!(sftp_response(session, after_cleanup).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP removed link was still readable or retained a request slot".into());
     }
     Ok(())
 }
