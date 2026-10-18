@@ -81,9 +81,9 @@ pub use proxy::{
     Socks5Transport,
 };
 pub use russh_adapter::{
-    ChannelEvent, ClientChannel, ClientChannelStream, ClientConfig, ClientConnection, ClientError,
-    ForwardedChannel, ForwardedChannelKind, HostKeyPolicy, MAX_CLIENT_CHANNEL_LIMIT,
-    NoneAuthOutcome, PublicKeyAuthError,
+    ChannelEvent, ClientChannel, ClientChannelStream, ClientConfig, ClientConfigError,
+    ClientConnection, ClientError, ForwardedChannel, ForwardedChannelKind, HostKeyPolicy,
+    MAX_CLIENT_CHANNEL_LIMIT, NoneAuthOutcome, PublicKeyAuthError,
 };
 pub use security_key::{
     SecurityKeyAlgorithm, SecurityKeyAuthRequest, SecurityKeyError, SecurityKeyProvider,

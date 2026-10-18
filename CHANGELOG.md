@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added per-Host outgoing SSH payload-byte and elapsed-time rekey configuration, preserving the engine's
+  one-GiB/one-hour defaults and validating overrides before passing them to the engine.
+  Authenticated echo tests verify exact channel bytes across both triggers. Incoming-byte
+  thresholds and an idle timer remain outside the current engine's implementation.
 - Added `AsyncGatewayTransport` and `ClientConnection::connect_via_gateway_stream` to write and
   flush the bounded K-6 client hello over an already negotiated async TLS/ALPN stream before SSH
   starts. TLS/ALPN setup and live edge interoperability remain caller-owned and unverified.
