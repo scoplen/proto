@@ -95,16 +95,22 @@ Pageant interoperability, live gateway interoperability, and broader channel sch
 unverified. The agent-backed signer also completes the concrete public-key authentication flow
 against the in-process russh server; platform agent interoperability remains unverified.
 The `openssh_interop` example provides a disposable external-server smoke test when
-`SCOPLEN_OPENSSH_HOST_KEY` (the server's OpenSSH public-key line) and one authentication source
-are supplied: `SCOPLEN_OPENSSH_PASSWORD`, `SCOPLEN_OPENSSH_RSA_KEY`,
+one host trust pin and one authentication source are supplied. Set either
+`SCOPLEN_OPENSSH_HOST_KEY` to the server's OpenSSH public-key line or
+`SCOPLEN_OPENSSH_HOST_CA_KEY` to a CA public-key file, and select
+`SCOPLEN_OPENSSH_PASSWORD`, `SCOPLEN_OPENSSH_RSA_KEY`,
 `SCOPLEN_OPENSSH_ED25519_KEY`, or `SCOPLEN_OPENSSH_P256_KEY`. The key variables contain paths to
 unencrypted OpenSSH private keys and are mutually exclusive. The optional
 `SCOPLEN_OPENSSH_RSA_HASH=256|512` selects the RSA-SHA2 signature algorithm (default 512).
-Optional host, port, and username variables select
-the test server. It verifies the pinned host key, authentication, and a session command. Password,
+Optional host, port, and username variables select the test server. It verifies the selected host
+trust pin, authentication, and a session command. Password,
 both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
 wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
+For host-certificate mode, the concrete adapter checks the certificate signature, host principal,
+validity, and critical options before the callback checks the CA pin. A disposable
+`linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and
+rejected an unrelated CA pin. Other host-certificate algorithms and servers remain unverified.
 For an Ed25519 user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
 file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
 certificate signature, principal, validity, critical options, and CA pin before sending it.

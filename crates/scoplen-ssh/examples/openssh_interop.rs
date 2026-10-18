@@ -19,74 +19,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port =
         env::var("SCOPLEN_OPENSSH_PORT").unwrap_or_else(|_| "22223".to_owned()).parse::<u16>()?;
     let username = env::var("SCOPLEN_OPENSSH_USER").unwrap_or_else(|_| "scoplen".to_owned());
-    let expected_key = env::var("SCOPLEN_OPENSSH_HOST_KEY")
-        .map_err(|_| "SCOPLEN_OPENSSH_HOST_KEY must be set to the server's public key")?;
-    let expected_key = PublicKey::from_openssh(&expected_key)?.to_bytes()?;
-    let verifier = move |_host: &str, key: &HostKey| match key {
-        HostKey::Raw { key_blob, .. } if key_blob == &expected_key => Ok(()),
-        _ => Err(HostKeyVerificationError::Rejected("unexpected server key".to_owned())),
-    };
-    let config = ClientConfig::new(host, port, verifier)?;
+    let config = client_config(host, port)?;
     let mut connection = ClientConnection::connect(config).await?;
-    let rsa_key = env::var("SCOPLEN_OPENSSH_RSA_KEY").ok();
-    let ed25519_key = env::var("SCOPLEN_OPENSSH_ED25519_KEY").ok();
-    let p256_key = env::var("SCOPLEN_OPENSSH_P256_KEY").ok();
-    let user_certificate = env::var("SCOPLEN_OPENSSH_USER_CERT").ok();
-    if user_certificate.is_some() && ed25519_key.is_none() {
-        return Err("user certificate requires SCOPLEN_OPENSSH_ED25519_KEY".into());
-    }
-    if [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref()]
-        .iter()
-        .filter(|key| key.is_some())
-        .count()
-        > 1
-    {
-        return Err("set only one OpenSSH private-key path".into());
-    }
-    if let Some(path) = rsa_key {
-        let key = PrivateKey::read_openssh_file(path)?;
-        let algorithm = match env::var("SCOPLEN_OPENSSH_RSA_HASH").as_deref() {
-            Ok("256") => SignatureAlgorithm::RsaSha2_256,
-            Ok("512") | Err(_) => SignatureAlgorithm::RsaSha2_512,
-            _ => return Err("SCOPLEN_OPENSSH_RSA_HASH must be 256 or 512".into()),
-        };
-        let signer = RsaSshSigner::new(key, algorithm)?;
-        connection.authenticate_publickey(&username, &signer).await?;
-    } else if let Some(path) = ed25519_key {
-        let key = PrivateKey::read_openssh_file(path)?;
-        let keypair = key.key_data().ed25519().ok_or("expected an Ed25519 private key")?;
-        let signer =
-            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(keypair.private.as_ref())?);
-        if let Some(cert_path) = user_certificate {
-            let ca_path = env::var("SCOPLEN_OPENSSH_USER_CA_KEY")
-                .map_err(|_| "user certificate requires a pinned CA public-key path")?;
-            let certificate = Certificate::read_file(Path::new(&cert_path))?;
-            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-            let certificate = UserCertificate::parse_and_validate(
-                &certificate.to_bytes()?,
-                &CertificateValidationPolicy::user(&username, now),
-            )?;
-            let pinned_ca = PublicKey::read_openssh_file(ca_path)?.to_bytes()?;
-            if certificate.certificate().ca_public_key_blob() != pinned_ca {
-                return Err("user certificate CA is not trusted".into());
-            }
-            connection.authenticate_certificate(&username, &certificate, &signer).await?;
-        } else {
-            connection.authenticate_publickey(&username, &signer).await?;
-        }
-    } else if let Some(path) = p256_key {
-        let key = PrivateKey::read_openssh_file(path)?;
-        let keypair = key.key_data().ecdsa().ok_or("expected a P-256 private key")?;
-        if keypair.curve() != ssh_key::EcdsaCurve::NistP256 {
-            return Err("expected a P-256 private key".into());
-        }
-        let signer = P256SshSigner::new(P256SigningKey::from_bytes(keypair.private_key_bytes())?);
-        connection.authenticate_publickey(&username, &signer).await?;
-    } else {
-        let password = env::var("SCOPLEN_OPENSSH_PASSWORD")
-            .map_err(|_| "password or an OpenSSH private-key path is required")?;
-        connection.authenticate_password(&username, password.as_bytes()).await?;
-    }
+    authenticate(&mut connection, &username).await?;
     let channel = connection.open_session().await?;
     channel.exec(true, b"printf scoplen-openssh-ok").await?;
     let mut channel = channel;
@@ -114,6 +49,94 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     connection.disconnect().await?;
     println!("openssh interop ok");
+    Ok(())
+}
+
+fn client_config(host: String, port: u16) -> Result<ClientConfig, Box<dyn std::error::Error>> {
+    let expected_key = env::var("SCOPLEN_OPENSSH_HOST_KEY").ok();
+    let host_ca = env::var("SCOPLEN_OPENSSH_HOST_CA_KEY").ok();
+    if expected_key.is_some() == host_ca.is_some() {
+        return Err("set exactly one host key or host CA pin".into());
+    }
+    let expected_key = expected_key
+        .map(|line| PublicKey::from_openssh(&line).and_then(|key| key.to_bytes()))
+        .transpose()?;
+    let expected_ca = host_ca
+        .map(|path| PublicKey::read_openssh_file(path).and_then(|key| key.to_bytes()))
+        .transpose()?;
+    let verifier = move |_host: &str, key: &HostKey| match key {
+        HostKey::Raw { key_blob, .. } if expected_key.as_ref() == Some(key_blob) => Ok(()),
+        HostKey::Certificate(cert) if expected_ca.as_deref() == Some(cert.ca_public_key_blob()) => {
+            Ok(())
+        }
+        _ => Err(HostKeyVerificationError::Rejected("unexpected server key".to_owned())),
+    };
+    Ok(ClientConfig::new(host, port, verifier)?)
+}
+
+async fn authenticate(
+    connection: &mut ClientConnection,
+    username: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let rsa_key = env::var("SCOPLEN_OPENSSH_RSA_KEY").ok();
+    let ed25519_key = env::var("SCOPLEN_OPENSSH_ED25519_KEY").ok();
+    let p256_key = env::var("SCOPLEN_OPENSSH_P256_KEY").ok();
+    let user_certificate = env::var("SCOPLEN_OPENSSH_USER_CERT").ok();
+    if user_certificate.is_some() && ed25519_key.is_none() {
+        return Err("user certificate requires SCOPLEN_OPENSSH_ED25519_KEY".into());
+    }
+    if [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref()]
+        .iter()
+        .filter(|key| key.is_some())
+        .count()
+        > 1
+    {
+        return Err("set only one OpenSSH private-key path".into());
+    }
+    if let Some(path) = rsa_key {
+        let key = PrivateKey::read_openssh_file(path)?;
+        let algorithm = match env::var("SCOPLEN_OPENSSH_RSA_HASH").as_deref() {
+            Ok("256") => SignatureAlgorithm::RsaSha2_256,
+            Ok("512") | Err(_) => SignatureAlgorithm::RsaSha2_512,
+            _ => return Err("SCOPLEN_OPENSSH_RSA_HASH must be 256 or 512".into()),
+        };
+        let signer = RsaSshSigner::new(key, algorithm)?;
+        connection.authenticate_publickey(username, &signer).await?;
+    } else if let Some(path) = ed25519_key {
+        let key = PrivateKey::read_openssh_file(path)?;
+        let keypair = key.key_data().ed25519().ok_or("expected an Ed25519 private key")?;
+        let signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(keypair.private.as_ref())?);
+        if let Some(cert_path) = user_certificate {
+            let ca_path = env::var("SCOPLEN_OPENSSH_USER_CA_KEY")
+                .map_err(|_| "user certificate requires a pinned CA public-key path")?;
+            let certificate = Certificate::read_file(Path::new(&cert_path))?;
+            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+            let certificate = UserCertificate::parse_and_validate(
+                &certificate.to_bytes()?,
+                &CertificateValidationPolicy::user(username, now),
+            )?;
+            let pinned_ca = PublicKey::read_openssh_file(ca_path)?.to_bytes()?;
+            if certificate.certificate().ca_public_key_blob() != pinned_ca {
+                return Err("user certificate CA is not trusted".into());
+            }
+            connection.authenticate_certificate(username, &certificate, &signer).await?;
+        } else {
+            connection.authenticate_publickey(username, &signer).await?;
+        }
+    } else if let Some(path) = p256_key {
+        let key = PrivateKey::read_openssh_file(path)?;
+        let keypair = key.key_data().ecdsa().ok_or("expected a P-256 private key")?;
+        if keypair.curve() != ssh_key::EcdsaCurve::NistP256 {
+            return Err("expected a P-256 private key".into());
+        }
+        let signer = P256SshSigner::new(P256SigningKey::from_bytes(keypair.private_key_bytes())?);
+        connection.authenticate_publickey(username, &signer).await?;
+    } else {
+        let password = env::var("SCOPLEN_OPENSSH_PASSWORD")
+            .map_err(|_| "password or an OpenSSH private-key path is required")?;
+        connection.authenticate_password(username, password.as_bytes()).await?;
+    }
     Ok(())
 }
 
