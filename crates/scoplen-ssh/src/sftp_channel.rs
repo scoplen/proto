@@ -583,6 +583,98 @@ mod tests {
         Removed,
     }
 
+    #[derive(Default, PartialEq, Eq)]
+    enum DirectoryState {
+        #[default]
+        Missing,
+        Empty,
+        Nonempty,
+    }
+
+    #[derive(Default)]
+    struct DirectoryFixture {
+        state: DirectoryState,
+        file_handle_open: bool,
+        directory_handle_open: bool,
+        entries_returned: bool,
+    }
+
+    impl DirectoryFixture {
+        fn status(id: u32, code: u32) -> SftpPacket {
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn mkdir(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+            if path != b"dir" || self.state != DirectoryState::Missing {
+                return Self::status(id, 4);
+            }
+            self.state = DirectoryState::Empty;
+            Self::status(id, 0)
+        }
+
+        fn open_file(&mut self, id: u32, path: &[u8], pflags: u32) -> SftpPacket {
+            if path != b"dir/entry" || pflags != 0x1a || self.state == DirectoryState::Missing {
+                return Self::status(id, 2);
+            }
+            self.state = DirectoryState::Nonempty;
+            self.file_handle_open = true;
+            SftpPacket::Handle { id, handle: b"dir-file-h".to_vec() }
+        }
+
+        fn opendir(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+            if path != b"dir" || self.state == DirectoryState::Missing {
+                return Self::status(id, 2);
+            }
+            self.directory_handle_open = true;
+            self.entries_returned = false;
+            SftpPacket::Handle { id, handle: b"dir-h".to_vec() }
+        }
+
+        fn readdir(&mut self, id: u32, handle: &[u8]) -> SftpPacket {
+            if handle != b"dir-h" || !self.directory_handle_open {
+                return Self::status(id, 4);
+            }
+            if self.entries_returned {
+                return Self::status(id, 1);
+            }
+            self.entries_returned = true;
+            SftpPacket::Name {
+                id,
+                entries: vec![
+                    SftpNameEntry::new(b"entry", Vec::new(), SftpAttributes::default()).unwrap(),
+                ],
+            }
+        }
+
+        fn close(&mut self, id: u32, handle: &[u8]) -> SftpPacket {
+            match handle {
+                b"dir-file-h" if self.file_handle_open => self.file_handle_open = false,
+                b"dir-h" if self.directory_handle_open => self.directory_handle_open = false,
+                _ => return Self::status(id, 4),
+            }
+            Self::status(id, 0)
+        }
+
+        fn remove(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+            if path != b"dir/entry" || self.state != DirectoryState::Nonempty {
+                return Self::status(id, 2);
+            }
+            self.state = DirectoryState::Empty;
+            Self::status(id, 0)
+        }
+
+        fn rmdir(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+            if path != b"dir" || self.state == DirectoryState::Missing {
+                return Self::status(id, 2);
+            }
+            if self.state == DirectoryState::Nonempty {
+                return Self::status(id, 4);
+            }
+            self.state = DirectoryState::Missing;
+            Self::status(id, 0)
+        }
+    }
+
     struct SftpServer {
         buffer: Vec<u8>,
         file: Vec<u8>,
@@ -594,12 +686,35 @@ mod tests {
         expand_path_prefix: Option<&'static [u8]>,
         copy_data_target: Option<Vec<u8>>,
         lsetstat_link_mtime: Option<u32>,
+        directory: Option<DirectoryFixture>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
     }
 
     impl SftpServer {
+        fn directory_response(&mut self, packet: &SftpPacket) -> Option<SftpPacket> {
+            let directory = self.directory.as_mut()?;
+            match packet {
+                SftpPacket::Mkdir { id, path, .. } => Some(directory.mkdir(*id, path)),
+                SftpPacket::Open { id, path, pflags, .. } if path == b"dir/entry" => {
+                    Some(directory.open_file(*id, path, *pflags))
+                }
+                SftpPacket::Opendir { id, path } => Some(directory.opendir(*id, path)),
+                SftpPacket::Readdir { id, handle } => Some(directory.readdir(*id, handle)),
+                SftpPacket::Close { id, handle }
+                    if handle == b"dir-h" || handle == b"dir-file-h" =>
+                {
+                    Some(directory.close(*id, handle))
+                }
+                SftpPacket::Remove { id, path } if path == b"dir/entry" => {
+                    Some(directory.remove(*id, path))
+                }
+                SftpPacket::Rmdir { id, path } => Some(directory.rmdir(*id, path)),
+                _ => None,
+            }
+        }
+
         fn version_response(&self) -> SftpPacket {
             let mut extensions = Vec::new();
             if self.advertise_limits {
@@ -1007,52 +1122,60 @@ mod tests {
                     return Ok(());
                 };
                 let is_read = matches!(packet, SftpPacket::Read { .. });
-                let response = match packet {
-                    SftpPacket::Init { .. } => self.version_response(),
-                    SftpPacket::Open { id, path, .. } if self.extension_handle_open.is_some() => {
-                        self.open_response(id, &path)
-                    }
-                    SftpPacket::Close { id, handle } if self.extension_handle_open.is_some() => {
-                        self.close_extension_handle(id, &handle)
-                    }
-                    SftpPacket::Realpath { id, .. } => Self::realpath_response(id),
-                    SftpPacket::Lstat { id, path } if self.lsetstat_link_mtime.is_some() => {
-                        self.link_attributes(id, false, &path)
-                    }
-                    SftpPacket::Stat { id, path } if self.lsetstat_link_mtime.is_some() => {
-                        self.link_attributes(id, true, &path)
-                    }
-                    SftpPacket::Read { id, handle, offset, length } => {
-                        self.read_response(id, &handle, offset, length)
-                    }
-                    SftpPacket::Remove { id, path }
-                        if self.hardlink_created.is_some() || self.rename_phase.is_some() =>
-                    {
-                        self.remove_extension_file(id, &path)
-                    }
-                    SftpPacket::Write { id, offset, data, .. } => {
-                        let Ok(start) = usize::try_from(offset) else {
-                            return Ok(());
-                        };
-                        let end = start.saturating_add(data.len());
-                        if end > self.file.len() {
-                            self.file.resize(end, 0);
+                let response = if let Some(response) = self.directory_response(&packet) {
+                    response
+                } else {
+                    match packet {
+                        SftpPacket::Init { .. } => self.version_response(),
+                        SftpPacket::Open { id, path, .. }
+                            if self.extension_handle_open.is_some() =>
+                        {
+                            self.open_response(id, &path)
                         }
-                        self.file[start..end].copy_from_slice(&data);
-                        SftpPacket::Status {
-                            id,
-                            code: 0,
-                            message: Vec::new(),
-                            language: Vec::new(),
+                        SftpPacket::Close { id, handle }
+                            if self.extension_handle_open.is_some() =>
+                        {
+                            self.close_extension_handle(id, &handle)
                         }
+                        SftpPacket::Realpath { id, .. } => Self::realpath_response(id),
+                        SftpPacket::Lstat { id, path } if self.lsetstat_link_mtime.is_some() => {
+                            self.link_attributes(id, false, &path)
+                        }
+                        SftpPacket::Stat { id, path } if self.lsetstat_link_mtime.is_some() => {
+                            self.link_attributes(id, true, &path)
+                        }
+                        SftpPacket::Read { id, handle, offset, length } => {
+                            self.read_response(id, &handle, offset, length)
+                        }
+                        SftpPacket::Remove { id, path }
+                            if self.hardlink_created.is_some() || self.rename_phase.is_some() =>
+                        {
+                            self.remove_extension_file(id, &path)
+                        }
+                        SftpPacket::Write { id, offset, data, .. } => {
+                            let Ok(start) = usize::try_from(offset) else {
+                                return Ok(());
+                            };
+                            let end = start.saturating_add(data.len());
+                            if end > self.file.len() {
+                                self.file.resize(end, 0);
+                            }
+                            self.file[start..end].copy_from_slice(&data);
+                            SftpPacket::Status {
+                                id,
+                                code: 0,
+                                message: Vec::new(),
+                                language: Vec::new(),
+                            }
+                        }
+                        SftpPacket::Extended { id, name, data } => {
+                            let Some(response) = self.extension_response(id, &name, &data) else {
+                                continue;
+                            };
+                            response
+                        }
+                        _ => continue,
                     }
-                    SftpPacket::Extended { id, name, data } => {
-                        let Some(response) = self.extension_response(id, &name, &data) else {
-                            continue;
-                        };
-                        response
-                    }
-                    _ => continue,
                 };
                 if is_read && self.reorder_first_reads {
                     if self.deferred_read_response.is_none() {
@@ -1075,6 +1198,7 @@ mod tests {
         file: Vec<u8>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
+        directory: bool,
     ) -> (ClientConnection, SftpSession) {
         let mut server_config = russh::server::Config::default();
         server_config.keys.push(
@@ -1102,6 +1226,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: None,
                     lsetstat_link_mtime: None,
+                    directory: directory.then(DirectoryFixture::default),
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -1117,9 +1242,92 @@ mod tests {
         (connection, session)
     }
 
+    async fn directory_response(session: &mut SftpSession, request: SftpPacket) -> SftpPacket {
+        session.send_request(&request).await.expect("send directory request");
+        let response = session.read_response().await.expect("read directory response");
+        assert_eq!(session.pending_requests(), 0);
+        response
+    }
+
+    #[tokio::test]
+    async fn directory_lifecycle_round_trips_over_authenticated_channel() {
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, true).await;
+        let missing = session.client_mut().opendir(b"missing").unwrap();
+        assert!(matches!(
+            directory_response(&mut session, missing).await,
+            SftpPacket::Status { code: 2, .. }
+        ));
+
+        let mkdir = session.client_mut().mkdir(b"dir", SftpAttributes::default()).unwrap();
+        assert!(matches!(
+            directory_response(&mut session, mkdir).await,
+            SftpPacket::Status { code: 0, .. }
+        ));
+        let create =
+            session.client_mut().open(b"dir/entry", 0x1a, SftpAttributes::default()).unwrap();
+        let file_handle = match directory_response(&mut session, create).await {
+            SftpPacket::Handle { handle, .. } => handle,
+            other => panic!("unexpected file handle response: {other:?}"),
+        };
+        let close = session.client_mut().close(file_handle).unwrap();
+        assert!(matches!(
+            directory_response(&mut session, close).await,
+            SftpPacket::Status { code: 0, .. }
+        ));
+
+        let open = session.client_mut().opendir(b"dir").unwrap();
+        let directory_handle = match directory_response(&mut session, open).await {
+            SftpPacket::Handle { handle, .. } => handle,
+            other => panic!("unexpected directory handle response: {other:?}"),
+        };
+        let read = session.client_mut().readdir(directory_handle.clone()).unwrap();
+        assert!(matches!(
+            directory_response(&mut session, read).await,
+            SftpPacket::Name { entries, .. }
+                if entries.iter().any(|entry| entry.filename == b"entry")
+        ));
+        let eof = session.client_mut().readdir(directory_handle.clone()).unwrap();
+        assert!(matches!(
+            directory_response(&mut session, eof).await,
+            SftpPacket::Status { code: 1, .. }
+        ));
+        let nonempty = session.client_mut().rmdir(b"dir").unwrap();
+        assert!(matches!(
+            directory_response(&mut session, nonempty).await,
+            SftpPacket::Status { code: 4, .. }
+        ));
+        let close = session.client_mut().close(directory_handle.clone()).unwrap();
+        assert!(matches!(
+            directory_response(&mut session, close).await,
+            SftpPacket::Status { code: 0, .. }
+        ));
+        let closed = session.client_mut().readdir(directory_handle).unwrap();
+        assert!(matches!(
+            directory_response(&mut session, closed).await,
+            SftpPacket::Status { code: 4, .. }
+        ));
+        let remove = session.client_mut().remove(b"dir/entry").unwrap();
+        assert!(matches!(
+            directory_response(&mut session, remove).await,
+            SftpPacket::Status { code: 0, .. }
+        ));
+        let rmdir = session.client_mut().rmdir(b"dir").unwrap();
+        assert!(matches!(
+            directory_response(&mut session, rmdir).await,
+            SftpPacket::Status { code: 0, .. }
+        ));
+        let removed = session.client_mut().opendir(b"dir").unwrap();
+        assert!(matches!(
+            directory_response(&mut session, removed).await,
+            SftpPacket::Status { code: 2, .. }
+        ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
     #[tokio::test]
     async fn short_read_resumes_missing_ranges_before_completing_download() {
-        let (connection, mut session) = transfer_session(b"abcdef".to_vec(), Some(1), true).await;
+        let (connection, mut session) =
+            transfer_session(b"abcdef".to_vec(), Some(1), true, false).await;
         for total in [Some(6), None] {
             let mut downloaded = Vec::new();
             let mut progress = Vec::new();
@@ -1139,7 +1347,7 @@ mod tests {
 
     #[tokio::test]
     async fn premature_eof_and_empty_data_are_not_successful_downloads() {
-        let (connection, mut session) = transfer_session(b"abc".to_vec(), None, false).await;
+        let (connection, mut session) = transfer_session(b"abc".to_vec(), None, false, false).await;
         let mut downloaded = Vec::new();
         let error = session
             .download_to(b"h", 0, Some(6), 2, 2, &mut downloaded, |_| {})
@@ -1148,7 +1356,8 @@ mod tests {
         assert!(matches!(error, SftpChannelError::RemoteStatus { code: 1 }));
         connection.disconnect().await.expect("disconnect client");
 
-        let (connection, mut session) = transfer_session(b"abc".to_vec(), Some(0), false).await;
+        let (connection, mut session) =
+            transfer_session(b"abc".to_vec(), Some(0), false, false).await;
         let mut downloaded = Vec::new();
         let error = session
             .download_to(b"h", 0, None, 2, 2, &mut downloaded, |_| {})
@@ -1449,6 +1658,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: Some(b"0123456789".to_vec()),
                     lsetstat_link_mtime: None,
+                    directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1543,6 +1753,7 @@ mod tests {
                     expand_path_prefix: Some(b"/srv/"),
                     copy_data_target: None,
                     lsetstat_link_mtime: Some(1_700_000_001),
+                    directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1628,6 +1839,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: None,
                     lsetstat_link_mtime: None,
+                    directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1692,6 +1904,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: None,
                     lsetstat_link_mtime: None,
+                    directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,

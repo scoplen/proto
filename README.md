@@ -162,9 +162,13 @@ symbolic link: the link's changed timestamp is visible through `LSTAT` while `ST
 target's timestamp unchanged. A missing path is rejected, request slots are released, and the
 temporary link is removed.
 The link setup follows OpenSSH's reversed `SYMLINK` wire order relative to the SFTP v3 draft.
-It passed against a disposable
-`linuxserver/openssh-server` container; other SFTP extensions, server implementations, and
-platforms remain unverified.
+The same SFTP run creates a unique directory and file, reads directory entries until EOF, rejects
+a missing directory, a nonempty directory removal, and a read from a closed directory handle,
+then removes both paths and checks that the directory is gone. Each response releases its request
+slot.
+The earlier SFTP paths passed against a disposable `linuxserver/openssh-server` container; the
+directory lifecycle also passed against disposable Alpine OpenSSH 9.9p2. Other SFTP operations,
+server implementations, and platforms remain unverified.
 Set `SCOPLEN_OPENSSH_FORWARD=1` to verify an RFC 4254 `direct-tcpip` channel to the disposable
 server's own SSH listener at `127.0.0.1:2222`, then a refused connection to port 1 and a fresh
 session open. The `linuxserver/openssh-server` image disables TCP forwarding by default; this

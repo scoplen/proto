@@ -477,6 +477,95 @@ async fn verify_lsetstat(
     Ok(())
 }
 
+async fn verify_directory(
+    session: &mut SftpSession,
+    path: &[u8],
+    missing_path: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let missing = session.client_mut().opendir(missing_path.to_vec())?;
+    if !matches!(sftp_response(session, missing).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP opendir did not reject a missing directory cleanly".into());
+    }
+
+    let directory = [path, b"-dir"].concat();
+    let entry = [directory.as_slice(), b"/entry"].concat();
+    let mkdir = session.client_mut().mkdir(directory.clone(), SftpAttributes::default())?;
+    if !matches!(sftp_response(session, mkdir).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP mkdir failed".into());
+    }
+    let create = session.client_mut().open(entry.clone(), 0x1a, SftpAttributes::default())?;
+    let file_handle = match sftp_response(session, create).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => {
+            return Err(
+                format!("unexpected SFTP directory entry create response: {other:?}").into()
+            );
+        }
+    };
+    let close = session.client_mut().close(file_handle)?;
+    if !matches!(sftp_response(session, close).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP directory entry close failed".into());
+    }
+
+    let open = session.client_mut().opendir(directory.clone())?;
+    let directory_handle = match sftp_response(session, open).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected SFTP opendir response: {other:?}").into()),
+    };
+    let mut saw_entry = false;
+    let mut saw_eof = false;
+    for _ in 0..16 {
+        let read = session.client_mut().readdir(directory_handle.clone())?;
+        match sftp_response(session, read).await? {
+            SftpPacket::Name { entries, .. } => {
+                saw_entry |= entries.iter().any(|entry| entry.filename == b"entry");
+            }
+            SftpPacket::Status { code: 1, .. } => {
+                saw_eof = true;
+                break;
+            }
+            other => return Err(format!("unexpected SFTP readdir response: {other:?}").into()),
+        }
+    }
+    if !saw_entry || !saw_eof || session.pending_requests() != 0 {
+        return Err("SFTP directory listing omitted the entry, EOF, or request release".into());
+    }
+
+    let nonempty = session.client_mut().rmdir(directory.clone())?;
+    if !matches!(sftp_response(session, nonempty).await?, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP rmdir accepted a nonempty directory or retained a request slot".into());
+    }
+    let close = session.client_mut().close(directory_handle.clone())?;
+    if !matches!(sftp_response(session, close).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP directory handle close failed".into());
+    }
+    let closed = session.client_mut().readdir(directory_handle)?;
+    if !matches!(sftp_response(session, closed).await?, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP readdir accepted a closed handle or retained a request slot".into());
+    }
+    let remove = session.client_mut().remove(entry)?;
+    if !matches!(sftp_response(session, remove).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP directory entry cleanup failed".into());
+    }
+    let rmdir = session.client_mut().rmdir(directory.clone())?;
+    if !matches!(sftp_response(session, rmdir).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP rmdir cleanup failed".into());
+    }
+    let removed = session.client_mut().opendir(directory)?;
+    if !matches!(sftp_response(session, removed).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP removed directory was still openable or retained a request slot".into());
+    }
+    Ok(())
+}
+
 async fn expand_sftp_path(
     session: &mut SftpSession,
     path: &[u8],
@@ -639,6 +728,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     }
 
     verify_statvfs(&mut session, &missing_path).await?;
+    verify_directory(&mut session, &path, &missing_path).await?;
 
     let create = session.client_mut().open(path.clone(), 0x1a, SftpAttributes::default())?;
     let write_handle = match sftp_response(&mut session, create).await? {
