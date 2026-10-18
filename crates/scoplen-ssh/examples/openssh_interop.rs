@@ -402,6 +402,81 @@ async fn verify_copy_data(
     Ok(())
 }
 
+async fn verify_lsetstat(
+    session: &mut SftpSession,
+    path: &[u8],
+    missing_path: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let attrs = SftpAttributes {
+        access_time: Some(1_600_000_000),
+        modify_time: Some(1_600_000_000),
+        ..SftpAttributes::default()
+    };
+    let missing = session.client_mut().lsetstat(missing_path.to_vec(), &attrs)?;
+    if !matches!(sftp_response(session, missing).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP lsetstat did not reject a missing path cleanly".into());
+    }
+    let set = session.client_mut().lsetstat(path.to_vec(), &attrs)?;
+    if !matches!(sftp_response(session, set).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP lsetstat failed or retained a request slot".into());
+    }
+    let stat = session.client_mut().lstat(path.to_vec())?;
+    if !matches!(
+        sftp_response(session, stat).await?,
+        SftpPacket::Attrs { attrs, .. } if attrs.modify_time == Some(1_600_000_000)
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP lsetstat timestamp was not visible through lstat".into());
+    }
+
+    let link_path = [path, b"-symlink"].concat();
+    // OpenSSH reverses the SFTP v3 draft's linkpath/targetpath wire order.
+    let link = session.client_mut().symlink(path.to_vec(), link_path.clone())?;
+    if !matches!(sftp_response(session, link).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP symlink setup failed or retained a request slot".into());
+    }
+    let link_attrs = SftpAttributes {
+        access_time: Some(1_500_000_000),
+        modify_time: Some(1_500_000_000),
+        ..SftpAttributes::default()
+    };
+    let set_link = session.client_mut().lsetstat(link_path.clone(), &link_attrs)?;
+    if !matches!(sftp_response(session, set_link).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP lsetstat did not update the symlink".into());
+    }
+    let link = session.client_mut().lstat(link_path.clone())?;
+    if !matches!(
+        sftp_response(session, link).await?,
+        SftpPacket::Attrs { attrs, .. } if attrs.modify_time == Some(1_500_000_000)
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP lsetstat did not change the symlink timestamp".into());
+    }
+    let target = session.client_mut().stat(link_path.clone())?;
+    if !matches!(
+        sftp_response(session, target).await?,
+        SftpPacket::Attrs { attrs, .. } if attrs.modify_time == Some(1_600_000_000)
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP lsetstat changed the symlink target timestamp".into());
+    }
+    let remove = session.client_mut().remove(link_path)?;
+    if !matches!(sftp_response(session, remove).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP symlink cleanup failed or retained a request slot".into());
+    }
+    Ok(())
+}
+
 async fn expand_sftp_path(
     session: &mut SftpSession,
     path: &[u8],
@@ -543,6 +618,9 @@ fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::er
     if !session.extensions().iter().any(|extension| extension.name == b"copy-data") {
         return Err("OpenSSH did not advertise copy-data".into());
     }
+    if !session.extensions().iter().any(|extension| extension.name == b"lsetstat@openssh.com") {
+        return Err("OpenSSH did not advertise lsetstat@openssh.com".into());
+    }
     Ok(())
 }
 
@@ -598,6 +676,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     }
     verify_fsync(&mut session, &write_handle, false).await?;
     verify_fstatvfs(&mut session, &write_handle, false).await?;
+    verify_lsetstat(&mut session, &path, &missing_path).await?;
 
     let read = session.client_mut().open(path.clone(), 1, SftpAttributes::default())?;
     let read_handle = match sftp_response(&mut session, read).await? {
