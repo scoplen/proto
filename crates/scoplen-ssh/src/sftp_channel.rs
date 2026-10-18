@@ -1119,11 +1119,29 @@ mod tests {
             }
         }
 
-        fn path_response(&mut self, packet: &SftpPacket) -> Option<SftpPacket> {
+        fn path_or_metadata_response(&mut self, packet: &SftpPacket) -> Option<SftpPacket> {
             match packet {
                 SftpPacket::Realpath { id, path } => Some(Self::realpath_response(*id, path)),
                 SftpPacket::Rename { id, old_path, new_path } if self.rename_phase.is_some() => {
                     Some(self.standard_rename_response(*id, old_path, new_path))
+                }
+                SftpPacket::Fstat { id, handle } if self.extension_handle_open.is_some() => {
+                    if handle == b"h" && self.extension_handle_open == Some(true) {
+                        Some(SftpPacket::Attrs {
+                            id: *id,
+                            attrs: SftpAttributes {
+                                size: Some(self.file.len() as u64),
+                                ..SftpAttributes::default()
+                            },
+                        })
+                    } else {
+                        Some(SftpPacket::Status {
+                            id: *id,
+                            code: 4,
+                            message: Vec::new(),
+                            language: Vec::new(),
+                        })
+                    }
                 }
                 _ => None,
             }
@@ -1208,8 +1226,9 @@ mod tests {
                     return Ok(());
                 };
                 let is_read = matches!(packet, SftpPacket::Read { .. });
-                let response = if let Some(response) =
-                    self.directory_response(&packet).or_else(|| self.path_response(&packet))
+                let response = if let Some(response) = self
+                    .directory_response(&packet)
+                    .or_else(|| self.path_or_metadata_response(&packet))
                 {
                     response
                 } else {
@@ -1479,6 +1498,21 @@ mod tests {
             let stats = response.statvfs_response().expect("decode fstatvfs");
             assert_eq!(stats.block_size, 4096);
             assert_eq!(stats.name_max, 255);
+        } else {
+            assert!(matches!(response, SftpPacket::Status { code: 4, .. }));
+        }
+        assert_eq!(session.pending_requests(), 0);
+    }
+
+    async fn assert_fstat(session: &mut SftpSession, handle: &[u8], open: bool) {
+        let request = session.client_mut().fstat(handle.to_vec()).expect("fstat request");
+        session.send_request(&request).await.expect("send fstat");
+        let response = session.read_response().await.expect("read fstat");
+        if open {
+            assert!(matches!(
+                response,
+                SftpPacket::Attrs { attrs: SftpAttributes { size: Some(12), .. }, .. }
+            ));
         } else {
             assert!(matches!(response, SftpPacket::Status { code: 4, .. }));
         }
@@ -1981,6 +2015,7 @@ mod tests {
         ));
         assert_eq!(session.pending_requests(), 0);
         assert_fstatvfs(&mut session, &handle, true).await;
+        assert_fstat(&mut session, &handle, true).await;
         let close = session.client_mut().close(handle.clone()).expect("close request");
         session.send_request(&close).await.expect("send close");
         assert!(matches!(
@@ -1996,6 +2031,7 @@ mod tests {
         ));
         assert_eq!(session.pending_requests(), 0);
         assert_fstatvfs(&mut session, &handle, false).await;
+        assert_fstat(&mut session, &handle, false).await;
         assert_hardlink(&mut session).await;
         assert_expand_path(&mut session).await;
         assert_lsetstat(&mut session).await;
