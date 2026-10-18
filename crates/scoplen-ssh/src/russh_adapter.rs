@@ -53,6 +53,8 @@ const MAX_CERTIFICATE_PRINCIPAL: usize = 4096;
 const MAX_PUBLICKEY_AUTH_PAYLOAD: usize = 256 * 1024;
 const MAX_KEYBOARD_SUBMETHODS: usize = 4096;
 const DEFAULT_CLIENT_CHANNEL_LIMIT: usize = 64;
+const DEFAULT_REKEY_WRITE_LIMIT: usize = 1 << 30;
+const DEFAULT_REKEY_TIME_LIMIT: Duration = Duration::from_secs(3600);
 /// Maximum number of channels that one client connection may keep open.
 pub const MAX_CLIENT_CHANNEL_LIMIT: usize = 256;
 const USERAUTH_REQUEST: u8 = 50;
@@ -72,6 +74,9 @@ pub enum ClientConfigError {
     /// The simultaneous channel limit is zero or exceeds the supported bound.
     #[error("SSH client channel limit must be between 1 and {MAX_CLIENT_CHANNEL_LIMIT}")]
     InvalidChannelLimit,
+    /// Rekey limits must be positive and the byte limit must not exceed one GiB.
+    #[error("SSH rekey limits require 1..=1073741824 outgoing bytes and a positive duration")]
+    InvalidRekeyLimits,
 }
 
 /// Host-certificate policy used by the concrete host-key callback.
@@ -120,8 +125,12 @@ pub struct ClientConfig {
     inactivity_timeout: Option<Duration>,
     keepalive_interval: Option<Duration>,
     keepalive_max: usize,
+    rekey_write_limit: usize,
+    rekey_time_limit: Duration,
     channel_limit: usize,
     algorithm_policy: HostAlgorithmPolicy,
+    #[cfg(test)]
+    completed_key_exchanges: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl fmt::Debug for ClientConfig {
@@ -134,6 +143,8 @@ impl fmt::Debug for ClientConfig {
             .field("inactivity_timeout", &self.inactivity_timeout)
             .field("keepalive_interval", &self.keepalive_interval)
             .field("keepalive_max", &self.keepalive_max)
+            .field("rekey_write_limit", &self.rekey_write_limit)
+            .field("rekey_time_limit", &self.rekey_time_limit)
             .field("channel_limit", &self.channel_limit)
             .field("algorithm_policy", &self.algorithm_policy)
             .finish_non_exhaustive()
@@ -150,8 +161,12 @@ impl Clone for ClientConfig {
             inactivity_timeout: self.inactivity_timeout,
             keepalive_interval: self.keepalive_interval,
             keepalive_max: self.keepalive_max,
+            rekey_write_limit: self.rekey_write_limit,
+            rekey_time_limit: self.rekey_time_limit,
             channel_limit: self.channel_limit,
             algorithm_policy: self.algorithm_policy.clone(),
+            #[cfg(test)]
+            completed_key_exchanges: Arc::clone(&self.completed_key_exchanges),
         }
     }
 }
@@ -180,8 +195,12 @@ impl ClientConfig {
             inactivity_timeout: None,
             keepalive_interval: None,
             keepalive_max: 3,
+            rekey_write_limit: DEFAULT_REKEY_WRITE_LIMIT,
+            rekey_time_limit: DEFAULT_REKEY_TIME_LIMIT,
             channel_limit: DEFAULT_CLIENT_CHANNEL_LIMIT,
             algorithm_policy: HostAlgorithmPolicy::default(),
+            #[cfg(test)]
+            completed_key_exchanges: Arc::default(),
         })
     }
 
@@ -205,6 +224,26 @@ impl ClientConfig {
         self.keepalive_interval = interval;
         self.keepalive_max = max_missed;
         self
+    }
+
+    /// Request rekeying after this many outgoing SSH payload bytes or this elapsed duration.
+    ///
+    /// The byte limit must be between one byte and one GiB, inclusive; the time limit must be
+    /// positive. Defaults are one GiB and one hour. The event loop checks the time limit when
+    /// processing traffic; an idle connection does not wake solely to rekey. Incoming byte
+    /// thresholds are not enforced by the current engine. The engine's byte counter excludes
+    /// packet headers, padding, and authentication tags.
+    pub fn with_rekey_limits(
+        mut self,
+        write_bytes: usize,
+        elapsed: Duration,
+    ) -> Result<Self, ClientConfigError> {
+        if !(1..=DEFAULT_REKEY_WRITE_LIMIT).contains(&write_bytes) || elapsed.is_zero() {
+            return Err(ClientConfigError::InvalidRekeyLimits);
+        }
+        self.rekey_write_limit = write_bytes;
+        self.rekey_time_limit = elapsed;
+        Ok(self)
     }
 
     /// Bound simultaneous session and forwarding channels on one SSH connection.
@@ -300,6 +339,11 @@ impl ClientConfig {
             inactivity_timeout: self.inactivity_timeout,
             keepalive_interval: self.keepalive_interval,
             keepalive_max: self.keepalive_max,
+            limits: russh::Limits::new(
+                self.rekey_write_limit,
+                DEFAULT_REKEY_WRITE_LIMIT,
+                self.rekey_time_limit,
+            ),
             nodelay: true,
             ..client::Config::default()
         }
@@ -1621,6 +1665,8 @@ struct ClientHandler {
     verifier: Arc<dyn HostKeyVerifier + Send + Sync>,
     channel_slots: Arc<Semaphore>,
     forwarded_tx: mpsc::Sender<ForwardedChannel>,
+    #[cfg(test)]
+    completed_key_exchanges: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl ClientHandler {
@@ -1635,6 +1681,8 @@ impl ClientHandler {
             verifier: Arc::clone(&config.verifier),
             channel_slots,
             forwarded_tx,
+            #[cfg(test)]
+            completed_key_exchanges: Arc::clone(&config.completed_key_exchanges),
         }
     }
 }
@@ -1764,6 +1812,17 @@ impl ClientHandler {
 
 impl Handler for ClientHandler {
     type Error = ClientError;
+
+    #[cfg(test)]
+    async fn kex_done(
+        &mut self,
+        _shared_secret: Option<&[u8]>,
+        _names: &russh::Names,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        self.completed_key_exchanges.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
 
     async fn check_server_key(
         &mut self,
@@ -2823,6 +2882,98 @@ mod tests {
             format!("HTTP/1.1 {status} Proxy Rejected\r\n\r\n")
         };
         client.write_all(response.as_bytes()).await.expect("HTTP CONNECT response");
+    }
+
+    #[test]
+    fn rekey_limits_validate_bounds_and_remain_per_host() {
+        let config = ClientConfig::new("host.example", 22, |_host: &str, _key: &HostKey| Ok(()))
+            .expect("client configuration");
+        for (bytes, elapsed) in [
+            (0, Duration::from_secs(1)),
+            (DEFAULT_REKEY_WRITE_LIMIT + 1, Duration::from_secs(1)),
+            (1, Duration::ZERO),
+        ] {
+            assert!(matches!(
+                config.clone().with_rekey_limits(bytes, elapsed),
+                Err(ClientConfigError::InvalidRekeyLimits)
+            ));
+        }
+        for bytes in [1, DEFAULT_REKEY_WRITE_LIMIT] {
+            config.clone().with_rekey_limits(bytes, Duration::from_nanos(1)).expect("valid bounds");
+        }
+        let configured = config
+            .clone()
+            .with_rekey_limits(32 * 1024, Duration::from_secs(60))
+            .expect("Host override")
+            .clone()
+            .russh_config()
+            .limits;
+        assert_eq!(configured.rekey_write_limit, 32 * 1024);
+        assert_eq!(configured.rekey_time_limit, Duration::from_secs(60));
+        let defaults = config.russh_config().limits;
+        assert_eq!(defaults.rekey_write_limit, DEFAULT_REKEY_WRITE_LIMIT);
+        assert_eq!(defaults.rekey_time_limit, DEFAULT_REKEY_TIME_LIMIT);
+    }
+
+    async fn assert_transfer_across_rekey(write_limit: usize, time_limit: Duration) {
+        let deadline = Duration::from_secs(10);
+        let (address, server) = start_echo_server().await;
+        let config =
+            ClientConfig::new("127.0.0.1", address.port(), |_host: &str, _key: &HostKey| Ok(()))
+                .expect("client configuration")
+                .with_rekey_limits(write_limit, time_limit)
+                .expect("valid rekey limits");
+        let completed = Arc::clone(&config.completed_key_exchanges);
+        let mut connection = timeout(deadline, ClientConnection::connect(config))
+            .await
+            .expect("bounded SSH handshake")
+            .expect("connect SSH client");
+        assert_eq!(completed.load(Ordering::SeqCst), 1, "initial exchange completed");
+        timeout(deadline, connection.authenticate_password("user", b"disposable-test-password"))
+            .await
+            .expect("bounded authentication")
+            .expect("authenticate");
+        let mut channel = timeout(deadline, connection.open_session())
+            .await
+            .expect("bounded session open")
+            .expect("open session");
+        let before = completed.load(Ordering::SeqCst);
+        if time_limit < Duration::from_secs(1) {
+            tokio::time::sleep(time_limit).await;
+        }
+        timeout(deadline, async {
+            // The peer retains its default one-GiB/one-hour policy, so only the client can
+            // initiate these exchanges. Check exact data on the same channel across a rekey.
+            for marker in 0_u8..16 {
+                let payload = vec![marker; 16 * 1024];
+                channel.send_data(&payload).await.expect("send echo payload");
+                let mut received = Vec::new();
+                while received.len() < payload.len() {
+                    match channel.next_event().await.expect("read echo").expect("channel open") {
+                        ChannelEvent::Data(data) => received.extend_from_slice(&data),
+                        event => panic!("unexpected echo event: {event:?}"),
+                    }
+                }
+                assert_eq!(received, payload, "rekey preserves exact channel bytes");
+            }
+            while completed.load(Ordering::SeqCst) <= before {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("transfer and client-initiated rekey complete before deadline");
+        connection.disconnect().await.expect("disconnect");
+        timeout(deadline, server).await.expect("server exits").expect("server task");
+    }
+
+    #[tokio::test]
+    async fn outgoing_byte_limit_rekeys_an_authenticated_session_without_data_loss() {
+        assert_transfer_across_rekey(32 * 1024, DEFAULT_REKEY_TIME_LIMIT).await;
+    }
+
+    #[tokio::test]
+    async fn elapsed_time_limit_rekeys_an_authenticated_session_without_data_loss() {
+        assert_transfer_across_rekey(DEFAULT_REKEY_WRITE_LIMIT, Duration::from_millis(100)).await;
     }
 
     #[test]

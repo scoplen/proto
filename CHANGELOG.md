@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added per-Host outgoing SSH payload-byte and elapsed-time rekey configuration, preserving the engine's
+  one-GiB/one-hour defaults and validating overrides before passing them to the engine.
+  Authenticated echo tests verify exact channel bytes across both triggers. Incoming-byte
+  thresholds and an idle timer remain outside the current engine's implementation.
 - Updated rustls to 0.23.46 in the SSH crate and both Cargo lockfiles, addressing
   RUSTSEC-2026-0346 through RUSTSEC-2026-0349 without suppressing the advisory checks.
 - Normalize expired SOCKS5 and HTTP CONNECT handshake socket deadlines to `TimedOut` on Unix,

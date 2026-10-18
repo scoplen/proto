@@ -78,6 +78,10 @@ can carry a target handshake through a jump host with
 `ClientConnection::connect_via_direct_tcpip`; repeating the operation composes arbitrary jump
 depth while retaining each parent connection. One connection multiplexes session and forwarding
 channels with a configurable simultaneous-channel cap; channel or stream drop releases a slot.
+`ClientConfig::with_rekey_limits` configures outgoing SSH payload-byte and elapsed-time limits per
+Host, retaining the engine defaults of one GiB and one hour. The engine checks elapsed time while
+processing traffic and does not wake an idle connection solely to rekey. Incoming-byte-triggered
+rekeying is not implemented by the current engine; the complete S4 rekey requirement remains open.
 The adapter keeps the engine types out of the public API. A bounded SOCKS4a/SOCKS5 dynamic
 listener now composes the handshake with `direct-tcpip`, including cancellation, concurrency
 limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping.
