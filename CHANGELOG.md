@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Released the concrete SSH handle lock while a keyboard-interactive responder waits for input.
+  The elapsed rekey timer may request an exchange during a prompt, but the current engine does not
+  process that request. It can begin an exchange after authentication resumes and checks elapsed
+  time again. Regression coverage checks lock availability, the subsequent exchange, and exact
+  channel bytes; timer tests now compare completed exchange times.
 - Added an idle elapsed-time rekey timer for every concrete SSH connection route. It rearms after
   completed exchanges, stops on disconnect and drop, and leaves authenticated channel bytes intact
   across idle rekeys. Incoming-byte thresholds and full OpenSSH default compatibility remain open.

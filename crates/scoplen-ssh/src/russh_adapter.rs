@@ -131,6 +131,8 @@ pub struct ClientConfig {
     algorithm_policy: HostAlgorithmPolicy,
     #[cfg(test)]
     completed_key_exchanges: Arc<std::sync::atomic::AtomicUsize>,
+    #[cfg(test)]
+    completed_key_exchange_times: Arc<std::sync::Mutex<Vec<Instant>>>,
 }
 
 impl fmt::Debug for ClientConfig {
@@ -167,6 +169,8 @@ impl Clone for ClientConfig {
             algorithm_policy: self.algorithm_policy.clone(),
             #[cfg(test)]
             completed_key_exchanges: Arc::clone(&self.completed_key_exchanges),
+            #[cfg(test)]
+            completed_key_exchange_times: Arc::clone(&self.completed_key_exchange_times),
         }
     }
 }
@@ -201,6 +205,8 @@ impl ClientConfig {
             algorithm_policy: HostAlgorithmPolicy::default(),
             #[cfg(test)]
             completed_key_exchanges: Arc::default(),
+            #[cfg(test)]
+            completed_key_exchange_times: Arc::default(),
         })
     }
 
@@ -1043,7 +1049,10 @@ impl ClientConnection {
     ///
     /// The responder is called once for each bounded server information request. Prompt text and
     /// response strings are validated through the shared K-7 authentication boundary before any
-    /// response is sent to `russh`; prompt order and response count are preserved exactly.
+    /// response is sent to `russh`; prompt order and response count are preserved exactly. The
+    /// connection's elapsed rekey timer can request an exchange while the responder waits for user
+    /// input. The current engine does not process that request during authentication; its later
+    /// elapsed-time check can start an exchange after authentication resumes.
     pub async fn authenticate_keyboard_interactive<F>(
         &mut self,
         username: &str,
@@ -1064,14 +1073,16 @@ impl ClientConnection {
             )
             .map_err(ClientError::Config)?;
         }
-        let mut handle = self.handle.write().await;
-        let mut reply = handle
-            .authenticate_keyboard_interactive_start(
-                username.to_owned(),
-                submethods.map(str::to_owned),
-            )
-            .await
-            .map_err(ClientError::from)?;
+        let mut reply = {
+            let mut handle = self.handle.write().await;
+            handle
+                .authenticate_keyboard_interactive_start(
+                    username.to_owned(),
+                    submethods.map(str::to_owned),
+                )
+                .await
+                .map_err(ClientError::from)?
+        };
         loop {
             reply = match reply {
                 russh::client::KeyboardInteractiveAuthResponse::Success => return Ok(()),
@@ -1121,7 +1132,9 @@ impl ClientConnection {
                         .map_err(|_| {
                             ClientError::InvalidInput("keyboard response count or size is invalid")
                         })?;
-                    handle
+                    self.handle
+                        .write()
+                        .await
                         .authenticate_keyboard_interactive_respond(responses)
                         .await
                         .map_err(ClientError::from)?
@@ -1781,6 +1794,8 @@ struct ClientHandler {
     exchanges: watch::Sender<Option<Instant>>,
     #[cfg(test)]
     completed_key_exchanges: Arc<std::sync::atomic::AtomicUsize>,
+    #[cfg(test)]
+    completed_key_exchange_times: Arc<std::sync::Mutex<Vec<Instant>>>,
 }
 
 impl ClientHandler {
@@ -1799,6 +1814,8 @@ impl ClientHandler {
             exchanges,
             #[cfg(test)]
             completed_key_exchanges: Arc::clone(&config.completed_key_exchanges),
+            #[cfg(test)]
+            completed_key_exchange_times: Arc::clone(&config.completed_key_exchange_times),
         }
     }
 }
@@ -1935,9 +1952,16 @@ impl Handler for ClientHandler {
         _names: &russh::Names,
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
-        self.exchanges.send_replace(Some(Instant::now()));
+        let completed_at = Instant::now();
+        self.exchanges.send_replace(Some(completed_at));
         #[cfg(test)]
-        self.completed_key_exchanges.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        {
+            self.completed_key_exchange_times
+                .lock()
+                .expect("exchange times lock")
+                .push(completed_at);
+            self.completed_key_exchanges.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
         Ok(())
     }
 
@@ -2220,6 +2244,25 @@ mod tests {
 
     impl russh::server::Handler for KeyboardServer {
         type Error = russh::Error;
+
+        async fn channel_open_session(
+            &mut self,
+            _channel: russh::Channel<russh::server::Msg>,
+            reply: russh::server::ChannelOpenHandle,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            reply.accept().await;
+            Ok(())
+        }
+
+        async fn data(
+            &mut self,
+            channel: russh::ChannelId,
+            data: &[u8],
+            session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            session.data(channel, data.to_vec())
+        }
 
         async fn auth_none(&mut self, _user: &str) -> Result<russh::server::Auth, Self::Error> {
             if self.accept_none {
@@ -3128,24 +3171,30 @@ mod tests {
 
     #[tokio::test]
     async fn idle_timer_rekeys_twice_and_preserves_open_channel_bytes() {
+        let limit = Duration::from_millis(300);
         let (address, server) = start_echo_server().await;
         let config =
             ClientConfig::new("127.0.0.1", address.port(), |_host: &str, _key: &HostKey| Ok(()))
                 .expect("client configuration")
-                .with_rekey_limits(DEFAULT_REKEY_WRITE_LIMIT, Duration::from_millis(300))
+                .with_rekey_limits(DEFAULT_REKEY_WRITE_LIMIT, limit)
                 .expect("rekey limits");
         let completed = Arc::clone(&config.completed_key_exchanges);
+        let exchange_times = Arc::clone(&config.completed_key_exchange_times);
         let mut connection = ClientConnection::connect(config).await.expect("connect SSH client");
         connection
             .authenticate_password("user", b"disposable-test-password")
             .await
             .expect("authenticate");
         let mut channel = connection.open_session().await.expect("open session");
-        assert_eq!(completed.load(Ordering::SeqCst), 1);
-        wait_for_exchanges(&completed, 2).await;
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert_eq!(completed.load(Ordering::SeqCst), 2, "completed exchange restarts timer");
-        wait_for_exchanges(&completed, 3).await;
+        let baseline = completed.load(Ordering::SeqCst);
+        wait_for_exchanges(&completed, baseline + 2).await;
+        {
+            let times = exchange_times.lock().expect("exchange times lock");
+            assert!(
+                times[baseline + 1].duration_since(times[baseline]) >= limit,
+                "completed exchange restarts the idle timer"
+            );
+        }
         let payload = b"channel payload after two idle key exchanges";
         channel.send_data(payload).await.expect("send channel data");
         let mut received = Vec::new();
@@ -3167,19 +3216,22 @@ mod tests {
 
     #[tokio::test]
     async fn outgoing_byte_rekey_restarts_idle_timer() {
+        let limit = Duration::from_secs(2);
         let (address, server) = start_echo_server().await;
         let config =
             ClientConfig::new("127.0.0.1", address.port(), |_host: &str, _key: &HostKey| Ok(()))
                 .expect("client configuration")
-                .with_rekey_limits(8 * 1024, Duration::from_millis(800))
+                .with_rekey_limits(8 * 1024, limit)
                 .expect("rekey limits");
         let completed = Arc::clone(&config.completed_key_exchanges);
+        let exchange_times = Arc::clone(&config.completed_key_exchange_times);
         let mut connection = ClientConnection::connect(config).await.expect("connect SSH client");
         connection
             .authenticate_password("user", b"disposable-test-password")
             .await
             .expect("authenticate");
         let mut channel = connection.open_session().await.expect("open session");
+        let baseline = completed.load(Ordering::SeqCst);
         let payload = vec![0x55; 8 * 1024];
         channel.send_data(&payload).await.expect("send payload");
         let mut received = Vec::new();
@@ -3195,10 +3247,19 @@ mod tests {
             }
         }
         assert_eq!(received, payload);
-        wait_for_exchanges(&completed, 2).await;
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        assert_eq!(completed.load(Ordering::SeqCst), 2, "byte exchange restarts elapsed limit");
-        wait_for_exchanges(&completed, 3).await;
+        wait_for_exchanges(&completed, baseline + 1).await;
+        wait_for_exchanges(&completed, baseline + 2).await;
+        {
+            let times = exchange_times.lock().expect("exchange times lock");
+            assert!(
+                times[baseline].duration_since(times[baseline - 1]) < limit,
+                "outgoing bytes trigger the first exchange before the idle deadline"
+            );
+            assert!(
+                times[baseline + 1].duration_since(times[baseline]) >= limit,
+                "byte-triggered exchange restarts the idle timer"
+            );
+        }
         connection.disconnect().await.expect("disconnect");
         timeout(Duration::from_secs(5), server).await.expect("server exits").expect("server task");
     }
@@ -3614,6 +3675,15 @@ mod tests {
     }
 
     async fn keyboard_server(accept_none: bool) -> (ClientConnection, tokio::task::JoinHandle<()>) {
+        let (connection, server, _) =
+            keyboard_server_with_rekey(accept_none, DEFAULT_REKEY_TIME_LIMIT).await;
+        (connection, server)
+    }
+
+    async fn keyboard_server_with_rekey(
+        accept_none: bool,
+        rekey_time_limit: Duration,
+    ) -> (ClientConnection, tokio::task::JoinHandle<()>, Arc<AtomicUsize>) {
         let mut server_config = russh::server::Config::default();
         server_config.keys.push(
             PrivateKey::random(
@@ -3634,8 +3704,12 @@ mod tests {
             .await;
         });
         let verifier = |_host: &str, _key: &HostKey| Ok(());
-        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("SSH config");
-        (ClientConnection::connect(config).await.expect("connect client"), server)
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier)
+            .expect("SSH config")
+            .with_rekey_limits(DEFAULT_REKEY_WRITE_LIMIT, rekey_time_limit)
+            .expect("rekey limits");
+        let completed = Arc::clone(&config.completed_key_exchanges);
+        (ClientConnection::connect(config).await.expect("connect client"), server, completed)
     }
 
     #[tokio::test]
@@ -3699,6 +3773,70 @@ mod tests {
             .await
             .expect_err("rejected response");
         assert!(matches!(error, ClientError::AuthenticationRejected { .. }));
+        connection.disconnect().await.expect("disconnect");
+        server.await.expect("server task");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn keyboard_responder_releases_handle_and_rekeys_after_authentication() {
+        let (mut connection, server, completed) =
+            keyboard_server_with_rekey(false, Duration::from_millis(80)).await;
+        let handle = Arc::clone(&connection.handle);
+        let (prompt_started_tx, prompt_started_rx) = tokio::sync::oneshot::channel();
+        let (lock_available_tx, lock_available_rx) = std::sync::mpsc::sync_channel(1);
+        let probe = tokio::spawn(async move {
+            let baseline = prompt_started_rx.await.expect("first prompt started");
+            let _guard = timeout(Duration::from_secs(3), handle.read())
+                .await
+                .expect("connection handle unlocked during responder");
+            lock_available_tx.send(()).expect("responder still waiting");
+            baseline
+        });
+        let mut prompt_started_tx = Some(prompt_started_tx);
+        let observed = Arc::clone(&completed);
+        timeout(
+            Duration::from_secs(5),
+            connection.authenticate_keyboard_interactive("user", Some("otp"), move |info| {
+                if info.prompts()[0].text() == b"Code: " {
+                    let baseline = observed.load(Ordering::SeqCst);
+                    prompt_started_tx
+                        .take()
+                        .expect("first prompt")
+                        .send(baseline)
+                        .expect("lock probe running");
+                    tokio::task::block_in_place(|| {
+                        lock_available_rx
+                            .recv_timeout(Duration::from_secs(3))
+                            .expect("connection handle available during responder");
+                        std::thread::sleep(Duration::from_millis(200));
+                    });
+                    Ok(vec!["123456".to_owned()])
+                } else {
+                    Ok(vec!["yes".to_owned()])
+                }
+            }),
+        )
+        .await
+        .expect("authentication deadline")
+        .expect("keyboard authentication after idle timeout");
+        let baseline = probe.await.expect("lock probe task");
+        wait_for_exchanges(&completed, baseline + 1).await;
+        let mut channel = connection.open_session().await.expect("open session");
+        let payload = b"keyboard authentication after idle rekey";
+        channel.send_data(payload).await.expect("send payload");
+        let mut received = Vec::new();
+        while received.len() < payload.len() {
+            match timeout(Duration::from_secs(5), channel.next_event())
+                .await
+                .expect("channel deadline")
+                .expect("read channel event")
+                .expect("channel open")
+            {
+                ChannelEvent::Data(bytes) => received.extend_from_slice(&bytes),
+                event => panic!("unexpected echo event: {event:?}"),
+            }
+        }
+        assert_eq!(received, payload);
         connection.disconnect().await.expect("disconnect");
         server.await.expect("server task");
     }

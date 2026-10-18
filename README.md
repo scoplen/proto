@@ -82,8 +82,11 @@ channels with a configurable simultaneous-channel cap; channel or stream drop re
 Host, retaining the engine defaults of one GiB and one hour. A connection-owned timer requests a
 rekey when that elapsed limit expires even while the connection is idle, and restarts after each
 completed key exchange, including byte-triggered exchanges. It stops on disconnect, transport
-failure, or connection drop. Incoming-byte-triggered rekeying is not implemented by the current
-engine; the complete S4 rekey requirement and OpenSSH default compatibility remain open.
+failure, or connection drop. During a keyboard-interactive prompt, the timer can request a rekey,
+but the current engine does not process that request while waiting for the user's answer. Its
+elapsed-time check can start an exchange after authentication resumes.
+Incoming-byte-triggered rekeying is not implemented by the current engine; the complete S4 rekey
+requirement and OpenSSH default compatibility remain open.
 The adapter keeps the engine types out of the public API. A bounded SOCKS4a/SOCKS5 dynamic
 listener now composes the handshake with `direct-tcpip`, including cancellation, concurrency
 limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping.
