@@ -111,6 +111,11 @@ For host-certificate mode, the concrete adapter checks the certificate signature
 validity, and critical options before the callback checks the CA pin. A disposable
 `linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and
 rejected an unrelated CA pin. Other host-certificate algorithms and servers remain unverified.
+The same example also passed against Dropbear 2025.88 from an Alpine 3.23 disposable container:
+install `dropbear`, create a `scoplen` user with a single authorized Ed25519 key, generate an
+Ed25519 host key with `dropbearkey`, run Dropbear on port 2222, pin its public key, and set
+`SCOPLEN_OPENSSH_ED25519_KEY` to the authorized private-key path. A second private key was
+rejected. Dropbear SFTP, forwarding, and other authentication paths remain unverified.
 For an Ed25519 user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
 file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
 certificate signature, principal, validity, critical options, and CA pin before sending it.
