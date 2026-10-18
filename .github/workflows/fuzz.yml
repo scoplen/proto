@@ -1,0 +1,43 @@
+name: fuzz
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - vector_loader
+          - object_decoder
+          - crypto_decoders
+          - agent_decoder
+          - sftp_decoder
+          - ssh_protocol
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install nightly Rust and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +nightly install cargo-fuzz --locked
+      - name: Fuzz parser boundary
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=300 -timeout=30
+      - name: Check fuzz dependency lockfile
+        run: git diff --exit-code -- fuzz/Cargo.lock
+      - name: Save crash input
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fuzz-${{ matrix.target }}-crash
+          path: fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore
+          retention-days: 14
