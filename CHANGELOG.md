@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added a strict-KEX interoperability harness to the disposable OpenSSH algorithm check. It
+  verifies a pinned-key authenticated command, rejection of injected `SSH_MSG_IGNORE` before and
+  after the server's first KEXINIT, and acceptance by a non-strict in-process control. The relay
+  checks the exact KEX algorithm name-list and bounds both directions and disconnects; the wider
+  interoperability matrix remains open.
 - Added per-Host outgoing SSH payload-byte and elapsed-time rekey configuration, preserving the engine's
   one-GiB/one-hour defaults and validating overrides before passing them to the engine.
   Authenticated echo tests verify exact channel bytes across both triggers. Incoming-byte

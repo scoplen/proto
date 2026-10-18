@@ -78,6 +78,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Constrained modern, legacy opt-in, and Host isolation
+      - name: Constrained algorithms, Host isolation, and strict KEX
         shell: pwsh
         run: ./scripts/ssh-algorithm-interop.ps1
