@@ -259,6 +259,11 @@ For a paired same-host comparison with OpenSSH under the two required S4 ciphers
 `pwsh ./scripts/ssh-throughput.ps1`. The setup, measurement method, local results, and limits are
 in [docs/ssh-throughput.md](docs/ssh-throughput.md).
 
+For diagnostic one-byte SSH echo latency comparisons against direct `russh` and a disposable
+OpenSSH server/client pair, run `pwsh ./scripts/ssh-keystroke-latency.ps1`. The local engine
+comparison runs with `cargo run --locked --release -p scoplen-ssh --example keystroke_latency`.
+The methods and limits are in [docs/ssh-keystroke-latency.md](docs/ssh-keystroke-latency.md).
+
 The tracked `fuzz/corpus/<target>/seed-*` files provide small synthetic valid and malformed
 inputs for all six parser targets. Valid model and certificate inputs come from the published
 known-answer vectors in `vectors/baseline.json` and `vectors/crypto.json`; SSH, SFTP, and agent
