@@ -575,6 +575,14 @@ mod tests {
     use super::*;
     use crate::{ClientConfig, HostKey, SftpAttributes, SftpNameEntry, SftpStatvfs};
 
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum RenamePhase {
+        Original,
+        Renamed,
+        Replaced,
+        Removed,
+    }
+
     struct SftpServer {
         buffer: Vec<u8>,
         file: Vec<u8>,
@@ -582,6 +590,7 @@ mod tests {
         advertise_statvfs: bool,
         extension_handle_open: Option<bool>,
         hardlink_created: Option<bool>,
+        rename_phase: Option<RenamePhase>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
@@ -602,6 +611,9 @@ mod tests {
             }
             if self.hardlink_created.is_some() {
                 extensions.push(SftpExtension::new(b"hardlink@openssh.com", b"1").unwrap());
+            }
+            if self.rename_phase.is_some() {
+                extensions.push(SftpExtension::new(b"posix-rename@openssh.com", b"1").unwrap());
             }
             SftpPacket::Version { version: 3, extensions }
         }
@@ -653,7 +665,20 @@ mod tests {
         }
 
         fn open_response(&mut self, id: u32, path: &[u8]) -> SftpPacket {
-            if path == b"file" || (path == b"link" && self.hardlink_created == Some(true)) {
+            if path == b"replacement"
+                && matches!(self.rename_phase, Some(RenamePhase::Original | RenamePhase::Renamed))
+            {
+                self.extension_handle_open = Some(true);
+                SftpPacket::Handle { id, handle: b"old".to_vec() }
+            } else if (path == b"file"
+                && !matches!(
+                    self.rename_phase,
+                    Some(RenamePhase::Renamed | RenamePhase::Replaced | RenamePhase::Removed)
+                ))
+                || (path == b"link" && self.hardlink_created == Some(true))
+                || (path == b"renamed" && self.rename_phase == Some(RenamePhase::Renamed))
+                || (path == b"replacement" && self.rename_phase == Some(RenamePhase::Replaced))
+            {
                 self.open_extension_handle(id)
             } else {
                 SftpPacket::Status { id, code: 2, message: Vec::new(), language: Vec::new() }
@@ -661,7 +686,9 @@ mod tests {
         }
 
         fn close_extension_handle(&mut self, id: u32, handle: &[u8]) -> SftpPacket {
-            let code = if handle == b"h" && self.extension_handle_open == Some(true) {
+            let code = if (handle == b"h" || handle == b"old")
+                && self.extension_handle_open == Some(true)
+            {
                 self.extension_handle_open = Some(false);
                 0
             } else {
@@ -701,9 +728,12 @@ mod tests {
             SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
         }
 
-        fn remove_hardlink(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+        fn remove_extension_file(&mut self, id: u32, path: &[u8]) -> SftpPacket {
             let code = if path == b"link" && self.hardlink_created == Some(true) {
                 self.hardlink_created = Some(false);
+                0
+            } else if path == b"replacement" && self.rename_phase == Some(RenamePhase::Replaced) {
+                self.rename_phase = Some(RenamePhase::Removed);
                 0
             } else {
                 2
@@ -711,10 +741,27 @@ mod tests {
             SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
         }
 
-        fn read_response(&self, id: u32, handle: &[u8], offset: u64, length: u32) -> SftpPacket {
-            if self.extension_handle_open.is_some()
-                && (handle != b"h" || self.extension_handle_open != Some(true))
+        fn rename_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
+            let code = if data == b"\0\0\0\x07missing\0\0\0\x0fmissing-renamed" {
+                2
+            } else if data == b"\0\0\0\x04file\0\0\0\x07renamed"
+                && self.rename_phase == Some(RenamePhase::Original)
             {
+                self.rename_phase = Some(RenamePhase::Renamed);
+                0
+            } else if data == b"\0\0\0\x07renamed\0\0\0\x0breplacement"
+                && self.rename_phase == Some(RenamePhase::Renamed)
+            {
+                self.rename_phase = Some(RenamePhase::Replaced);
+                0
+            } else {
+                4
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn read_response(&self, id: u32, handle: &[u8], offset: u64, length: u32) -> SftpPacket {
+            if self.extension_handle_open.is_some() && self.extension_handle_open != Some(true) {
                 return SftpPacket::Status {
                     id,
                     code: 4,
@@ -722,14 +769,28 @@ mod tests {
                     language: Vec::new(),
                 };
             }
+            let contents: &[u8] = if handle == b"old"
+                && matches!(self.rename_phase, Some(RenamePhase::Original | RenamePhase::Renamed))
+            {
+                b"previous destination contents"
+            } else if handle == b"h" || self.extension_handle_open.is_none() {
+                &self.file
+            } else {
+                return SftpPacket::Status {
+                    id,
+                    code: 4,
+                    message: Vec::new(),
+                    language: Vec::new(),
+                };
+            };
             match usize::try_from(offset) {
-                Ok(start) if start < self.file.len() => {
+                Ok(start) if start < contents.len() => {
                     let end = start
                         .saturating_add(
                             self.read_reply_limit.unwrap_or(length as usize).min(length as usize),
                         )
-                        .min(self.file.len());
-                    SftpPacket::Data { id, data: self.file[start..end].to_vec() }
+                        .min(contents.len());
+                    SftpPacket::Data { id, data: contents[start..end].to_vec() }
                 }
                 _ => SftpPacket::Status { id, code: 1, message: Vec::new(), language: Vec::new() },
             }
@@ -836,8 +897,10 @@ mod tests {
                     SftpPacket::Read { id, handle, offset, length } => {
                         self.read_response(id, &handle, offset, length)
                     }
-                    SftpPacket::Remove { id, path } if self.hardlink_created.is_some() => {
-                        self.remove_hardlink(id, &path)
+                    SftpPacket::Remove { id, path }
+                        if self.hardlink_created.is_some() || self.rename_phase.is_some() =>
+                    {
+                        self.remove_extension_file(id, &path)
                     }
                     SftpPacket::Write { id, offset, data, .. } => {
                         let Ok(start) = usize::try_from(offset) else {
@@ -880,6 +943,11 @@ mod tests {
                         if name == b"hardlink@openssh.com" && self.hardlink_created.is_some() =>
                     {
                         self.hardlink_response(id, &data)
+                    }
+                    SftpPacket::Extended { id, name, data }
+                        if name == b"posix-rename@openssh.com" && self.rename_phase.is_some() =>
+                    {
+                        self.rename_response(id, &data)
                     }
                     _ => continue,
                 };
@@ -927,6 +995,7 @@ mod tests {
                     advertise_statvfs: false,
                     extension_handle_open: None,
                     hardlink_created: None,
+                    rename_phase: None,
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -1068,6 +1137,89 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
     }
 
+    async fn assert_rename_status(session: &mut SftpSession, old: &[u8], new: &[u8], code: u32) {
+        let request = session.client_mut().posix_rename(old, new).expect("posix-rename request");
+        session.send_request(&request).await.expect("send posix-rename");
+        assert!(matches!(
+            session.read_response().await.expect("read posix-rename"),
+            SftpPacket::Status { code: actual, .. } if actual == code
+        ));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
+    async fn assert_file_bytes(session: &mut SftpSession, path: &[u8], expected: &[u8]) {
+        let open =
+            session.client_mut().open(path, 1, SftpAttributes::default()).expect("open file");
+        session.send_request(&open).await.expect("send file open");
+        let handle = match session.read_response().await.expect("read file open") {
+            SftpPacket::Handle { handle, .. } => handle,
+            other => panic!("unexpected file open response: {other:?}"),
+        };
+        let length = u32::try_from(expected.len()).expect("bounded expected file length");
+        let read = session.client_mut().read(handle.clone(), 0, length).expect("read file");
+        session.send_request(&read).await.expect("send file read");
+        assert!(matches!(
+            session.read_response().await.expect("read file bytes"),
+            SftpPacket::Data { data, .. } if data == expected
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let close = session.client_mut().close(handle).expect("close file");
+        session.send_request(&close).await.expect("send file close");
+        assert!(matches!(
+            session.read_response().await.expect("read file close"),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
+    async fn assert_missing_file(session: &mut SftpSession, path: &[u8]) {
+        let open = session
+            .client_mut()
+            .open(path, 1, SftpAttributes::default())
+            .expect("open missing file");
+        session.send_request(&open).await.expect("send missing-file open");
+        assert!(matches!(
+            session.read_response().await.expect("read missing-file open"),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
+    async fn assert_posix_rename(session: &mut SftpSession) {
+        assert!(
+            session
+                .extensions()
+                .iter()
+                .any(|extension| extension.name == b"posix-rename@openssh.com")
+        );
+        assert_rename_status(session, b"missing", b"missing-renamed", 2).await;
+        assert_file_bytes(session, b"replacement", b"previous destination contents").await;
+        assert_rename_status(session, b"file", b"renamed", 0).await;
+        assert_missing_file(session, b"file").await;
+        assert_file_bytes(session, b"renamed", b"linked bytes").await;
+        assert_rename_status(session, b"renamed", b"replacement", 0).await;
+        assert_missing_file(session, b"renamed").await;
+        assert_file_bytes(session, b"replacement", b"linked bytes").await;
+        let remove = session.client_mut().remove(b"replacement").expect("remove replacement");
+        session.send_request(&remove).await.expect("send replacement remove");
+        assert!(matches!(
+            session.read_response().await.expect("read replacement remove"),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        assert_missing_file(session, b"replacement").await;
+    }
+
+    async fn assert_missing_statvfs(session: &mut SftpSession) {
+        let missing = session.client_mut().statvfs(b"missing").expect("missing statvfs request");
+        session.send_request(&missing).await.expect("send missing statvfs");
+        assert!(matches!(
+            session.read_response().await.expect("read missing statvfs"),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
     #[tokio::test]
     async fn opens_subsystem_negotiates_v3_and_round_trips_packets() {
         let mut server_config = russh::server::Config::default();
@@ -1093,6 +1245,7 @@ mod tests {
                     advertise_statvfs: true,
                     extension_handle_open: Some(false),
                     hardlink_created: Some(false),
+                    rename_phase: Some(RenamePhase::Original),
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1106,7 +1259,7 @@ mod tests {
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
-        assert_eq!(session.extensions().len(), 5);
+        assert_eq!(session.extensions().len(), 6);
         assert!(session.limits().is_some());
         assert_eq!(
             session.request_limits().await.expect("request limits"),
@@ -1164,14 +1317,9 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
         assert_fstatvfs(&mut session, &handle, false).await;
         assert_hardlink(&mut session).await;
+        assert_posix_rename(&mut session).await;
 
-        let missing = session.client_mut().statvfs(b"missing").expect("missing statvfs request");
-        session.send_request(&missing).await.expect("send missing statvfs");
-        assert!(matches!(
-            session.read_response().await.expect("read missing statvfs"),
-            SftpPacket::Status { code: 2, .. }
-        ));
-        assert_eq!(session.pending_requests(), 0);
+        assert_missing_statvfs(&mut session).await;
         connection.disconnect().await.expect("disconnect client");
     }
 
@@ -1200,6 +1348,7 @@ mod tests {
                     advertise_statvfs: false,
                     extension_handle_open: None,
                     hardlink_created: None,
+                    rename_phase: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1260,6 +1409,7 @@ mod tests {
                     advertise_statvfs: false,
                     extension_handle_open: None,
                     hardlink_created: None,
+                    rename_phase: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,

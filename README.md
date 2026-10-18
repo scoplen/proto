@@ -136,7 +136,9 @@ statistics and missing-path rejection, pipelined upload in two parts, resumed do
 progress and byte comparison, `fsync@openssh.com` and `fstatvfs@openssh.com` on the open upload
 handle, rejection of both requests after closing that handle without retaining request state, and
 `hardlink@openssh.com` success with identical linked bytes, missing-source and existing-destination
-rejection, and removal of both unique remote paths. It passed against a disposable
+rejection, plus `posix-rename@openssh.com` missing-source rejection, a rename preserving file bytes,
+replacement of an existing destination with different contents, request-slot release, and cleanup
+of the unique remote paths. It passed against a disposable
 `linuxserver/openssh-server` container; other SFTP extensions, server implementations, and
 platforms remain unverified.
 Set `SCOPLEN_OPENSSH_FORWARD=1` to verify an RFC 4254 `direct-tcpip` channel to the disposable
