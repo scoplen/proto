@@ -44,7 +44,9 @@ SSHD
 /usr/sbin/sshd -D -e -f /tmp/modern.conf &
 exec /usr/sbin/sshd -D -e -f /tmp/legacy.conf
 '@
-    docker run -d --rm --name $container -p '127.0.0.1::2222' -p '127.0.0.1::2223' alpine:3.21 sh -c $setup | Out-Null
+    # A CRLF checkout leaves carriage returns in PowerShell here-strings; Alpine sh rejects them.
+    $setup = $setup.Replace("`r", '')
+    docker run -d --name $container -p '127.0.0.1::2222' -p '127.0.0.1::2223' alpine:3.21 sh -c $setup | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Failed to start disposable OpenSSH algorithm container' }
     $started = $true
 
@@ -85,7 +87,16 @@ exec /usr/sbin/sshd -D -e -f /tmp/legacy.conf
     cargo run --quiet --locked -p scoplen-ssh --example algorithm_interop
     if ($LASTEXITCODE -ne 0) { throw 'Constrained OpenSSH algorithm interop failed' }
 }
+catch {
+    if ($started) {
+        $state = docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' $container 2>$null
+        if ($LASTEXITCODE -eq 0) { Write-Warning "Disposable OpenSSH state: $state" }
+        $logs = docker logs --tail 30 $container 2>&1
+        if ($LASTEXITCODE -eq 0 -and $logs) { Write-Warning "Disposable OpenSSH log:`n$($logs | Out-String)" }
+    }
+    throw
+}
 finally {
-    if ($started) { docker stop $container | Out-Null }
+    if ($started) { docker rm -f $container 2>$null | Out-Null }
     foreach ($name in $testVariables) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 }
