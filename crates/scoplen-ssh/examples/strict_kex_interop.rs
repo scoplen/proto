@@ -262,13 +262,26 @@ async fn read_first_kexinit<R: AsyncRead + Unpin>(
         return Err(io::Error::new(ErrorKind::InvalidData, "first SSH packet is not KEXINIT"));
     }
     let payload_end = packet.len() - padding_length;
-    let marker_present = packet[5..payload_end]
-        .windows(STRICT_SERVER_MARKER.len())
-        .any(|part| part == STRICT_SERVER_MARKER);
+    let marker_present = kexinit_offers_strict(&packet[5..payload_end])?;
     if marker_present != server_advertises_strict {
         return Err(io::Error::new(ErrorKind::InvalidData, "unexpected server strict KEX offer"));
     }
     Ok(packet)
+}
+
+fn kexinit_offers_strict(payload: &[u8]) -> io::Result<bool> {
+    let names_length = payload
+        .get(17..21)
+        .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
+        .map(u32::from_be_bytes)
+        .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "missing KEX algorithm length"))?;
+    let names_end = 21usize
+        .checked_add(names_length as usize)
+        .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "invalid KEX algorithm length"))?;
+    let names = payload
+        .get(21..names_end)
+        .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "truncated KEX algorithms"))?;
+    Ok(names.split(|byte| *byte == b',').any(|name| name == STRICT_SERVER_MARKER))
 }
 
 fn require_checks(
@@ -313,4 +326,38 @@ async fn verify_command(
     }
     timeout(DEADLINE, connection.disconnect()).await??;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{STRICT_SERVER_MARKER, kexinit_offers_strict};
+
+    fn kexinit_payload(names: &[u8], extra: &[u8]) -> Vec<u8> {
+        let mut payload = vec![20];
+        payload.extend_from_slice(&[0; 16]);
+        payload.extend_from_slice(&(names.len() as u32).to_be_bytes());
+        payload.extend_from_slice(names);
+        payload.extend_from_slice(extra);
+        payload
+    }
+
+    #[test]
+    fn strict_marker_must_be_a_complete_kex_algorithm_name() {
+        let mut names = b"curve25519-sha256,".to_vec();
+        names.extend_from_slice(STRICT_SERVER_MARKER);
+        assert!(kexinit_offers_strict(&kexinit_payload(&names, &[])).unwrap());
+        assert!(
+            !kexinit_offers_strict(&kexinit_payload(b"curve25519-sha256", STRICT_SERVER_MARKER,))
+                .unwrap()
+        );
+        names.push(b'x');
+        assert!(!kexinit_offers_strict(&kexinit_payload(&names, &[])).unwrap());
+    }
+
+    #[test]
+    fn truncated_kex_algorithm_list_is_rejected() {
+        let mut payload = kexinit_payload(b"curve25519-sha256", &[]);
+        payload[17..21].copy_from_slice(&100u32.to_be_bytes());
+        assert!(kexinit_offers_strict(&payload).is_err());
+    }
 }

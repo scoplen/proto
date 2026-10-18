@@ -115,8 +115,12 @@ open.
 `pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners with one modern
 algorithm set and one legacy-only set. The `algorithm_interop` example verifies an authenticated
 command on the modern set, handshake rejection by the default policy on the legacy set, a working
-command after per-Host legacy opt-in, and rejection by another default Host. This covers the
-selected algorithms only; the full transport and strict-KEX interoperability matrix remains open.
+command after per-Host legacy opt-in, and rejection by another default Host. The same script runs
+`strict_kex_interop`: a pinned-key, password-authenticated OpenSSH command succeeds, then a local
+relay inserts a valid `SSH_MSG_IGNORE` before and after the server's first KEXINIT in separate
+connections. The strict client rejects both before host-key verification, while a server that does
+not advertise strict KEX accepts the same packets. This covers one initial exchange and the
+selected modern algorithms; rekey and the wider server, platform, and algorithm matrix remain open.
 With a disposable OpenSSH server, `cargo run -p scoplen-ssh --example proxy_command_interop`
 exercises a real SSH handshake through a child process's standard streams. Set
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's public-key line and `SCOPLEN_OPENSSH_PASSWORD` to the

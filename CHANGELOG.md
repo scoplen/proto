@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added a strict-KEX interoperability harness to the disposable OpenSSH algorithm check. It
+  verifies a pinned-key authenticated command, rejection of injected `SSH_MSG_IGNORE` before and
+  after the server's first KEXINIT, and acceptance by a non-strict in-process control. The relay
+  checks the exact KEX algorithm name-list and bounds both directions and disconnects; the wider
+  interoperability matrix remains open.
 - Added `AsyncGatewayTransport` and `ClientConnection::connect_via_gateway_stream` to write and
   flush the bounded K-6 client hello over an already negotiated async TLS/ALPN stream before SSH
   starts. TLS/ALPN setup and live edge interoperability remain caller-owned and unverified.
