@@ -255,6 +255,27 @@ async fn verify_fstatvfs(
     Ok(())
 }
 
+async fn verify_fstat(
+    session: &mut SftpSession,
+    handle: &[u8],
+    expected_size: Option<u64>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let request = session.client_mut().fstat(handle.to_vec())?;
+    let response = sftp_response(session, request).await?;
+    if let Some(size) = expected_size {
+        if !matches!(response, SftpPacket::Attrs { attrs: SftpAttributes { size: Some(actual), .. }, .. } if actual == size)
+            || session.pending_requests() != 0
+        {
+            return Err("SFTP fstat returned the wrong file size or retained a request slot".into());
+        }
+    } else if !matches!(response, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP fstat accepted a closed handle or retained a request slot".into());
+    }
+    Ok(())
+}
+
 async fn verify_hardlink(
     session: &mut SftpSession,
     path: &[u8],
@@ -934,12 +955,14 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     }
     verify_fsync(&mut session, &write_handle, true).await?;
     verify_fstatvfs(&mut session, &write_handle, true).await?;
+    verify_fstat(&mut session, &write_handle, Some(data.len() as u64)).await?;
     let close = session.client_mut().close(write_handle.clone())?;
     if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
         return Err("SFTP write handle close failed".into());
     }
     verify_fsync(&mut session, &write_handle, false).await?;
     verify_fstatvfs(&mut session, &write_handle, false).await?;
+    verify_fstat(&mut session, &write_handle, None).await?;
     verify_realpath(&mut session, &path, &missing_path).await?;
     verify_lsetstat(&mut session, &path, &missing_path).await?;
 

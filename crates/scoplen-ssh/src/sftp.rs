@@ -1077,6 +1077,11 @@ impl SftpClient {
         self.queue(|id| SftpPacket::Lstat { id, path: path.into() })
     }
 
+    /// Queue an FSTAT request with a tracked request id.
+    pub fn fstat(&mut self, handle: impl Into<Vec<u8>>) -> Result<SftpPacket, SftpError> {
+        self.queue(|id| SftpPacket::Fstat { id, handle: handle.into() })
+    }
+
     /// Queue a SETSTAT request with a tracked request id.
     pub fn setstat(
         &mut self,
@@ -1713,6 +1718,26 @@ mod tests {
                 .encode(),
             Err(SftpError::InvalidValue("target path"))
         );
+    }
+
+    #[test]
+    fn fstat_builder_rejects_invalid_handles_without_retaining_requests() {
+        let mut client = SftpClient::new(1).unwrap();
+        client.accept_version(&SftpPacket::Version { version: 3, extensions: Vec::new() }).unwrap();
+        assert_eq!(client.fstat(Vec::new()), Err(SftpError::InvalidValue("handle")));
+        assert_eq!(
+            client.fstat(vec![0; MAX_SFTP_HANDLE + 1]),
+            Err(SftpError::FieldTooLarge("handle"))
+        );
+        assert_eq!(client.pending_requests(), 0);
+        let request = client.fstat([0, 0xff]).unwrap();
+        let id = request.request_id().unwrap();
+        assert_eq!(request, SftpPacket::Fstat { id, handle: vec![0, 0xff] });
+        assert_eq!(client.pending_requests(), 1);
+        client
+            .accept_response(&SftpPacket::Attrs { id, attrs: SftpAttributes::default() })
+            .unwrap();
+        assert_eq!(client.pending_requests(), 0);
     }
 
     #[test]
