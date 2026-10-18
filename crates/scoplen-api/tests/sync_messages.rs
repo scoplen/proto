@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use scoplen_api::sync::{
-    MAX_SYNC_BATCH_BYTES, MAX_SYNC_BATCH_OBJECTS, MAX_SYNC_RETAINED_VERSIONS, SyncAckRequest,
-    SyncAckResponse, SyncChange, SyncChangesQuery, SyncSnapshotResponse, SyncVersionsResponse,
-    SyncWrite, SyncWriteAssignment, SyncWriteBatch, SyncWriteBatchResponse,
+    MAX_SYNC_BATCH_BYTES, MAX_SYNC_BATCH_OBJECTS, MAX_SYNC_CONFLICT_BODY_BYTES,
+    MAX_SYNC_CONFLICT_PAYLOAD_BYTES, MAX_SYNC_RETAINED_VERSIONS, SyncAckRequest, SyncAckResponse,
+    SyncChange, SyncChangesQuery, SyncConflictEntry, SyncConflictProblem, SyncSnapshotResponse,
+    SyncVersionsResponse, SyncWrite, SyncWriteAssignment, SyncWriteBatch, SyncWriteBatchResponse,
 };
+use scoplen_api::{ErrorCode, ProblemDetails};
 use scoplen_model::cbor::{self, Value};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
@@ -42,7 +44,7 @@ fn published_sync_message_vectors_match_public_codecs() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/sync-messages.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vectors");
-    assert_eq!(document.vectors.len(), 6);
+    assert_eq!(document.vectors.len(), 8);
     for vector in &document.vectors {
         let expected = decode_hex(&vector.expected);
         match vector.kind.as_str() {
@@ -55,6 +57,11 @@ fn published_sync_message_vectors_match_public_codecs() {
                 let source = write_response_from_json(&vector.input);
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
                 assert_eq!(SyncWriteBatchResponse::from_cbor(&expected).expect("decode"), source);
+            }
+            "sync.writes.conflict" => {
+                let source = conflict_from_json(&vector.input);
+                assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
+                assert_eq!(SyncConflictProblem::from_cbor(&expected).expect("decode"), source);
             }
             "sync.ack.request" => {
                 let source = SyncAckRequest { cursor: json_number(&vector.input, "cursor") };
@@ -184,6 +191,153 @@ fn assignment_response_matches_batch_and_rejects_bad_order() {
 }
 
 #[test]
+fn conflict_problem_validates_request_order_and_bounds() {
+    let batch = SyncWriteBatch { writes: vec![write(1, None), write(2, None), write(3, None)] };
+    let mut response = conflict_problem();
+    response.conflicts[1].object_id = id(3);
+    response.validate_for_batch(&batch).expect("ordered subset");
+    response.conflicts.reverse();
+    assert!(response.validate_for_batch(&batch).is_err());
+    response.conflicts.reverse();
+    response.conflicts[1].object_id = id(4);
+    assert!(response.validate_for_batch(&batch).is_err());
+    response.conflicts[1].object_id = id(1);
+    assert!(response.to_cbor().is_err());
+
+    let mut response = conflict_problem();
+    response.conflicts.clear();
+    assert!(response.to_cbor().is_err());
+    response.conflicts = (0..=u16::try_from(MAX_SYNC_BATCH_OBJECTS).expect("count fits"))
+        .map(|number| SyncConflictEntry { object_id: numbered_id(number), current: None })
+        .collect();
+    assert!(response.to_cbor().is_err());
+    response.conflicts.pop();
+    response.to_cbor().expect("500 conflicts allowed");
+
+    let mut response = conflict_problem();
+    response.conflicts[0].current.as_mut().expect("current").object_id = id(2);
+    assert!(response.to_cbor().is_err());
+    response.conflicts[0].current.as_mut().expect("current").object_id = id(1);
+    response.conflicts[0].current.as_mut().expect("current").payload =
+        vec![0; MAX_SYNC_CONFLICT_PAYLOAD_BYTES];
+    response.to_cbor().expect("260 KiB payload allowed");
+    response.conflicts[0].current.as_mut().expect("current").payload.push(0);
+    assert!(response.to_cbor().is_err());
+
+    let mut response = conflict_problem();
+    response.problem.status = 400;
+    assert!(response.to_cbor().is_err());
+    response.problem.status = 409;
+    response.problem.code = ErrorCode::new("sync.invalid_request").expect("code");
+    assert!(response.to_cbor().is_err());
+    response.problem.code = ErrorCode::new("sync.conflict").expect("code");
+    response.problem.changed = true;
+    assert!(response.to_cbor().is_err());
+}
+
+#[test]
+fn conflict_decoder_rejects_incomplete_and_malformed_extensions() {
+    let response = conflict_problem();
+    let Value::Map(fields) = cbor::decode(&response.to_cbor().expect("encode")).expect("decode")
+    else {
+        panic!("problem map");
+    };
+    let mut missing = fields.clone();
+    missing.retain(|(key, _)| key != &Value::Text("conflicts".into()));
+    assert!(
+        SyncConflictProblem::from_cbor(&cbor::encode(&Value::Map(missing)).expect("encode"))
+            .is_err()
+    );
+    for replacement in [Value::Null, Value::Array(vec![])] {
+        let mut wrong = fields.clone();
+        replace_text_field(&mut wrong, "conflicts", replacement);
+        assert!(
+            SyncConflictProblem::from_cbor(&cbor::encode(&Value::Map(wrong)).expect("encode"))
+                .is_err()
+        );
+    }
+
+    let mut wrong = fields.clone();
+    let Value::Array(entries) = text_field_mut(&mut wrong, "conflicts") else {
+        panic!("conflicts array");
+    };
+    let Value::Map(first) = &mut entries[0] else { panic!("conflict entry") };
+    first.retain(|(key, _)| key != &Value::Text("current".into()));
+    assert!(
+        SyncConflictProblem::from_cbor(&cbor::encode(&Value::Map(wrong)).expect("encode")).is_err()
+    );
+
+    let mut wrong = fields.clone();
+    let Value::Array(entries) = text_field_mut(&mut wrong, "conflicts") else {
+        panic!("conflicts array");
+    };
+    let Value::Map(first) = &mut entries[0] else { panic!("conflict entry") };
+    replace_text_field(first, "object_id", Value::Text("invalid".into()));
+    assert!(
+        SyncConflictProblem::from_cbor(&cbor::encode(&Value::Map(wrong)).expect("encode")).is_err()
+    );
+
+    let mut wrong = fields.clone();
+    let Value::Array(entries) = text_field_mut(&mut wrong, "conflicts") else {
+        panic!("conflicts array");
+    };
+    let Value::Map(first) = &mut entries[0] else { panic!("conflict entry") };
+    replace_text_field(first, "current", Value::Map(vec![]));
+    assert!(
+        SyncConflictProblem::from_cbor(&cbor::encode(&Value::Map(wrong)).expect("encode")).is_err()
+    );
+
+    let mut duplicate = fields.clone();
+    let Value::Array(entries) = text_field_mut(&mut duplicate, "conflicts") else {
+        panic!("conflicts array");
+    };
+    entries.push(entries[0].clone());
+    assert!(
+        SyncConflictProblem::from_cbor(&cbor::encode(&Value::Map(duplicate)).expect("encode"))
+            .is_err()
+    );
+
+    let mut oversized = fields.clone();
+    let Value::Array(entries) = text_field_mut(&mut oversized, "conflicts") else {
+        panic!("conflicts array");
+    };
+    let Value::Map(first) = &mut entries[0] else { panic!("conflict entry") };
+    let Value::Map(current) = text_field_mut(first, "current") else { panic!("current change") };
+    for (key, value) in current {
+        if key == &Value::UInt(3) {
+            *value = Value::Bytes(vec![0; MAX_SYNC_CONFLICT_PAYLOAD_BYTES + 1]);
+        }
+    }
+    assert!(
+        SyncConflictProblem::from_cbor(&cbor::encode(&Value::Map(oversized)).expect("encode"))
+            .is_err()
+    );
+
+    assert!(SyncConflictProblem::from_cbor(&[0xbf, 0xff]).is_err());
+    assert!(SyncConflictProblem::from_cbor(&vec![0; MAX_SYNC_CONFLICT_BODY_BYTES + 1]).is_err());
+}
+
+#[test]
+fn conflict_decoder_ignores_future_response_fields() {
+    let response = conflict_problem();
+    let Value::Map(mut fields) =
+        cbor::decode(&response.to_cbor().expect("encode")).expect("decode")
+    else {
+        panic!("problem map");
+    };
+    let Value::Array(entries) = text_field_mut(&mut fields, "conflicts") else {
+        panic!("conflicts array");
+    };
+    let Value::Map(first) = &mut entries[0] else { panic!("conflict entry") };
+    first.push((Value::Text("future_entry".into()), Value::UInt(1)));
+    let Value::Map(current) = text_field_mut(first, "current") else { panic!("current change") };
+    current.push((Value::UInt(6), Value::Bool(true)));
+    fields.push((Value::Text("future_problem".into()), Value::UInt(2)));
+    let extended = cbor::encode(&Value::Map(fields)).expect("extended problem");
+    assert_eq!(SyncConflictProblem::from_cbor(&extended).expect("decode extensions"), response);
+}
+
+#[test]
 fn acknowledgements_use_canonical_text_maps_and_response_extensions() {
     let request = SyncAckRequest { cursor: u64::MAX };
     let encoded = request.to_cbor().expect("encode");
@@ -291,6 +445,25 @@ fn versions() -> SyncVersionsResponse {
     SyncVersionsResponse { versions: vec![change(1, 2), change(1, 5)] }
 }
 
+fn conflict_problem() -> SyncConflictProblem {
+    SyncConflictProblem {
+        problem: ProblemDetails::new(
+            ErrorCode::new("sync.conflict").expect("code"),
+            409,
+            "Write conflict",
+            "The write batch was not applied; merge the current objects before retrying.",
+            "request-1",
+            false,
+            true,
+        )
+        .expect("problem"),
+        conflicts: vec![
+            SyncConflictEntry { object_id: id(1), current: Some(change(1, 4)) },
+            SyncConflictEntry { object_id: id(2), current: None },
+        ],
+    }
+}
+
 fn write_batch_from_json(input: &str) -> SyncWriteBatch {
     let source: JsonValue = serde_json::from_str(input).expect("write JSON");
     SyncWriteBatch {
@@ -347,6 +520,30 @@ fn versions_from_json(input: &str) -> SyncVersionsResponse {
             .map(change_from_json)
             .collect(),
     }
+}
+
+fn conflict_from_json(input: &str) -> SyncConflictProblem {
+    let source: JsonValue = serde_json::from_str(input).expect("conflict JSON");
+    SyncConflictProblem {
+        problem: serde_json::from_value(source["problem"].clone()).expect("problem"),
+        conflicts: source["conflicts"]
+            .as_array()
+            .expect("conflicts")
+            .iter()
+            .map(|entry| SyncConflictEntry {
+                object_id: Uuid::parse_str(entry["object_id"].as_str().expect("id")).expect("UUID"),
+                current: entry["current"].as_object().map(|_| change_from_json(&entry["current"])),
+            })
+            .collect(),
+    }
+}
+
+fn text_field_mut<'a>(fields: &'a mut [(Value, Value)], key: &str) -> &'a mut Value {
+    &mut fields.iter_mut().find(|(field, _)| field == &Value::Text(key.into())).expect("field").1
+}
+
+fn replace_text_field(fields: &mut [(Value, Value)], key: &str, value: Value) {
+    *text_field_mut(fields, key) = value;
 }
 
 fn change_from_json(entry: &JsonValue) -> SyncChange {

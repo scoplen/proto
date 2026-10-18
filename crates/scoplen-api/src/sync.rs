@@ -10,10 +10,16 @@ use scoplen_model::{
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::ProblemDetails;
+
 /// Maximum number of writes accepted in one atomic batch.
 pub const MAX_SYNC_BATCH_OBJECTS: usize = 500;
 /// Maximum encoded size of one write request body.
 pub const MAX_SYNC_BATCH_BYTES: usize = 4 * 1024 * 1024;
+/// Maximum opaque payload in a current change returned with a write conflict.
+pub const MAX_SYNC_CONFLICT_PAYLOAD_BYTES: usize = 260 * 1024;
+/// Maximum encoded size of a conflict problem, including its required extension.
+pub const MAX_SYNC_CONFLICT_BODY_BYTES: usize = 128 * 1024 * 1024;
 /// Maximum number of retained historical versions in addition to the current version.
 pub const MAX_SYNC_RETAINED_VERSIONS: usize = 20;
 /// Maximum size of one opaque account-key artifact in the K-4 key-bundle codecs.
@@ -1508,6 +1514,157 @@ pub type SyncWriteRequest = SyncWriteBatch;
 /// Alias matching the endpoint's response terminology.
 pub type SyncWriteResponse = SyncWriteBatchResponse;
 
+/// One stale object in a K-4 atomic write conflict.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncConflictEntry {
+    /// Object id from the rejected write.
+    pub object_id: Uuid,
+    /// The current version, or `None` when the object is absent.
+    pub current: Option<SyncChange>,
+}
+
+impl SyncConflictEntry {
+    fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.object_id, "conflict object id")?;
+        if let Some(current) = &self.current {
+            current.validate()?;
+            if current.object_id != self.object_id {
+                return Err(invalid("current change object id does not match conflict object id"));
+            }
+            if current.payload.len() > MAX_SYNC_CONFLICT_PAYLOAD_BYTES {
+                return Err(invalid("current change payload exceeds 260 KiB"));
+            }
+        }
+        Ok(())
+    }
+
+    fn into_value(self) -> Value {
+        map(vec![
+            ("object_id", Value::Bytes(self.object_id.as_bytes().to_vec())),
+            ("current", self.current.map_or(Value::Null, SyncChange::into_value)),
+        ])
+    }
+
+    fn from_value(value: Value) -> Result<Self, SyncCodecError> {
+        let mut fields = expect_map(value)?;
+        let entry = Self {
+            object_id: take_uuid(&mut fields, "object_id")?,
+            current: match fields.remove("current") {
+                Some(Value::Null) => None,
+                Some(value) => Some(SyncChange::from_value(value)?),
+                None => return Err(invalid("missing current")),
+            },
+        };
+        entry.validate()?;
+        Ok(entry)
+    }
+}
+
+/// A `409 sync.conflict` problem with the complete K-4 conflict extension.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncConflictProblem {
+    /// The eight required RFC 9457 Scoplen problem fields.
+    pub problem: ProblemDetails,
+    /// Stale objects in their original write-request order.
+    pub conflicts: Vec<SyncConflictEntry>,
+}
+
+impl SyncConflictProblem {
+    /// Validate the problem and its bounded, unique conflict entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the base problem is not a `409 sync.conflict`, the batch was changed,
+    /// or the conflict extension is missing, oversized, duplicated, or malformed.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.problem.validate().map_err(|error| invalid(error.to_string()))?;
+        if self.problem.status != 409 || self.problem.code.as_str() != "sync.conflict" {
+            return Err(invalid("conflict problem must use 409 sync.conflict"));
+        }
+        if self.problem.changed {
+            return Err(invalid("conflict problem must leave the batch unchanged"));
+        }
+        if self.conflicts.is_empty() || self.conflicts.len() > MAX_SYNC_BATCH_OBJECTS {
+            return Err(invalid("conflicts must contain 1..500 entries"));
+        }
+        let mut ids = BTreeSet::new();
+        for entry in &self.conflicts {
+            entry.validate()?;
+            if !ids.insert(entry.object_id) {
+                return Err(invalid("duplicate conflict object id"));
+            }
+        }
+        Ok(())
+    }
+
+    /// Verify that every conflict names a submitted write and retains request order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the batch or problem is invalid, an object was not submitted, or the
+    /// conflict order differs from the relative order of the submitted writes.
+    pub fn validate_for_batch(&self, batch: &SyncWriteBatch) -> Result<(), SyncCodecError> {
+        batch.validate()?;
+        self.validate()?;
+        let mut writes = batch.writes.iter();
+        for conflict in &self.conflicts {
+            if !writes.any(|write| write.object_id == conflict.object_id) {
+                return Err(invalid("conflict objects must match write batch order"));
+            }
+        }
+        Ok(())
+    }
+
+    /// Encode the base problem and complete extension as deterministic CBOR.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid fields, encoding failure, or an encoded body above 128 MiB.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let base = self.problem.to_cbor().map_err(|error| invalid(error.to_string()))?;
+        let Value::Map(mut fields) = cbor::decode(&base)? else {
+            return Err(invalid("base problem must be a map"));
+        };
+        fields.push((
+            Value::Text("conflicts".into()),
+            Value::Array(
+                self.conflicts.iter().cloned().map(SyncConflictEntry::into_value).collect(),
+            ),
+        ));
+        let encoded = cbor::encode(&Value::Map(fields))?;
+        enforce_conflict_body_limit(encoded.len())?;
+        Ok(encoded)
+    }
+
+    /// Decode a bounded deterministic CBOR conflict problem, ignoring future response fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed or oversized CBOR or an incomplete conflict extension.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_conflict_body_limit(input.len())?;
+        let problem =
+            ProblemDetails::from_cbor(input).map_err(|error| invalid(error.to_string()))?;
+        let mut fields = decode_map(input)?;
+        let Some(Value::Array(values)) = fields.remove("conflicts") else {
+            return Err(invalid("conflicts must be an array"));
+        };
+        if values.is_empty() || values.len() > MAX_SYNC_BATCH_OBJECTS {
+            return Err(invalid("conflicts must contain 1..500 entries"));
+        }
+        let response = Self {
+            problem,
+            conflicts: values
+                .into_iter()
+                .map(SyncConflictEntry::from_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        };
+        response.validate()?;
+        Ok(response)
+    }
+}
+
 /// A device cursor acknowledgement request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SyncAckRequest {
@@ -2111,6 +2268,13 @@ fn validate_page(
 
 fn invalid(message: impl Into<String>) -> SyncCodecError {
     SyncCodecError::Invalid(message.into())
+}
+
+fn enforce_conflict_body_limit(size: usize) -> Result<(), SyncCodecError> {
+    if size > MAX_SYNC_CONFLICT_BODY_BYTES {
+        return Err(invalid("conflict problem exceeds 128 MiB"));
+    }
+    Ok(())
 }
 
 fn validate_key_artifact(value: &[u8], key: &str) -> Result<(), SyncCodecError> {
