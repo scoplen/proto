@@ -166,7 +166,9 @@ statistics and missing-path rejection, pipelined upload in two parts, resumed do
 progress and byte comparison, `fsync@openssh.com` and `fstatvfs@openssh.com` on the open upload
 handle, rejection of both requests after closing that handle without retaining request state,
 standard SFTP v3 `FSTAT` reporting the uploaded file's exact size on the open handle and rejecting
-the closed handle without retaining request state, and `hardlink@openssh.com` success with identical
+the closed handle without retaining request state, standard `FSETSTAT` growing and restoring its
+size on the open handle and rejecting the closed handle without changing the file, and
+`hardlink@openssh.com` success with identical
 linked bytes, missing-source and existing-destination
 rejection, plus `posix-rename@openssh.com` missing-source rejection, a rename preserving file bytes,
 replacement of an existing destination with different contents, `expand-path@openssh.com` returning
