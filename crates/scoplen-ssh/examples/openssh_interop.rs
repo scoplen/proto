@@ -3,9 +3,11 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use scoplen_crypto::Ed25519SigningKey;
 use scoplen_ssh::{
-    ChannelEvent, ClientConfig, ClientConnection, ClientError, HostKey, HostKeyVerificationError,
-    RsaSshSigner, SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm,
+    ChannelEvent, ClientConfig, ClientConnection, ClientError, Ed25519SshSigner, HostKey,
+    HostKeyVerificationError, RsaSshSigner, SftpAttributes, SftpPacket, SftpSession,
+    SignatureAlgorithm,
 };
 use ssh_key::{PrivateKey, PublicKey};
 use tokio::time::timeout;
@@ -25,7 +27,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let config = ClientConfig::new(host, port, verifier)?;
     let mut connection = ClientConnection::connect(config).await?;
-    if let Ok(path) = env::var("SCOPLEN_OPENSSH_RSA_KEY") {
+    let rsa_key = env::var("SCOPLEN_OPENSSH_RSA_KEY").ok();
+    let ed25519_key = env::var("SCOPLEN_OPENSSH_ED25519_KEY").ok();
+    if rsa_key.is_some() && ed25519_key.is_some() {
+        return Err("set only one OpenSSH private-key path".into());
+    }
+    if let Some(path) = rsa_key {
         let key = PrivateKey::read_openssh_file(path)?;
         let algorithm = match env::var("SCOPLEN_OPENSSH_RSA_HASH").as_deref() {
             Ok("256") => SignatureAlgorithm::RsaSha2_256,
@@ -34,9 +41,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         let signer = RsaSshSigner::new(key, algorithm)?;
         connection.authenticate_publickey(&username, &signer).await?;
+    } else if let Some(path) = ed25519_key {
+        let key = PrivateKey::read_openssh_file(path)?;
+        let keypair = key.key_data().ed25519().ok_or("expected an Ed25519 private key")?;
+        let signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(keypair.private.as_ref())?);
+        connection.authenticate_publickey(&username, &signer).await?;
     } else {
         let password = env::var("SCOPLEN_OPENSSH_PASSWORD")
-            .map_err(|_| "SCOPLEN_OPENSSH_PASSWORD or SCOPLEN_OPENSSH_RSA_KEY is required")?;
+            .map_err(|_| "password or an OpenSSH private-key path is required")?;
         connection.authenticate_password(&username, password.as_bytes()).await?;
     }
     let channel = connection.open_session().await?;

@@ -95,13 +95,14 @@ Pageant interoperability, live gateway interoperability, and broader channel sch
 unverified. The agent-backed signer also completes the concrete public-key authentication flow
 against the in-process russh server; platform agent interoperability remains unverified.
 The `openssh_interop` example provides a disposable external-server smoke test when
-`SCOPLEN_OPENSSH_HOST_KEY` (the server's OpenSSH public-key line) and either
-`SCOPLEN_OPENSSH_PASSWORD` or `SCOPLEN_OPENSSH_RSA_KEY` (a path to an unencrypted OpenSSH RSA
-private key) are supplied. The optional `SCOPLEN_OPENSSH_RSA_HASH=256|512` selects the RSA-SHA2
-signature algorithm (default 512). Optional host, port, and username variables select the test
-server. It verifies the pinned host key, authentication, and a session command. Password and both
-RSA-SHA2 variants passed against disposable Linux OpenSSH containers; wrong credentials and a
-wrong host key were rejected. The broader interoperability matrix remains open.
+`SCOPLEN_OPENSSH_HOST_KEY` (the server's OpenSSH public-key line) and one authentication source
+are supplied: `SCOPLEN_OPENSSH_PASSWORD`, `SCOPLEN_OPENSSH_RSA_KEY`, or
+`SCOPLEN_OPENSSH_ED25519_KEY`. The key variables contain paths to unencrypted OpenSSH private
+keys and are mutually exclusive. The optional `SCOPLEN_OPENSSH_RSA_HASH=256|512` selects the
+RSA-SHA2 signature algorithm (default 512). Optional host, port, and username variables select
+the test server. It verifies the pinned host key, authentication, and a session command. Password,
+both RSA-SHA2 variants, and Ed25519 passed against disposable Linux OpenSSH containers; wrong
+credentials and a wrong host key were rejected. The broader interoperability matrix remains open.
 Set `SCOPLEN_OPENSSH_SFTP=1` for the same example against a disposable server to additionally
 exercise SFTP v3 on the authenticated connection. This verifies advertised OpenSSH transfer
 limits, a missing-file response with released request state, pipelined upload in two parts,
