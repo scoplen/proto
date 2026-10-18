@@ -27,10 +27,10 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install nightly Rust and cargo-fuzz
         run: |
-          rustup toolchain install nightly --profile minimal
+          rustup toolchain install nightly --profile minimal --component rust-src
           cargo +nightly install cargo-fuzz --locked
       - name: Fuzz parser boundary
-        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=300 -timeout=30
+        run: cargo +nightly fuzz run ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=300 -timeout=30
       - name: Check fuzz dependency lockfile
         run: git diff --exit-code -- fuzz/Cargo.lock
       - name: Save crash input

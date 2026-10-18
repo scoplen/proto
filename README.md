@@ -234,6 +234,16 @@ cargo test --workspace
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
+The tracked `fuzz/corpus/<target>/seed-*` files provide small synthetic valid and malformed
+inputs for all six parser targets. Valid model and certificate inputs come from the published
+known-answer vectors in `vectors/baseline.json` and `vectors/crypto.json`; SSH, SFTP, and agent
+frames follow the public codec tests. The Linux change check replays every target's corpus, and
+the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
+Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
+Fuzz-discovered mutations remain ignored; review, minimize, and name useful regression inputs
+before tracking them as new seeds. The scheduled run's results and performance targets remain
+separate Gate S4 acceptance work.
+
 The local Cargo patch file used for cross-repository development is intentionally ignored. Do not
 publish crates, tags, or packages from an agent checkout.
 

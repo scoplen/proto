@@ -1,6 +1,7 @@
 /target/
 /fuzz/artifacts/
-/fuzz/corpus/
+/fuzz/corpus/*/*
+!/fuzz/corpus/*/seed-*
 .cargo/config.toml
 
 /fuzz/target/
