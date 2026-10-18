@@ -8,15 +8,15 @@ under Apache-2.0.
 
 ## Status
 
-Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1) and the K-1
-object model (roadmap gate S2) are complete. The model includes deterministic CBOR, schema-version
+Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1), K-1 object
+model (S2), and K-2 cryptographic gate (S3) are complete. The model includes deterministic CBOR, schema-version
 handling, per-object limits, merge properties, and executable known-answer vectors. Protocol,
 cryptographic, and wire behavior is added only from the canonical specifications in `scoplen-docs`;
 the S3 primitive boundary now includes zeroizing secret containers, operating-system randomness,
 XChaCha20-Poly1305, HKDF-SHA-256, Argon2id, P-256 and Ed25519 signatures, and HPKE key wrapping
 for device and account recipients. The published K-2 known-answer set is exercised through the
 `scoplen-crypto` public API, including account/request-bound escrow share contexts and the
-administrator recovery verification code. S3 remains incomplete while pairing is unimplemented.
+administrator recovery verification code, CPace pairing exchange, and canonical QR pairing bindings.
 The `scoplen-ssh` crate exposes K-7's ordered algorithm policy, role-specific offers, strict key
 exchange state, a bounded direct TCP byte transport, and engine-independent authentication
 boundaries. `TcpTransport` limits host resolution, uses bounded RFC 8305 style staggered Happy

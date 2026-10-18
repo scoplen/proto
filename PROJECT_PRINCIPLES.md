@@ -22,13 +22,13 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
 
 ## Open gaps
 
-- The S1 baseline and S2 object-model gate are complete, including schema handling, model limits,
-  merge laws, and known-answer vectors. S3 has its primitives, key hierarchy, device certificates,
-  encrypted envelopes, recovery, Shamir, escrow wrapping, and vectors for the implemented
-  constructions. CPace/QR pairing and its vectors remain open. S4 has a per-Host algorithm policy,
-  role-specific transport negotiation, strict-KEX state validation, and an engine-independent
-  publickey boundary with Ed25519/P-256 signers and OpenSSH certificate checks; concrete transport,
-  remaining authentication methods, channels, and interoperability remain open. S6 has the error contract, K-3 device-auth
-  JSON codecs, and K-4 session and sync codecs, while the remaining wire contracts remain open.
+- The S1 baseline, S2 object-model gate, and S3 cryptographic gate are complete, including schema
+  handling, model limits, merge laws, key hierarchy, device certificates, encrypted envelopes,
+  recovery, Shamir, escrow wrapping, CPace/QR pairing, and executable known-answer vectors.
+  S4 has a concrete client adapter for transport, authentication, channels, routes, and SFTP,
+  with per-Host algorithm and outgoing rekey configuration and initial strict-KEX verification;
+  complete algorithm/extension support, rekey behavior, interoperability, and performance remain
+  open. S6 has the error contract, K-3 device-auth JSON codecs, and K-4 sync codecs, while complete
+  API and production endpoint behavior remain open. The canonical roadmap records each outcome.
   S5 and S7 have no completed gate evidence.
 - Independent security review and interoperability evidence are required before a Stable release.
