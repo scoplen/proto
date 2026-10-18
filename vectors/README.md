@@ -27,7 +27,10 @@ integer-keyed maps 1 and 2. Acknowledgement requests and responses use a JSON ob
 and `more`, with the same integer-keyed entries and page rules as the change feed. Version
 responses use `versions`, contain one object id in ascending sequence order, and include at most
 the current entry plus 20 retained entries. All expected values are deterministic CBOR in lowercase
-hexadecimal.
+hexadecimal. Conflict responses use `sync.writes.conflict` with a complete RFC 9457 `problem`
+and a `conflicts` array in request order. Each conflict names an `object_id` and carries a current
+change entry or JSON `null` for an absent object. The codec bounds the array to 1–500 unique ids,
+each current payload to 260 KiB, and the encoded problem body to 128 MiB.
 
 `sync-notifications.json` contains the content-free K-4 notification events sent over the WebSocket.
 Vault advancement uses `{seq, vault}`, rotation pending uses `{rotation_pending, vault}`, and
