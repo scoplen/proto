@@ -2084,6 +2084,77 @@ mod tests {
     }
 
     #[derive(Clone)]
+    struct JumpServer {
+        allowed_host: &'static str,
+        session_channels: Vec<russh::ChannelId>,
+    }
+
+    impl russh::server::Handler for JumpServer {
+        type Error = russh::Error;
+
+        async fn auth_password(
+            &mut self,
+            _user: &str,
+            _password: &str,
+        ) -> Result<russh::server::Auth, Self::Error> {
+            Ok(russh::server::Auth::Accept)
+        }
+
+        async fn channel_open_session(
+            &mut self,
+            channel: russh::Channel<russh::server::Msg>,
+            reply: russh::server::ChannelOpenHandle,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            self.session_channels.push(channel.id());
+            reply.accept().await;
+            Ok(())
+        }
+
+        async fn channel_open_direct_tcpip(
+            &mut self,
+            channel: russh::Channel<russh::server::Msg>,
+            host_to_connect: &str,
+            port_to_connect: u32,
+            _originator_address: &str,
+            _originator_port: u32,
+            reply: russh::server::ChannelOpenHandle,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            if host_to_connect != self.allowed_host {
+                reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
+                return Ok(());
+            }
+            let Ok(port) = u16::try_from(port_to_connect) else {
+                reply.reject(russh::ChannelOpenFailure::ConnectFailed).await;
+                return Ok(());
+            };
+            let Ok(mut target) = TcpStream::connect(("127.0.0.1", port)).await else {
+                reply.reject(russh::ChannelOpenFailure::ConnectFailed).await;
+                return Ok(());
+            };
+            reply.accept().await;
+            tokio::spawn(async move {
+                let mut channel = channel.into_stream();
+                let _ = copy_bidirectional(&mut channel, &mut target).await;
+            });
+            Ok(())
+        }
+
+        async fn data(
+            &mut self,
+            channel: russh::ChannelId,
+            data: &[u8],
+            session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            if self.session_channels.contains(&channel) {
+                session.data(channel, data.to_vec())?;
+            }
+            Ok(())
+        }
+    }
+
+    #[derive(Clone)]
     struct SessionRequestServer {
         environments: mpsc::Sender<(String, String)>,
         signals: mpsc::Sender<String>,
@@ -2525,6 +2596,31 @@ mod tests {
             let (stream, _) = listener.accept().await.expect("accept SSH client");
             let _ =
                 russh::server::run_stream(server_config, stream, ResizeServer { changes }).await;
+        });
+        (address, task)
+    }
+
+    async fn start_jump_server(
+        allowed_host: &'static str,
+    ) -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind jump server");
+        let address = listener.local_addr().expect("jump server address");
+        let task = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept jump client");
+            let _ = russh::server::run_stream(
+                Arc::new(server_config),
+                stream,
+                JumpServer { allowed_host, session_channels: Vec::new() },
+            )
+            .await;
         });
         (address, task)
     }
@@ -3875,6 +3971,106 @@ mod tests {
         drop(fourth);
         drop(extra);
         connection.disconnect().await.expect("disconnect client");
+    }
+
+    async fn assert_channel_echo(channel: &mut ClientChannel, payload: &[u8]) {
+        channel.send_data(payload).await.expect("send channel data");
+        assert!(matches!(
+            timeout(Duration::from_secs(5), channel.next_event()).await.expect("channel echo"),
+            Ok(Some(ChannelEvent::Data(data))) if data == payload
+        ));
+    }
+
+    #[tokio::test]
+    async fn two_hop_jump_chain_handles_data_failures_and_channel_reuse() {
+        let (target_address, target_server) = start_echo_server().await;
+        let (second_address, second_server) = start_jump_server("target.test").await;
+        let (first_address, first_server) = start_jump_server("hop-b.test").await;
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+
+        let first_config = ClientConfig::new("127.0.0.1", first_address.port(), verifier)
+            .expect("first-hop config")
+            .with_channel_limit(2)
+            .expect("first-hop channel limit");
+        let mut first = ClientConnection::connect(first_config).await.expect("connect first hop");
+        first.authenticate_password("user", b"password").await.expect("authenticate first hop");
+
+        let second_config = ClientConfig::new("hop-b.test", second_address.port(), verifier)
+            .expect("second-hop config")
+            .with_channel_limit(2)
+            .expect("second-hop channel limit");
+        let mut second = timeout(
+            Duration::from_secs(5),
+            ClientConnection::connect_via_direct_tcpip(second_config, &first, "127.0.0.1", 5000),
+        )
+        .await
+        .expect("second-hop handshake")
+        .expect("connect second hop");
+        second.authenticate_password("user", b"password").await.expect("authenticate second hop");
+
+        let target_config = ClientConfig::new("target.test", target_address.port(), verifier)
+            .expect("target config");
+        let mut target = timeout(
+            Duration::from_secs(5),
+            ClientConnection::connect_via_direct_tcpip(target_config, &second, "127.0.0.1", 5001),
+        )
+        .await
+        .expect("target handshake")
+        .expect("connect target");
+        target.authenticate_password("user", b"password").await.expect("authenticate target");
+
+        let mut target_channel = target.open_session().await.expect("target session");
+        assert_channel_echo(&mut target_channel, b"through two SSH jumps").await;
+        let mut first_channel = first.open_session().await.expect("first-hop session");
+        assert_channel_echo(&mut first_channel, b"first hop stays usable").await;
+
+        let denied = ClientConfig::new("denied.test", target_address.port(), verifier)
+            .expect("denied target config");
+        assert!(matches!(
+            timeout(
+                Duration::from_secs(5),
+                ClientConnection::connect_via_direct_tcpip(denied, &second, "127.0.0.1", 5002)
+            )
+            .await
+            .expect("denied target response"),
+            Err(ClientError::ChannelOpen { code: 1, .. })
+        ));
+
+        let closed_listener = TcpListener::bind("127.0.0.1:0").await.expect("bind closed target");
+        let closed_port = closed_listener.local_addr().expect("closed target address").port();
+        drop(closed_listener);
+        let closed =
+            ClientConfig::new("target.test", closed_port, verifier).expect("closed target config");
+        assert!(matches!(
+            timeout(
+                Duration::from_secs(5),
+                ClientConnection::connect_via_direct_tcpip(closed, &second, "127.0.0.1", 5003)
+            )
+            .await
+            .expect("closed target response"),
+            Err(ClientError::ChannelOpen { code: 2, .. })
+        ));
+
+        let mut second_channel = second.open_session().await.expect("failed opens released slot");
+        assert!(matches!(
+            second.open_session().await,
+            Err(ClientError::ChannelLimitReached { max: 2 })
+        ));
+        assert_channel_echo(&mut second_channel, b"second hop stays usable").await;
+        drop(second_channel);
+        let reused = second.open_session().await.expect("second-hop slot reused");
+        drop(reused);
+        drop(first_channel);
+        drop(target_channel);
+        target.disconnect().await.expect("disconnect target");
+        second.disconnect().await.expect("disconnect second hop");
+        first.disconnect().await.expect("disconnect first hop");
+        for server in [target_server, second_server, first_server] {
+            timeout(Duration::from_secs(5), server)
+                .await
+                .expect("SSH server shutdown")
+                .expect("SSH server task");
+        }
     }
 
     #[test]
