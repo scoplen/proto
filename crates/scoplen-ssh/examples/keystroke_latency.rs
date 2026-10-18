@@ -133,8 +133,11 @@ async fn scoplen_echo(
     byte: u8,
 ) -> Result<Duration, Box<dyn Error>> {
     let started = Instant::now();
-    channel.send_data(&[byte]).await?;
-    let event = timeout(DEADLINE, channel.next_event()).await??;
+    let event = timeout(DEADLINE, async {
+        channel.send_data(&[byte]).await?;
+        channel.next_event().await
+    })
+    .await??;
     match event {
         Some(ChannelEvent::Data(data)) if data == [byte] => Ok(started.elapsed()),
         other => Err(format!("unexpected Scoplen echo: {other:?}").into()),
@@ -146,8 +149,11 @@ async fn russh_echo(
     byte: u8,
 ) -> Result<Duration, Box<dyn Error>> {
     let started = Instant::now();
-    channel.data_bytes(vec![byte]).await?;
-    let event = timeout(DEADLINE, channel.wait()).await?;
+    let event = timeout(DEADLINE, async {
+        channel.data_bytes(vec![byte]).await?;
+        Ok::<_, russh::Error>(channel.wait().await)
+    })
+    .await??;
     match event {
         Some(ChannelMsg::Data { data }) if data.as_ref() == [byte] => Ok(started.elapsed()),
         other => Err(format!("unexpected russh echo: {other:?}").into()),
@@ -282,6 +288,35 @@ async fn openssh_echo(
     Ok(started.elapsed())
 }
 
+async fn measure_external(
+    channel: &mut scoplen_ssh::ClientChannel,
+    stdin: &mut ChildStdin,
+    stdout: &mut ChildStdout,
+) -> Result<(Vec<Duration>, Vec<Duration>), Box<dyn Error>> {
+    let mut scoplen_samples = Vec::with_capacity(SAMPLES);
+    let mut openssh_samples = Vec::with_capacity(SAMPLES);
+    for trial in 0..WARMUP + SAMPLES {
+        let byte = u8::try_from(trial % 251)?;
+        let (scoplen_time, openssh_time) = if trial % 2 == 0 {
+            (scoplen_echo(channel, byte).await?, openssh_echo(stdin, stdout, byte).await?)
+        } else {
+            let openssh_time = openssh_echo(stdin, stdout, byte).await?;
+            (scoplen_echo(channel, byte).await?, openssh_time)
+        };
+        if trial >= WARMUP {
+            let sample = trial - WARMUP + 1;
+            println!(
+                "sample={sample} scoplen_us={:.3} openssh_us={:.3}",
+                micros(scoplen_time),
+                micros(openssh_time)
+            );
+            scoplen_samples.push(scoplen_time);
+            openssh_samples.push(openssh_time);
+        }
+    }
+    Ok((scoplen_samples, openssh_samples))
+}
+
 async fn compare_openssh() -> Result<(), Box<dyn Error>> {
     let settings = ExternalSettings::from_environment()?;
     let expected = PublicKey::from_openssh(&settings.host_key)?.to_bytes()?;
@@ -337,38 +372,30 @@ async fn compare_openssh() -> Result<(), Box<dyn Error>> {
     let mut stdin = child.stdin.take().ok_or("OpenSSH stdin not piped")?;
     let mut stdout = child.stdout.take().ok_or("OpenSSH stdout not piped")?;
 
-    let mut scoplen_samples = Vec::with_capacity(SAMPLES);
-    let mut openssh_samples = Vec::with_capacity(SAMPLES);
     println!(
         "fixture=external-openssh cipher={} warmup={WARMUP} samples={SAMPLES} payload_bytes=1",
         settings.cipher
     );
-    for trial in 0..WARMUP + SAMPLES {
-        let byte = u8::try_from(trial % 251)?;
-        let (scoplen_time, openssh_time) = if trial % 2 == 0 {
-            (
-                scoplen_echo(&mut channel, byte).await?,
-                openssh_echo(&mut stdin, &mut stdout, byte).await?,
-            )
-        } else {
-            let openssh_time = openssh_echo(&mut stdin, &mut stdout, byte).await?;
-            (scoplen_echo(&mut channel, byte).await?, openssh_time)
+    let (scoplen_samples, openssh_samples) =
+        match measure_external(&mut channel, &mut stdin, &mut stdout).await {
+            Ok(samples) => samples,
+            Err(error) => {
+                let _ = child.start_kill();
+                let _ = timeout(DEADLINE, child.wait()).await;
+                return Err(error);
+            }
         };
-        if trial >= WARMUP {
-            let sample = trial - WARMUP + 1;
-            println!(
-                "sample={sample} scoplen_us={:.3} openssh_us={:.3}",
-                micros(scoplen_time),
-                micros(openssh_time)
-            );
-            scoplen_samples.push(scoplen_time);
-            openssh_samples.push(openssh_time);
-        }
-    }
     summary("scoplen", &scoplen_samples);
     summary("openssh", &openssh_samples);
     drop(stdin);
-    let status = timeout(DEADLINE, child.wait()).await??;
+    let status = match timeout(DEADLINE, child.wait()).await {
+        Ok(result) => result?,
+        Err(error) => {
+            let _ = child.start_kill();
+            let _ = timeout(DEADLINE, child.wait()).await;
+            return Err(error.into());
+        }
+    };
     if !status.success() {
         return Err(format!("OpenSSH exited with {status}").into());
     }

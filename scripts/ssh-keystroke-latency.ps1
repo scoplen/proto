@@ -20,6 +20,19 @@ foreach ($name in $names) {
     $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 
+function Remove-DisposableContainer {
+    param([string]$Name, [bool]$WasStarted)
+
+    $owner = (docker inspect --format '{{ index .Config.Labels "com.scoplen.latency-run" }}' $Name 2>$null | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        if ($WasStarted) { throw "Could not inspect disposable container before cleanup: $Name" }
+        return
+    }
+    if ($owner -ne $Name) { throw "Refusing to remove an unowned container: $Name" }
+    docker rm -f $Name | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to remove disposable container: $Name" }
+}
+
 foreach ($program in @('docker', 'ssh', 'ssh-keygen', 'cargo')) {
     if (-not (Get-Command $program -ErrorAction SilentlyContinue)) {
         throw "Required program is missing: $program"
@@ -58,7 +71,12 @@ try {
     Write-Output "host_os=$($PSVersionTable.OS)"
     Write-Output "host_cpu=$cpu"
     Write-Output "openssh_client=$sshVersion"
-    Write-Output "scoplen_revision=$(git -C $repo rev-parse --short HEAD)"
+    $revision = (git -C $repo rev-parse --short HEAD | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to read benchmark source revision' }
+    $worktreeChanges = @(git -C $repo status --porcelain)
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to read benchmark worktree status' }
+    Write-Output "scoplen_revision=$revision"
+    Write-Output "scoplen_worktree_dirty=$(($worktreeChanges.Count -ne 0).ToString().ToLowerInvariant())"
 
     foreach ($cipher in @('chacha20-poly1305@openssh.com', 'aes256-gcm@openssh.com')) {
         $container = 'scoplen-ssh-latency-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
@@ -87,7 +105,7 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
 "@
         $setup = $setup.Replace("`r", '')
         try {
-            docker run -d --name $container -p '127.0.0.1::2222' $Image sh -c $setup | Out-Null
+            docker run -d --name $container --label "com.scoplen.latency-run=$container" -p '127.0.0.1::2222' $Image sh -c $setup | Out-Null
             if ($LASTEXITCODE -ne 0) { throw 'Failed to start disposable OpenSSH server' }
             $containerStarted = $true
             $port = $null
@@ -141,25 +159,27 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
             if ($LASTEXITCODE -ne 0) { throw "Keystroke comparison failed for $cipher" }
         }
         finally {
-            if ($containerStarted) {
-                docker rm -f $container | Out-Null
-                $containerStarted = $false
-            }
+            Remove-DisposableContainer -Name $container -WasStarted $containerStarted
+            $containerStarted = $false
             $container = $null
         }
     }
 }
 finally {
-    if ($containerStarted) { docker rm -f $container | Out-Null }
-    foreach ($name in $names) {
-        [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process')
+    try {
+        if ($container) { Remove-DisposableContainer -Name $container -WasStarted $containerStarted }
     }
-    if (Test-Path -LiteralPath $temporary) {
-        $resolved = [System.IO.Path]::GetFullPath($temporary)
-        if (-not $resolved.StartsWith($temporaryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
-            -not (Split-Path -Leaf $resolved).StartsWith('scoplen-ssh-latency-')) {
-            throw 'Refusing to remove a temporary path outside the expected directory'
+    finally {
+        foreach ($name in $names) {
+            [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process')
         }
-        Remove-Item -LiteralPath $resolved -Recurse -Force
+        if (Test-Path -LiteralPath $temporary) {
+            $resolved = [System.IO.Path]::GetFullPath($temporary)
+            if (-not $resolved.StartsWith($temporaryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+                -not (Split-Path -Leaf $resolved).StartsWith('scoplen-ssh-latency-')) {
+                throw 'Refusing to remove a temporary path outside the expected directory'
+            }
+            Remove-Item -LiteralPath $resolved -Recurse -Force
+        }
     }
 }
