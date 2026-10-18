@@ -3,10 +3,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use scoplen_crypto::Ed25519SigningKey;
+use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
 use scoplen_ssh::{
     ChannelEvent, ClientConfig, ClientConnection, ClientError, Ed25519SshSigner, HostKey,
-    HostKeyVerificationError, RsaSshSigner, SftpAttributes, SftpPacket, SftpSession,
+    HostKeyVerificationError, P256SshSigner, RsaSshSigner, SftpAttributes, SftpPacket, SftpSession,
     SignatureAlgorithm,
 };
 use ssh_key::{PrivateKey, PublicKey};
@@ -29,7 +29,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut connection = ClientConnection::connect(config).await?;
     let rsa_key = env::var("SCOPLEN_OPENSSH_RSA_KEY").ok();
     let ed25519_key = env::var("SCOPLEN_OPENSSH_ED25519_KEY").ok();
-    if rsa_key.is_some() && ed25519_key.is_some() {
+    let p256_key = env::var("SCOPLEN_OPENSSH_P256_KEY").ok();
+    if [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref()]
+        .iter()
+        .filter(|key| key.is_some())
+        .count()
+        > 1
+    {
         return Err("set only one OpenSSH private-key path".into());
     }
     if let Some(path) = rsa_key {
@@ -46,6 +52,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let keypair = key.key_data().ed25519().ok_or("expected an Ed25519 private key")?;
         let signer =
             Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(keypair.private.as_ref())?);
+        connection.authenticate_publickey(&username, &signer).await?;
+    } else if let Some(path) = p256_key {
+        let key = PrivateKey::read_openssh_file(path)?;
+        let keypair = key.key_data().ecdsa().ok_or("expected a P-256 private key")?;
+        if keypair.curve() != ssh_key::EcdsaCurve::NistP256 {
+            return Err("expected a P-256 private key".into());
+        }
+        let signer = P256SshSigner::new(P256SigningKey::from_bytes(keypair.private_key_bytes())?);
         connection.authenticate_publickey(&username, &signer).await?;
     } else {
         let password = env::var("SCOPLEN_OPENSSH_PASSWORD")
