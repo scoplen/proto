@@ -501,13 +501,11 @@ mod tests {
     }
 
     #[test]
-    fn refused_connection_is_typed() {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
-        let address = listener.local_addr().expect("listener address");
-        drop(listener);
-
+    fn unusable_destination_is_typed() {
+        // A released ephemeral port can self-connect on Windows when the source port is reused.
+        let address = SocketAddr::from(([127, 0, 0, 1], 0));
         let error = TcpTransport::connect_addr(address, Duration::from_secs(1))
-            .expect_err("closed listener must refuse connection");
+            .expect_err("port zero cannot identify a listening peer");
         let actual = match error {
             TransportError::Connect { address, .. }
             | TransportError::ConnectTimeout { address, .. } => address,
