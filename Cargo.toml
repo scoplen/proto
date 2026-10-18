@@ -13,7 +13,7 @@ exclude = ["fuzz"]
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
-rust-version = "1.85"
+rust-version = "1.99"
 authors = ["Scoplen maintainers"]
 
 [workspace.dependencies]
@@ -25,10 +25,12 @@ uuid = { version = "=1.16.0", features = ["v7"] }
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
-all = "warn"
-pedantic = "warn"
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Keep russh callbacks in the same async-trait form, including synchronous implementations.
+unused_async_trait_impl = "allow"
 
 [patch.crates-io]
-# pageant 0.2.2 is the last russh-compatible release, but its published source uses let-chains
-# while declaring Rust 1.85 support. Keep the tiny MSRV fix local until upstream publishes it.
+# The published Pageant adapter lacks the bounded native WM_COPYDATA query and
+# current-thread mapping names required by K-7. Retain that transport implementation.
 pageant = { path = "vendor/pageant" }

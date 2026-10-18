@@ -489,6 +489,7 @@ impl Agent for AgentService {
     }
 }
 
+#[allow(clippy::result_large_err)] // Match the tonic service boundary without boxing its Status.
 fn validate_gateway_id(value: &str) -> Result<(), Status> {
     validate_text(value, MAX_ID_BYTES, "identifier")?;
     let bytes = value.as_bytes();
@@ -501,10 +502,12 @@ fn validate_gateway_id(value: &str) -> Result<(), Status> {
     Ok(())
 }
 
+#[allow(clippy::result_large_err)] // Match the tonic service boundary without boxing its Status.
 fn validate_session_id(value: &str) -> Result<(), Status> {
     validate_text(value, MAX_SESSION_ID_BYTES, "session id")
 }
 
+#[allow(clippy::result_large_err)] // Match the tonic service boundary without boxing its Status.
 fn validate_text(value: &str, max: usize, label: &'static str) -> Result<(), Status> {
     if value.is_empty() {
         return Err(Status::invalid_argument(format!("{label} is required")));
@@ -515,6 +518,7 @@ fn validate_text(value: &str, max: usize, label: &'static str) -> Result<(), Sta
     Ok(())
 }
 
+#[allow(clippy::result_large_err)] // Match the tonic service boundary without boxing its Status.
 fn validate_bytes(value: &[u8], max: usize, label: &'static str) -> Result<(), Status> {
     if value.is_empty() {
         return Err(Status::invalid_argument(format!("{label} is required")));
@@ -525,6 +529,7 @@ fn validate_bytes(value: &[u8], max: usize, label: &'static str) -> Result<(), S
     Ok(())
 }
 
+#[allow(clippy::result_large_err)] // Match the tonic service boundary without boxing its Status.
 fn validate_load(active: u32, pending: u32, cpu_millis: u32) -> Result<(), Status> {
     if active > 1_000_000 || pending > 1_000_000 || cpu_millis > 100_000 {
         return Err(Status::invalid_argument("load exceeds its bounds"));

@@ -23,6 +23,6 @@ fn main() {
         .server_mod_attribute(".", "#[allow(clippy::all, clippy::pedantic)]");
     prost.service_generator(tonic.service_generator());
     prost
-        .compile_protos(&[gateway, agent], &[proto_root.clone()])
+        .compile_protos(&[gateway, agent], std::slice::from_ref(&proto_root))
         .expect("internal protobuf contracts compile");
 }

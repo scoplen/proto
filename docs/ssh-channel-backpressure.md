@@ -16,7 +16,7 @@ SSH connection. All waits have a 15-second deadline, and the stall probe samples
 
 The guards are 4 MiB for client-to-server and 6 MiB for server-to-client. They are regression
 limits for this fixture, not a product memory budget. The server uses a 2 MiB receive window and
-an eight-message channel queue in the first case. The client uses `russh` 0.63.1's default 2 MiB
+an eight-message channel queue in the first case. The client uses `russh` 0.64.1's default 2 MiB
 window, 32 KiB maximum packet, and 100-message channel queue in the second. The client wrapper
 splits caller data into chunks of at most 64 KiB and awaits each engine send. These finite queues
 and the peer window explain why an 8 MiB transfer cannot be accepted while its consumer is paused.
@@ -27,6 +27,13 @@ On Windows 10.0.26200, all three tests passed. The completed byte counts at the 
 1,638,400 bytes from client to server and 4,194,304 bytes from server to client. Both transfers
 then completed with the exact 8,388,608 expected bytes. The zero-window channel remained pending
 while a second channel delivered its byte.
+
+## Local run, 2026-10-19
+
+The same three tests passed on Windows 10.0.26200 with Rust 1.99.0 and `russh` 0.64.1. Stable
+stall counts were 1,638,400 client-to-server bytes and 4,259,840 server-to-client bytes. Both
+transfers resumed with all 8,388,608 bytes intact, and the independent channel still progressed
+while the zero-window send remained pending.
 
 This test measures accepted bytes and transfer behavior, not process RSS or peak heap use. It does
 not establish a per-channel allocation ceiling under many simultaneous saturated channels or

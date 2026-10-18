@@ -67,7 +67,8 @@ impl PairingQrPayload {
             return Err(PairingQrError::InvalidPayload);
         }
         let mut public_key_hash = [0; 32];
-        for (byte, pair) in public_key_hash.iter_mut().zip(hash_text.as_bytes().chunks_exact(2)) {
+        for (byte, pair) in public_key_hash.iter_mut().zip(hash_text.as_bytes().as_chunks::<2>().0)
+        {
             if !pair.iter().all(|digit| digit.is_ascii_digit() || (b'a'..=b'f').contains(digit)) {
                 return Err(PairingQrError::InvalidPayload);
             }

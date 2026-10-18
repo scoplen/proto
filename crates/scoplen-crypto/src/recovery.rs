@@ -268,7 +268,7 @@ pub fn verify_safety_qr(
     }
 
     let mut provided = [0_u8; 64];
-    for (index, pair) in payload.as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in payload.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         provided[index] = (hex_value(pair[0])? << 4) | hex_value(pair[1])?;
     }
 
@@ -308,7 +308,7 @@ fn ordered_fingerprints(
 }
 
 fn append_safety_digits(output: &mut String, fingerprint: &[u8; 32]) {
-    for block in fingerprint.chunks_exact(5) {
+    for block in fingerprint.as_chunks::<5>().0 {
         let value = u64::from_be_bytes([0, 0, 0, block[0], block[1], block[2], block[3], block[4]])
             % 100_000;
         write!(output, "{value:05}").expect("writing to String cannot fail");

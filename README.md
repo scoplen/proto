@@ -79,14 +79,17 @@ can carry a target handshake through a jump host with
 depth while retaining each parent connection. One connection multiplexes session and forwarding
 channels with a configurable simultaneous-channel cap; channel or stream drop releases a slot.
 `ClientConfig::with_rekey_limits` configures outgoing SSH payload-byte and elapsed-time limits per
-Host, retaining the engine defaults of one GiB and one hour. A connection-owned timer requests a
-rekey when that elapsed limit expires even while the connection is idle, and restarts after each
-completed key exchange, including byte-triggered exchanges. It stops on disconnect, transport
-failure, or connection drop. During a keyboard-interactive prompt, the timer can request a rekey,
-but the current engine does not process that request while waiting for the user's answer. Its
-elapsed-time check can start an exchange after authentication resumes.
-Incoming-byte-triggered rekeying is not implemented by the current engine; the complete S4 rekey
-requirement and OpenSSH default compatibility remain open.
+Host; `with_rekey_read_limit` configures the incoming payload threshold independently. Byte limits
+are between one byte and one GiB, inclusive; the engine defaults remain one GiB in either direction
+and one hour. Counters exclude packet lengths, padding, and authentication tags. The released
+`russh` 0.64.1 engine initiates rekey after either threshold or the elapsed deadline, including
+while authenticated connections are idle. Completed exchanges reset counters and the deadline;
+the event loop owns the timer and stops on disconnect, transport failure, or connection drop.
+Retained channel handles and streams cannot keep a dropped connection alive. Explicit disconnect
+allows one second for graceful protocol shutdown, then closes the transport if output is blocked.
+Automatic rekey waits until authentication completes, including a pending keyboard-interactive
+prompt, then handles an expired elapsed limit without waiting for channel traffic. Full
+OpenSSH cipher-dependent default compatibility remains open.
 Rekey durations must fit an event-loop deadline. `ClientConfig::with_inactivity_timeout` also
 returns a typed result, rejects zero or unrepresentable enabled durations, and accepts `None` to
 disable the timeout. Received traffic resets the configured inactivity timer.
@@ -273,7 +276,9 @@ loader is usable by both workstreams.
 
 ## Development
 
-Rust 1.85.0 is pinned in `rust-toolchain.toml`.
+Rust 1.99.0 is pinned in `rust-toolchain.toml` and is the minimum supported version, aligned with
+the other implementation repositories. The Pageant dependency remains patched locally for its
+bounded native WM_COPYDATA mapping and current-thread query names required by K-7.
 
 ```text
 cargo fmt --all -- --check

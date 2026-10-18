@@ -52,46 +52,44 @@ pub fn merge(local: &Object, remote: &Object) -> Result<Object, MergeError> {
 pub fn references(object: &Object) -> Vec<Uuid> {
     let mut references = Vec::new();
     let mut add_scalar = |field| {
-        if let Some(entry) = object.field(field) {
-            if let Value::Bytes(bytes) = &entry.value {
-                if let Ok(id) = uuid(bytes) {
-                    references.push(id);
-                }
-            }
+        if let Some(entry) = object.field(field)
+            && let Value::Bytes(bytes) = &entry.value
+            && let Ok(id) = uuid(bytes)
+        {
+            references.push(id);
         }
     };
     match object.object_type {
         crate::ObjectType::ACCESS_PROFILE => {
             add_scalar(1);
             add_scalar(4);
-            if let Some(entry) = object.field(5) {
-                if let Value::Bytes(bytes) = &entry.value {
-                    if let Ok(id) = uuid(bytes) {
-                        references.push(id);
-                    }
-                }
+            if let Some(entry) = object.field(5)
+                && let Value::Bytes(bytes) = &entry.value
+                && let Ok(id) = uuid(bytes)
+            {
+                references.push(id);
             }
         }
         crate::ObjectType::HOST => {
             for (path, _) in object.field_entries(5) {
-                if let FieldPath::MapEntry { key: crate::MapKey::Bytes(bytes), .. } = path {
-                    if let Ok(id) = uuid(bytes) {
-                        references.push(id);
-                    }
+                if let FieldPath::MapEntry { key: crate::MapKey::Bytes(bytes), .. } = path
+                    && let Ok(id) = uuid(bytes)
+                {
+                    references.push(id);
                 }
             }
         }
         crate::ObjectType::ROUTE => {
             add_scalar(5);
             add_scalar(7);
-            if let Some(entry) = object.field(3) {
-                if let Value::Array(values) = &entry.value {
-                    for value in values {
-                        if let Value::Bytes(bytes) = value {
-                            if let Ok(id) = uuid(bytes) {
-                                references.push(id);
-                            }
-                        }
+            if let Some(entry) = object.field(3)
+                && let Value::Array(values) = &entry.value
+            {
+                for value in values {
+                    if let Value::Bytes(bytes) = value
+                        && let Ok(id) = uuid(bytes)
+                    {
+                        references.push(id);
                     }
                 }
             }
@@ -107,14 +105,14 @@ pub fn references(object: &Object) -> Vec<Uuid> {
         }
         crate::ObjectType::WORKSPACE => {
             for (path, entry) in object.field_entries(3) {
-                if let FieldPath::MapEntry { .. } = path {
-                    if let Value::Array(values) = &entry.value {
-                        for value in values {
-                            if let Value::Bytes(bytes) = value {
-                                if let Ok(id) = uuid(bytes) {
-                                    references.push(id);
-                                }
-                            }
+                if let FieldPath::MapEntry { .. } = path
+                    && let Value::Array(values) = &entry.value
+                {
+                    for value in values {
+                        if let Value::Bytes(bytes) = value
+                            && let Ok(id) = uuid(bytes)
+                        {
+                            references.push(id);
                         }
                     }
                 }
@@ -351,7 +349,9 @@ mod tests {
         assert_eq!(input.len() % 2, 0, "hex vector has an odd length");
         input
             .as_bytes()
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| {
                 let text = std::str::from_utf8(pair).expect("ASCII hex");
                 u8::from_str_radix(text, 16).expect("hex byte")

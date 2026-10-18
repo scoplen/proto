@@ -25,7 +25,7 @@ fn write(object: u8, base_seq: Option<u64>) -> SyncWrite {
         object_id: id(object),
         base_seq,
         payload: vec![0xde, 0xad],
-        tombstone: object % 2 == 0,
+        tombstone: object.is_multiple_of(2),
     }
 }
 
@@ -34,7 +34,7 @@ fn change(object: u8, seq: u64) -> SyncChange {
         object_id: id(object),
         seq,
         payload: vec![object, 0xbe],
-        tombstone: object % 2 == 0,
+        tombstone: object.is_multiple_of(2),
         signer_device_id: Some(id(object.saturating_add(10))),
     }
 }
@@ -565,7 +565,9 @@ fn json_number(input: &str, key: &str) -> u64 {
 fn decode_hex(input: &str) -> Vec<u8> {
     input
         .as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             let text = std::str::from_utf8(pair).expect("ASCII hex");
             u8::from_str_radix(text, 16).expect("hex byte")

@@ -11,7 +11,7 @@ pwsh ./scripts/ssh-throughput.ps1
 ```
 
 The script needs PowerShell 7, Docker with a running Linux daemon, `ssh`, `ssh-keygen`, Rust
-1.85.0, and network access to the Alpine package repository. It builds the comparison example in
+1.99.0, and network access to the Alpine package repository. It builds the comparison example in
 release mode. `-BytesMiB` (16–1024, default 256), `-Samples` (3–20, default 5), and `-Image`
 (default `alpine:3.21`) are optional. For a repeat with the same base image, pass the recorded
 repository digest to `-Image`. The script pins Alpine's `openssh-server` package to
@@ -58,3 +58,18 @@ Scoplen from 40.41 to 137.89 MiB/s for ChaCha20; OpenSSH ranged from 63.28 to 14
 Scoplen from 89.62 to 162.92 MiB/s for AES-GCM. The first warmup was especially slow after the
 container started. These medians exceed 80% on this host, but the variance prevents treating this
 run as the release performance gate or as evidence for other hosts.
+
+## Windows engine-upgrade run, 2026-10-19
+
+The same host, OpenSSH client/server versions, base image, and 256 MiB/five-sample procedure
+were repeated with Rust 1.99.0 and `russh` 0.64.1. Source was `proto@61c2a7a` plus the engine
+upgrade and connection-lifetime changes. Windows CRLF normalization now applies before Alpine
+executes the server setup; a CRLF probe reproduced the original shell failure.
+
+| Server cipher | OpenSSH median | Scoplen median | Scoplen / OpenSSH |
+|---|---:|---:|---:|
+| `chacha20-poly1305@openssh.com` | 149.12 MiB/s | 139.72 MiB/s | 93.70% |
+| `aes256-gcm@openssh.com` | 158.27 MiB/s | 155.21 MiB/s | 98.07% |
+
+All retained transfers had the exact expected zero bytes and successful exit status. The ratios
+exceed the local 80% threshold; dedicated fixed-hardware regression evidence remains required.

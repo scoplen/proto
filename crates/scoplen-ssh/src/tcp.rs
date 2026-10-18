@@ -462,7 +462,6 @@ fn validate_timeout(timeout: Duration) -> Result<(), TransportError> {
 #[cfg(test)]
 mod tests {
     use std::{
-        io::{Read as _, Write as _},
         net::{TcpListener, TcpStream},
         thread,
     };

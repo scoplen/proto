@@ -117,7 +117,7 @@ impl ProxyCommandTransport {
     }
 
     fn lock_error() -> io::Error {
-        io::Error::new(io::ErrorKind::Other, "ProxyCommand transport state is unavailable")
+        io::Error::other("ProxyCommand transport state is unavailable")
     }
 
     fn take_stdin(&self) {
@@ -134,10 +134,10 @@ impl ProxyCommandTransport {
 
     fn kill_child(&self) -> io::Result<()> {
         let mut child = self.child.lock().map_err(|_| Self::lock_error())?;
-        if let Err(error) = child.kill() {
-            if error.kind() != io::ErrorKind::InvalidInput {
-                return Err(error);
-            }
+        if let Err(error) = child.kill()
+            && error.kind() != io::ErrorKind::InvalidInput
+        {
+            return Err(error);
         }
         child.wait().map(|_| ())
     }
@@ -541,7 +541,7 @@ mod tests {
         assert!(matches!(
             ProxyCommandTransport::spawn(
                 "echo",
-                std::iter::repeat("arg").take(MAX_PROXY_COMMAND_ARGUMENTS + 1)
+                std::iter::repeat_n("arg", MAX_PROXY_COMMAND_ARGUMENTS + 1)
             ),
             Err(ProxyCommandError::TooManyArguments { max: MAX_PROXY_COMMAND_ARGUMENTS })
         ));

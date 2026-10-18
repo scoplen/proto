@@ -128,6 +128,7 @@ impl From<PrimitiveError> for PairingError {
 
 /// The pairing session identifiers and device ordering bound into `CPace`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(clippy::struct_field_names)] // Each field is a distinct protocol identifier.
 pub struct PairingContext {
     pairing_id: Uuid,
     initiator_device_id: Uuid,
@@ -500,7 +501,7 @@ impl PairingSession {
                 continue;
             }
             match self.seal_frame_with_nonce(plaintext, &nonce) {
-                Err(PairingError::NonceReuse) => continue,
+                Err(PairingError::NonceReuse) => {}
                 result => return result,
             }
         }
