@@ -140,7 +140,9 @@ handle, rejection of both requests after closing that handle without retaining r
 rejection, plus `posix-rename@openssh.com` missing-source rejection, a rename preserving file bytes,
 replacement of an existing destination with different contents, `expand-path@openssh.com` returning
 an absolute path to the existing file with matching bytes and an absolute path for a missing file
-(whose subsequent open fails), with request-slot release and cleanup of the unique remote paths.
+(whose subsequent open fails), and `copy-data` between open handles with source and destination
+offsets, byte comparison, invalid-source and closed-destination rejection, request-slot release,
+and cleanup of the unique remote paths.
 It passed against a disposable
 `linuxserver/openssh-server` container; other SFTP extensions, server implementations, and
 platforms remain unverified.

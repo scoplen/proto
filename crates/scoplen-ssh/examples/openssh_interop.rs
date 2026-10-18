@@ -335,6 +335,73 @@ async fn verify_sftp_bytes(
     Ok(())
 }
 
+async fn verify_copy_data(
+    session: &mut SftpSession,
+    source_handle: &[u8],
+    path: &[u8],
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let target_path = [path, b"-copy"].concat();
+    let create = session.client_mut().open(target_path.clone(), 0x1a, SftpAttributes::default())?;
+    let target_handle = match sftp_response(session, create).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected SFTP copy target response: {other:?}").into()),
+    };
+    let initial = b"0123456789";
+    if session.upload(&target_handle, 0, initial, 4096, 4, |_| {}).await? != initial.len() as u64
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP copy target setup failed or retained a request slot".into());
+    }
+
+    let copy =
+        session.client_mut().copy_data(source_handle.to_vec(), 9, 8, target_handle.clone(), 1)?;
+    if !matches!(sftp_response(session, copy).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP copy-data failed or retained a request slot".into());
+    }
+    let invalid =
+        session.client_mut().copy_data(b"invalid-copy-handle", 9, 8, target_handle.clone(), 1)?;
+    if !matches!(sftp_response(session, invalid).await?, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err(
+            "SFTP copy-data accepted an invalid source handle or retained a request slot".into()
+        );
+    }
+
+    let close = session.client_mut().close(target_handle.clone())?;
+    if !matches!(sftp_response(session, close).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP copy target close failed or retained a request slot".into());
+    }
+    let closed = session.client_mut().copy_data(source_handle.to_vec(), 9, 8, target_handle, 1)?;
+    if !matches!(sftp_response(session, closed).await?, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err(
+            "SFTP copy-data accepted a closed target handle or retained a request slot".into()
+        );
+    }
+    let expected = [b"0".as_slice(), &data[9..17], b"9"].concat();
+    verify_sftp_bytes(session, &target_path, &expected).await?;
+    let remove = session.client_mut().remove(target_path.clone())?;
+    if !matches!(sftp_response(session, remove).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP copy target cleanup failed or retained a request slot".into());
+    }
+    let gone = session.client_mut().open(target_path, 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, gone).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP copy target cleanup left a path behind".into());
+    }
+    Ok(())
+}
+
 async fn expand_sftp_path(
     session: &mut SftpSession,
     path: &[u8],
@@ -473,6 +540,9 @@ fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::er
     if !session.extensions().iter().any(|extension| extension.name == b"expand-path@openssh.com") {
         return Err("OpenSSH did not advertise expand-path@openssh.com".into());
     }
+    if !session.extensions().iter().any(|extension| extension.name == b"copy-data") {
+        return Err("OpenSSH did not advertise copy-data".into());
+    }
     Ok(())
 }
 
@@ -558,6 +628,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     {
         return Err("SFTP resumed download or progress mismatch".into());
     }
+    verify_copy_data(&mut session, &read_handle, &path, &data).await?;
     let close = session.client_mut().close(read_handle)?;
     if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
         return Err("SFTP read handle close failed".into());

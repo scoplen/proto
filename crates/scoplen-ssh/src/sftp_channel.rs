@@ -592,6 +592,7 @@ mod tests {
         hardlink_created: Option<bool>,
         rename_phase: Option<RenamePhase>,
         expand_path_prefix: Option<&'static [u8]>,
+        copy_data_target: Option<Vec<u8>>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
@@ -618,6 +619,9 @@ mod tests {
             }
             if self.expand_path_prefix.is_some() {
                 extensions.push(SftpExtension::new(b"expand-path@openssh.com", b"1").unwrap());
+            }
+            if self.copy_data_target.is_some() {
+                extensions.push(SftpExtension::new(b"copy-data", b"1").unwrap());
             }
             SftpPacket::Version { version: 3, extensions }
         }
@@ -669,7 +673,10 @@ mod tests {
         }
 
         fn open_response(&mut self, id: u32, path: &[u8]) -> SftpPacket {
-            if path == b"replacement"
+            if path == b"copy-target" && self.copy_data_target.is_some() {
+                self.extension_handle_open = Some(true);
+                SftpPacket::Handle { id, handle: b"copy".to_vec() }
+            } else if path == b"replacement"
                 && matches!(self.rename_phase, Some(RenamePhase::Original | RenamePhase::Renamed))
             {
                 self.extension_handle_open = Some(true);
@@ -690,7 +697,7 @@ mod tests {
         }
 
         fn close_extension_handle(&mut self, id: u32, handle: &[u8]) -> SftpPacket {
-            let code = if (handle == b"h" || handle == b"old")
+            let code = if (handle == b"h" || handle == b"old" || handle == b"copy")
                 && self.extension_handle_open == Some(true)
             {
                 self.extension_handle_open = Some(false);
@@ -716,6 +723,20 @@ mod tests {
             } else {
                 SftpPacket::Status { id, code: 4, message: Vec::new(), language: Vec::new() }
             }
+        }
+
+        fn copy_data_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
+            let expected = SftpPacket::copy_data_request(id, b"h", 2, 4, b"copy", 1).unwrap();
+            let code = if self.extension_handle_open == Some(true)
+                && matches!(expected, SftpPacket::Extended { data: expected, .. } if data == expected)
+            {
+                let target = self.copy_data_target.as_mut().unwrap();
+                target[1..5].copy_from_slice(&self.file[2..6]);
+                0
+            } else {
+                4
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
         }
 
         fn hardlink_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
@@ -805,6 +826,8 @@ mod tests {
                 Some(self.rename_response(id, data))
             } else if name == b"expand-path@openssh.com" && self.expand_path_prefix.is_some() {
                 Some(self.expand_path_response(id, data))
+            } else if name == b"copy-data" && self.copy_data_target.is_some() {
+                Some(self.copy_data_response(id, data))
             } else {
                 None
             }
@@ -819,7 +842,9 @@ mod tests {
                     language: Vec::new(),
                 };
             }
-            let contents: &[u8] = if handle == b"old"
+            let contents: &[u8] = if handle == b"copy" {
+                self.copy_data_target.as_deref().unwrap_or_default()
+            } else if handle == b"old"
                 && matches!(self.rename_phase, Some(RenamePhase::Original | RenamePhase::Renamed))
             {
                 b"previous destination contents"
@@ -1022,6 +1047,7 @@ mod tests {
                     hardlink_created: None,
                     rename_phase: None,
                     expand_path_prefix: None,
+                    copy_data_target: None,
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -1275,6 +1301,98 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn copy_data_round_trips_over_authenticated_channel() {
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ = russh::server::run_stream(
+                Arc::new(server_config),
+                stream,
+                SftpServer {
+                    buffer: Vec::new(),
+                    file: b"linked bytes".to_vec(),
+                    advertise_limits: false,
+                    advertise_statvfs: false,
+                    extension_handle_open: Some(false),
+                    hardlink_created: None,
+                    rename_phase: None,
+                    expand_path_prefix: None,
+                    copy_data_target: Some(b"0123456789".to_vec()),
+                    read_reply_limit: None,
+                    reorder_first_reads: false,
+                    deferred_read_response: None,
+                },
+            )
+            .await;
+        });
+
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        connection.authenticate_password("user", b"password").await.expect("authenticate client");
+        let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
+        assert!(session.extensions().iter().any(|extension| extension.name == b"copy-data"));
+
+        for (path, flags, expected) in
+            [(b"file".as_slice(), 1, b"h".as_slice()), (b"copy-target", 3, b"copy")]
+        {
+            let open = session.client_mut().open(path, flags, SftpAttributes::default()).unwrap();
+            session.send_request(&open).await.unwrap();
+            assert!(matches!(
+                session.read_response().await.unwrap(),
+                SftpPacket::Handle { handle, .. } if handle == expected
+            ));
+            assert_eq!(session.pending_requests(), 0);
+        }
+
+        let copy = session.client_mut().copy_data(b"h", 2, 4, b"copy", 1).unwrap();
+        session.send_request(&copy).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let read = session.client_mut().read(b"copy", 0, 10).unwrap();
+        session.send_request(&read).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Data { data, .. } if data == b"0nked56789"
+        ));
+        assert_eq!(session.pending_requests(), 0);
+
+        let invalid = session.client_mut().copy_data(b"invalid", 2, 4, b"copy", 1).unwrap();
+        session.send_request(&invalid).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 4, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let close = session.client_mut().close(b"h").unwrap();
+        session.send_request(&close).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        let closed = session.client_mut().copy_data(b"h", 2, 4, b"copy", 1).unwrap();
+        session.send_request(&closed).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 4, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
     async fn opens_subsystem_negotiates_v3_and_round_trips_packets() {
         let mut server_config = russh::server::Config::default();
         server_config.keys.push(
@@ -1301,6 +1419,7 @@ mod tests {
                     hardlink_created: Some(false),
                     rename_phase: Some(RenamePhase::Original),
                     expand_path_prefix: Some(b"/srv/"),
+                    copy_data_target: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1406,6 +1525,7 @@ mod tests {
                     hardlink_created: None,
                     rename_phase: None,
                     expand_path_prefix: None,
+                    copy_data_target: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1468,6 +1588,7 @@ mod tests {
                     hardlink_created: None,
                     rename_phase: None,
                     expand_path_prefix: None,
+                    copy_data_target: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
