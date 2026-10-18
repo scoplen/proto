@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Made `ClientConfig::with_inactivity_timeout` return a typed result and reject zero or
+  unrepresentable enabled durations, preventing an engine deadline-reset panic. Rekey durations
+  must also fit a deadline. Public real-SSH tests cover activity resets and silent-peer expiry.
 - Fixed intermittent Windows strict-KEX fixture teardown failures. A relay `ConnectionAborted`
   is expected only after the injected packet was delivered and the client's strict rejection or
   non-strict control success was confirmed; other relay failures retain stage diagnostics.

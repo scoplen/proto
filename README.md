@@ -87,6 +87,9 @@ but the current engine does not process that request while waiting for the user'
 elapsed-time check can start an exchange after authentication resumes.
 Incoming-byte-triggered rekeying is not implemented by the current engine; the complete S4 rekey
 requirement and OpenSSH default compatibility remain open.
+Rekey durations must fit an event-loop deadline. `ClientConfig::with_inactivity_timeout` also
+returns a typed result, rejects zero or unrepresentable enabled durations, and accepts `None` to
+disable the timeout. Received traffic resets the configured inactivity timer.
 `ClientConfig::with_keepalive` configures encrypted `keepalive@openssh.com` probes per Host and
 returns a typed configuration result. Probes are disabled by default, with a missed-reply count
 of three. Enabled intervals must be positive and representable as an event-loop deadline, and
