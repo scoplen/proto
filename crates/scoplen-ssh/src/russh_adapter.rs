@@ -11,7 +11,7 @@ use std::{
     borrow::Cow,
     ffi::{OsStr, OsString},
     fmt, io,
-    net::TcpStream as StdTcpStream,
+    net::{Shutdown, TcpStream as StdTcpStream},
     pin::Pin,
     str,
     sync::Arc,
@@ -424,6 +424,9 @@ pub enum ClientError {
     /// A SOCKS5 or HTTP CONNECT route failed before the SSH stream was opened.
     #[error("SSH proxy route failed: {0}")]
     Proxy(#[from] ProxyTransportError),
+    /// A proxy accepted the route, but the SSH handshake did not finish in time.
+    #[error("SSH handshake through proxy timed out after {timeout:?}")]
+    ProxySshHandshakeTimeout { timeout: Duration },
     /// A desktop `ProxyCommand` could not be started or configured.
     #[error("SSH ProxyCommand failed: {0}")]
     ProxyCommand(#[from] ProxyCommandError),
@@ -529,6 +532,20 @@ pub struct ClientConnection {
     forwarded_channels: mpsc::Receiver<ForwardedChannel>,
 }
 
+// russh moves the socket into its key-exchange task before connect_stream returns. Shutting down
+// this duplicate wakes that task if the handshake future times out or its caller is canceled.
+struct ProxyHandshakeSocketGuard {
+    socket: Option<StdTcpStream>,
+}
+
+impl Drop for ProxyHandshakeSocketGuard {
+    fn drop(&mut self) {
+        if let Some(socket) = &self.socket {
+            let _ = socket.shutdown(Shutdown::Both);
+        }
+    }
+}
+
 impl fmt::Debug for ClientConnection {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("ClientConnection").finish_non_exhaustive()
@@ -616,7 +633,8 @@ impl ClientConnection {
     ///
     /// The existing bounded SOCKS5 transport performs DNS, proxy negotiation, and socket setup
     /// on a blocking worker so the caller's async runtime is not stalled. The resulting socket is
-    /// then handed to the same `russh` stream boundary used by [`Self::connect_stream`].
+    /// then handed to the same `russh` stream boundary used by [`Self::connect_stream`]. The
+    /// timeout applies separately to proxy setup and the subsequent SSH handshake.
     pub async fn connect_via_socks5(
         config: ClientConfig,
         proxy_host: &str,
@@ -642,14 +660,14 @@ impl ClientConnection {
         .await
         .map_err(|_| ClientError::Transport(io::Error::other("SSH proxy route task stopped")))?
         .map_err(ClientError::Proxy)?;
-        Self::connect_via_proxy_socket(config, stream).await
+        Self::connect_via_proxy_socket(config, stream, timeout).await
     }
 
     /// Connect through an HTTP CONNECT proxy and complete the SSH handshake over the stream.
     ///
     /// The existing bounded HTTP CONNECT transport performs the proxy handshake on a blocking
     /// worker, clears handshake-only socket timeouts, and then reuses the common async SSH stream
-    /// boundary.
+    /// boundary. The timeout applies separately to proxy setup and the subsequent SSH handshake.
     pub async fn connect_via_http_connect(
         config: ClientConfig,
         proxy_host: &str,
@@ -675,7 +693,7 @@ impl ClientConnection {
         .await
         .map_err(|_| ClientError::Transport(io::Error::other("SSH proxy route task stopped")))?
         .map_err(ClientError::Proxy)?;
-        Self::connect_via_proxy_socket(config, stream).await
+        Self::connect_via_proxy_socket(config, stream, timeout).await
     }
 
     /// Spawn a bounded desktop `ProxyCommand` and complete the SSH handshake over its standard
@@ -698,10 +716,21 @@ impl ClientConnection {
     async fn connect_via_proxy_socket(
         config: ClientConfig,
         stream: StdTcpStream,
+        timeout: Duration,
     ) -> Result<Self, ClientError> {
         stream.set_nonblocking(true).map_err(ClientError::Transport)?;
+        let mut shutdown_guard = ProxyHandshakeSocketGuard {
+            socket: Some(stream.try_clone().map_err(ClientError::Transport)?),
+        };
         let stream = tokio::net::TcpStream::from_std(stream).map_err(ClientError::Transport)?;
-        Self::connect_stream(config, stream).await
+        match async_timeout(timeout, Self::connect_stream(config, stream)).await {
+            Ok(Ok(connection)) => {
+                shutdown_guard.socket = None;
+                Ok(connection)
+            }
+            Ok(Err(error)) => Err(error),
+            Err(_) => Err(ClientError::ProxySshHandshakeTimeout { timeout }),
+        }
     }
 
     /// Connect to a target through an already connected and authenticated jump host.
@@ -2672,6 +2701,42 @@ mod tests {
         (port, task)
     }
 
+    async fn start_stalled_ssh_proxy(
+        kind: RouteProxyKind,
+        expected_host: &'static str,
+        expected_port: u16,
+    ) -> (u16, mpsc::Receiver<()>, tokio::task::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind stalled proxy");
+        let port = listener.local_addr().expect("stalled proxy address").port();
+        let (ready, ready_rx) = mpsc::channel(1);
+        let task = tokio::spawn(async move {
+            let (mut client, _) = listener.accept().await.expect("accept stalled proxy client");
+            match kind {
+                RouteProxyKind::Socks5 => {
+                    socks5_proxy_handshake(&mut client, expected_host, expected_port, 0).await;
+                }
+                RouteProxyKind::HttpConnect => {
+                    http_connect_proxy_handshake(&mut client, expected_host, expected_port, 200)
+                        .await;
+                }
+            }
+            let mut banner = Vec::new();
+            while !banner.ends_with(b"\n") {
+                let mut byte = [0];
+                client.read_exact(&mut byte).await.expect("client SSH banner");
+                banner.push(byte[0]);
+                assert!(banner.len() <= 255, "SSH banner is bounded");
+            }
+            assert!(banner.starts_with(b"SSH-2.0-"));
+            client.write_all(b"SSH-2.0-stalled-proxy-test\r\n").await.expect("server SSH banner");
+            let mut kex = [0];
+            client.read_exact(&mut kex).await.expect("client key exchange started");
+            let _ = ready.send(()).await;
+            tokio::io::copy(&mut client, &mut tokio::io::sink()).await.expect("read until close");
+        });
+        (port, ready_rx, task)
+    }
+
     async fn socks5_proxy_handshake(
         client: &mut TcpStream,
         expected_host: &str,
@@ -3269,6 +3334,80 @@ mod tests {
             }))
         ));
         proxy_task.join().expect("timeout proxy task");
+    }
+
+    #[tokio::test]
+    async fn proxy_routes_time_out_stalled_ssh_handshake_and_close_socket() {
+        let handshake_timeout = Duration::from_millis(200);
+        for kind in [RouteProxyKind::Socks5, RouteProxyKind::HttpConnect] {
+            let (proxy_port, _ready, proxy_task) =
+                start_stalled_ssh_proxy(kind, "target.example", 22).await;
+            let verifier = |_host: &str, _key: &HostKey| Ok(());
+            let config = ClientConfig::new("target.example", 22, verifier).expect("config");
+            let error = timeout(Duration::from_secs(3), async {
+                match kind {
+                    RouteProxyKind::Socks5 => {
+                        ClientConnection::connect_via_socks5(
+                            config,
+                            "127.0.0.1",
+                            proxy_port,
+                            None,
+                            handshake_timeout,
+                        )
+                        .await
+                    }
+                    RouteProxyKind::HttpConnect => {
+                        ClientConnection::connect_via_http_connect(
+                            config,
+                            "127.0.0.1",
+                            proxy_port,
+                            None,
+                            handshake_timeout,
+                        )
+                        .await
+                    }
+                }
+            })
+            .await
+            .expect("SSH handshake has a deadline")
+            .expect_err("stalled SSH handshake");
+            assert!(matches!(
+                error,
+                ClientError::ProxySshHandshakeTimeout { timeout } if timeout == handshake_timeout
+            ));
+            timeout(Duration::from_secs(3), proxy_task)
+                .await
+                .expect("SSH socket closes on timeout")
+                .expect("stalled proxy task");
+        }
+    }
+
+    #[tokio::test]
+    async fn canceling_proxy_ssh_handshake_closes_spawned_engine_socket() {
+        let (proxy_port, mut ready, proxy_task) =
+            start_stalled_ssh_proxy(RouteProxyKind::Socks5, "target.example", 22).await;
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("target.example", 22, verifier).expect("config");
+        let connection = tokio::spawn(async move {
+            ClientConnection::connect_via_socks5(
+                config,
+                "127.0.0.1",
+                proxy_port,
+                None,
+                Duration::from_secs(5),
+            )
+            .await
+        });
+        timeout(Duration::from_secs(3), ready.recv())
+            .await
+            .expect("key exchange starts")
+            .expect("stalled proxy signals key exchange");
+        connection.abort();
+        assert!(connection.await.expect_err("connection task was canceled").is_cancelled());
+        timeout(Duration::from_secs(3), proxy_task)
+            .await
+            .expect("SSH socket closes on cancellation")
+            .expect("stalled proxy task");
     }
 
     #[tokio::test]
