@@ -105,6 +105,12 @@ the test server. It verifies the pinned host key, authentication, and a session 
 both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
 wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
+For an Ed25519 user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
+file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
+certificate signature, principal, validity, critical options, and CA pin before sending it.
+A disposable `linuxserver/openssh-server` container with `TrustedUserCAKeys` configured accepted
+the certificate; a certificate from another CA was rejected by OpenSSH. Revocation and other
+certificate algorithms remain unverified.
 Set `SCOPLEN_OPENSSH_SFTP=1` for the same example against a disposable server to additionally
 exercise SFTP v3 on the authenticated connection. This verifies advertised OpenSSH transfer
 limits, a missing-file response with released request state, pipelined upload in two parts,

@@ -1,15 +1,16 @@
 use std::{
     env,
+    path::Path,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
 use scoplen_ssh::{
-    ChannelEvent, ClientConfig, ClientConnection, ClientError, Ed25519SshSigner, HostKey,
-    HostKeyVerificationError, P256SshSigner, RsaSshSigner, SftpAttributes, SftpPacket, SftpSession,
-    SignatureAlgorithm,
+    CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, ClientError,
+    Ed25519SshSigner, HostKey, HostKeyVerificationError, P256SshSigner, RsaSshSigner,
+    SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm, UserCertificate,
 };
-use ssh_key::{PrivateKey, PublicKey};
+use ssh_key::{Certificate, PrivateKey, PublicKey};
 use tokio::time::timeout;
 
 #[tokio::main]
@@ -30,6 +31,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rsa_key = env::var("SCOPLEN_OPENSSH_RSA_KEY").ok();
     let ed25519_key = env::var("SCOPLEN_OPENSSH_ED25519_KEY").ok();
     let p256_key = env::var("SCOPLEN_OPENSSH_P256_KEY").ok();
+    let user_certificate = env::var("SCOPLEN_OPENSSH_USER_CERT").ok();
+    if user_certificate.is_some() && ed25519_key.is_none() {
+        return Err("user certificate requires SCOPLEN_OPENSSH_ED25519_KEY".into());
+    }
     if [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref()]
         .iter()
         .filter(|key| key.is_some())
@@ -52,7 +57,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let keypair = key.key_data().ed25519().ok_or("expected an Ed25519 private key")?;
         let signer =
             Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(keypair.private.as_ref())?);
-        connection.authenticate_publickey(&username, &signer).await?;
+        if let Some(cert_path) = user_certificate {
+            let ca_path = env::var("SCOPLEN_OPENSSH_USER_CA_KEY")
+                .map_err(|_| "user certificate requires a pinned CA public-key path")?;
+            let certificate = Certificate::read_file(Path::new(&cert_path))?;
+            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+            let certificate = UserCertificate::parse_and_validate(
+                &certificate.to_bytes()?,
+                &CertificateValidationPolicy::user(&username, now),
+            )?;
+            let pinned_ca = PublicKey::read_openssh_file(ca_path)?.to_bytes()?;
+            if certificate.certificate().ca_public_key_blob() != pinned_ca {
+                return Err("user certificate CA is not trusted".into());
+            }
+            connection.authenticate_certificate(&username, &certificate, &signer).await?;
+        } else {
+            connection.authenticate_publickey(&username, &signer).await?;
+        }
     } else if let Some(path) = p256_key {
         let key = PrivateKey::read_openssh_file(path)?;
         let keypair = key.key_data().ecdsa().ok_or("expected a P-256 private key")?;
