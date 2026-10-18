@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Fixed intermittent Windows strict-KEX fixture teardown failures. A relay `ConnectionAborted`
+  is expected only after the injected packet was delivered and the client's strict rejection or
+  non-strict control success was confirmed; other relay failures retain stage diagnostics.
 - Made `ClientConfig::with_keepalive` return a typed result and reject enabled zero intervals,
   non-expiring missed-reply counts, and unrepresentable deadlines before the engine can spin,
   grow its probe queue indefinitely, or panic. Probes remain disabled by default. Real SSH relay
