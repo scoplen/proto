@@ -53,3 +53,13 @@ jobs:
         # RUSTSEC-2023-0071 has no patched RSA release; the same exception is
         # recorded in deny.toml and must stay visible until upstream is fixed.
         run: cargo audit --ignore RUSTSEC-2023-0071
+
+  dropbear-interop:
+    name: Dropbear interoperability
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Password, rejected password, and host-key pin
+        shell: pwsh
+        run: ./scripts/dropbear-interop.ps1
