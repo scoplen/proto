@@ -110,6 +110,14 @@ trust pin, authentication, and a session command. Password,
 both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
 wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
+With a disposable OpenSSH server, `cargo run -p scoplen-ssh --example proxy_command_interop`
+exercises a real SSH handshake through a child process's standard streams. Set
+`SCOPLEN_OPENSSH_HOST_KEY` to the server's public-key line and `SCOPLEN_OPENSSH_PASSWORD` to the
+test account password; optional `SCOPLEN_OPENSSH_HOST`, `SCOPLEN_OPENSSH_PORT`, and
+`SCOPLEN_OPENSSH_USER` select the endpoint. The example checks the pinned host key, password
+authentication, command output and exit status, wrong-pin rejection, a missing or failed child,
+and handshake timeout with child cleanup. It passed from Windows against a disposable Linux
+OpenSSH container; Unix hosts and other server implementations remain unverified for this route.
 For host-certificate mode, the concrete adapter checks the certificate signature, host principal,
 validity, and critical options before the callback checks the CA pin. A disposable
 `linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and
