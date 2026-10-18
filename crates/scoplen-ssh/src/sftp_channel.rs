@@ -686,6 +686,7 @@ mod tests {
         expand_path_prefix: Option<&'static [u8]>,
         copy_data_target: Option<Vec<u8>>,
         lsetstat_link_mtime: Option<u32>,
+        symlink_target: Option<Vec<u8>>,
         directory: Option<DirectoryFixture>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
@@ -868,8 +869,12 @@ mod tests {
             let missing = SftpPacket::lsetstat_request(id, b"missing", &attrs).unwrap();
             let code = if matches!(expected, SftpPacket::Extended { data: expected, .. } if data == expected)
             {
-                self.lsetstat_link_mtime = Some(1_600_000_000);
-                0
+                if self.symlink_target.is_some() {
+                    self.lsetstat_link_mtime = Some(1_600_000_000);
+                    0
+                } else {
+                    2
+                }
             } else if matches!(missing, SftpPacket::Extended { data: missing, .. } if data == missing)
             {
                 2
@@ -880,7 +885,7 @@ mod tests {
         }
 
         fn link_attributes(&self, id: u32, follow: bool, path: &[u8]) -> SftpPacket {
-            if path != b"symlink" {
+            if path != b"symlink" || self.symlink_target.is_none() {
                 return SftpPacket::Status {
                     id,
                     code: 2,
@@ -897,6 +902,43 @@ mod tests {
                     ..SftpAttributes::default()
                 },
             }
+        }
+
+        fn symlink_response(
+            &mut self,
+            id: u32,
+            link_path: &[u8],
+            target_path: &[u8],
+        ) -> SftpPacket {
+            let code = if link_path == b"symlink"
+                && target_path == b"file"
+                && self.symlink_target.is_none()
+            {
+                self.symlink_target = Some(target_path.to_vec());
+                0
+            } else {
+                4
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn readlink_response(&self, id: u32, path: &[u8]) -> SftpPacket {
+            if let Some(target) = self.symlink_target.as_ref().filter(|_| path == b"symlink") {
+                return SftpPacket::Name {
+                    id,
+                    entries: vec![
+                        SftpNameEntry::new(target.clone(), Vec::new(), SftpAttributes::default())
+                            .unwrap(),
+                    ],
+                };
+            }
+            SftpPacket::Status { id, code: 2, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn remove_symlink(&mut self, id: u32, path: &[u8]) -> SftpPacket {
+            let code =
+                if path == b"symlink" && self.symlink_target.take().is_some() { 0 } else { 2 };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
         }
 
         fn hardlink_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
@@ -1144,6 +1186,19 @@ mod tests {
                         SftpPacket::Stat { id, path } if self.lsetstat_link_mtime.is_some() => {
                             self.link_attributes(id, true, &path)
                         }
+                        SftpPacket::Symlink { id, link_path, target_path }
+                            if self.lsetstat_link_mtime.is_some() =>
+                        {
+                            self.symlink_response(id, &link_path, &target_path)
+                        }
+                        SftpPacket::Readlink { id, path } if self.lsetstat_link_mtime.is_some() => {
+                            self.readlink_response(id, &path)
+                        }
+                        SftpPacket::Remove { id, path }
+                            if self.lsetstat_link_mtime.is_some() && path == b"symlink" =>
+                        {
+                            self.remove_symlink(id, &path)
+                        }
                         SftpPacket::Read { id, handle, offset, length } => {
                             self.read_response(id, &handle, offset, length)
                         }
@@ -1226,6 +1281,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: None,
                     lsetstat_link_mtime: None,
+                    symlink_target: None,
                     directory: directory.then(DirectoryFixture::default),
                     read_reply_limit,
                     reorder_first_reads,
@@ -1580,6 +1636,29 @@ mod tests {
         ));
         assert_eq!(session.pending_requests(), 0);
 
+        let missing_link = session.client_mut().readlink(b"missing").unwrap();
+        session.send_request(&missing_link).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let create_link = session.client_mut().symlink(b"symlink", b"file").unwrap();
+        session.send_request(&create_link).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let read_link = session.client_mut().readlink(b"symlink").unwrap();
+        session.send_request(&read_link).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Name { entries, .. }
+                if entries.len() == 1 && entries[0].filename == b"file"
+        ));
+        assert_eq!(session.pending_requests(), 0);
+
         let request = session.client_mut().lsetstat(b"symlink", &attrs).unwrap();
         session.send_request(&request).await.unwrap();
         assert!(matches!(
@@ -1599,6 +1678,20 @@ mod tests {
         assert!(matches!(
             session.read_response().await.unwrap(),
             SftpPacket::Attrs { attrs, .. } if attrs.modify_time == Some(1_700_000_000)
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let remove_link = session.client_mut().remove(b"symlink").unwrap();
+        session.send_request(&remove_link).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let after_cleanup = session.client_mut().readlink(b"symlink").unwrap();
+        session.send_request(&after_cleanup).await.unwrap();
+        assert!(matches!(
+            session.read_response().await.unwrap(),
+            SftpPacket::Status { code: 2, .. }
         ));
         assert_eq!(session.pending_requests(), 0);
     }
@@ -1658,6 +1751,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: Some(b"0123456789".to_vec()),
                     lsetstat_link_mtime: None,
+                    symlink_target: None,
                     directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
@@ -1753,6 +1847,7 @@ mod tests {
                     expand_path_prefix: Some(b"/srv/"),
                     copy_data_target: None,
                     lsetstat_link_mtime: Some(1_700_000_001),
+                    symlink_target: None,
                     directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
@@ -1839,6 +1934,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: None,
                     lsetstat_link_mtime: None,
+                    symlink_target: None,
                     directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
@@ -1904,6 +2000,7 @@ mod tests {
                     expand_path_prefix: None,
                     copy_data_target: None,
                     lsetstat_link_mtime: None,
+                    symlink_target: None,
                     directory: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
