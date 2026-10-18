@@ -412,7 +412,11 @@ fn proxy_io(
     operation: ProxyOperation,
     error: &io::Error,
 ) -> ProxyTransportError {
-    ProxyTransportError::Proxy(ProxyError::Io { protocol, operation, kind: error.kind() })
+    ProxyTransportError::Proxy(ProxyError::Io {
+        protocol,
+        operation,
+        kind: handshake_error_kind(error.kind()),
+    })
 }
 
 fn proxy_transport_io(
@@ -421,7 +425,16 @@ fn proxy_transport_io(
     error: TransportError,
 ) -> ProxyTransportError {
     let io_error: io::Error = error.into();
-    ProxyTransportError::Proxy(ProxyError::Io { protocol, operation, kind: io_error.kind() })
+    ProxyTransportError::Proxy(ProxyError::Io {
+        protocol,
+        operation,
+        kind: handshake_error_kind(io_error.kind()),
+    })
+}
+
+fn handshake_error_kind(kind: io::ErrorKind) -> io::ErrorKind {
+    // A blocking socket with SO_RCVTIMEO/SO_SNDTIMEO reports EAGAIN on Unix.
+    if kind == io::ErrorKind::WouldBlock { io::ErrorKind::TimedOut } else { kind }
 }
 
 fn clear_handshake_timeout(inner: &TcpTransport) -> Result<(), TransportError> {

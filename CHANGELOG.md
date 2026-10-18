@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Updated rustls to 0.23.46 in the SSH crate and both Cargo lockfiles, addressing
+  RUSTSEC-2026-0346 through RUSTSEC-2026-0349 without suppressing the advisory checks.
+- Normalize expired SOCKS5 and HTTP CONNECT handshake socket deadlines to `TimedOut` on Unix,
+  where blocking socket timeouts surface as `WouldBlock`; direct public transport tests cover both
+  proxy protocols and the concrete SSH route retains its typed timeout error.
 - Added `AsyncGatewayTransport` and `ClientConnection::connect_via_gateway_stream` to write and
   flush the bounded K-6 client hello over an already negotiated async TLS/ALPN stream before SSH
   starts. TLS/ALPN setup and live edge interoperability remain caller-owned and unverified.
