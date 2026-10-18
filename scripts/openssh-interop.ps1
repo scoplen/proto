@@ -59,11 +59,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH SFTP or forwarding interop failed' }
     cargo run --quiet --locked -p scoplen-ssh --example proxy_command_interop
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH ProxyCommand interop failed' }
+    cargo run --quiet --locked -p scoplen-ssh --example dynamic_socks_interop
+    if ($LASTEXITCODE -ne 0) { throw 'OpenSSH dynamic SOCKS interop failed' }
 
     $env:SCOPLEN_OPENSSH_PASSWORD = 'wrong-password'
     cargo run --quiet --locked -p scoplen-ssh --example openssh_interop 2>$null
     if ($LASTEXITCODE -eq 0) { throw 'OpenSSH accepted an incorrect password' }
-    Write-Output 'OpenSSH SFTP, forwarding, ProxyCommand, and wrong-password interop passed'
+    Write-Output 'OpenSSH SFTP, forwarding, ProxyCommand, SOCKS, and wrong-password interop passed'
 }
 finally {
     if ($started) { docker stop $container | Out-Null }

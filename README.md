@@ -174,7 +174,7 @@ SOCKS5 and SOCKS4a routes to the server's SSH listener, refusal and closure for 
 a fresh forwarded connection and session command on the same authenticated SSH connection, and
 listener cancellation releasing its local port. It passed from Windows against a disposable Linux
 OpenSSH container; other host platforms, destinations, and server implementations remain
-unverified for this route.
+unverified for this route. The disposable OpenSSH CI script above also runs this example.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, bounded conflict problem, acknowledgement, snapshot, version-history, content-free

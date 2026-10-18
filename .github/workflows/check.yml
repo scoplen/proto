@@ -70,6 +70,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: SFTP, forwarding, ProxyCommand, and rejected password
+      - name: SFTP, forwarding, ProxyCommand, SOCKS, and rejected password
         shell: pwsh
         run: ./scripts/openssh-interop.ps1
