@@ -1,8 +1,11 @@
-use std::{env, time::Duration};
+use std::{
+    env,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use scoplen_ssh::{
     ChannelEvent, ClientConfig, ClientConnection, HostKey, HostKeyVerificationError, RsaSshSigner,
-    SignatureAlgorithm,
+    SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm,
 };
 use ssh_key::{PrivateKey, PublicKey};
 use tokio::time::timeout;
@@ -55,7 +58,109 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if output != b"scoplen-openssh-ok" {
         return Err(format!("unexpected output: {output:?}").into());
     }
+    if env::var("SCOPLEN_OPENSSH_SFTP").as_deref() == Ok("1") {
+        timeout(Duration::from_secs(30), verify_sftp(&connection)).await??;
+    }
     connection.disconnect().await?;
     println!("openssh interop ok");
+    Ok(())
+}
+
+async fn sftp_response(
+    session: &mut SftpSession,
+    request: SftpPacket,
+) -> Result<SftpPacket, Box<dyn std::error::Error>> {
+    session.send_request(&request).await?;
+    Ok(session.read_response().await?)
+}
+
+async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
+    let mut session = SftpSession::open(connection, 4).await?;
+    if session.limits().is_none() {
+        return Err("OpenSSH did not advertise SFTP transfer limits".into());
+    }
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let path = format!(".scoplen-interop-{}-{nonce}", std::process::id()).into_bytes();
+    let missing_path = [path.as_slice(), b"-missing"].concat();
+    let missing = session.client_mut().open(missing_path, 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(&mut session, missing).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("missing SFTP file was not rejected cleanly".into());
+    }
+
+    let create = session.client_mut().open(path.clone(), 0x1a, SftpAttributes::default())?;
+    let write_handle = match sftp_response(&mut session, create).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected SFTP create response: {other:?}").into()),
+    };
+    let data: Vec<u8> = b"scoplen-sftp-v3".iter().copied().cycle().take(100_000).collect();
+    let mut upload_progress = Vec::new();
+    let first = session
+        .upload(&write_handle, 0, &data[..40_000], 4096, 4, |event| {
+            upload_progress.push(event);
+        })
+        .await?;
+    let second = session
+        .upload(&write_handle, first, &data[40_000..], 4096, 4, |event| {
+            upload_progress.push(event);
+        })
+        .await?;
+    if first != 40_000
+        || second != 60_000
+        || upload_progress.last().is_none_or(|event| {
+            event.offset != data.len() as u64
+                || event.transferred != second
+                || event.total != Some(data.len() as u64)
+        })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP upload or progress mismatch".into());
+    }
+    let close = session.client_mut().close(write_handle)?;
+    if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP write handle close failed".into());
+    }
+
+    let read = session.client_mut().open(path.clone(), 1, SftpAttributes::default())?;
+    let read_handle = match sftp_response(&mut session, read).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected SFTP read response: {other:?}").into()),
+    };
+    let mut downloaded = Vec::new();
+    let mut download_progress = Vec::new();
+    let count = session
+        .download_to(
+            &read_handle,
+            1000,
+            Some(data.len() as u64),
+            4096,
+            4,
+            &mut downloaded,
+            |event| download_progress.push(event),
+        )
+        .await?;
+    if count != (data.len() - 1000) as u64
+        || downloaded != data[1000..]
+        || download_progress.last().is_none_or(|event| {
+            event.offset != data.len() as u64
+                || event.transferred != count
+                || event.total != Some(data.len() as u64)
+        })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP resumed download or progress mismatch".into());
+    }
+    let close = session.client_mut().close(read_handle)?;
+    if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP read handle close failed".into());
+    }
+    let remove = session.client_mut().remove(path)?;
+    if !matches!(sftp_response(&mut session, remove).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP cleanup or request release failed".into());
+    }
+    println!("openssh sftp interop ok");
     Ok(())
 }
