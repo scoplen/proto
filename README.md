@@ -1,4 +1,4 @@
-# scoplen-proto
+# proto
 
 Shared Rust contracts and protocol libraries for Scoplen.
 
