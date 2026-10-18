@@ -580,7 +580,7 @@ mod tests {
         file: Vec<u8>,
         advertise_limits: bool,
         advertise_statvfs: bool,
-        fsync_handle_open: Option<bool>,
+        extension_handle_open: Option<bool>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
@@ -595,8 +595,9 @@ mod tests {
             if self.advertise_statvfs {
                 extensions.push(SftpExtension::new(b"statvfs@openssh.com", b"2").unwrap());
             }
-            if self.fsync_handle_open.is_some() {
+            if self.extension_handle_open.is_some() {
                 extensions.push(SftpExtension::new(b"fsync@openssh.com", b"1").unwrap());
+                extensions.push(SftpExtension::new(b"fstatvfs@openssh.com", b"2").unwrap());
             }
             SftpPacket::Version { version: 3, extensions }
         }
@@ -614,38 +615,42 @@ mod tests {
             }
         }
 
+        fn filesystem_stats(id: u32) -> SftpPacket {
+            SftpPacket::ExtendedReply {
+                id,
+                data: SftpStatvfs {
+                    block_size: 4096,
+                    fragment_size: 4096,
+                    blocks: 100,
+                    free_blocks: 80,
+                    available_blocks: 70,
+                    files: 50,
+                    free_files: 40,
+                    available_files: 30,
+                    filesystem_id: 1,
+                    flags: 0,
+                    name_max: 255,
+                }
+                .encode(),
+            }
+        }
+
         fn statvfs_response(id: u32, data: &[u8]) -> SftpPacket {
             if data == b"\0\0\0\x01." {
-                SftpPacket::ExtendedReply {
-                    id,
-                    data: SftpStatvfs {
-                        block_size: 4096,
-                        fragment_size: 4096,
-                        blocks: 100,
-                        free_blocks: 80,
-                        available_blocks: 70,
-                        files: 50,
-                        free_files: 40,
-                        available_files: 30,
-                        filesystem_id: 1,
-                        flags: 0,
-                        name_max: 255,
-                    }
-                    .encode(),
-                }
+                Self::filesystem_stats(id)
             } else {
                 SftpPacket::Status { id, code: 2, message: Vec::new(), language: Vec::new() }
             }
         }
 
-        fn open_fsync_handle(&mut self, id: u32) -> SftpPacket {
-            self.fsync_handle_open = Some(true);
+        fn open_extension_handle(&mut self, id: u32) -> SftpPacket {
+            self.extension_handle_open = Some(true);
             SftpPacket::Handle { id, handle: b"h".to_vec() }
         }
 
-        fn close_fsync_handle(&mut self, id: u32, handle: &[u8]) -> SftpPacket {
-            let code = if handle == b"h" && self.fsync_handle_open == Some(true) {
-                self.fsync_handle_open = Some(false);
+        fn close_extension_handle(&mut self, id: u32, handle: &[u8]) -> SftpPacket {
+            let code = if handle == b"h" && self.extension_handle_open == Some(true) {
+                self.extension_handle_open = Some(false);
                 0
             } else {
                 4
@@ -654,9 +659,30 @@ mod tests {
         }
 
         fn fsync_response(&self, id: u32, data: &[u8]) -> SftpPacket {
-            let code =
-                if data == b"\0\0\0\x01h" && self.fsync_handle_open == Some(true) { 0 } else { 4 };
+            let code = if data == b"\0\0\0\x01h" && self.extension_handle_open == Some(true) {
+                0
+            } else {
+                4
+            };
             SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn fstatvfs_response(&self, id: u32, data: &[u8]) -> SftpPacket {
+            if data == b"\0\0\0\x01h" && self.extension_handle_open == Some(true) {
+                Self::filesystem_stats(id)
+            } else {
+                SftpPacket::Status { id, code: 4, message: Vec::new(), language: Vec::new() }
+            }
+        }
+
+        fn realpath_response(id: u32) -> SftpPacket {
+            SftpPacket::Name {
+                id,
+                entries: vec![
+                    SftpNameEntry::new(b"/srv".to_vec(), Vec::new(), SftpAttributes::default())
+                        .unwrap(),
+                ],
+            }
         }
     }
 
@@ -740,23 +766,13 @@ mod tests {
                 let is_read = matches!(packet, SftpPacket::Read { .. });
                 let response = match packet {
                     SftpPacket::Init { .. } => self.version_response(),
-                    SftpPacket::Open { id, .. } if self.fsync_handle_open.is_some() => {
-                        self.open_fsync_handle(id)
+                    SftpPacket::Open { id, .. } if self.extension_handle_open.is_some() => {
+                        self.open_extension_handle(id)
                     }
-                    SftpPacket::Close { id, handle } if self.fsync_handle_open.is_some() => {
-                        self.close_fsync_handle(id, &handle)
+                    SftpPacket::Close { id, handle } if self.extension_handle_open.is_some() => {
+                        self.close_extension_handle(id, &handle)
                     }
-                    SftpPacket::Realpath { id, .. } => SftpPacket::Name {
-                        id,
-                        entries: vec![
-                            SftpNameEntry::new(
-                                b"/srv".to_vec(),
-                                Vec::new(),
-                                SftpAttributes::default(),
-                            )
-                            .unwrap(),
-                        ],
-                    },
+                    SftpPacket::Realpath { id, .. } => Self::realpath_response(id),
                     SftpPacket::Read { id, offset, length, .. } => match usize::try_from(offset) {
                         Ok(start) if start < self.file.len() => {
                             let end = start
@@ -802,9 +818,15 @@ mod tests {
                         Self::statvfs_response(id, &data)
                     }
                     SftpPacket::Extended { id, name, data }
-                        if name == b"fsync@openssh.com" && self.fsync_handle_open.is_some() =>
+                        if name == b"fsync@openssh.com" && self.extension_handle_open.is_some() =>
                     {
                         self.fsync_response(id, &data)
+                    }
+                    SftpPacket::Extended { id, name, data }
+                        if name == b"fstatvfs@openssh.com"
+                            && self.extension_handle_open.is_some() =>
+                    {
+                        self.fstatvfs_response(id, &data)
                     }
                     _ => continue,
                 };
@@ -850,7 +872,7 @@ mod tests {
                     file,
                     advertise_limits: false,
                     advertise_statvfs: false,
-                    fsync_handle_open: None,
+                    extension_handle_open: None,
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -910,6 +932,20 @@ mod tests {
         connection.disconnect().await.expect("disconnect client");
     }
 
+    async fn assert_fstatvfs(session: &mut SftpSession, handle: &[u8], open: bool) {
+        let request = session.client_mut().fstatvfs(handle.to_vec()).expect("fstatvfs request");
+        session.send_request(&request).await.expect("send fstatvfs");
+        let response = session.read_response().await.expect("read fstatvfs");
+        if open {
+            let stats = response.statvfs_response().expect("decode fstatvfs");
+            assert_eq!(stats.block_size, 4096);
+            assert_eq!(stats.name_max, 255);
+        } else {
+            assert!(matches!(response, SftpPacket::Status { code: 4, .. }));
+        }
+        assert_eq!(session.pending_requests(), 0);
+    }
+
     #[tokio::test]
     async fn opens_subsystem_negotiates_v3_and_round_trips_packets() {
         let mut server_config = russh::server::Config::default();
@@ -933,7 +969,7 @@ mod tests {
                     file: Vec::new(),
                     advertise_limits: true,
                     advertise_statvfs: true,
-                    fsync_handle_open: Some(false),
+                    extension_handle_open: Some(false),
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -947,7 +983,7 @@ mod tests {
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
-        assert_eq!(session.extensions().len(), 3);
+        assert_eq!(session.extensions().len(), 4);
         assert!(session.limits().is_some());
         assert_eq!(
             session.request_limits().await.expect("request limits"),
@@ -988,19 +1024,22 @@ mod tests {
             SftpPacket::Status { code: 0, .. }
         ));
         assert_eq!(session.pending_requests(), 0);
+        assert_fstatvfs(&mut session, &handle, true).await;
         let close = session.client_mut().close(handle.clone()).expect("close request");
         session.send_request(&close).await.expect("send close");
         assert!(matches!(
             session.read_response().await.expect("read close"),
             SftpPacket::Status { code: 0, .. }
         ));
-        let closed_fsync = session.client_mut().fsync(handle).expect("closed fsync request");
+        let closed_fsync =
+            session.client_mut().fsync(handle.clone()).expect("closed fsync request");
         session.send_request(&closed_fsync).await.expect("send closed fsync");
         assert!(matches!(
             session.read_response().await.expect("read closed fsync"),
             SftpPacket::Status { code: 4, .. }
         ));
         assert_eq!(session.pending_requests(), 0);
+        assert_fstatvfs(&mut session, &handle, false).await;
 
         let missing = session.client_mut().statvfs(b"missing").expect("missing statvfs request");
         session.send_request(&missing).await.expect("send missing statvfs");
@@ -1035,7 +1074,7 @@ mod tests {
                     file: Vec::new(),
                     advertise_limits: false,
                     advertise_statvfs: false,
-                    fsync_handle_open: None,
+                    extension_handle_open: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1094,7 +1133,7 @@ mod tests {
                     file: b"abcdef".to_vec(),
                     advertise_limits: false,
                     advertise_statvfs: false,
-                    fsync_handle_open: None,
+                    extension_handle_open: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
