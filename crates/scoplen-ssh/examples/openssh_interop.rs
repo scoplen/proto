@@ -1,9 +1,10 @@
 use std::{env, time::Duration};
 
 use scoplen_ssh::{
-    ChannelEvent, ClientConfig, ClientConnection, HostKey, HostKeyVerificationError,
+    ChannelEvent, ClientConfig, ClientConnection, HostKey, HostKeyVerificationError, RsaSshSigner,
+    SignatureAlgorithm,
 };
-use ssh_key::PublicKey;
+use ssh_key::{PrivateKey, PublicKey};
 use tokio::time::timeout;
 
 #[tokio::main]
@@ -12,8 +13,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port =
         env::var("SCOPLEN_OPENSSH_PORT").unwrap_or_else(|_| "22223".to_owned()).parse::<u16>()?;
     let username = env::var("SCOPLEN_OPENSSH_USER").unwrap_or_else(|_| "scoplen".to_owned());
-    let password = env::var("SCOPLEN_OPENSSH_PASSWORD")
-        .map_err(|_| "SCOPLEN_OPENSSH_PASSWORD must be set for the disposable test server")?;
     let expected_key = env::var("SCOPLEN_OPENSSH_HOST_KEY")
         .map_err(|_| "SCOPLEN_OPENSSH_HOST_KEY must be set to the server's public key")?;
     let expected_key = PublicKey::from_openssh(&expected_key)?.to_bytes()?;
@@ -23,7 +22,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let config = ClientConfig::new(host, port, verifier)?;
     let mut connection = ClientConnection::connect(config).await?;
-    connection.authenticate_password(&username, password.as_bytes()).await?;
+    if let Ok(path) = env::var("SCOPLEN_OPENSSH_RSA_KEY") {
+        let key = PrivateKey::read_openssh_file(path)?;
+        let algorithm = match env::var("SCOPLEN_OPENSSH_RSA_HASH").as_deref() {
+            Ok("256") => SignatureAlgorithm::RsaSha2_256,
+            Ok("512") | Err(_) => SignatureAlgorithm::RsaSha2_512,
+            _ => return Err("SCOPLEN_OPENSSH_RSA_HASH must be 256 or 512".into()),
+        };
+        let signer = RsaSshSigner::new(key, algorithm)?;
+        connection.authenticate_publickey(&username, &signer).await?;
+    } else {
+        let password = env::var("SCOPLEN_OPENSSH_PASSWORD")
+            .map_err(|_| "SCOPLEN_OPENSSH_PASSWORD or SCOPLEN_OPENSSH_RSA_KEY is required")?;
+        connection.authenticate_password(&username, password.as_bytes()).await?;
+    }
     let channel = connection.open_session().await?;
     channel.exec(true, b"printf scoplen-openssh-ok").await?;
     let mut channel = channel;

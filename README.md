@@ -95,9 +95,13 @@ Pageant interoperability, live gateway interoperability, and broader channel sch
 unverified. The agent-backed signer also completes the concrete public-key authentication flow
 against the in-process russh server; platform agent interoperability remains unverified.
 The `openssh_interop` example provides a disposable external-server smoke test when
-`SCOPLEN_OPENSSH_PASSWORD` and `SCOPLEN_OPENSSH_HOST_KEY` (the server's OpenSSH public-key line)
-and the optional host, port, and username variables are supplied; it verifies the pinned host key,
-password authentication, and a session command.
+`SCOPLEN_OPENSSH_HOST_KEY` (the server's OpenSSH public-key line) and either
+`SCOPLEN_OPENSSH_PASSWORD` or `SCOPLEN_OPENSSH_RSA_KEY` (a path to an unencrypted OpenSSH RSA
+private key) are supplied. The optional `SCOPLEN_OPENSSH_RSA_HASH=256|512` selects the RSA-SHA2
+signature algorithm (default 512). Optional host, port, and username variables select the test
+server. It verifies the pinned host key, authentication, and a session command. Password and both
+RSA-SHA2 variants passed against disposable Linux OpenSSH containers; wrong credentials and a
+wrong host key were rejected. The broader interoperability matrix remains open.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, acknowledgement, snapshot, version-history, content-free notification, account
