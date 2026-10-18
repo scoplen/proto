@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{io::ErrorKind, net::TcpListener, thread, time::Duration};
+use std::{
+    io::{self, ErrorKind},
+    net::TcpListener,
+    thread,
+    time::Duration,
+};
 
 use scoplen_ssh::{
     HttpConnectTransport, ProxyError, ProxyOperation, ProxyProtocol, ProxyTransportError,
@@ -13,8 +18,11 @@ fn stalled_proxy() -> (u16, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind proxy");
     let port = listener.local_addr().expect("proxy address").port();
     let task = thread::spawn(move || {
-        let (_client, _) = listener.accept().expect("accept proxy client");
-        thread::sleep(Duration::from_millis(400));
+        let (mut client, _) = listener.accept().expect("accept proxy client");
+        client.set_read_timeout(Some(Duration::from_secs(5))).expect("bound proxy read");
+        let request_bytes =
+            io::copy(&mut client, &mut io::sink()).expect("read until client close");
+        assert!(request_bytes > 0, "client sent a proxy request");
     });
     (port, task)
 }
