@@ -14,7 +14,7 @@ use std::{
     net::{Shutdown, TcpStream as StdTcpStream},
     pin::Pin,
     str,
-    sync::Arc,
+    sync::{Arc, Weak},
     task::{Context, Poll},
     time::Duration,
 };
@@ -28,8 +28,8 @@ use russh::{
 use scoplen_crypto::SecretVec;
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
-use tokio::time::timeout as async_timeout;
+use tokio::sync::{OwnedSemaphorePermit, RwLock, Semaphore, mpsc, watch};
+use tokio::time::{Instant, timeout as async_timeout};
 use zeroize::Zeroize;
 
 use crate::{
@@ -230,7 +230,7 @@ impl ClientConfig {
     ///
     /// The byte limit must be between one byte and one GiB, inclusive; the time limit must be
     /// positive. Defaults are one GiB and one hour. The event loop checks the time limit when
-    /// processing traffic; an idle connection does not wake solely to rekey. Incoming byte
+    /// processing traffic; a separate timer requests rekey for idle connections. Incoming byte
     /// thresholds are not enforced by the current engine. The engine's byte counter excludes
     /// packet headers, padding, and authentication tags.
     pub fn with_rekey_limits(
@@ -573,10 +573,58 @@ impl From<russh::Error> for ClientError {
 
 /// A connected and authenticated-capable SSH client.
 pub struct ClientConnection {
-    handle: client::Handle<ClientHandler>,
+    handle: Arc<RwLock<client::Handle<ClientHandler>>>,
+    rekey_task: tokio::task::JoinHandle<()>,
     channel_slots: Arc<Semaphore>,
     channel_limit: usize,
     forwarded_channels: mpsc::Receiver<ForwardedChannel>,
+}
+
+impl Drop for ClientConnection {
+    fn drop(&mut self) {
+        self.rekey_task.abort();
+    }
+}
+
+async fn idle_rekey_timer(
+    handle: Weak<RwLock<client::Handle<ClientHandler>>>,
+    mut exchanges: watch::Receiver<Option<Instant>>,
+    limit: Duration,
+) {
+    loop {
+        let Some(completed_at) = *exchanges.borrow_and_update() else {
+            break;
+        };
+        let Some(deadline) = completed_at.checked_add(limit) else {
+            if exchanges.changed().await.is_err() {
+                break;
+            }
+            continue;
+        };
+        tokio::select! {
+            biased;
+            changed = exchanges.changed() => {
+                if changed.is_err() { break; }
+            }
+            () = tokio::time::sleep_until(deadline) => {
+                let Some(handle) = handle.upgrade() else { break; };
+                let request = {
+                    let handle = handle.read().await;
+                    if exchanges.has_changed().unwrap_or(false) {
+                        continue;
+                    }
+                    if handle.is_closed() { break; }
+                    handle.rekey_soon().await
+                };
+                drop(handle);
+                if request.is_err() {
+                    break;
+                }
+                // One request is outstanding. Only a completed exchange starts another period.
+                if exchanges.changed().await.is_err() { break; }
+            }
+        }
+    }
 }
 
 // russh moves the socket into its key-exchange task before connect_stream returns. Shutting down
@@ -604,10 +652,12 @@ impl ClientConnection {
     pub async fn connect(config: ClientConfig) -> Result<Self, ClientError> {
         let channel_slots = Arc::new(Semaphore::new(config.channel_limit));
         let (forwarded_tx, forwarded_channels) = mpsc::channel(config.channel_limit);
-        let handler = ClientHandler::new(&config, Arc::clone(&channel_slots), forwarded_tx);
+        let (exchanges_tx, exchanges_rx) = watch::channel(None);
+        let handler =
+            ClientHandler::new(&config, Arc::clone(&channel_slots), forwarded_tx, exchanges_tx);
         let address = (config.host.clone(), config.port);
         let handle = client::connect(Arc::new(config.russh_config()), address, handler).await?;
-        Ok(Self { handle, channel_slots, channel_limit: config.channel_limit, forwarded_channels })
+        Ok(Self::from_handle(handle, &config, channel_slots, forwarded_channels, exchanges_rx))
     }
 
     /// Connect over a caller-provided byte stream and complete SSH key exchange.
@@ -617,10 +667,34 @@ impl ClientConnection {
     {
         let channel_slots = Arc::new(Semaphore::new(config.channel_limit));
         let (forwarded_tx, forwarded_channels) = mpsc::channel(config.channel_limit);
-        let handler = ClientHandler::new(&config, Arc::clone(&channel_slots), forwarded_tx);
+        let (exchanges_tx, exchanges_rx) = watch::channel(None);
+        let handler =
+            ClientHandler::new(&config, Arc::clone(&channel_slots), forwarded_tx, exchanges_tx);
         let handle =
             client::connect_stream(Arc::new(config.russh_config()), stream, handler).await?;
-        Ok(Self { handle, channel_slots, channel_limit: config.channel_limit, forwarded_channels })
+        Ok(Self::from_handle(handle, &config, channel_slots, forwarded_channels, exchanges_rx))
+    }
+
+    fn from_handle(
+        handle: client::Handle<ClientHandler>,
+        config: &ClientConfig,
+        channel_slots: Arc<Semaphore>,
+        forwarded_channels: mpsc::Receiver<ForwardedChannel>,
+        exchanges: watch::Receiver<Option<Instant>>,
+    ) -> Self {
+        let handle = Arc::new(RwLock::new(handle));
+        let rekey_task = tokio::spawn(idle_rekey_timer(
+            Arc::downgrade(&handle),
+            exchanges,
+            config.rekey_time_limit,
+        ));
+        Self {
+            handle,
+            rekey_task,
+            channel_slots,
+            channel_limit: config.channel_limit,
+            forwarded_channels,
+        }
     }
 
     /// Write the K-6 gateway client hello over an already negotiated TLS/ALPN stream, then start
@@ -845,6 +919,8 @@ impl ClientConnection {
         let mut adapter = RusshSignerAdapter { signer, identity, username: username.to_owned() };
         let result = self
             .handle
+            .write()
+            .await
             .authenticate_publickey_with(username.to_owned(), key, hash_alg, &mut adapter)
             .await
             .map_err(ClientError::PublicKey)?;
@@ -894,6 +970,8 @@ impl ClientConnection {
         let mut adapter = RusshSignerAdapter { signer, identity, username: username.to_owned() };
         let result = self
             .handle
+            .write()
+            .await
             .authenticate_certificate_with(username.to_owned(), certificate, hash_alg, &mut adapter)
             .await
             .map_err(ClientError::PublicKey)?;
@@ -919,6 +997,8 @@ impl ClientConnection {
             .map_err(|_| ClientError::PasswordEncoding)?;
         let result = self
             .handle
+            .write()
+            .await
             .authenticate_password(username.to_owned(), password.clone())
             .await
             .map_err(ClientError::from);
@@ -941,7 +1021,14 @@ impl ClientConnection {
     ) -> Result<NoneAuthOutcome, ClientError> {
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
-        match self.handle.authenticate_none(username.to_owned()).await.map_err(ClientError::from)? {
+        match self
+            .handle
+            .write()
+            .await
+            .authenticate_none(username.to_owned())
+            .await
+            .map_err(ClientError::from)?
+        {
             russh::client::AuthResult::Success => Ok(NoneAuthOutcome::Authenticated),
             russh::client::AuthResult::Failure { remaining_methods, partial_success } => {
                 Ok(NoneAuthOutcome::Rejected {
@@ -977,8 +1064,8 @@ impl ClientConnection {
             )
             .map_err(ClientError::Config)?;
         }
-        let mut reply = self
-            .handle
+        let mut handle = self.handle.write().await;
+        let mut reply = handle
             .authenticate_keyboard_interactive_start(
                 username.to_owned(),
                 submethods.map(str::to_owned),
@@ -1034,7 +1121,7 @@ impl ClientConnection {
                         .map_err(|_| {
                             ClientError::InvalidInput("keyboard response count or size is invalid")
                         })?;
-                    self.handle
+                    handle
                         .authenticate_keyboard_interactive_respond(responses)
                         .await
                         .map_err(ClientError::from)?
@@ -1047,6 +1134,8 @@ impl ClientConnection {
     pub async fn open_session(&self) -> Result<ClientChannel, ClientError> {
         let permit = self.channel_permit()?;
         self.handle
+            .read()
+            .await
             .channel_open_session()
             .await
             .map(|channel| ClientChannel::new(channel, permit))
@@ -1067,6 +1156,8 @@ impl ClientConnection {
             .map_err(ClientError::Config)?;
         let permit = self.channel_permit()?;
         self.handle
+            .read()
+            .await
             .channel_open_direct_tcpip(
                 target_address.to_owned(),
                 target_port,
@@ -1087,6 +1178,8 @@ impl ClientConnection {
             .map_err(ClientError::Config)?;
         let permit = self.channel_permit()?;
         self.handle
+            .read()
+            .await
             .channel_open_direct_streamlocal(socket_path.to_owned())
             .await
             .map(|channel| ClientChannel::new(channel, permit))
@@ -1104,21 +1197,36 @@ impl ClientConnection {
     ) -> Result<u32, ClientError> {
         validate_text(address.as_bytes(), MAX_CHANNEL_ADDRESS, "forward address", false)
             .map_err(ClientError::Config)?;
-        self.handle.tcpip_forward(address.to_owned(), port).await.map_err(ClientError::from)
+        self.handle
+            .read()
+            .await
+            .tcpip_forward(address.to_owned(), port)
+            .await
+            .map_err(ClientError::from)
     }
 
     /// Cancel a remote TCP forwarding definition.
     pub async fn cancel_tcpip_forward(&self, address: &str, port: u32) -> Result<(), ClientError> {
         validate_text(address.as_bytes(), MAX_CHANNEL_ADDRESS, "forward address", false)
             .map_err(ClientError::Config)?;
-        self.handle.cancel_tcpip_forward(address.to_owned(), port).await.map_err(ClientError::from)
+        self.handle
+            .read()
+            .await
+            .cancel_tcpip_forward(address.to_owned(), port)
+            .await
+            .map_err(ClientError::from)
     }
 
     /// Ask the server to listen for a remote Unix-socket forwarding definition.
     pub async fn request_streamlocal_forward(&self, socket_path: &str) -> Result<(), ClientError> {
         validate_text(socket_path.as_bytes(), MAX_CHANNEL_ADDRESS, "socket path", true)
             .map_err(ClientError::Config)?;
-        self.handle.streamlocal_forward(socket_path.to_owned()).await.map_err(ClientError::from)
+        self.handle
+            .read()
+            .await
+            .streamlocal_forward(socket_path.to_owned())
+            .await
+            .map_err(ClientError::from)
     }
 
     /// Cancel a remote Unix-socket forwarding definition.
@@ -1126,6 +1234,8 @@ impl ClientConnection {
         validate_text(socket_path.as_bytes(), MAX_CHANNEL_ADDRESS, "socket path", true)
             .map_err(ClientError::Config)?;
         self.handle
+            .read()
+            .await
             .cancel_streamlocal_forward(socket_path.to_owned())
             .await
             .map_err(ClientError::from)
@@ -1148,7 +1258,10 @@ impl ClientConnection {
 
     /// Ask the peer to disconnect this SSH connection.
     pub async fn disconnect(&self) -> Result<(), ClientError> {
+        self.rekey_task.abort();
         self.handle
+            .read()
+            .await
             .disconnect(russh::Disconnect::ByApplication, "", "en")
             .await
             .map_err(ClientError::from)
@@ -1665,6 +1778,7 @@ struct ClientHandler {
     verifier: Arc<dyn HostKeyVerifier + Send + Sync>,
     channel_slots: Arc<Semaphore>,
     forwarded_tx: mpsc::Sender<ForwardedChannel>,
+    exchanges: watch::Sender<Option<Instant>>,
     #[cfg(test)]
     completed_key_exchanges: Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -1674,6 +1788,7 @@ impl ClientHandler {
         config: &ClientConfig,
         channel_slots: Arc<Semaphore>,
         forwarded_tx: mpsc::Sender<ForwardedChannel>,
+        exchanges: watch::Sender<Option<Instant>>,
     ) -> Self {
         Self {
             host: config.host.clone(),
@@ -1681,6 +1796,7 @@ impl ClientHandler {
             verifier: Arc::clone(&config.verifier),
             channel_slots,
             forwarded_tx,
+            exchanges,
             #[cfg(test)]
             completed_key_exchanges: Arc::clone(&config.completed_key_exchanges),
         }
@@ -1813,15 +1929,27 @@ impl ClientHandler {
 impl Handler for ClientHandler {
     type Error = ClientError;
 
-    #[cfg(test)]
     async fn kex_done(
         &mut self,
         _shared_secret: Option<&[u8]>,
         _names: &russh::Names,
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
+        self.exchanges.send_replace(Some(Instant::now()));
+        #[cfg(test)]
         self.completed_key_exchanges.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(())
+    }
+
+    async fn disconnected(
+        &mut self,
+        reason: russh::client::DisconnectReason<Self::Error>,
+    ) -> Result<(), Self::Error> {
+        self.exchanges.send_replace(None);
+        match reason {
+            russh::client::DisconnectReason::ReceivedDisconnect(_) => Ok(()),
+            russh::client::DisconnectReason::Error(error) => Err(error),
+        }
     }
 
     async fn check_server_key(
@@ -2687,6 +2815,12 @@ mod tests {
     }
 
     async fn start_echo_server() -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        start_echo_server_with_control(None).await
+    }
+
+    async fn start_echo_server_with_control(
+        control: Option<mpsc::Sender<russh::server::Handle>>,
+    ) -> (SocketAddr, tokio::task::JoinHandle<()>) {
         let (changes, _received) = mpsc::channel(1);
         let mut server_config = russh::server::Config::default();
         server_config.keys.push(
@@ -2701,8 +2835,14 @@ mod tests {
         let address = listener.local_addr().expect("SSH server address");
         let task = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("accept SSH client");
-            let _ =
-                russh::server::run_stream(server_config, stream, ResizeServer { changes }).await;
+            let running =
+                russh::server::run_stream(server_config, stream, ResizeServer { changes })
+                    .await
+                    .expect("start SSH server session");
+            if let Some(control) = control {
+                control.send(running.handle()).await.expect("send server handle");
+            }
+            let _ = running.await;
         });
         (address, task)
     }
@@ -2976,6 +3116,204 @@ mod tests {
         assert_transfer_across_rekey(DEFAULT_REKEY_WRITE_LIMIT, Duration::from_millis(100)).await;
     }
 
+    async fn wait_for_exchanges(completed: &AtomicUsize, count: usize) {
+        timeout(Duration::from_secs(5), async {
+            while completed.load(Ordering::SeqCst) < count {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("key exchange completed before deadline");
+    }
+
+    #[tokio::test]
+    async fn idle_timer_rekeys_twice_and_preserves_open_channel_bytes() {
+        let (address, server) = start_echo_server().await;
+        let config =
+            ClientConfig::new("127.0.0.1", address.port(), |_host: &str, _key: &HostKey| Ok(()))
+                .expect("client configuration")
+                .with_rekey_limits(DEFAULT_REKEY_WRITE_LIMIT, Duration::from_millis(300))
+                .expect("rekey limits");
+        let completed = Arc::clone(&config.completed_key_exchanges);
+        let mut connection = ClientConnection::connect(config).await.expect("connect SSH client");
+        connection
+            .authenticate_password("user", b"disposable-test-password")
+            .await
+            .expect("authenticate");
+        let mut channel = connection.open_session().await.expect("open session");
+        assert_eq!(completed.load(Ordering::SeqCst), 1);
+        wait_for_exchanges(&completed, 2).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(completed.load(Ordering::SeqCst), 2, "completed exchange restarts timer");
+        wait_for_exchanges(&completed, 3).await;
+        let payload = b"channel payload after two idle key exchanges";
+        channel.send_data(payload).await.expect("send channel data");
+        let mut received = Vec::new();
+        while received.len() < payload.len() {
+            match timeout(Duration::from_secs(5), channel.next_event())
+                .await
+                .expect("echo deadline")
+                .expect("read echo")
+                .expect("channel open")
+            {
+                ChannelEvent::Data(bytes) => received.extend_from_slice(&bytes),
+                event => panic!("unexpected echo event: {event:?}"),
+            }
+        }
+        assert_eq!(received, payload);
+        connection.disconnect().await.expect("disconnect");
+        timeout(Duration::from_secs(5), server).await.expect("server exits").expect("server task");
+    }
+
+    #[tokio::test]
+    async fn outgoing_byte_rekey_restarts_idle_timer() {
+        let (address, server) = start_echo_server().await;
+        let config =
+            ClientConfig::new("127.0.0.1", address.port(), |_host: &str, _key: &HostKey| Ok(()))
+                .expect("client configuration")
+                .with_rekey_limits(8 * 1024, Duration::from_millis(800))
+                .expect("rekey limits");
+        let completed = Arc::clone(&config.completed_key_exchanges);
+        let mut connection = ClientConnection::connect(config).await.expect("connect SSH client");
+        connection
+            .authenticate_password("user", b"disposable-test-password")
+            .await
+            .expect("authenticate");
+        let mut channel = connection.open_session().await.expect("open session");
+        let payload = vec![0x55; 8 * 1024];
+        channel.send_data(&payload).await.expect("send payload");
+        let mut received = Vec::new();
+        while received.len() < payload.len() {
+            match timeout(Duration::from_secs(5), channel.next_event())
+                .await
+                .expect("echo deadline")
+                .expect("read echo")
+                .expect("channel open")
+            {
+                ChannelEvent::Data(bytes) => received.extend_from_slice(&bytes),
+                event => panic!("unexpected echo event: {event:?}"),
+            }
+        }
+        assert_eq!(received, payload);
+        wait_for_exchanges(&completed, 2).await;
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(completed.load(Ordering::SeqCst), 2, "byte exchange restarts elapsed limit");
+        wait_for_exchanges(&completed, 3).await;
+        connection.disconnect().await.expect("disconnect");
+        timeout(Duration::from_secs(5), server).await.expect("server exits").expect("server task");
+    }
+
+    #[tokio::test]
+    async fn rekey_timer_stops_on_disconnect_drop_and_remote_disconnect() {
+        for ending in 0..3 {
+            let (control_tx, mut control_rx) = mpsc::channel(1);
+            let (address, server) = start_echo_server_with_control(Some(control_tx)).await;
+            let config = ClientConfig::new(
+                "127.0.0.1",
+                address.port(),
+                |_host: &str, _key: &HostKey| Ok(()),
+            )
+            .expect("client configuration");
+            let connection = ClientConnection::connect(config).await.expect("connect SSH client");
+            let task = connection.rekey_task.abort_handle();
+            match ending {
+                0 => {
+                    connection.disconnect().await.expect("disconnect");
+                    drop(connection);
+                    timeout(Duration::from_secs(5), server)
+                        .await
+                        .expect("server exits")
+                        .expect("server task");
+                }
+                1 => {
+                    drop(connection);
+                    timeout(Duration::from_secs(5), server)
+                        .await
+                        .expect("server exits")
+                        .expect("server task");
+                }
+                _ => {
+                    let server_handle = control_rx.recv().await.expect("server session handle");
+                    server_handle
+                        .disconnect(russh::Disconnect::ByApplication, String::new(), String::new())
+                        .await
+                        .expect("server disconnect");
+                    timeout(Duration::from_secs(5), server)
+                        .await
+                        .expect("server exits")
+                        .expect("server task");
+                    timeout(Duration::from_secs(5), async {
+                        while !task.is_finished() {
+                            tokio::task::yield_now().await;
+                        }
+                    })
+                    .await
+                    .expect("remote disconnect stops timer");
+                    drop(connection);
+                }
+            }
+            timeout(Duration::from_secs(5), async {
+                while !task.is_finished() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("timer task stopped");
+        }
+    }
+
+    #[tokio::test]
+    async fn rekey_timer_stops_when_transport_fails() {
+        let (server_address, server) = start_echo_server().await;
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind relay");
+        let relay_address = listener.local_addr().expect("relay address");
+        let relay = tokio::spawn(async move {
+            let (mut client, _) = listener.accept().await.expect("accept relay client");
+            let mut upstream = TcpStream::connect(server_address).await.expect("connect server");
+            let _ = copy_bidirectional(&mut client, &mut upstream).await;
+        });
+        let config =
+            ClientConfig::new("127.0.0.1", relay_address.port(), |_host: &str, _key: &HostKey| {
+                Ok(())
+            })
+            .expect("client configuration");
+        let connection = ClientConnection::connect(config).await.expect("connect through relay");
+        let task = connection.rekey_task.abort_handle();
+        relay.abort();
+        let _ = relay.await;
+        timeout(Duration::from_secs(5), async {
+            while !task.is_finished() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("transport error stops timer");
+        drop(connection);
+        timeout(Duration::from_secs(5), server).await.expect("server exits").expect("server task");
+    }
+
+    #[tokio::test]
+    async fn authentication_after_idle_rekey_does_not_deadlock() {
+        let (address, server) = start_echo_server().await;
+        let config =
+            ClientConfig::new("127.0.0.1", address.port(), |_host: &str, _key: &HostKey| Ok(()))
+                .expect("client configuration")
+                .with_rekey_limits(DEFAULT_REKEY_WRITE_LIMIT, Duration::from_millis(50))
+                .expect("rekey limits");
+        let completed = Arc::clone(&config.completed_key_exchanges);
+        let mut connection = ClientConnection::connect(config).await.expect("connect SSH client");
+        wait_for_exchanges(&completed, 2).await;
+        timeout(
+            Duration::from_secs(5),
+            connection.authenticate_password("user", b"disposable-test-password"),
+        )
+        .await
+        .expect("authentication deadline")
+        .expect("authenticate after rekey");
+        connection.disconnect().await.expect("disconnect");
+        timeout(Duration::from_secs(5), server).await.expect("server exits").expect("server task");
+    }
+
     #[test]
     fn config_rejects_empty_host_and_zero_port() {
         let verifier = |_host: &str, _key: &HostKey| Ok(());
@@ -3086,7 +3424,9 @@ mod tests {
         };
         let config = ClientConfig::new("host.example", 22, verifier).expect("config");
         let (forwarded_tx, _forwarded_rx) = mpsc::channel(1);
-        let mut handler = ClientHandler::new(&config, Arc::new(Semaphore::new(1)), forwarded_tx);
+        let (exchanges, _) = watch::channel(None);
+        let mut handler =
+            ClientHandler::new(&config, Arc::new(Semaphore::new(1)), forwarded_tx, exchanges);
         assert!(
             handler
                 .check_server_key(&PublicKeyOrCertificate::PublicKey {
