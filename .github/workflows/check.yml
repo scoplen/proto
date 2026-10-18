@@ -71,3 +71,13 @@ jobs:
       - name: SFTP, forwarding, ProxyCommand, SOCKS, and rejected password
         shell: pwsh
         run: ./scripts/openssh-interop.ps1
+
+  openssh-algorithms:
+    name: OpenSSH algorithm policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Constrained modern, legacy opt-in, and Host isolation
+        shell: pwsh
+        run: ./scripts/ssh-algorithm-interop.ps1
