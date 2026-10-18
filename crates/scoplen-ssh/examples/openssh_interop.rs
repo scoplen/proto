@@ -335,6 +335,40 @@ async fn verify_sftp_bytes(
     Ok(())
 }
 
+async fn expand_sftp_path(
+    session: &mut SftpSession,
+    path: &[u8],
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let request = session.client_mut().expand_path(path.to_vec())?;
+    let expanded = match sftp_response(session, request).await? {
+        SftpPacket::Name { entries, .. } if entries.len() == 1 => entries[0].filename.clone(),
+        other => return Err(format!("unexpected SFTP expand-path response: {other:?}").into()),
+    };
+    if !expanded.starts_with(b"/") || !expanded.ends_with(path) || session.pending_requests() != 0 {
+        return Err("SFTP expand-path returned an invalid path or retained a request slot".into());
+    }
+    Ok(expanded)
+}
+
+async fn verify_expand_path(
+    session: &mut SftpSession,
+    path: &[u8],
+    missing_path: &[u8],
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let expanded = expand_sftp_path(session, path).await?;
+    verify_sftp_bytes(session, &expanded, data).await?;
+
+    let missing = expand_sftp_path(session, missing_path).await?;
+    let open = session.client_mut().open(missing, 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, open).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP expanded missing path opened or retained a request slot".into());
+    }
+    Ok(())
+}
+
 async fn verify_posix_rename(
     session: &mut SftpSession,
     path: &[u8],
@@ -436,6 +470,9 @@ fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::er
     if !session.extensions().iter().any(|extension| extension.name == b"posix-rename@openssh.com") {
         return Err("OpenSSH did not advertise posix-rename@openssh.com".into());
     }
+    if !session.extensions().iter().any(|extension| extension.name == b"expand-path@openssh.com") {
+        return Err("OpenSSH did not advertise expand-path@openssh.com".into());
+    }
     Ok(())
 }
 
@@ -526,6 +563,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
         return Err("SFTP read handle close failed".into());
     }
     verify_hardlink(&mut session, &path, &linked_path, &missing_path, &data).await?;
+    verify_expand_path(&mut session, &path, &missing_path, &data).await?;
     verify_posix_rename(&mut session, &path, &missing_path, &data).await?;
     println!("openssh sftp interop ok");
     Ok(())
