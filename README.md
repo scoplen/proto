@@ -86,7 +86,9 @@ now composes the bounded v3 handshake and packet framing over an accepted SSH `s
 with bounded subsystem failure and truncation mapping; `SftpSession` adds bounded pipelining and
 request correlation, negotiates `limits@openssh.com`, caps transfer chunks to the peer's packet,
 read, and write limits, and supports resume-by-offset uploads/downloads with progress callbacks
-on that channel.
+on that channel. Pipelined downloads fill short-read gaps before advancing contiguous progress;
+an early EOF for a caller-specified end offset and an empty data response fail instead of
+silently returning a partial file.
 The concrete adapter also forwards bounded environment and signal requests and accepts
 server-opened `auth-agent@openssh.com` channels. `ForwardedChannel::serve_agent` reassembles
 russh channel fragments, applies the fail-closed forwarding policy, and returns bounded agent

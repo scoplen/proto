@@ -1,6 +1,9 @@
 //! Bounded SFTP v3 framing over one authenticated SSH session channel.
 
-use std::{collections::BTreeMap, io};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    io,
+};
 
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -237,32 +240,52 @@ impl SftpSession {
         let mut next_offset = start_offset;
         let mut committed_offset = start_offset;
         let mut transferred = 0_u64;
-        let mut eof = false;
+        let mut eof_at = None::<u64>;
         let mut inflight = BTreeMap::<u32, (u64, u32)>::new();
-        let mut ready = BTreeMap::<u64, (Vec<u8>, u32)>::new();
+        let mut ready = BTreeMap::<u64, Vec<u8>>::new();
+        let mut retry = VecDeque::<(u64, u32)>::new();
         progress(SftpTransferProgress { offset: start_offset, transferred, total });
 
         loop {
-            while !eof
-                && inflight.len() < pipeline
-                && self.client.available_requests() > 0
-                && total.is_none_or(|end| next_offset < end)
-            {
-                let remaining = total.map(|end| end.saturating_sub(next_offset));
-                let length = remaining.map_or(chunk_size, |value| {
-                    u32::try_from(value.min(u64::from(chunk_size))).unwrap_or(chunk_size)
-                });
-                let request = self.client.read(handle.to_vec(), next_offset, length)?;
+            while inflight.len() < pipeline && self.client.available_requests() > 0 {
+                let (offset, length) = if let Some((offset, length)) = retry.pop_front() {
+                    if eof_at.is_some_and(|end| offset >= end) {
+                        continue;
+                    }
+                    let length = eof_at.map_or(length, |end| {
+                        u32::try_from((end - offset).min(u64::from(length))).unwrap_or(length)
+                    });
+                    (offset, length)
+                } else if eof_at.is_none()
+                    && ready.is_empty()
+                    && total.is_none_or(|end| next_offset < end)
+                {
+                    let remaining = total.map(|end| end.saturating_sub(next_offset));
+                    let length = remaining.map_or(chunk_size, |value| {
+                        u32::try_from(value.min(u64::from(chunk_size))).unwrap_or(chunk_size)
+                    });
+                    let offset = next_offset;
+                    next_offset = next_offset
+                        .checked_add(u64::from(length))
+                        .ok_or(SftpError::InvalidValue("read offset"))?;
+                    (offset, length)
+                } else {
+                    break;
+                };
+                let request = self.client.read(handle.to_vec(), offset, length)?;
                 let id = request.request_id().ok_or(SftpError::Malformed("read request id"))?;
                 self.send_request(&request).await?;
-                inflight.insert(id, (next_offset, length));
-                next_offset = next_offset
-                    .checked_add(u64::from(length))
-                    .ok_or(SftpError::InvalidValue("read offset"))?;
+                inflight.insert(id, (offset, length));
             }
 
             if inflight.is_empty() {
-                break;
+                if ready.is_empty() && total.or(eof_at) == Some(committed_offset) {
+                    break;
+                }
+                if eof_at.is_some() {
+                    return Err(SftpChannelError::RemoteStatus { code: 1 });
+                }
+                return Err(SftpError::Malformed("non-contiguous read responses").into());
             }
             let response = self.read_response().await?;
             let id = response.request_id().ok_or(SftpError::Malformed("read response id"))?;
@@ -271,22 +294,36 @@ impl SftpSession {
             };
             match response {
                 SftpPacket::Data { data, .. } => {
-                    if data.len() > expected as usize {
+                    if data.is_empty() {
+                        return Err(SftpError::Malformed("empty read response").into());
+                    }
+                    if data.len() > expected as usize
+                        || eof_at.is_some_and(|end| offset + data.len() as u64 > end)
+                    {
                         return Err(SftpError::InvalidValue("read response length").into());
                     }
+                    let received = u32::try_from(data.len())
+                        .map_err(|_| SftpError::InvalidValue("read response length"))?;
                     if data.len() < expected as usize {
-                        eof = true;
+                        retry.push_back((offset + u64::from(received), expected - received));
                     }
-                    ready.insert(offset, (data, expected));
+                    if ready.insert(offset, data).is_some() {
+                        return Err(SftpError::Malformed("overlapping read response").into());
+                    }
                 }
-                SftpPacket::Status { code: 1, .. } => eof = true,
+                SftpPacket::Status { code: 1, .. } => {
+                    if offset < committed_offset || ready.range(offset..).next().is_some() {
+                        return Err(SftpError::Malformed("read data after EOF").into());
+                    }
+                    eof_at = Some(eof_at.map_or(offset, |end| end.min(offset)));
+                }
                 SftpPacket::Status { code, .. } => {
                     return Err(SftpChannelError::RemoteStatus { code });
                 }
                 _ => return Err(SftpError::Malformed("read response type").into()),
             }
 
-            while let Some((data, expected)) = ready.remove(&committed_offset) {
+            while let Some(data) = ready.remove(&committed_offset) {
                 sink.write_all(&data).await?;
                 committed_offset = committed_offset
                     .checked_add(data.len() as u64)
@@ -295,9 +332,6 @@ impl SftpSession {
                     .checked_add(data.len() as u64)
                     .ok_or(SftpError::InvalidValue("transfer length"))?;
                 progress(SftpTransferProgress { offset: committed_offset, transferred, total });
-                if data.len() < expected as usize {
-                    eof = true;
-                }
             }
         }
         sink.flush().await?;
@@ -545,6 +579,9 @@ mod tests {
         buffer: Vec<u8>,
         file: Vec<u8>,
         advertise_limits: bool,
+        read_reply_limit: Option<usize>,
+        reorder_first_reads: bool,
+        deferred_read_response: Option<SftpPacket>,
     }
 
     #[test]
@@ -624,6 +661,7 @@ mod tests {
                 let Ok(packet) = SftpPacket::decode(&frame) else {
                     return Ok(());
                 };
+                let is_read = matches!(packet, SftpPacket::Read { .. });
                 let response = match packet {
                     SftpPacket::Init { .. } => {
                         let extensions = if self.advertise_limits {
@@ -646,7 +684,13 @@ mod tests {
                     },
                     SftpPacket::Read { id, offset, length, .. } => match usize::try_from(offset) {
                         Ok(start) if start < self.file.len() => {
-                            let end = start.saturating_add(length as usize).min(self.file.len());
+                            let end = start
+                                .saturating_add(
+                                    self.read_reply_limit
+                                        .unwrap_or(length as usize)
+                                        .min(length as usize),
+                                )
+                                .min(self.file.len());
                             SftpPacket::Data { id, data: self.file[start..end].to_vec() }
                         }
                         _ => SftpPacket::Status {
@@ -688,12 +732,104 @@ mod tests {
                     }
                     _ => continue,
                 };
-                let Ok(encoded) = response.encode() else {
-                    return Ok(());
-                };
-                let _ = session.data(channel, encoded);
+                if is_read && self.reorder_first_reads {
+                    if self.deferred_read_response.is_none() {
+                        self.deferred_read_response = Some(response);
+                        continue;
+                    }
+                    self.reorder_first_reads = false;
+                    let _ = session.data(channel, response.encode().expect("SFTP response"));
+                    let deferred = self.deferred_read_response.take().expect("deferred read");
+                    let _ =
+                        session.data(channel, deferred.encode().expect("deferred SFTP response"));
+                    continue;
+                }
+                let _ = session.data(channel, response.encode().expect("SFTP response"));
             }
         }
+    }
+
+    async fn transfer_session(
+        file: Vec<u8>,
+        read_reply_limit: Option<usize>,
+        reorder_first_reads: bool,
+    ) -> (ClientConnection, SftpSession) {
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ = russh::server::run_stream(
+                Arc::new(server_config),
+                stream,
+                SftpServer {
+                    buffer: Vec::new(),
+                    file,
+                    advertise_limits: false,
+                    read_reply_limit,
+                    reorder_first_reads,
+                    deferred_read_response: None,
+                },
+            )
+            .await;
+        });
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        connection.authenticate_password("user", b"password").await.expect("authenticate client");
+        let session = SftpSession::open(&connection, 2).await.expect("open sftp session");
+        (connection, session)
+    }
+
+    #[tokio::test]
+    async fn short_read_resumes_missing_ranges_before_completing_download() {
+        let (connection, mut session) = transfer_session(b"abcdef".to_vec(), Some(1), true).await;
+        for total in [Some(6), None] {
+            let mut downloaded = Vec::new();
+            let mut progress = Vec::new();
+            let count = session
+                .download_to(b"h", 0, total, 2, 2, &mut downloaded, |event| progress.push(event))
+                .await
+                .expect("short-read download");
+            assert_eq!(count, 6);
+            assert_eq!(downloaded, b"abcdef");
+            assert_eq!(progress.first().map(|event| event.offset), Some(0));
+            assert_eq!(progress.last().map(|event| event.offset), Some(6));
+            assert!(progress.windows(2).all(|pair| pair[0].offset < pair[1].offset));
+            assert_eq!(session.pending_requests(), 0);
+        }
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn premature_eof_and_empty_data_are_not_successful_downloads() {
+        let (connection, mut session) = transfer_session(b"abc".to_vec(), None, false).await;
+        let mut downloaded = Vec::new();
+        let error = session
+            .download_to(b"h", 0, Some(6), 2, 2, &mut downloaded, |_| {})
+            .await
+            .expect_err("premature EOF");
+        assert!(matches!(error, SftpChannelError::RemoteStatus { code: 1 }));
+        connection.disconnect().await.expect("disconnect client");
+
+        let (connection, mut session) = transfer_session(b"abc".to_vec(), Some(0), false).await;
+        let mut downloaded = Vec::new();
+        let error = session
+            .download_to(b"h", 0, None, 2, 2, &mut downloaded, |_| {})
+            .await
+            .expect_err("empty data");
+        assert!(matches!(
+            error,
+            SftpChannelError::Protocol(SftpError::Malformed("empty read response"))
+        ));
+        connection.disconnect().await.expect("disconnect client");
     }
 
     #[tokio::test]
@@ -714,7 +850,14 @@ mod tests {
             let _ = russh::server::run_stream(
                 server_config,
                 stream,
-                SftpServer { buffer: Vec::new(), file: Vec::new(), advertise_limits: true },
+                SftpServer {
+                    buffer: Vec::new(),
+                    file: Vec::new(),
+                    advertise_limits: true,
+                    read_reply_limit: None,
+                    reorder_first_reads: false,
+                    deferred_read_response: None,
+                },
             )
             .await;
         });
@@ -762,7 +905,14 @@ mod tests {
             let _ = russh::server::run_stream(
                 server_config,
                 stream,
-                SftpServer { buffer: Vec::new(), file: Vec::new(), advertise_limits: false },
+                SftpServer {
+                    buffer: Vec::new(),
+                    file: Vec::new(),
+                    advertise_limits: false,
+                    read_reply_limit: None,
+                    reorder_first_reads: false,
+                    deferred_read_response: None,
+                },
             )
             .await;
         });
@@ -816,6 +966,9 @@ mod tests {
                     buffer: Vec::new(),
                     file: b"abcdef".to_vec(),
                     advertise_limits: false,
+                    read_reply_limit: None,
+                    reorder_first_reads: false,
+                    deferred_read_response: None,
                 },
             )
             .await;
