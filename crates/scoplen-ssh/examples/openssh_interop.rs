@@ -255,8 +255,61 @@ async fn verify_fstatvfs(
     Ok(())
 }
 
-async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
-    let mut session = SftpSession::open(connection, 4).await?;
+async fn verify_hardlink(
+    session: &mut SftpSession,
+    path: &[u8],
+    linked_path: &[u8],
+    missing_path: &[u8],
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let missing_link_path = [path, b"-missing-link"].concat();
+    let missing = session.client_mut().hardlink(missing_path.to_vec(), missing_link_path)?;
+    if !matches!(sftp_response(session, missing).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP hardlink did not reject a missing source cleanly".into());
+    }
+    let link = session.client_mut().hardlink(path.to_vec(), linked_path.to_vec())?;
+    if !matches!(sftp_response(session, link).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP hardlink failed or retained a request slot".into());
+    }
+    let existing = session.client_mut().hardlink(path.to_vec(), linked_path.to_vec())?;
+    if !matches!(sftp_response(session, existing).await?, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err(
+            "SFTP hardlink accepted an existing destination or retained a request slot".into()
+        );
+    }
+
+    let open = session.client_mut().open(linked_path.to_vec(), 1, SftpAttributes::default())?;
+    let handle = match sftp_response(session, open).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected SFTP linked-file open response: {other:?}").into()),
+    };
+    let mut linked_data = Vec::new();
+    let count = session
+        .download_to(&handle, 0, Some(data.len() as u64), 4096, 4, &mut linked_data, |_| {})
+        .await?;
+    if count != data.len() as u64 || linked_data != data || session.pending_requests() != 0 {
+        return Err("SFTP hardlink contents did not match the uploaded file".into());
+    }
+    let close = session.client_mut().close(handle)?;
+    if !matches!(sftp_response(session, close).await?, SftpPacket::Status { code: 0, .. }) {
+        return Err("SFTP linked-file handle close failed".into());
+    }
+    let remove = session.client_mut().remove(linked_path.to_vec())?;
+    if !matches!(sftp_response(session, remove).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP hardlink cleanup or request release failed".into());
+    }
+    Ok(())
+}
+
+fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::error::Error>> {
     if session.limits().is_none() {
         return Err("OpenSSH did not advertise SFTP transfer limits".into());
     }
@@ -266,8 +319,18 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     if !session.extensions().iter().any(|extension| extension.name == b"fstatvfs@openssh.com") {
         return Err("OpenSSH did not advertise fstatvfs@openssh.com".into());
     }
+    if !session.extensions().iter().any(|extension| extension.name == b"hardlink@openssh.com") {
+        return Err("OpenSSH did not advertise hardlink@openssh.com".into());
+    }
+    Ok(())
+}
+
+async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
+    let mut session = SftpSession::open(connection, 4).await?;
+    verify_sftp_capabilities(&session)?;
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let path = format!(".scoplen-interop-{}-{nonce}", std::process::id()).into_bytes();
+    let linked_path = [path.as_slice(), b"-link"].concat();
     let missing_path = [path.as_slice(), b"-missing"].concat();
     let missing = session.client_mut().open(missing_path.clone(), 1, SftpAttributes::default())?;
     if !matches!(sftp_response(&mut session, missing).await?, SftpPacket::Status { code: 2, .. })
@@ -348,6 +411,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
         return Err("SFTP read handle close failed".into());
     }
+    verify_hardlink(&mut session, &path, &linked_path, &missing_path, &data).await?;
     let remove = session.client_mut().remove(path)?;
     if !matches!(sftp_response(&mut session, remove).await?, SftpPacket::Status { code: 0, .. })
         || session.pending_requests() != 0

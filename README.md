@@ -135,7 +135,8 @@ limits, a missing-file response with released request state, `statvfs@openssh.co
 statistics and missing-path rejection, pipelined upload in two parts, resumed download with
 progress and byte comparison, `fsync@openssh.com` and `fstatvfs@openssh.com` on the open upload
 handle, rejection of both requests after closing that handle without retaining request state, and
-removal of the unique temporary remote file. It passed against a disposable
+`hardlink@openssh.com` success with identical linked bytes, missing-source and existing-destination
+rejection, and removal of both unique remote paths. It passed against a disposable
 `linuxserver/openssh-server` container; other SFTP extensions, server implementations, and
 platforms remain unverified.
 Set `SCOPLEN_OPENSSH_FORWARD=1` to verify an RFC 4254 `direct-tcpip` channel to the disposable
