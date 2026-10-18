@@ -138,10 +138,10 @@ async fn connect_with_ignore(
 ) -> Result<Result<(), ClientError>, Box<dyn Error>> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let relay_port = listener.local_addr()?.port();
+    let stream = timeout(DEADLINE, TcpStream::connect(("127.0.0.1", relay_port))).await??;
     let mut relay = tokio::spawn(async move {
         relay_ignore_at_kexinit(listener, upstream_port, server_advertises_strict, point).await
     });
-    let stream = timeout(DEADLINE, TcpStream::connect(("127.0.0.1", relay_port))).await??;
     let connection = match timeout(DEADLINE, ClientConnection::connect_stream(config, stream)).await
     {
         Ok(connection) => connection,
@@ -152,7 +152,14 @@ async fn connect_with_ignore(
         }
     };
     let outcome = match connection {
-        Ok(connection) => connection.disconnect().await,
+        Ok(connection) => match timeout(DEADLINE, connection.disconnect()).await {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                relay.abort();
+                let _ = relay.await;
+                return Err(error.into());
+            }
+        },
         Err(error) => Err(error),
     };
     match timeout(DEADLINE, &mut relay).await {
@@ -176,12 +183,11 @@ async fn relay_ignore_at_kexinit(
     let server = TcpStream::connect(("127.0.0.1", upstream_port)).await?;
     let (mut client_reader, mut client_writer) = client.into_split();
     let (mut server_reader, mut server_writer) = server.into_split();
-    let mut client_to_server = tokio::spawn(async move {
-        copy(&mut client_reader, &mut server_writer).await?;
-        server_writer.shutdown().await
-    });
-
-    let outcome = async {
+    let client_to_server = async {
+        peer_close(copy(&mut client_reader, &mut server_writer).await)?;
+        peer_close(server_writer.shutdown().await)
+    };
+    let server_to_client = async {
         let banner = read_banner(&mut server_reader).await?;
         client_writer.write_all(&banner).await?;
         let packet = read_first_kexinit(&mut server_reader, server_advertises_strict).await?;
@@ -192,18 +198,31 @@ async fn relay_ignore_at_kexinit(
         if matches!(point, InjectionPoint::AfterKexInit) {
             client_writer.write_all(&IGNORE_PACKET).await?;
         }
-        let client_to_server_done = tokio::select! {
-            _ = copy(&mut server_reader, &mut client_writer) => false,
-            _ = &mut client_to_server => true,
-        };
-        Ok(client_to_server_done)
+        peer_close(copy(&mut server_reader, &mut client_writer).await)
+    };
+    tokio::pin!(client_to_server, server_to_client);
+    tokio::select! {
+        result = &mut server_to_client => result,
+        result = &mut client_to_server => {
+            result?;
+            server_to_client.await
+        }
     }
-    .await;
-    if !matches!(outcome, Ok(true)) {
-        client_to_server.abort();
-        let _ = client_to_server.await;
+}
+
+fn peer_close<T>(result: io::Result<T>) -> io::Result<()> {
+    match result {
+        Ok(_) => Ok(()),
+        Err(error)
+            if matches!(
+                error.kind(),
+                ErrorKind::UnexpectedEof | ErrorKind::ConnectionReset | ErrorKind::BrokenPipe
+            ) =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(error),
     }
-    outcome.map(|_| ())
 }
 
 async fn read_banner<R: AsyncRead + Unpin>(reader: &mut R) -> io::Result<Vec<u8>> {
