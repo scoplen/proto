@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `scoplen-proto` will be recorded here.
+All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 

@@ -1,6 +1,6 @@
 # Shared repository architecture
 
-`scoplen-proto` is the contract implementation shared by the client and server workstreams. It has
+The `proto` repository implements contracts shared by the client and server workstreams. It has
 no runtime dependency on either consumer.
 
 | Crate | Contract or role |
