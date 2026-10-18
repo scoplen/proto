@@ -1,0 +1,1 @@
+{"format":"scoplen-test-vectors","version":1,"vectors":[{"id":"baseline","kind":"model.cbor","input":"00","expected":"00"}]}

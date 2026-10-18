@@ -25,17 +25,15 @@ jobs:
         run: cargo test --workspace --all-targets
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: Fuzz target build
+      - name: Build and replay fuzz corpus
         if: runner.os == 'Linux'
         run: |
-          rustup toolchain install nightly --profile minimal
+          rustup toolchain install nightly --profile minimal --component rust-src
           cargo +nightly install cargo-fuzz --locked
-          cargo +nightly fuzz build vector_loader
-          cargo +nightly fuzz build object_decoder
-          cargo +nightly fuzz build crypto_decoders
-          cargo +nightly fuzz build agent_decoder
-          cargo +nightly fuzz build sftp_decoder
-          cargo +nightly fuzz build ssh_protocol
+          for target in vector_loader object_decoder crypto_decoders agent_decoder sftp_decoder ssh_protocol; do
+            test -n "$(find "fuzz/corpus/$target" -maxdepth 1 -type f -name 'seed-*' -print -quit)"
+            cargo +nightly fuzz run "$target" "fuzz/corpus/$target" -- -runs=0 -timeout=10
+          done
 
   dependency-audit:
     name: Dependency policy
