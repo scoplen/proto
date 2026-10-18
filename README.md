@@ -118,7 +118,11 @@ The same example also passed against Dropbear 2025.88 from an Alpine 3.23 dispos
 install `dropbear`, create a `scoplen` user with a single authorized Ed25519 key, generate an
 Ed25519 host key with `dropbearkey`, run Dropbear on port 2222, pin its public key, and set
 `SCOPLEN_OPENSSH_ED25519_KEY` to the authorized private-key path. A second private key was
-rejected. Dropbear SFTP, forwarding, and other authentication paths remain unverified.
+rejected. Dropbear SFTP, forwarding, certificates, and other authentication paths remain unverified.
+`pwsh ./scripts/dropbear-interop.ps1` now runs the same session-command example against disposable
+Dropbear 2024.86 in Alpine 3.21 with password authentication, then checks wrong-password and
+wrong-host-key rejection. The CI workflow runs this test on Linux; the container is stopped after
+the run.
 The example also passed against OpenSSH 9.7p1 from a disposable Alpine 3.20 container with
 Ed25519 and RSA-SHA2-256/512 public-key authentication and a session command; an unauthorized
 RSA key was rejected. The container uses `openssh-server`, an unlocked `scoplen` test account,
