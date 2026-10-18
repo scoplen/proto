@@ -641,7 +641,7 @@ impl Signal {
         }
     }
 
-    fn parse(value: &[u8]) -> Result<Self, ChannelCodecError> {
+    pub(crate) fn parse(value: &[u8]) -> Result<Self, ChannelCodecError> {
         match value {
             b"ABRT" => Ok(Self::Abrt),
             b"ALRM" => Ok(Self::Alrm),
@@ -1080,7 +1080,7 @@ fn validate_size(value: &[u8], limit: usize, field: &'static str) -> Result<(), 
     }
 }
 
-fn validate_text(
+pub(crate) fn validate_text(
     value: &[u8],
     limit: usize,
     field: &'static str,

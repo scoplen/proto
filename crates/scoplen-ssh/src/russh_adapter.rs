@@ -38,11 +38,12 @@ use crate::{
     AsyncGatewayTransportError, CertificateValidationPolicy, ExtendedDataType,
     GatewayTlsClientConfig, GatewayTlsConnectError, HostAlgorithmPolicy, HostKeyVerificationError,
     HostKeyVerifier, HttpConnectTransport, KeyboardInteractiveInfoRequest,
-    KeyboardInteractivePrompt, KeyboardInteractiveResponse, MAX_CHANNEL_ADDRESS,
+    KeyboardInteractivePrompt, KeyboardInteractiveResponse, MAX_CHANNEL_ADDRESS, MAX_CHANNEL_NAME,
     MAX_CHANNEL_STRING, MAX_CHANNEL_TEXT, ProxyCredentials, ProxyTransportError, PtyRequest,
     PublicKeyAuthContext, PublicKeyAuthRequest, PublicKeyIdentity, Signal, SignatureAlgorithm,
     Signer, SignerError, Socks5Transport, TcpTransport, TransportError, UserCertificate,
     WindowChangeRequest,
+    channels::validate_text as validate_channel_text,
     process::{ProxyCommandError, ProxyCommandStream, ProxyCommandTransport},
     verify_host_key,
 };
@@ -1361,12 +1362,7 @@ impl ClientChannel {
                 ChannelMsg::Close => ChannelEvent::Close,
                 ChannelMsg::ExitStatus { exit_status } => ChannelEvent::ExitStatus(exit_status),
                 ChannelMsg::ExitSignal { signal_name, core_dumped, error_message, lang_tag } => {
-                    ChannelEvent::ExitSignal {
-                        signal: signal_name_text(&signal_name).to_owned(),
-                        core_dumped,
-                        error_message,
-                        language_tag: lang_tag,
-                    }
+                    exit_signal_event(&signal_name, core_dumped, error_message, lang_tag)?
                 }
                 ChannelMsg::Success => ChannelEvent::Success,
                 ChannelMsg::Failure => ChannelEvent::Failure,
@@ -1834,6 +1830,26 @@ fn signal_name_text(signal: &russh::Sig) -> &str {
     }
 }
 
+fn exit_signal_event(
+    signal_name: &russh::Sig,
+    core_dumped: bool,
+    error_message: String,
+    language_tag: String,
+) -> Result<ChannelEvent, ClientError> {
+    let signal = Signal::parse(signal_name_text(signal_name).as_bytes())
+        .map_err(|_| ClientError::Protocol)?;
+    validate_channel_text(error_message.as_bytes(), MAX_CHANNEL_TEXT, "error message", false)
+        .map_err(|_| ClientError::Protocol)?;
+    validate_channel_text(language_tag.as_bytes(), MAX_CHANNEL_NAME, "language tag", false)
+        .map_err(|_| ClientError::Protocol)?;
+    Ok(ChannelEvent::ExitSignal {
+        signal: signal.name().to_owned(),
+        core_dumped,
+        error_message,
+        language_tag,
+    })
+}
+
 fn to_russh_signal(signal: Signal) -> russh::Sig {
     match signal {
         Signal::Abrt => russh::Sig::ABRT,
@@ -2114,6 +2130,52 @@ mod tests {
             _session: &mut russh::server::Session,
         ) -> Result<(), Self::Error> {
             let _ = self.signals.send(signal_name_text(&signal).to_owned()).await;
+            Ok(())
+        }
+    }
+
+    #[derive(Clone)]
+    struct ExitSignalServer {
+        signal: russh::Sig,
+        core_dumped: bool,
+        error_message: String,
+        language_tag: String,
+    }
+
+    impl russh::server::Handler for ExitSignalServer {
+        type Error = russh::Error;
+
+        async fn auth_password(
+            &mut self,
+            _user: &str,
+            _password: &str,
+        ) -> Result<russh::server::Auth, Self::Error> {
+            Ok(russh::server::Auth::Accept)
+        }
+
+        async fn channel_open_session(
+            &mut self,
+            _channel: russh::Channel<russh::server::Msg>,
+            reply: russh::server::ChannelOpenHandle,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            reply.accept().await;
+            Ok(())
+        }
+
+        async fn exec_request(
+            &mut self,
+            channel: russh::ChannelId,
+            _data: &[u8],
+            session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            session.exit_signal_request(
+                channel,
+                self.signal.clone(),
+                self.core_dumped,
+                &self.error_message,
+                &self.language_tag,
+            )?;
             Ok(())
         }
     }
@@ -3210,6 +3272,104 @@ mod tests {
             "TSTP"
         );
         connection.disconnect().await.expect("disconnect client");
+    }
+
+    async fn peer_exit_signal_event(
+        exit_signal: ExitSignalServer,
+    ) -> Result<Option<ChannelEvent>, ClientError> {
+        let mut server_config = russh::server::Config::default();
+        server_config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let _ = russh::server::run_stream(Arc::new(server_config), stream, exit_signal).await;
+        });
+
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect client");
+        connection.authenticate_password("user", b"password").await.expect("authenticate client");
+        let mut channel = connection.open_session().await.expect("open session");
+        channel.exec(false, b"exit").await.expect("request exit signal");
+        let event = timeout(Duration::from_secs(5), channel.next_event())
+            .await
+            .expect("exit-signal response");
+        connection.disconnect().await.expect("disconnect client");
+        server.await.expect("server task");
+        event
+    }
+
+    #[tokio::test]
+    async fn peer_exit_signal_uses_shared_channel_boundary() {
+        let event = peer_exit_signal_event(ExitSignalServer {
+            signal: russh::Sig::Custom("USR2".to_owned()),
+            core_dumped: true,
+            error_message: "interrupted".to_owned(),
+            language_tag: "en".to_owned(),
+        })
+        .await
+        .expect("valid exit signal");
+        assert_eq!(
+            event,
+            Some(ChannelEvent::ExitSignal {
+                signal: "USR2".to_owned(),
+                core_dumped: true,
+                error_message: "interrupted".to_owned(),
+                language_tag: "en".to_owned(),
+            })
+        );
+
+        for exit_signal in [
+            ExitSignalServer {
+                signal: russh::Sig::Custom("INVALID".to_owned()),
+                core_dumped: false,
+                error_message: String::new(),
+                language_tag: String::new(),
+            },
+            ExitSignalServer {
+                signal: russh::Sig::TERM,
+                core_dumped: false,
+                error_message: "bad\0diagnostic".to_owned(),
+                language_tag: String::new(),
+            },
+            ExitSignalServer {
+                signal: russh::Sig::TERM,
+                core_dumped: false,
+                error_message: String::new(),
+                language_tag: "bad\0language".to_owned(),
+            },
+            ExitSignalServer {
+                signal: russh::Sig::TERM,
+                core_dumped: false,
+                error_message: String::new(),
+                language_tag: "x".repeat(MAX_CHANNEL_NAME + 1),
+            },
+        ] {
+            assert!(matches!(
+                peer_exit_signal_event(exit_signal).await,
+                Err(ClientError::Protocol)
+            ));
+        }
+    }
+
+    #[test]
+    fn peer_exit_signal_rejects_oversized_diagnostic() {
+        assert!(matches!(
+            exit_signal_event(
+                &russh::Sig::TERM,
+                false,
+                "x".repeat(MAX_CHANNEL_TEXT + 1),
+                String::new()
+            ),
+            Err(ClientError::Protocol)
+        ));
     }
 
     async fn agent_forward_request_case(allow: bool) -> ChannelEvent {
