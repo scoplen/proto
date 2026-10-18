@@ -309,6 +309,117 @@ async fn verify_hardlink(
     Ok(())
 }
 
+async fn verify_sftp_bytes(
+    session: &mut SftpSession,
+    path: &[u8],
+    expected: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let open = session.client_mut().open(path.to_vec(), 1, SftpAttributes::default())?;
+    let handle = match sftp_response(session, open).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected SFTP file open response: {other:?}").into()),
+    };
+    let mut downloaded = Vec::new();
+    let count = session
+        .download_to(&handle, 0, Some(expected.len() as u64), 4096, 4, &mut downloaded, |_| {})
+        .await?;
+    if count != expected.len() as u64 || downloaded != expected || session.pending_requests() != 0 {
+        return Err("SFTP file contents or request release mismatch".into());
+    }
+    let close = session.client_mut().close(handle)?;
+    if !matches!(sftp_response(session, close).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP file handle close or request release failed".into());
+    }
+    Ok(())
+}
+
+async fn verify_posix_rename(
+    session: &mut SftpSession,
+    path: &[u8],
+    missing_path: &[u8],
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let renamed_path = [path, b"-renamed"].concat();
+    let replacement_path = [path, b"-replacement"].concat();
+    let missing_destination = [path, b"-missing-rename"].concat();
+    let missing = session.client_mut().posix_rename(missing_path.to_vec(), missing_destination)?;
+    if !matches!(sftp_response(session, missing).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP posix-rename did not reject a missing source cleanly".into());
+    }
+
+    let previous = b"previous destination contents";
+    let create =
+        session.client_mut().open(replacement_path.clone(), 0x1a, SftpAttributes::default())?;
+    let handle = match sftp_response(session, create).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => {
+            return Err(format!("unexpected SFTP replacement create response: {other:?}").into());
+        }
+    };
+    if session.upload(&handle, 0, previous, 4096, 4, |_| {}).await? != previous.len() as u64
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP replacement setup failed or retained a request slot".into());
+    }
+    let close = session.client_mut().close(handle)?;
+    if !matches!(sftp_response(session, close).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP replacement setup handle close failed".into());
+    }
+    verify_sftp_bytes(session, &replacement_path, previous).await?;
+
+    let rename = session.client_mut().posix_rename(path.to_vec(), renamed_path.clone())?;
+    if !matches!(sftp_response(session, rename).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP posix-rename failed or retained a request slot".into());
+    }
+    let old = session.client_mut().open(path.to_vec(), 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, old).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP posix-rename left the source path behind".into());
+    }
+    verify_sftp_bytes(session, &renamed_path, data).await?;
+
+    let replace =
+        session.client_mut().posix_rename(renamed_path.clone(), replacement_path.clone())?;
+    if !matches!(sftp_response(session, replace).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP posix-rename did not replace an existing destination cleanly".into());
+    }
+    let old = session.client_mut().open(renamed_path, 1, SftpAttributes::default())?;
+    if !matches!(sftp_response(session, old).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP posix-rename left the replaced source path behind".into());
+    }
+    verify_sftp_bytes(session, &replacement_path, data).await?;
+    let remove = session.client_mut().remove(replacement_path)?;
+    if !matches!(sftp_response(session, remove).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP posix-rename cleanup or request release failed".into());
+    }
+    let gone = session.client_mut().open(
+        [path, b"-replacement"].concat(),
+        1,
+        SftpAttributes::default(),
+    )?;
+    if !matches!(sftp_response(session, gone).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP posix-rename cleanup left a destination path behind".into());
+    }
+    Ok(())
+}
+
 fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::error::Error>> {
     if session.limits().is_none() {
         return Err("OpenSSH did not advertise SFTP transfer limits".into());
@@ -321,6 +432,9 @@ fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::er
     }
     if !session.extensions().iter().any(|extension| extension.name == b"hardlink@openssh.com") {
         return Err("OpenSSH did not advertise hardlink@openssh.com".into());
+    }
+    if !session.extensions().iter().any(|extension| extension.name == b"posix-rename@openssh.com") {
+        return Err("OpenSSH did not advertise posix-rename@openssh.com".into());
     }
     Ok(())
 }
@@ -412,12 +526,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
         return Err("SFTP read handle close failed".into());
     }
     verify_hardlink(&mut session, &path, &linked_path, &missing_path, &data).await?;
-    let remove = session.client_mut().remove(path)?;
-    if !matches!(sftp_response(&mut session, remove).await?, SftpPacket::Status { code: 0, .. })
-        || session.pending_requests() != 0
-    {
-        return Err("SFTP cleanup or request release failed".into());
-    }
+    verify_posix_rename(&mut session, &path, &missing_path, &data).await?;
     println!("openssh sftp interop ok");
     Ok(())
 }
