@@ -207,10 +207,36 @@ async fn verify_statvfs(
     Ok(())
 }
 
+async fn verify_fsync(
+    session: &mut SftpSession,
+    handle: &[u8],
+    expect_success: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let request = session.client_mut().fsync(handle.to_vec())?;
+    let response = sftp_response(session, request).await?;
+    let valid_status = match response {
+        SftpPacket::Status { code: 0, .. } => expect_success,
+        SftpPacket::Status { code: 1.., .. } => !expect_success,
+        _ => false,
+    };
+    if !valid_status || session.pending_requests() != 0 {
+        return Err(if expect_success {
+            "SFTP fsync failed or retained a request slot"
+        } else {
+            "SFTP fsync accepted a closed handle or retained a request slot"
+        }
+        .into());
+    }
+    Ok(())
+}
+
 async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
     let mut session = SftpSession::open(connection, 4).await?;
     if session.limits().is_none() {
         return Err("OpenSSH did not advertise SFTP transfer limits".into());
+    }
+    if !session.extensions().iter().any(|extension| extension.name == b"fsync@openssh.com") {
+        return Err("OpenSSH did not advertise fsync@openssh.com".into());
     }
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let path = format!(".scoplen-interop-{}-{nonce}", std::process::id()).into_bytes();
@@ -252,10 +278,12 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     {
         return Err("SFTP upload or progress mismatch".into());
     }
-    let close = session.client_mut().close(write_handle)?;
+    verify_fsync(&mut session, &write_handle, true).await?;
+    let close = session.client_mut().close(write_handle.clone())?;
     if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
         return Err("SFTP write handle close failed".into());
     }
+    verify_fsync(&mut session, &write_handle, false).await?;
 
     let read = session.client_mut().open(path.clone(), 1, SftpAttributes::default())?;
     let read_handle = match sftp_response(&mut session, read).await? {
