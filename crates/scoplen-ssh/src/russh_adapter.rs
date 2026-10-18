@@ -77,6 +77,11 @@ pub enum ClientConfigError {
     /// Rekey limits must be positive and the byte limit must not exceed one GiB.
     #[error("SSH rekey limits require 1..=1073741824 outgoing bytes and a positive duration")]
     InvalidRekeyLimits,
+    /// Enabled keepalive settings cannot spin or disable missed-reply detection.
+    #[error(
+        "SSH keepalive requires a positive representable interval and missed count in 1..usize::MAX"
+    )]
+    InvalidKeepalive,
 }
 
 /// Host-certificate policy used by the concrete host-key callback.
@@ -225,11 +230,27 @@ impl ClientConfig {
     }
 
     /// Configure periodic keepalives used by the underlying event loop.
-    #[must_use]
-    pub fn with_keepalive(mut self, interval: Option<Duration>, max_missed: usize) -> Self {
+    ///
+    /// `None` disables probes regardless of `max_missed`. An enabled interval must be positive
+    /// and representable as an event-loop deadline; its missed-reply count must be positive and
+    /// less than `usize::MAX` so the engine's saturating counter can expire the connection.
+    pub fn with_keepalive(
+        mut self,
+        interval: Option<Duration>,
+        max_missed: usize,
+    ) -> Result<Self, ClientConfigError> {
+        if let Some(interval) = interval {
+            if interval.is_zero()
+                || Instant::now().checked_add(interval).is_none()
+                || max_missed == 0
+                || max_missed == usize::MAX
+            {
+                return Err(ClientConfigError::InvalidKeepalive);
+            }
+        }
         self.keepalive_interval = interval;
         self.keepalive_max = max_missed;
-        self
+        Ok(self)
     }
 
     /// Request rekeying after this many outgoing SSH payload bytes or this elapsed duration.
