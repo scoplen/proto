@@ -591,6 +591,7 @@ mod tests {
         extension_handle_open: Option<bool>,
         hardlink_created: Option<bool>,
         rename_phase: Option<RenamePhase>,
+        expand_path_prefix: Option<&'static [u8]>,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
@@ -614,6 +615,9 @@ mod tests {
             }
             if self.rename_phase.is_some() {
                 extensions.push(SftpExtension::new(b"posix-rename@openssh.com", b"1").unwrap());
+            }
+            if self.expand_path_prefix.is_some() {
+                extensions.push(SftpExtension::new(b"expand-path@openssh.com", b"1").unwrap());
             }
             SftpPacket::Version { version: 3, extensions }
         }
@@ -670,7 +674,7 @@ mod tests {
             {
                 self.extension_handle_open = Some(true);
                 SftpPacket::Handle { id, handle: b"old".to_vec() }
-            } else if (path == b"file"
+            } else if ((path == b"file" || path == b"/srv/file")
                 && !matches!(
                     self.rename_phase,
                     Some(RenamePhase::Renamed | RenamePhase::Replaced | RenamePhase::Removed)
@@ -758,6 +762,52 @@ mod tests {
                 4
             };
             SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
+        fn expand_path_response(&self, id: u32, data: &[u8]) -> SftpPacket {
+            let leaf: &[u8] = if data == b"\0\0\0\x04file" {
+                b"file"
+            } else if data == b"\0\0\0\x07missing" {
+                b"missing"
+            } else {
+                return SftpPacket::Status {
+                    id,
+                    code: 4,
+                    message: Vec::new(),
+                    language: Vec::new(),
+                };
+            };
+            SftpPacket::Name {
+                id,
+                entries: vec![
+                    SftpNameEntry::new(
+                        [self.expand_path_prefix.unwrap(), leaf].concat(),
+                        Vec::new(),
+                        SftpAttributes::default(),
+                    )
+                    .unwrap(),
+                ],
+            }
+        }
+
+        fn extension_response(&mut self, id: u32, name: &[u8], data: &[u8]) -> Option<SftpPacket> {
+            if name == b"limits@openssh.com" && self.advertise_limits {
+                Some(Self::limits_response(id))
+            } else if name == b"statvfs@openssh.com" && self.advertise_statvfs {
+                Some(Self::statvfs_response(id, data))
+            } else if name == b"fsync@openssh.com" && self.extension_handle_open.is_some() {
+                Some(self.fsync_response(id, data))
+            } else if name == b"fstatvfs@openssh.com" && self.extension_handle_open.is_some() {
+                Some(self.fstatvfs_response(id, data))
+            } else if name == b"hardlink@openssh.com" && self.hardlink_created.is_some() {
+                Some(self.hardlink_response(id, data))
+            } else if name == b"posix-rename@openssh.com" && self.rename_phase.is_some() {
+                Some(self.rename_response(id, data))
+            } else if name == b"expand-path@openssh.com" && self.expand_path_prefix.is_some() {
+                Some(self.expand_path_response(id, data))
+            } else {
+                None
+            }
         }
 
         fn read_response(&self, id: u32, handle: &[u8], offset: u64, length: u32) -> SftpPacket {
@@ -918,36 +968,11 @@ mod tests {
                             language: Vec::new(),
                         }
                     }
-                    SftpPacket::Extended { id, name, .. }
-                        if name == b"limits@openssh.com" && self.advertise_limits =>
-                    {
-                        Self::limits_response(id)
-                    }
-                    SftpPacket::Extended { id, name, data }
-                        if name == b"statvfs@openssh.com" && self.advertise_statvfs =>
-                    {
-                        Self::statvfs_response(id, &data)
-                    }
-                    SftpPacket::Extended { id, name, data }
-                        if name == b"fsync@openssh.com" && self.extension_handle_open.is_some() =>
-                    {
-                        self.fsync_response(id, &data)
-                    }
-                    SftpPacket::Extended { id, name, data }
-                        if name == b"fstatvfs@openssh.com"
-                            && self.extension_handle_open.is_some() =>
-                    {
-                        self.fstatvfs_response(id, &data)
-                    }
-                    SftpPacket::Extended { id, name, data }
-                        if name == b"hardlink@openssh.com" && self.hardlink_created.is_some() =>
-                    {
-                        self.hardlink_response(id, &data)
-                    }
-                    SftpPacket::Extended { id, name, data }
-                        if name == b"posix-rename@openssh.com" && self.rename_phase.is_some() =>
-                    {
-                        self.rename_response(id, &data)
+                    SftpPacket::Extended { id, name, data } => {
+                        let Some(response) = self.extension_response(id, &name, &data) else {
+                            continue;
+                        };
+                        response
                     }
                     _ => continue,
                 };
@@ -996,6 +1021,7 @@ mod tests {
                     extension_handle_open: None,
                     hardlink_created: None,
                     rename_phase: None,
+                    expand_path_prefix: None,
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -1185,6 +1211,34 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
     }
 
+    async fn assert_expand_path(session: &mut SftpSession) {
+        assert!(
+            session
+                .extensions()
+                .iter()
+                .any(|extension| extension.name == b"expand-path@openssh.com")
+        );
+        let request = session.client_mut().expand_path(b"file").expect("expand file path");
+        session.send_request(&request).await.expect("send expand-path");
+        assert!(matches!(
+            session.read_response().await.expect("read expand-path"),
+            SftpPacket::Name { entries, .. }
+                if entries.len() == 1 && entries[0].filename == b"/srv/file"
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        assert_file_bytes(session, b"/srv/file", b"linked bytes").await;
+
+        let missing = session.client_mut().expand_path(b"missing").expect("expand missing path");
+        session.send_request(&missing).await.expect("send missing expand-path");
+        assert!(matches!(
+            session.read_response().await.expect("read missing expand-path"),
+            SftpPacket::Name { entries, .. }
+                if entries.len() == 1 && entries[0].filename == b"/srv/missing"
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        assert_missing_file(session, b"/srv/missing").await;
+    }
+
     async fn assert_posix_rename(session: &mut SftpSession) {
         assert!(
             session
@@ -1246,6 +1300,7 @@ mod tests {
                     extension_handle_open: Some(false),
                     hardlink_created: Some(false),
                     rename_phase: Some(RenamePhase::Original),
+                    expand_path_prefix: Some(b"/srv/"),
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1259,7 +1314,7 @@ mod tests {
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
-        assert_eq!(session.extensions().len(), 6);
+        assert_eq!(session.extensions().len(), 7);
         assert!(session.limits().is_some());
         assert_eq!(
             session.request_limits().await.expect("request limits"),
@@ -1317,6 +1372,7 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
         assert_fstatvfs(&mut session, &handle, false).await;
         assert_hardlink(&mut session).await;
+        assert_expand_path(&mut session).await;
         assert_posix_rename(&mut session).await;
 
         assert_missing_statvfs(&mut session).await;
@@ -1349,6 +1405,7 @@ mod tests {
                     extension_handle_open: None,
                     hardlink_created: None,
                     rename_phase: None,
+                    expand_path_prefix: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -1410,6 +1467,7 @@ mod tests {
                     extension_handle_open: None,
                     hardlink_created: None,
                     rename_phase: None,
+                    expand_path_prefix: None,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
