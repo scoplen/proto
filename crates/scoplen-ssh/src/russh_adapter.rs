@@ -16,7 +16,10 @@ use std::{
     net::{Shutdown, TcpStream as StdTcpStream},
     pin::Pin,
     str,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     task::{Context, Poll},
     time::Duration,
 };
@@ -520,11 +523,13 @@ pub enum ClientError {
     /// The supplied password cannot be represented by the current `russh` password API.
     #[error("SSH password must be valid UTF-8")]
     PasswordEncoding,
-    /// The server rejected password authentication.
-    #[error("SSH password authentication was rejected")]
+    /// The server rejected an authentication method or requires another factor.
+    #[error("SSH authentication was rejected")]
     AuthenticationRejected {
         /// Whether the server accepted the method as a partial multi-factor step.
         partial_success: bool,
+        /// Remaining methods recognized by the SSH engine, in server order. Unknown methods are omitted.
+        remaining_methods: Vec<String>,
     },
     /// The public-key signer or its session-bound request was invalid.
     #[error("SSH public-key authentication could not be completed: {0}")]
@@ -588,8 +593,18 @@ pub enum ClientError {
     UnexpectedChannelEvent,
 }
 
+fn authentication_rejected(
+    remaining_methods: &russh::MethodSet,
+    partial_success: bool,
+) -> ClientError {
+    ClientError::AuthenticationRejected {
+        partial_success,
+        remaining_methods: remaining_methods.iter().map(String::from).collect(),
+    }
+}
+
 /// Result of an RFC 4252 `none` probe. The server may accept `none` or advertise further
-/// methods. Advertised method names are kept in the server's order.
+/// methods. Methods recognized by the SSH engine retain server order; unknown names are omitted.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NoneAuthOutcome {
     /// The server accepted `none`; the connection is authenticated.
@@ -644,6 +659,7 @@ impl From<russh::Error> for ClientError {
 /// A connected and authenticated-capable SSH client.
 pub struct ClientConnection {
     handle: client::Handle<ClientHandler>,
+    authenticated: AtomicBool,
     transport_lifetime: Mutex<Option<oneshot::Sender<()>>>,
     stopped: watch::Receiver<bool>,
     channel_slots: Arc<Semaphore>,
@@ -746,6 +762,7 @@ impl ClientConnection {
             client::connect_stream(Arc::new(config.russh_config()), stream, handler).await?;
         Ok(Self {
             handle,
+            authenticated: AtomicBool::new(false),
             transport_lifetime: Mutex::new(Some(owner)),
             stopped,
             channel_slots,
@@ -980,9 +997,12 @@ impl ClientConnection {
             .await
             .map_err(ClientError::PublicKey)?;
         match result {
-            russh::client::AuthResult::Success => Ok(()),
-            russh::client::AuthResult::Failure { partial_success, .. } => {
-                Err(ClientError::AuthenticationRejected { partial_success })
+            russh::client::AuthResult::Success => {
+                self.authenticated.store(true, Ordering::Release);
+                Ok(())
+            }
+            russh::client::AuthResult::Failure { remaining_methods, partial_success } => {
+                Err(authentication_rejected(&remaining_methods, partial_success))
             }
         }
     }
@@ -1018,6 +1038,12 @@ impl ClientConnection {
         {
             return Err(ClientError::PublicKey(PublicKeyAuthError::KeyMismatch));
         }
+        let identity = PublicKeyIdentity::for_certificate(
+            signer.algorithm().certificate_name(),
+            identity.key_blob().to_vec(),
+            identity.signing_key_blob().to_vec(),
+        )
+        .map_err(PublicKeyAuthError::Signer)?;
         let certificate =
             ssh_key::Certificate::from_bytes(user_certificate.certificate().as_bytes())
                 .map_err(|_| PublicKeyAuthError::MalformedPayload("user certificate"))?;
@@ -1029,9 +1055,12 @@ impl ClientConnection {
             .await
             .map_err(ClientError::PublicKey)?;
         match result {
-            russh::client::AuthResult::Success => Ok(()),
-            russh::client::AuthResult::Failure { partial_success, .. } => {
-                Err(ClientError::AuthenticationRejected { partial_success })
+            russh::client::AuthResult::Success => {
+                self.authenticated.store(true, Ordering::Release);
+                Ok(())
+            }
+            russh::client::AuthResult::Failure { remaining_methods, partial_success } => {
+                Err(authentication_rejected(&remaining_methods, partial_success))
             }
         }
     }
@@ -1055,9 +1084,12 @@ impl ClientConnection {
             .map_err(ClientError::from);
         password.zeroize();
         match result? {
-            russh::client::AuthResult::Success => Ok(()),
-            russh::client::AuthResult::Failure { partial_success, .. } => {
-                Err(ClientError::AuthenticationRejected { partial_success })
+            russh::client::AuthResult::Success => {
+                self.authenticated.store(true, Ordering::Release);
+                Ok(())
+            }
+            russh::client::AuthResult::Failure { remaining_methods, partial_success } => {
+                Err(authentication_rejected(&remaining_methods, partial_success))
             }
         }
     }
@@ -1073,7 +1105,10 @@ impl ClientConnection {
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
         match self.handle.authenticate_none(username.to_owned()).await.map_err(ClientError::from)? {
-            russh::client::AuthResult::Success => Ok(NoneAuthOutcome::Authenticated),
+            russh::client::AuthResult::Success => {
+                self.authenticated.store(true, Ordering::Release);
+                Ok(NoneAuthOutcome::Authenticated)
+            }
             russh::client::AuthResult::Failure { remaining_methods, partial_success } => {
                 Ok(NoneAuthOutcome::Rejected {
                     methods: remaining_methods.iter().map(String::from).collect(),
@@ -1122,12 +1157,14 @@ impl ClientConnection {
         };
         loop {
             reply = match reply {
-                russh::client::KeyboardInteractiveAuthResponse::Success => return Ok(()),
-                russh::client::KeyboardInteractiveAuthResponse::Failure {
-                    partial_success, ..
-                } => {
-                    return Err(ClientError::AuthenticationRejected { partial_success });
+                russh::client::KeyboardInteractiveAuthResponse::Success => {
+                    self.authenticated.store(true, Ordering::Release);
+                    return Ok(());
                 }
+                russh::client::KeyboardInteractiveAuthResponse::Failure {
+                    remaining_methods,
+                    partial_success,
+                } => return Err(authentication_rejected(&remaining_methods, partial_success)),
                 russh::client::KeyboardInteractiveAuthResponse::InfoRequest {
                     name,
                     instructions,
@@ -1237,6 +1274,7 @@ impl ClientConnection {
         address: &str,
         port: u32,
     ) -> Result<u32, ClientError> {
+        self.require_authenticated()?;
         validate_text(address.as_bytes(), MAX_CHANNEL_ADDRESS, "forward address", false)
             .map_err(ClientError::Config)?;
         self.handle.tcpip_forward(address.to_owned(), port).await.map_err(ClientError::from)
@@ -1244,6 +1282,7 @@ impl ClientConnection {
 
     /// Cancel a remote TCP forwarding definition.
     pub async fn cancel_tcpip_forward(&self, address: &str, port: u32) -> Result<(), ClientError> {
+        self.require_authenticated()?;
         validate_text(address.as_bytes(), MAX_CHANNEL_ADDRESS, "forward address", false)
             .map_err(ClientError::Config)?;
         self.handle.cancel_tcpip_forward(address.to_owned(), port).await.map_err(ClientError::from)
@@ -1251,6 +1290,7 @@ impl ClientConnection {
 
     /// Ask the server to listen for a remote Unix-socket forwarding definition.
     pub async fn request_streamlocal_forward(&self, socket_path: &str) -> Result<(), ClientError> {
+        self.require_authenticated()?;
         validate_text(socket_path.as_bytes(), MAX_CHANNEL_ADDRESS, "socket path", true)
             .map_err(ClientError::Config)?;
         self.handle.streamlocal_forward(socket_path.to_owned()).await.map_err(ClientError::from)
@@ -1258,6 +1298,7 @@ impl ClientConnection {
 
     /// Cancel a remote Unix-socket forwarding definition.
     pub async fn cancel_streamlocal_forward(&self, socket_path: &str) -> Result<(), ClientError> {
+        self.require_authenticated()?;
         validate_text(socket_path.as_bytes(), MAX_CHANNEL_ADDRESS, "socket path", true)
             .map_err(ClientError::Config)?;
         self.handle
@@ -1276,9 +1317,18 @@ impl ClientConnection {
     }
 
     fn channel_permit(&self) -> Result<OwnedSemaphorePermit, ClientError> {
+        self.require_authenticated()?;
         Arc::clone(&self.channel_slots)
             .try_acquire_owned()
             .map_err(|_| ClientError::ChannelLimitReached { max: self.channel_limit })
+    }
+
+    fn require_authenticated(&self) -> Result<(), ClientError> {
+        if self.authenticated.load(Ordering::Acquire) {
+            Ok(())
+        } else {
+            Err(ClientError::NotAuthenticated)
+        }
     }
 
     /// Close this SSH connection, including when surviving channels have blocked output.
@@ -4084,6 +4134,8 @@ mod tests {
             connection.probe_authentication("user").await.expect("accepted none probe"),
             NoneAuthOutcome::Authenticated
         );
+        let channel = connection.open_session().await.expect("none-authenticated session");
+        drop(channel);
         connection.disconnect().await.expect("disconnect");
         server.await.expect("server task");
     }
@@ -5351,6 +5403,144 @@ mod tests {
             .await
             .expect("SSH server task")
             .expect("SSH server");
+    }
+
+    fn assert_rsa_certificate_payload_binding(
+        signer: &RsaSshSigner,
+        identity: &PublicKeyIdentity,
+        presented_key: &AgentIdentity,
+        other_certificate: &[u8],
+    ) {
+        let adapter =
+            RusshSignerAdapter { signer, identity: identity.clone(), username: "alice".to_owned() };
+        let context =
+            PublicKeyAuthContext::new([3; 32], "alice", "ssh-connection").expect("context");
+        let other_algorithm = match signer.algorithm() {
+            SignatureAlgorithm::RsaSha2_256 => SignatureAlgorithm::RsaSha2_512,
+            SignatureAlgorithm::RsaSha2_512 => SignatureAlgorithm::RsaSha2_256,
+            _ => unreachable!(),
+        };
+        let changed_hash = PublicKeyIdentity::for_certificate(
+            other_algorithm.certificate_name(),
+            identity.key_blob().to_vec(),
+            identity.signing_key_blob().to_vec(),
+        )
+        .expect("other RSA hash identity");
+        let changed_hash_payload = PublicKeyAuthRequest::probe(context.clone(), changed_hash)
+            .expect("probe")
+            .signature_payload();
+        assert!(matches!(
+            adapter.sign_request(presented_key, changed_hash_payload),
+            Err(PublicKeyAuthError::KeyMismatch)
+        ));
+        let changed_certificate = PublicKeyIdentity::for_certificate(
+            signer.algorithm().certificate_name(),
+            other_certificate.to_vec(),
+            identity.signing_key_blob().to_vec(),
+        )
+        .expect("other certificate identity");
+        let changed_certificate_payload = PublicKeyAuthRequest::probe(context, changed_certificate)
+            .expect("probe")
+            .signature_payload();
+        assert!(matches!(
+            adapter.sign_request(presented_key, changed_certificate_payload),
+            Err(PublicKeyAuthError::KeyMismatch)
+        ));
+    }
+
+    #[tokio::test]
+    async fn rsa_sha2_user_certificates_authenticate_against_real_russh_server() {
+        let mut rng = ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng);
+        let subject =
+            PrivateKey::random(&mut rng, Algorithm::Rsa { hash: None }).expect("RSA subject key");
+        let ca = PrivateKey::random(&mut rng, Algorithm::Ed25519).expect("CA key");
+        let now = unix_time_seconds();
+        let mut builder = certificate::Builder::new(
+            vec![8; 16],
+            subject.public_key().clone(),
+            now - 60,
+            now + 60,
+        )
+        .expect("certificate builder");
+        builder.cert_type(certificate::CertType::User).expect("user certificate");
+        builder.valid_principal("alice").expect("certificate principal");
+        let certificate = builder.sign(&ca).expect("signed certificate");
+        let encoded_certificate = certificate.to_bytes().expect("certificate bytes");
+        let user_certificate = UserCertificate::parse_and_validate(
+            &encoded_certificate,
+            &CertificateValidationPolicy::user("alice", now),
+        )
+        .expect("validated user certificate");
+        let mut other_builder = certificate::Builder::new(
+            vec![9; 16],
+            subject.public_key().clone(),
+            now - 60,
+            now + 60,
+        )
+        .expect("other certificate builder");
+        other_builder.cert_type(certificate::CertType::User).expect("user certificate");
+        other_builder.valid_principal("alice").expect("certificate principal");
+        let other_certificate = other_builder
+            .sign(&ca)
+            .expect("other signed certificate")
+            .to_bytes()
+            .expect("other certificate bytes");
+
+        for algorithm in [SignatureAlgorithm::RsaSha2_256, SignatureAlgorithm::RsaSha2_512] {
+            let signer = RsaSshSigner::new(subject.clone(), algorithm).expect("RSA signer");
+            let validated_identity = user_certificate.identity();
+            let identity = PublicKeyIdentity::for_certificate(
+                algorithm.certificate_name(),
+                validated_identity.key_blob().to_vec(),
+                validated_identity.signing_key_blob().to_vec(),
+            )
+            .expect("RSA SHA-2 certificate identity");
+            let presented_key = AgentIdentity::from(subject.public_key().clone());
+            assert_rsa_certificate_payload_binding(
+                &signer,
+                &identity,
+                &presented_key,
+                &other_certificate,
+            );
+            let mut server_config = russh::server::Config::default();
+            server_config.keys.push(
+                PrivateKey::random(
+                    &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                    Algorithm::Ed25519,
+                )
+                .expect("server key"),
+            );
+            let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+            let address = listener.local_addr().expect("server address");
+            let expected_key = encoded_certificate.clone();
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.expect("accept client");
+                let session = russh::server::run_stream(
+                    Arc::new(server_config),
+                    stream,
+                    PublicKeyServer { expected_key },
+                )
+                .await
+                .expect("start server session");
+                let _ = session.await;
+            });
+            let config = ClientConfig::new(
+                "127.0.0.1",
+                address.port(),
+                |_host: &str, _key: &HostKey| Ok(()),
+            )
+            .expect("SSH config");
+            let mut connection = ClientConnection::connect(config).await.expect("connect client");
+            connection
+                .authenticate_certificate("alice", &user_certificate, &signer)
+                .await
+                .expect("RSA SHA-2 certificate authentication");
+            connection.disconnect().await.expect("disconnect client");
+            timeout(Duration::from_secs(5), server)
+                .await
+                .expect("SSH server deadline")
+                .expect("SSH server task");
+        }
     }
 
     #[tokio::test]
