@@ -181,6 +181,32 @@ async fn sftp_response(
     Ok(session.read_response().await?)
 }
 
+async fn verify_statvfs(
+    session: &mut SftpSession,
+    missing_path: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !session.extensions().iter().any(|extension| extension.name == b"statvfs@openssh.com") {
+        return Err("OpenSSH did not advertise statvfs@openssh.com".into());
+    }
+    let statvfs = session.client_mut().statvfs(b".")?;
+    let stats = sftp_response(session, statvfs).await?.statvfs_response()?;
+    if stats.block_size == 0
+        || stats.fragment_size == 0
+        || stats.blocks == 0
+        || stats.name_max == 0
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP statvfs returned invalid filesystem statistics".into());
+    }
+    let missing_statvfs = session.client_mut().statvfs(missing_path.to_vec())?;
+    if !matches!(sftp_response(session, missing_statvfs).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("missing SFTP statvfs path was not rejected cleanly".into());
+    }
+    Ok(())
+}
+
 async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
     let mut session = SftpSession::open(connection, 4).await?;
     if session.limits().is_none() {
@@ -189,12 +215,14 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let path = format!(".scoplen-interop-{}-{nonce}", std::process::id()).into_bytes();
     let missing_path = [path.as_slice(), b"-missing"].concat();
-    let missing = session.client_mut().open(missing_path, 1, SftpAttributes::default())?;
+    let missing = session.client_mut().open(missing_path.clone(), 1, SftpAttributes::default())?;
     if !matches!(sftp_response(&mut session, missing).await?, SftpPacket::Status { code: 2, .. })
         || session.pending_requests() != 0
     {
         return Err("missing SFTP file was not rejected cleanly".into());
     }
+
+    verify_statvfs(&mut session, &missing_path).await?;
 
     let create = session.client_mut().open(path.clone(), 0x1a, SftpAttributes::default())?;
     let write_handle = match sftp_response(&mut session, create).await? {

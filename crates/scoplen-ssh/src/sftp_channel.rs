@@ -573,15 +573,55 @@ mod tests {
     use tokio::net::TcpListener;
 
     use super::*;
-    use crate::{ClientConfig, HostKey, SftpAttributes, SftpNameEntry};
+    use crate::{ClientConfig, HostKey, SftpAttributes, SftpNameEntry, SftpStatvfs};
 
     struct SftpServer {
         buffer: Vec<u8>,
         file: Vec<u8>,
         advertise_limits: bool,
+        advertise_statvfs: bool,
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
+    }
+
+    impl SftpServer {
+        fn limits_response(id: u32) -> SftpPacket {
+            SftpPacket::ExtendedReply {
+                id,
+                data: SftpLimits {
+                    max_packet_length: 256 * 1024,
+                    max_read_length: 128 * 1024,
+                    max_write_length: 64 * 1024,
+                    max_open_handles: 128,
+                }
+                .encode(),
+            }
+        }
+
+        fn statvfs_response(id: u32, data: &[u8]) -> SftpPacket {
+            if data == b"\0\0\0\x01." {
+                SftpPacket::ExtendedReply {
+                    id,
+                    data: SftpStatvfs {
+                        block_size: 4096,
+                        fragment_size: 4096,
+                        blocks: 100,
+                        free_blocks: 80,
+                        available_blocks: 70,
+                        files: 50,
+                        free_files: 40,
+                        available_files: 30,
+                        filesystem_id: 1,
+                        flags: 0,
+                        name_max: 255,
+                    }
+                    .encode(),
+                }
+            } else {
+                SftpPacket::Status { id, code: 2, message: Vec::new(), language: Vec::new() }
+            }
+        }
     }
 
     #[test]
@@ -664,11 +704,15 @@ mod tests {
                 let is_read = matches!(packet, SftpPacket::Read { .. });
                 let response = match packet {
                     SftpPacket::Init { .. } => {
-                        let extensions = if self.advertise_limits {
-                            vec![SftpExtension::new(b"limits@openssh.com", b"1").unwrap()]
-                        } else {
-                            Vec::new()
-                        };
+                        let mut extensions = Vec::new();
+                        if self.advertise_limits {
+                            extensions
+                                .push(SftpExtension::new(b"limits@openssh.com", b"1").unwrap());
+                        }
+                        if self.advertise_statvfs {
+                            extensions
+                                .push(SftpExtension::new(b"statvfs@openssh.com", b"2").unwrap());
+                        }
                         SftpPacket::Version { version: 3, extensions }
                     }
                     SftpPacket::Realpath { id, .. } => SftpPacket::Name {
@@ -719,16 +763,12 @@ mod tests {
                     SftpPacket::Extended { id, name, .. }
                         if name == b"limits@openssh.com" && self.advertise_limits =>
                     {
-                        SftpPacket::ExtendedReply {
-                            id,
-                            data: SftpLimits {
-                                max_packet_length: 256 * 1024,
-                                max_read_length: 128 * 1024,
-                                max_write_length: 64 * 1024,
-                                max_open_handles: 128,
-                            }
-                            .encode(),
-                        }
+                        Self::limits_response(id)
+                    }
+                    SftpPacket::Extended { id, name, data }
+                        if name == b"statvfs@openssh.com" && self.advertise_statvfs =>
+                    {
+                        Self::statvfs_response(id, &data)
                     }
                     _ => continue,
                 };
@@ -773,6 +813,7 @@ mod tests {
                     buffer: Vec::new(),
                     file,
                     advertise_limits: false,
+                    advertise_statvfs: false,
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
@@ -854,6 +895,7 @@ mod tests {
                     buffer: Vec::new(),
                     file: Vec::new(),
                     advertise_limits: true,
+                    advertise_statvfs: true,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -867,7 +909,7 @@ mod tests {
         let mut connection = ClientConnection::connect(config).await.expect("connect client");
         connection.authenticate_password("user", b"password").await.expect("authenticate client");
         let mut session = SftpSession::open(&connection, 2).await.expect("open sftp session");
-        assert_eq!(session.extensions().len(), 1);
+        assert_eq!(session.extensions().len(), 2);
         assert!(session.limits().is_some());
         assert_eq!(
             session.request_limits().await.expect("request limits"),
@@ -884,6 +926,21 @@ mod tests {
             session.read_response().await.expect("read realpath"),
             SftpPacket::Name { id: 2, entries } if entries[0].filename == b"/srv"
         ));
+        let statvfs = session.client_mut().statvfs(b".").expect("statvfs request");
+        session.send_request(&statvfs).await.expect("send statvfs");
+        let stats =
+            session.read_response().await.expect("read statvfs").statvfs_response().unwrap();
+        assert_eq!(stats.block_size, 4096);
+        assert_eq!(stats.name_max, 255);
+        assert_eq!(session.pending_requests(), 0);
+
+        let missing = session.client_mut().statvfs(b"missing").expect("missing statvfs request");
+        session.send_request(&missing).await.expect("send missing statvfs");
+        assert!(matches!(
+            session.read_response().await.expect("read missing statvfs"),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
         connection.disconnect().await.expect("disconnect client");
     }
 
@@ -909,6 +966,7 @@ mod tests {
                     buffer: Vec::new(),
                     file: Vec::new(),
                     advertise_limits: false,
+                    advertise_statvfs: false,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
@@ -966,6 +1024,7 @@ mod tests {
                     buffer: Vec::new(),
                     file: b"abcdef".to_vec(),
                     advertise_limits: false,
+                    advertise_statvfs: false,
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,

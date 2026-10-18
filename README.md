@@ -131,10 +131,11 @@ the certificate; a certificate from another CA was rejected by OpenSSH. Revocati
 certificate algorithms remain unverified.
 Set `SCOPLEN_OPENSSH_SFTP=1` for the same example against a disposable server to additionally
 exercise SFTP v3 on the authenticated connection. This verifies advertised OpenSSH transfer
-limits, a missing-file response with released request state, pipelined upload in two parts,
-resumed download with progress and byte comparison, handle closure, and removal of the unique
-temporary remote file. It passed against the local `linuxserver/openssh-server` image; other
-server implementations and platforms remain unverified.
+limits, a missing-file response with released request state, `statvfs@openssh.com` filesystem
+statistics and missing-path rejection, pipelined upload in two parts, resumed download with
+progress and byte comparison, handle closure, and removal of the unique temporary remote file.
+It passed against a disposable `linuxserver/openssh-server` container; other SFTP extensions,
+server implementations, and platforms remain unverified.
 Set `SCOPLEN_OPENSSH_FORWARD=1` to verify an RFC 4254 `direct-tcpip` channel to the disposable
 server's own SSH listener at `127.0.0.1:2222`, then a refused connection to port 1 and a fresh
 session open. The `linuxserver/openssh-server` image disables TCP forwarding by default; this
