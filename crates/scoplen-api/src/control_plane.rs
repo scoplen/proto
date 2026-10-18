@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub use crate::ProblemDetails;
+
 /// Canonical Cedar entity/action schema for the control plane.
 pub const CEDAR_SCHEMA: &str = include_str!("../cedar/schema.cedarschema");
 
@@ -107,34 +109,11 @@ pub enum QueryError {
     Sort,
 }
 
-/// RFC 9457 problem details used by every control-plane error response.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct ProblemDetails {
-    /// Problem type URI.
-    #[serde(rename = "type")]
-    pub problem_type: String,
-    /// Short human-readable title.
-    pub title: String,
-    /// HTTP status in the 4xx/5xx range.
-    pub status: u16,
-    /// Stable Scoplen error code.
-    pub code: String,
-    /// Optional human-readable detail.
-    pub detail: Option<String>,
-    /// Optional occurrence URI.
-    pub instance: Option<String>,
-    /// Whether the requested state changed before failure.
-    pub changed: Option<bool>,
-    /// Forward-compatible extension fields.
-    #[serde(default, flatten)]
-    pub extensions: serde_json::Map<String, Value>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
         BUILT_IN_POLICIES, CEDAR_SCHEMA, GATEWAY_CONTROL_PROTO, HOST_AGENT_PROTO, ListQuery, Page,
-        ProblemDetails, QueryError, Resource,
+        QueryError, Resource,
     };
     use crate::{INTERNAL_PROTO_DESCRIPTOR, proto};
     use cedar_policy::{PolicySet, Schema, ValidationMode, Validator};
@@ -157,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn generated_envelopes_round_trip_without_dropping_extensions() {
+    fn resource_page_round_trips_with_opaque_data() {
         let resource = Resource {
             id: "018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1".into(),
             etag: "\"1\"".into(),
@@ -169,12 +148,6 @@ mod tests {
         let json = serde_json::to_string(&page).expect("encode");
         let decoded: Page<Resource> = serde_json::from_str(&json).expect("decode");
         assert_eq!(decoded, page);
-        let problem: ProblemDetails = serde_json::from_value(json!({
-            "type":"about:blank","title":"Denied","status":403,
-            "code":"policy.denied","x_trace":"kept"
-        }))
-        .expect("problem");
-        assert_eq!(problem.extensions["x_trace"], "kept");
     }
 
     #[test]
