@@ -118,6 +118,9 @@ test account password; optional `SCOPLEN_OPENSSH_HOST`, `SCOPLEN_OPENSSH_PORT`, 
 authentication, command output and exit status, wrong-pin rejection, a missing or failed child,
 and handshake timeout with child cleanup. It passed from Windows against a disposable Linux
 OpenSSH container; Unix hosts and other server implementations remain unverified for this route.
+`pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH server and runs
+the direct SFTP/forwarding and ProxyCommand examples, plus wrong-password rejection. The Linux CI
+workflow runs the same script on each change; the container is stopped afterward.
 For host-certificate mode, the concrete adapter checks the certificate signature, host principal,
 validity, and critical options before the callback checks the CA pin. A disposable
 `linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and
