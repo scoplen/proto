@@ -45,7 +45,7 @@ regression tracking required by `13-testing-and-quality.md` §2 and §7 remain o
 - Host: Windows 10.0.26200, AMD Ryzen 9 7945HX, Rust 1.85.0.
 - OpenSSH client: OpenSSH for Windows 9.5p2. Server: OpenSSH 9.9p2, OpenSSL 3.3.7.
 - Base image ID: `sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507`.
-- Source revision: `proto@b893d03` plus the comparison code in this change.
+- Source revision: `scoplen-proto@b893d03` plus the comparison code in this change.
 - Transfer: 256 MiB per trial; one warmup and five retained samples for each client and cipher.
 
 | Server cipher | OpenSSH median | Scoplen median | Scoplen / OpenSSH |
