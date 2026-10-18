@@ -845,6 +845,26 @@ mod tests {
             }
         }
 
+        fn fsetstat_response(
+            &mut self,
+            id: u32,
+            handle: &[u8],
+            attrs: &SftpAttributes,
+        ) -> SftpPacket {
+            let code = if handle == b"h" && self.extension_handle_open == Some(true) {
+                match attrs.size.and_then(|size| usize::try_from(size).ok()) {
+                    Some(size) if size <= 1024 * 1024 => {
+                        self.file.resize(size, 0);
+                        0
+                    }
+                    _ => 4,
+                }
+            } else {
+                4
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
         fn copy_data_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
             let expected = SftpPacket::copy_data_request(id, b"h", 2, 4, b"copy", 1).unwrap();
             let code = if self.extension_handle_open == Some(true)
@@ -1142,6 +1162,11 @@ mod tests {
                             language: Vec::new(),
                         })
                     }
+                }
+                SftpPacket::Fsetstat { id, handle, attrs }
+                    if self.extension_handle_open.is_some() =>
+                {
+                    Some(self.fsetstat_response(*id, handle, attrs))
                 }
                 _ => None,
             }
@@ -1504,18 +1529,57 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
     }
 
-    async fn assert_fstat(session: &mut SftpSession, handle: &[u8], open: bool) {
+    async fn assert_fstat(session: &mut SftpSession, handle: &[u8], expected_size: Option<u64>) {
         let request = session.client_mut().fstat(handle.to_vec()).expect("fstat request");
         session.send_request(&request).await.expect("send fstat");
         let response = session.read_response().await.expect("read fstat");
-        if open {
+        if let Some(size) = expected_size {
             assert!(matches!(
                 response,
-                SftpPacket::Attrs { attrs: SftpAttributes { size: Some(12), .. }, .. }
+                SftpPacket::Attrs { attrs: SftpAttributes { size: Some(actual), .. }, .. } if actual == size
             ));
         } else {
             assert!(matches!(response, SftpPacket::Status { code: 4, .. }));
         }
+        assert_eq!(session.pending_requests(), 0);
+    }
+
+    async fn assert_fsetstat(session: &mut SftpSession, handle: &[u8], size: u64, open: bool) {
+        let request = session
+            .client_mut()
+            .fsetstat(
+                handle.to_vec(),
+                SftpAttributes { size: Some(size), ..SftpAttributes::default() },
+            )
+            .expect("fsetstat request");
+        session.send_request(&request).await.expect("send fsetstat");
+        let response = session.read_response().await.expect("read fsetstat");
+        assert!(matches!(response, SftpPacket::Status { code, .. } if (code == 0) == open));
+        assert_eq!(session.pending_requests(), 0);
+    }
+
+    async fn assert_fsetstat_open_round_trip(session: &mut SftpSession, handle: &[u8]) {
+        assert_fsetstat(session, handle, 13, true).await;
+        assert_fstat(session, handle, Some(13)).await;
+        assert_fsetstat(session, handle, 12, true).await;
+        assert_fstat(session, handle, Some(12)).await;
+    }
+
+    async fn assert_fsetstat_closed(session: &mut SftpSession, handle: &[u8]) {
+        assert_fsetstat(session, handle, 13, false).await;
+        let reopen = session.client_mut().open(b"file", 1, SftpAttributes::default()).unwrap();
+        session.send_request(&reopen).await.expect("send reopen");
+        let reopened = match session.read_response().await.expect("read reopen") {
+            SftpPacket::Handle { handle, .. } => handle,
+            other => panic!("unexpected reopen response: {other:?}"),
+        };
+        assert_fstat(session, &reopened, Some(12)).await;
+        let close = session.client_mut().close(reopened).unwrap();
+        session.send_request(&close).await.expect("send reclose");
+        assert!(matches!(
+            session.read_response().await.expect("read reclose"),
+            SftpPacket::Status { code: 0, .. }
+        ));
         assert_eq!(session.pending_requests(), 0);
     }
 
@@ -2015,7 +2079,8 @@ mod tests {
         ));
         assert_eq!(session.pending_requests(), 0);
         assert_fstatvfs(&mut session, &handle, true).await;
-        assert_fstat(&mut session, &handle, true).await;
+        assert_fstat(&mut session, &handle, Some(12)).await;
+        assert_fsetstat_open_round_trip(&mut session, &handle).await;
         let close = session.client_mut().close(handle.clone()).expect("close request");
         session.send_request(&close).await.expect("send close");
         assert!(matches!(
@@ -2031,7 +2096,8 @@ mod tests {
         ));
         assert_eq!(session.pending_requests(), 0);
         assert_fstatvfs(&mut session, &handle, false).await;
-        assert_fstat(&mut session, &handle, false).await;
+        assert_fstat(&mut session, &handle, None).await;
+        assert_fsetstat_closed(&mut session, &handle).await;
         assert_hardlink(&mut session).await;
         assert_expand_path(&mut session).await;
         assert_lsetstat(&mut session).await;
