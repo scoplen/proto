@@ -87,6 +87,12 @@ but the current engine does not process that request while waiting for the user'
 elapsed-time check can start an exchange after authentication resumes.
 Incoming-byte-triggered rekeying is not implemented by the current engine; the complete S4 rekey
 requirement and OpenSSH default compatibility remain open.
+`ClientConfig::with_keepalive` configures encrypted `keepalive@openssh.com` probes per Host and
+returns a typed configuration result. Probes are disabled by default, with a missed-reply count
+of three. Enabled intervals must be positive and representable as an event-loop deadline, and
+the count must be greater than zero and less than `usize::MAX`. `None` disables probes regardless
+of the count. Responsive peers preserve the channel; a silent peer expires the configured
+connection. This does not implement the separate `ping@openssh.com` extension.
 The adapter keeps the engine types out of the public API. A bounded SOCKS4a/SOCKS5 dynamic
 listener now composes the handshake with `direct-tcpip`, including cancellation, concurrency
 limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping.

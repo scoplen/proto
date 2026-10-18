@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Made `ClientConfig::with_keepalive` return a typed result and reject enabled zero intervals,
+  non-expiring missed-reply counts, and unrepresentable deadlines before the engine can spin,
+  grow its probe queue indefinitely, or panic. Probes remain disabled by default. Real SSH relay
+  tests cover responsive peers, silent-peer expiry, explicit disablement, and per-Host isolation.
 - Unified the control-plane and shared Rust problem-details types, requiring the same eight
   validated error fields in JSON, CBOR, OpenAPI, and TypeScript. Unknown response fields and valid
   future error codes remain accepted. The OpenAPI generator now emits the TypeScript problem
