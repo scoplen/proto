@@ -184,6 +184,47 @@ async fn echo(channel: &mut ClientChannel, data: &[u8]) {
 }
 
 #[test]
+fn enabled_inactivity_and_rekey_reject_unrepresentable_deadlines() {
+    let verifier = |_host: &str, _key: &HostKey| Ok(());
+    let config = ClientConfig::new("127.0.0.1", 22, verifier).expect("client config");
+    for timeout in [Duration::ZERO, Duration::MAX] {
+        assert!(matches!(
+            config.clone().with_inactivity_timeout(Some(timeout)),
+            Err(ClientConfigError::InvalidInactivityTimeout)
+        ));
+    }
+    assert!(matches!(
+        config.clone().with_rekey_limits(1, Duration::MAX),
+        Err(ClientConfigError::InvalidRekeyLimits)
+    ));
+    config.with_inactivity_timeout(None).expect("disabled inactivity timeout");
+}
+
+#[tokio::test]
+async fn activity_resets_inactivity_timeout_and_silence_expires_connection() {
+    let fixture = start_fixture().await;
+    let config = ClientConfig::new(
+        "127.0.0.1",
+        fixture.address.port(),
+        |_host: &str, _key: &HostKey| Ok(()),
+    )
+    .expect("client config")
+    .with_inactivity_timeout(Some(INTERVAL * 5))
+    .expect("representable inactivity timeout");
+    let connection = connect_with_config(config).await;
+    let mut channel = connection.open_session().await.expect("open session");
+    for _ in 0..7 {
+        sleep(INTERVAL).await;
+        echo(&mut channel, b"active").await;
+    }
+    let closed = timeout(DEADLINE, channel.next_event())
+        .await
+        .expect("idle connection expires")
+        .expect("read channel event");
+    assert!(closed.is_none(), "event stream closes after inactivity");
+}
+
+#[test]
 fn enabled_keepalive_rejects_unbounded_or_nonprogressing_settings() {
     let verifier = |_host: &str, _key: &HostKey| Ok(());
     let config = ClientConfig::new("127.0.0.1", 22, verifier).expect("client config");

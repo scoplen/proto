@@ -74,8 +74,13 @@ pub enum ClientConfigError {
     /// The simultaneous channel limit is zero or exceeds the supported bound.
     #[error("SSH client channel limit must be between 1 and {MAX_CLIENT_CHANNEL_LIMIT}")]
     InvalidChannelLimit,
-    /// Rekey limits must be positive and the byte limit must not exceed one GiB.
-    #[error("SSH rekey limits require 1..=1073741824 outgoing bytes and a positive duration")]
+    /// An enabled inactivity timeout must make progress and fit an event-loop deadline.
+    #[error("SSH inactivity timeout must be positive and representable as a deadline")]
+    InvalidInactivityTimeout,
+    /// Rekey limits must fit a deadline and the byte limit must not exceed one GiB.
+    #[error(
+        "SSH rekey limits require 1..=1073741824 outgoing bytes and a positive representable duration"
+    )]
     InvalidRekeyLimits,
     /// Enabled keepalive settings cannot spin or disable missed-reply detection.
     #[error(
@@ -223,10 +228,20 @@ impl ClientConfig {
     }
 
     /// Configure the inactivity timeout used by the underlying event loop.
-    #[must_use]
-    pub fn with_inactivity_timeout(mut self, timeout: Option<Duration>) -> Self {
+    ///
+    /// `None` disables the timeout. An enabled timeout must be positive and representable as an
+    /// event-loop deadline, including after received traffic resets the timer.
+    pub fn with_inactivity_timeout(
+        mut self,
+        timeout: Option<Duration>,
+    ) -> Result<Self, ClientConfigError> {
+        if timeout.is_some_and(|timeout| {
+            timeout.is_zero() || Instant::now().checked_add(timeout).is_none()
+        }) {
+            return Err(ClientConfigError::InvalidInactivityTimeout);
+        }
         self.inactivity_timeout = timeout;
-        self
+        Ok(self)
     }
 
     /// Configure periodic keepalives used by the underlying event loop.
@@ -256,16 +271,19 @@ impl ClientConfig {
     /// Request rekeying after this many outgoing SSH payload bytes or this elapsed duration.
     ///
     /// The byte limit must be between one byte and one GiB, inclusive; the time limit must be
-    /// positive. Defaults are one GiB and one hour. The event loop checks the time limit when
-    /// processing traffic; a separate timer requests rekey for idle connections. Incoming byte
-    /// thresholds are not enforced by the current engine. The engine's byte counter excludes
-    /// packet headers, padding, and authentication tags.
+    /// positive and representable as a deadline. Defaults are one GiB and one hour. The event
+    /// loop checks the time limit when processing traffic; a separate timer requests rekey for
+    /// idle connections. Incoming byte thresholds are not enforced by the current engine. The
+    /// engine's byte counter excludes packet headers, padding, and authentication tags.
     pub fn with_rekey_limits(
         mut self,
         write_bytes: usize,
         elapsed: Duration,
     ) -> Result<Self, ClientConfigError> {
-        if !(1..=DEFAULT_REKEY_WRITE_LIMIT).contains(&write_bytes) || elapsed.is_zero() {
+        if !(1..=DEFAULT_REKEY_WRITE_LIMIT).contains(&write_bytes)
+            || elapsed.is_zero()
+            || Instant::now().checked_add(elapsed).is_none()
+        {
             return Err(ClientConfigError::InvalidRekeyLimits);
         }
         self.rekey_write_limit = write_bytes;
@@ -3096,6 +3114,7 @@ mod tests {
             (0, Duration::from_secs(1)),
             (DEFAULT_REKEY_WRITE_LIMIT + 1, Duration::from_secs(1)),
             (1, Duration::ZERO),
+            (1, Duration::MAX),
         ] {
             assert!(matches!(
                 config.clone().with_rekey_limits(bytes, elapsed),
