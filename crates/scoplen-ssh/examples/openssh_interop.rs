@@ -230,6 +230,31 @@ async fn verify_fsync(
     Ok(())
 }
 
+async fn verify_fstatvfs(
+    session: &mut SftpSession,
+    handle: &[u8],
+    expect_success: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let request = session.client_mut().fstatvfs(handle.to_vec())?;
+    let response = sftp_response(session, request).await?;
+    if expect_success {
+        let stats = response.statvfs_response()?;
+        if stats.block_size == 0
+            || stats.fragment_size == 0
+            || stats.blocks == 0
+            || stats.name_max == 0
+            || session.pending_requests() != 0
+        {
+            return Err("SFTP fstatvfs returned invalid filesystem statistics".into());
+        }
+    } else if !matches!(response, SftpPacket::Status { code: 1.., .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP fstatvfs accepted a closed handle or retained a request slot".into());
+    }
+    Ok(())
+}
+
 async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
     let mut session = SftpSession::open(connection, 4).await?;
     if session.limits().is_none() {
@@ -237,6 +262,9 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     }
     if !session.extensions().iter().any(|extension| extension.name == b"fsync@openssh.com") {
         return Err("OpenSSH did not advertise fsync@openssh.com".into());
+    }
+    if !session.extensions().iter().any(|extension| extension.name == b"fstatvfs@openssh.com") {
+        return Err("OpenSSH did not advertise fstatvfs@openssh.com".into());
     }
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let path = format!(".scoplen-interop-{}-{nonce}", std::process::id()).into_bytes();
@@ -279,11 +307,13 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
         return Err("SFTP upload or progress mismatch".into());
     }
     verify_fsync(&mut session, &write_handle, true).await?;
+    verify_fstatvfs(&mut session, &write_handle, true).await?;
     let close = session.client_mut().close(write_handle.clone())?;
     if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
         return Err("SFTP write handle close failed".into());
     }
     verify_fsync(&mut session, &write_handle, false).await?;
+    verify_fstatvfs(&mut session, &write_handle, false).await?;
 
     let read = session.client_mut().open(path.clone(), 1, SftpAttributes::default())?;
     let read_handle = match sftp_response(&mut session, read).await? {
