@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [patch.crates-io]
-# Keep fuzz builds on the same MSRV-compatible Pageant adapter as the main workspace.
+# Use the same bounded native Pageant transport as the main workspace.
 pageant = { path = "../vendor/pageant" }
 
 [dependencies]

@@ -74,10 +74,10 @@ impl ListQuery {
     ///
     /// Returns the first bound violation in the query.
     pub fn validate(&self) -> Result<(), QueryError> {
-        if let Some(limit) = self.limit {
-            if !(1..=500).contains(&limit) {
-                return Err(QueryError::Limit);
-            }
+        if let Some(limit) = self.limit
+            && !(1..=500).contains(&limit)
+        {
+            return Err(QueryError::Limit);
         }
         if self.cursor.as_ref().is_some_and(|value| value.len() > 512) {
             return Err(QueryError::Cursor);

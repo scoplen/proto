@@ -346,18 +346,19 @@ mod tests {
             RevocationStatement::decode(&revocation.encode().expect("encode")).expect("decode");
         decoded.verify(&account.public_key()).expect("verify");
         assert_eq!(
-            verify_device_list(&[certificate.clone()], &[], &account.public_key())
+            verify_device_list(std::slice::from_ref(&certificate), &[], &account.public_key())
                 .expect("active list"),
             vec![certificate.clone()]
         );
-        assert!(
+        assert_eq!(
             verify_device_list(
-                &[certificate.clone()],
-                &[revocation.clone()],
+                std::slice::from_ref(&certificate),
+                std::slice::from_ref(&revocation),
                 &account.public_key()
             )
             .expect("revoked list")
-            .is_empty()
+            .len(),
+            0
         );
         assert_eq!(
             verify_device_list(

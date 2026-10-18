@@ -26,8 +26,8 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   handling, model limits, merge laws, key hierarchy, device certificates, encrypted envelopes,
   recovery, Shamir, escrow wrapping, CPace/QR pairing, and executable known-answer vectors.
   S4 has a concrete client adapter for transport, authentication, channels, routes, and SFTP,
-  with per-Host algorithm and outgoing rekey configuration and initial strict-KEX verification;
-  complete algorithm/extension support, rekey behavior, interoperability, and performance remain
+  with per-Host algorithm, incoming/outgoing byte and elapsed rekey configuration, and initial
+  strict-KEX verification; complete algorithm/extension support, default compatibility, interoperability, and performance remain
   open. S6 has the error contract, K-3 device-auth JSON codecs, and K-4 sync codecs, while complete
   API and production endpoint behavior remain open. The canonical roadmap records each outcome.
   S5 and S7 have no completed gate evidence.

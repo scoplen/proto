@@ -822,10 +822,8 @@ fn validate_session_spec(value: &cbor::Value) -> bool {
                 }
                 forward = true;
             }
-            4 => {
-                if !matches!(value, cbor::Value::Text(_)) {
-                    return false;
-                }
+            4 if !matches!(value, cbor::Value::Text(_)) => {
+                return false;
             }
             _ => {}
         }
@@ -843,10 +841,10 @@ fn validate_type_fields(object: &Object) -> Result<(), ModelError> {
         ObjectType::HOST => {
             object.required_text(1).map_err(|_| invalid_field(object, "name is required"))?;
             object.required_text(2).map_err(|_| invalid_field(object, "address is required"))?;
-            if let Some(entry) = object.set_field(3) {
-                if !matches!(entry.value, cbor::Value::UInt(_)) {
-                    return Err(invalid_field(object, "port must be unsigned"));
-                }
+            if let Some(entry) = object.set_field(3)
+                && !matches!(entry.value, cbor::Value::UInt(_))
+            {
+                return Err(invalid_field(object, "port must be unsigned"));
             }
         }
         ObjectType::ACCESS_PROFILE => {
@@ -985,10 +983,10 @@ fn validate_trust_record_fields(object: &Object) -> Result<(), ModelError> {
     if object.set_field(1).is_none() && object.set_field(2).is_none() {
         return Err(invalid_field(object, "trust records require a host or pattern"));
     }
-    if let Some(provenance) = object.set_field(5) {
-        if !matches!(provenance.value, cbor::Value::UInt(1..=4)) {
-            return Err(invalid_field(object, "provenance is outside the registry"));
-        }
+    if let Some(provenance) = object.set_field(5)
+        && !matches!(provenance.value, cbor::Value::UInt(1..=4))
+    {
+        return Err(invalid_field(object, "provenance is outside the registry"));
     }
     Ok(())
 }
@@ -1263,7 +1261,7 @@ mod tests {
         put_field(&mut route, 1, cbor::Value::Text("jump".into()), 1);
         put_field(&mut route, 2, cbor::Value::UInt(1), 2);
         put_field(&mut route, 3, cbor::Value::Array(vec![]), 3);
-        assert!(route.required_array(3).expect("hops").is_empty());
+        assert_eq!(route.required_array(3).expect("hops"), []);
 
         let mut workspace = Object::new(id(5), ObjectType::WORKSPACE, 1).expect("workspace");
         put_field(&mut workspace, 1, cbor::Value::Text("workspace".into()), 1);

@@ -238,7 +238,9 @@ fn response_from_json(input: &str) -> SyncChangesResponse {
 fn decode_hex(input: &str) -> Vec<u8> {
     input
         .as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             let pair = std::str::from_utf8(pair).expect("ASCII hex");
             u8::from_str_radix(pair, 16).expect("hex byte")

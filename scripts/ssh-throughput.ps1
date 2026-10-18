@@ -91,6 +91,8 @@ Subsystem sftp internal-sftp
 SSHD
 exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
 "@
+        # Alpine sh rejects carriage returns from a Windows CRLF checkout.
+        $setup = $setup.Replace("`r", '')
         try {
             docker run -d --rm --name $container -p '127.0.0.1::2222' $Image sh -c $setup | Out-Null
             if ($LASTEXITCODE -ne 0) { throw 'Failed to start disposable OpenSSH server' }

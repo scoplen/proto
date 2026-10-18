@@ -1248,6 +1248,7 @@ impl UserCertificate {
 
 /// A host key or host certificate after structural and certificate validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::large_enum_variant)] // Keep the validated certificate in the existing public shape.
 pub enum HostKey {
     /// A raw SSH public key blob.
     Raw { algorithm: String, key_blob: Vec<u8> },
@@ -1517,7 +1518,7 @@ mod tests {
     fn signature_parts(signature: &[u8]) -> (&[u8], &[u8]) {
         let (algorithm, rest) = read_string(signature).expect("signature algorithm");
         let (blob, trailing) = read_string(rest).expect("signature blob");
-        assert!(trailing.is_empty());
+        assert_eq!(trailing.len(), 0);
         (algorithm, blob)
     }
 
@@ -1656,7 +1657,7 @@ mod tests {
         assert_eq!(username, b"alice");
         assert_eq!(service, b"ssh-connection");
         assert_eq!(method, USERAUTH_NONE_METHOD);
-        assert!(trailing.is_empty());
+        assert_eq!(trailing.len(), 0);
 
         let password =
             PasswordAuthRequest::new(context.clone(), b"secret".to_vec()).expect("password");
@@ -1797,7 +1798,7 @@ mod tests {
         let (_, ed_public_key_rest) =
             read_string(ed_public_key_blob.as_slice()).expect("ed algorithm");
         let (ed_public_key, ed_trailing) = read_string(ed_public_key_rest).expect("ed public key");
-        assert!(ed_trailing.is_empty());
+        assert_eq!(ed_trailing.len(), 0);
         ed25519_verify(ed_public_key, &ed_request.signature_payload(), ed_signature)
             .expect("ed25519 signature verifies");
 
@@ -1815,7 +1816,7 @@ mod tests {
         let (p256_key, _) = read_string(p256_key).expect("p256 point");
         let (r, rest) = read_string(p256_signature).expect("r");
         let (s, trailing) = read_string(rest).expect("s");
-        assert!(trailing.is_empty());
+        assert_eq!(trailing.len(), 0);
         let mut fixed_signature = mpint_to_fixed(r, 32);
         fixed_signature.extend_from_slice(&mpint_to_fixed(s, 32));
         p256_verify(p256_key, &p256_request.signature_payload(), &fixed_signature)
@@ -2103,7 +2104,7 @@ mod tests {
         )
         .expect("host certificate");
         let HostKey::Certificate(verified) = verified else { panic!("host certificate") };
-        assert!(!verified.ca_public_key_blob().is_empty());
+        assert_ne!(verified.ca_public_key_blob().len(), 0);
         assert_eq!(calls.get(), 1);
         assert_eq!(
             verify_host_key(

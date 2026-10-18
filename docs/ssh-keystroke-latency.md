@@ -32,7 +32,7 @@ Run the disposable-server script from the repository root:
 pwsh ./scripts/ssh-keystroke-latency.ps1
 ```
 
-It requires PowerShell 7, Docker with a running Linux daemon, `ssh`, `ssh-keygen`, Rust 1.85.0,
+It requires PowerShell 7, Docker with a running Linux daemon, `ssh`, `ssh-keygen`, Rust 1.99.0,
 and access to the Alpine package repository. `-Image` defaults to `alpine:3.21`; use the recorded
 image digest for a repeat with the same base image. The script pins Alpine's OpenSSH package to
 `9.9_p2-r0` and fails if it is unavailable. It binds each server to a random loopback port,

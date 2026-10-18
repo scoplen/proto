@@ -643,7 +643,7 @@ mod tests {
         let outer = request.signature().expect("signature");
         let (algorithm, rest) = read_string(outer).expect("algorithm");
         let (body, trailing) = read_string(rest).expect("body");
-        assert!(trailing.is_empty());
+        assert_eq!(trailing.len(), 0);
         assert_eq!(algorithm, identity.algorithm().name().as_bytes());
         let decoded = SecurityKeySignature::from_ssh_blob(identity.algorithm(), body)
             .expect("signature body");
@@ -728,7 +728,7 @@ mod tests {
                 .expect("decoded");
         let (r, rest) = read_string(decoded.signature()).expect("r");
         let (s, trailing) = read_string(rest).expect("s");
-        assert!(trailing.is_empty());
+        assert_eq!(trailing.len(), 0);
         let mut fixed = [0; 64];
         let r = r.strip_prefix(&[0]).unwrap_or(r);
         let s = s.strip_prefix(&[0]).unwrap_or(s);

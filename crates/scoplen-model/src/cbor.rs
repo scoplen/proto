@@ -162,23 +162,23 @@ fn write_argument(major: u8, value: u64, output: &mut Vec<u8>) {
     match value {
         0..=23 => output.push(initial | u8::try_from(value).expect("value is at most 23")),
         24..=U8_MAX_U64 => {
-            output.push(initial | 24);
+            output.push(initial | 0x18);
             output.push(u8::try_from(value).expect("value is at most u8::MAX"));
         }
         256..=U16_MAX_U64 => {
-            output.push(initial | 25);
+            output.push(initial | 0x19);
             output.extend_from_slice(
                 &u16::try_from(value).expect("value is at most u16::MAX").to_be_bytes(),
             );
         }
         65_536..=U32_MAX_U64 => {
-            output.push(initial | 26);
+            output.push(initial | 0x1a);
             output.extend_from_slice(
                 &u32::try_from(value).expect("value is at most u32::MAX").to_be_bytes(),
             );
         }
         _ => {
-            output.push(initial | 27);
+            output.push(initial | 0x1b);
             output.extend_from_slice(&value.to_be_bytes());
         }
     }
@@ -243,10 +243,10 @@ impl<'a> Decoder<'a> {
                     let start = self.position;
                     let key = self.value(depth + 1)?;
                     let key_bytes = &self.input[start..self.position];
-                    if let Some(previous) = previous_key {
-                        if previous >= key_bytes {
-                            return Err(Error::NonCanonicalMap);
-                        }
+                    if let Some(previous) = previous_key
+                        && previous >= key_bytes
+                    {
+                        return Err(Error::NonCanonicalMap);
                     }
                     previous_key = Some(key_bytes);
                     let value = self.value(depth + 1)?;
@@ -496,7 +496,9 @@ mod tests {
         assert_eq!(input.len() % 2, 0, "hex vector has an odd length");
         input
             .as_bytes()
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| {
                 let text = std::str::from_utf8(pair).expect("ASCII hex");
                 u8::from_str_radix(text, 16).expect("hex byte")

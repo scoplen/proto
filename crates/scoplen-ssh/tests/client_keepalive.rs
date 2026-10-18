@@ -98,10 +98,10 @@ where
             break;
         }
         let current_mode = mode.load(Ordering::SeqCst);
-        if current_mode >= OBSERVE {
-            if let Some(client_bytes) = &client_bytes {
-                client_bytes.fetch_add(count, Ordering::SeqCst);
-            }
+        if current_mode >= OBSERVE
+            && let Some(client_bytes) = &client_bytes
+        {
+            client_bytes.fetch_add(count, Ordering::SeqCst);
         }
         if current_mode != BLACKHOLE {
             writer.write_all(&buffer[..count]).await?;

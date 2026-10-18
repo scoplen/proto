@@ -198,11 +198,8 @@ impl ChannelOpen {
                 encoder.string(originator_address, MAX_CHANNEL_ADDRESS, "originator address")?;
                 encoder.u32(*originator_port);
             }
-            ChannelOpenType::DirectStreamLocal { socket_path, reserved } => {
-                encoder.string(socket_path, MAX_CHANNEL_ADDRESS, "socket path")?;
-                encoder.string(reserved, MAX_CHANNEL_STRING, "reserved field")?;
-            }
-            ChannelOpenType::ForwardedStreamLocal { socket_path, reserved } => {
+            ChannelOpenType::DirectStreamLocal { socket_path, reserved }
+            | ChannelOpenType::ForwardedStreamLocal { socket_path, reserved } => {
                 encoder.string(socket_path, MAX_CHANNEL_ADDRESS, "socket path")?;
                 encoder.string(reserved, MAX_CHANNEL_STRING, "reserved field")?;
             }

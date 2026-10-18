@@ -2478,7 +2478,7 @@ mod tests {
             signature: b"signed payload".to_vec(),
         };
         assert_eq!(AgentServer::new(store).serve(&mut stream), Err(AgentError::FrameTooLarge));
-        assert!(stream.written.is_empty());
+        assert_eq!(stream.written.len(), 0);
     }
 
     #[test]
@@ -2506,7 +2506,7 @@ mod tests {
             channel.exchange(&[0, 0, 0, 0]),
             Err(AgentError::MalformedFrame("empty agent payload"))
         );
-        assert!(channel.into_inner().written.is_empty());
+        assert_eq!(channel.into_inner().written.len(), 0);
 
         let oversized =
             (u32::try_from(MAX_AGENT_FRAME).expect("test limit") + 1).to_be_bytes().to_vec();
@@ -2710,13 +2710,13 @@ mod tests {
             channel.exchange(&[0, 0, 0, 0]),
             Err(AgentError::MalformedFrame("empty agent payload"))
         );
-        assert!(channel.into_inner().request.is_empty());
+        assert_eq!(channel.into_inner().request.len(), 0);
 
         let mut channel = PageantWmCopyDataChannel::new(FakePageantBackend::responding(Vec::new()));
         let mut request = AgentMessage::RequestIdentities.encode_frame().expect("request");
         request.resize(PAGEANT_WM_COPYDATA_MAX_MSGLEN + 1, 0);
         assert_eq!(channel.exchange(&request), Err(AgentError::FrameTooLarge));
-        assert!(channel.into_inner().request.is_empty());
+        assert_eq!(channel.into_inner().request.len(), 0);
 
         let mut identities =
             vec![AgentIdentity::new(b"k", vec![b'a'; 4096]).expect("identity"); 63];
@@ -2726,7 +2726,7 @@ mod tests {
         assert!(AgentMessage::decode_frame(&request).is_ok());
         let mut channel = PageantWmCopyDataChannel::new(FakePageantBackend::responding(Vec::new()));
         assert_eq!(channel.exchange(&request), Err(AgentError::FrameTooLarge));
-        assert!(channel.into_inner().request.is_empty());
+        assert_eq!(channel.into_inner().request.len(), 0);
     }
 
     #[test]
@@ -3314,7 +3314,7 @@ mod tests {
         let responses = channel
             .on_data(&ChannelData { recipient_channel: 4, data: request })
             .expect("response");
-        assert!(!responses.is_empty());
+        assert_ne!(responses.len(), 0);
         assert!(responses.iter().all(|fragment| fragment.data.len() <= 5));
         assert_eq!(
             decode_agent_frames(&responses),
