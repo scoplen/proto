@@ -136,7 +136,7 @@ one host trust pin and one authentication source are supplied. Set either
 unencrypted OpenSSH private keys and are mutually exclusive. The optional
 `SCOPLEN_OPENSSH_RSA_HASH=256|512` selects the RSA-SHA2 signature algorithm (default 512).
 Optional host, port, and username variables select the test server. It verifies the selected host
-trust pin, authentication, and a session command. Password,
+trust pin, authentication, exact command output, and exit status zero. Password,
 both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
 wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
@@ -164,9 +164,12 @@ server's SSH port as seen from inside the server. It checks the host pin and pas
 hop, session commands on each connection, wrong-pin and closed-target rejection, and parent
 connection reuse after the failures. The disposable OpenSSH script below runs this example.
 `pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH server and runs
-the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump examples, plus wrong-password
-rejection. The Linux CI workflow runs the same script on each change; the container is stopped
-afterward.
+the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump examples. It also tests raw keys
+and user certificates with Ed25519, P-256, RSA-SHA2-256, and RSA-SHA2-512. Rejection checks cover
+wrong passwords, unauthorized keys, wrong certificate principals, wrong local CA pins, and
+locally valid certificates from a server-untrusted CA. The Linux CI workflow runs the same script
+on each change; disposable keys and the container are removed afterward. This fixture does not
+complete the required version, platform, revocation, agent, and security-key matrix.
 For host-certificate mode, the concrete adapter checks the certificate signature, host principal,
 validity, and critical options before the callback checks the CA pin. A disposable
 `linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and
@@ -185,12 +188,13 @@ Ed25519 and RSA-SHA2-256/512 public-key authentication and a session command; an
 RSA key was rejected. The container uses `openssh-server`, an unlocked `scoplen` test account,
 authorized test public keys, and generated host keys. This adds one older OpenSSH release to the
 interop evidence; the remaining version and platform matrix is open.
-For an Ed25519 user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
+For a user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
 file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
 certificate signature, principal, validity, critical options, and CA pin before sending it.
 A disposable `linuxserver/openssh-server` container with `TrustedUserCAKeys` configured accepted
-the certificate; a certificate from another CA was rejected by OpenSSH. Revocation and other
-certificate algorithms remain unverified.
+the certificate; a certificate from another CA was rejected by OpenSSH. The automated Alpine
+fixture covers Ed25519, P-256, and both RSA-SHA2 variants. Revocation and the remaining certificate
+algorithms, platforms, and server versions remain unverified.
 Set `SCOPLEN_OPENSSH_SFTP=1` for the same example against a disposable server to additionally
 exercise SFTP v3 on the authenticated connection. This verifies advertised OpenSSH transfer
 limits, a missing-file response with released request state, `statvfs@openssh.com` filesystem
