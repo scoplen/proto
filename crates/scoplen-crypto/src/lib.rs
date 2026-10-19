@@ -7,6 +7,7 @@
 
 mod certificate;
 mod cpace;
+mod device_auth;
 mod envelope;
 mod escrow;
 mod hpke;
@@ -23,6 +24,7 @@ pub use cpace::{
     CPACE_CHANNEL_IDENTIFIER, PairingCode, PairingContext, PairingError, PairingInitiator,
     PairingResponder, PairingRole, PairingSession,
 };
+pub use device_auth::{DeviceAuthContext, DeviceAuthError};
 pub use envelope::ObjectEnvelope;
 pub use escrow::{
     escrow_account_context, escrow_device_context, escrow_verification_code,

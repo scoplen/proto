@@ -91,13 +91,19 @@ is the deterministic CBOR body in lowercase hexadecimal. The `scoplen-api` tests
 public JSON and CBOR contract, including
 unknown error-code preservation and malformed-body rejection.
 
-`api-auth.json` contains the K-3 JSON vectors. Challenge responses use a 32-byte lowercase
-hexadecimal nonce and an RFC 3339 UTC timestamp. Device requests use a canonical UUIDv7, the
+`api-auth.json` contains the K-3 JSON and signature-input vectors. Challenge requests contain
+only a canonical UUIDv7 device id and have a 256-byte encoded-body limit. The signature-input
+vector encodes `spl-auth-v1 || UTF-8 canonical HTTPS origin || raw nonce || raw UUIDv7` in lowercase
+hexadecimal; the public crypto test signs it with the K-2 device signer and rejects substituted
+origin, nonce, or device values. Challenge responses use a 32-byte lowercase
+hexadecimal nonce and a normalized RFC 3339 UTC timestamp with seconds `00` through `59`. Device
+requests use a canonical UUIDv7, the
 canonical challenge nonce, and a fixed-width P-256 `r || s` signature as lowercase hexadecimal.
 Token responses use literal `DPoP`; `AuthTokenResponse::new` writes the default 600-second and
 30-day lifetimes, while readers and validators accept any positive integer lifetime. The expected
 values are canonical field order; readers ignore unknown response fields while device requests
-reject unknown fields.
+reject unknown fields. Device request bodies have a 4,096-byte encoded-body limit, including
+whitespace; both request codecs reject duplicate, missing, and mistyped fields.
 
 `sync-session.json` contains `sync.session.request` and `sync.session.response` vectors. Each
 `input` is a JSON description of the typed K-4 session value; `expected` is deterministic CBOR in
