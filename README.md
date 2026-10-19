@@ -156,6 +156,12 @@ read, and write limits, and supports resume-by-offset uploads/downloads with pro
 on that channel. Pipelined downloads fill short-read gaps before advancing contiguous progress;
 an early EOF for a caller-specified end offset and an empty data response fail instead of
 silently returning a partial file.
+`SftpSession::upload_from` reads exactly a declared byte length from an async reader at its current
+position and writes at a caller-selected remote offset. It never seeks or reads beyond that length;
+the byte-slice `upload` entry point shares its bounded pipeline and contiguous progress behavior.
+Both in-flight writes and acknowledged writes waiting for an earlier response occupy pipeline
+slots. Premature source EOF and source I/O failures preserve their I/O error and isolate the SFTP
+session while the parent SSH connection remains usable.
 An interrupted or failed exchange that loses request correlation invalidates only its SFTP
 session. The failing call retains its original typed error; later operations return
 `SessionUnusable` until the caller opens a new SFTP channel on the same authenticated SSH

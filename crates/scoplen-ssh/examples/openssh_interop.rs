@@ -1015,6 +1015,34 @@ async fn verify_failed_pipelined_sftp_write(
     Ok(session)
 }
 
+async fn upload_sftp_stream(
+    session: &mut SftpSession,
+    handle: &[u8],
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut source = data;
+    let mut progress = Vec::new();
+    let first = session
+        .upload_from(handle, 0, 40_000, 4096, 4, &mut source, |event| progress.push(event))
+        .await?;
+    let second = session
+        .upload_from(handle, first, 60_000, 4096, 4, &mut source, |event| progress.push(event))
+        .await?;
+    if first != 40_000
+        || second != 60_000
+        || !source.is_empty()
+        || progress.last().is_none_or(|event| {
+            event.offset != data.len() as u64
+                || event.transferred != second
+                || event.total != Some(data.len() as u64)
+        })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP upload or progress mismatch".into());
+    }
+    Ok(())
+}
+
 async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
     let mut session = SftpSession::open(connection, 4).await?;
     verify_sftp_capabilities(&session)?;
@@ -1038,28 +1066,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
         other => return Err(format!("unexpected SFTP create response: {other:?}").into()),
     };
     let data: Vec<u8> = (0..=u8::MAX).cycle().take(100_000).collect();
-    let mut upload_progress = Vec::new();
-    let first = session
-        .upload(&write_handle, 0, &data[..40_000], 4096, 4, |event| {
-            upload_progress.push(event);
-        })
-        .await?;
-    let second = session
-        .upload(&write_handle, first, &data[40_000..], 4096, 4, |event| {
-            upload_progress.push(event);
-        })
-        .await?;
-    if first != 40_000
-        || second != 60_000
-        || upload_progress.last().is_none_or(|event| {
-            event.offset != data.len() as u64
-                || event.transferred != second
-                || event.total != Some(data.len() as u64)
-        })
-        || session.pending_requests() != 0
-    {
-        return Err("SFTP upload or progress mismatch".into());
-    }
+    upload_sftp_stream(&mut session, &write_handle, &data).await?;
     verify_fsync(&mut session, &write_handle, true).await?;
     verify_fstatvfs(&mut session, &write_handle, true).await?;
     verify_fstat(&mut session, &write_handle, Some(data.len() as u64)).await?;
