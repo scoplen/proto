@@ -72,7 +72,7 @@ fn decode_nonce(value: &str) -> Result<[u8; 32], DeviceAuthError> {
     Ok(nonce)
 }
 
-fn validate_origin(origin: &str) -> Result<(), DeviceAuthError> {
+pub(crate) fn validate_origin(origin: &str) -> Result<(), DeviceAuthError> {
     if origin.is_empty() || origin.len() > MAX_ORIGIN_BYTES || !origin.is_ascii() {
         return Err(DeviceAuthError::InvalidOrigin);
     }

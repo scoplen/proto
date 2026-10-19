@@ -50,6 +50,12 @@ travels in an HttpOnly cookie managed by the server. `api-problem.json` includes
 examples as canonical JSON with the registered codes and `changed`/`retryable` fields; its older
 CBOR vectors remain valid. All token strings are synthetic public test data.
 
+`api-dpop.json` publishes the compact ES256 protected-resource proof from RFC 9449 Figure 13,
+with its public JWK thumbprint from Figure 11, proof id and timestamp, inclusive
+last accepted second, and independently computed `ath`. The public `scoplen-crypto` test verifies
+the original JWS signing bytes against the RFC's access token and these expected values. The vector is public RFC test material,
+not a production credential; replay prevention remains a consumer obligation.
+
 `sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a

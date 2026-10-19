@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-80 ES256/P-256 DPoP construction and stateless verification in `scoplen-crypto`,
+  including strict canonical target/JWK/JWS validation, RFC 7638 thumbprints, token and nonce
+  binding, inclusive freshness limits, redacted credential diagnostics, and signer-output
+  verification. An RFC 9449 proof vector, public failure-path tests, and DPoP fuzz seeds cover
+  the shared boundary. Consumers still own token authentication, cross-instance replay claims,
+  authorization, and refresh rotation.
 - Extended the SSH protocol fuzz target to public security-key and SSH certificate boundaries,
   including canonical round-trip assertions, certificate signature/role/principal/validity
   validation, and tracked valid and malformed identity seeds.

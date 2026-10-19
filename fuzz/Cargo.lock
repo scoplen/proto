@@ -2385,6 +2385,7 @@ name = "scoplen-crypto"
 version = "0.1.0"
 dependencies = [
  "argon2 0.5.3",
+ "base64",
  "chacha20poly1305",
  "ed25519-dalek 2.2.0",
  "getrandom 0.3.4",
@@ -2398,6 +2399,8 @@ dependencies = [
  "rand_core 0.10.1",
  "rand_core 0.6.4",
  "scoplen-model",
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
  "subtle",
  "thiserror",
