@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Extended the disposable OpenSSH 9.9p2 authentication, certificate, SFTP, and route fixture to
+  current OpenSSH 10.6p1 with an exact package and SSH banner check. CI runs both server versions
+  through the same positive and rejection paths; wider platform and implementation coverage remains open.
 - Added a pinned OpenSSH 8.8p1 Linux-server fixture using the public SSH client example. The
   Windows-hosted Docker run verifies installed version and banner, password, Ed25519 and both
   RSA-SHA2 hashes, exact command output and exit status, plus credential and host-pin rejection.

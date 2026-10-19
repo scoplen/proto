@@ -289,9 +289,12 @@ key, password, host, port, and user variables, plus `SCOPLEN_OPENSSH_JUMP_TARGET
 server's SSH port as seen from inside the server. It checks the host pin and password at every
 hop, session commands on each connection, wrong-pin and closed-target rejection, and parent
 connection reuse after the failures. The disposable OpenSSH script below runs this example.
-`pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH server and runs
-the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump examples. It also tests raw keys
-and user certificates with Ed25519, ECDSA P-256/P-384/P-521, RSA-SHA2-256, and RSA-SHA2-512. A
+`pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH 9.9p2 server;
+`pwsh ./scripts/openssh-interop.ps1 -ServerVersion 10.6p1` runs the same checks against the
+current OpenSSH 10.6p1 package from Alpine edge. Both paths check the installed package and SSH
+banner before connecting, then run the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump
+examples. The fixture also tests raw keys and user certificates with Ed25519, ECDSA
+P-256/P-384/P-521, RSA-SHA2-256, and RSA-SHA2-512. A
 software-generated authenticator fixture tests raw `sk-ssh-ed25519@openssh.com` and
 `sk-ecdsa-sha2-nistp256@openssh.com` authentication, including rejection of signatures from the
 wrong key, application, or session payload. The same fixture tests user certificates over both
@@ -309,7 +312,7 @@ principal, validity, and critical options. The caller still decides whether to t
 the interoperability example compares it with an explicitly pinned CA public key before calling
 `authenticate_certificate`. OpenSSH enforces its configured `TrustedUserCAKeys` and KRL; the
 client does not parse the KRL. This fixture does not establish physical-token, libfido2,
-Windows WebAuthn, other server versions or platforms, agent-backed certificate, or broader
+Windows WebAuthn, other server implementations or platforms, agent-backed certificate, or broader
 certificate-revocation coverage.
 To run `security_key_interop auth ed25519` or `security_key_interop auth p256` independently,
 set `SCOPLEN_OPENSSH_HOST_KEY` to the server's OpenSSH host public-key line and set

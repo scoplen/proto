@@ -1,11 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
+param([ValidateSet('9.9p2', '10.6p1')][string]$ServerVersion = '9.9p2')
+
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $container = 'scoplen-openssh-interop-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
-$tempBase = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+$tempBase = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\', '/')
 $tempRoot = [System.IO.Path]::GetFullPath((Join-Path $tempBase ('scoplen-openssh-keys-' + [guid]::NewGuid().ToString('N'))))
 $started = $false
+$serverProfiles = @{
+    '9.9p2' = @{ Image = 'alpine:3.21'; Package = 'openssh-server=9.9_p2-r0'; Installed = 'openssh-server-9.9_p2-r0 '; Banner = '^SSH-2\.0-OpenSSH_9\.9\r?$' }
+    '10.6p1' = @{ Image = 'alpine:edge'; Package = 'openssh-server=10.6_p1-r1'; Installed = 'openssh-server-10.6_p1-r1 '; Banner = '^SSH-2\.0-OpenSSH_10\.6\r?$' }
+}
+$serverProfile = $serverProfiles[$ServerVersion]
 $authVariables = @(
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH',
     'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY', 'SCOPLEN_OPENSSH_ECDSA_KEY',
@@ -60,7 +67,7 @@ try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
     $setup = @'
 set -eu
-apk add --no-cache openssh-server
+apk add --no-cache __OPENSSH_PACKAGE__
 adduser -D scoplen
 printf 'scoplen:scoplen-test-password\n' | chpasswd
 ssh-keygen -q -t ed25519 -N '' -f /tmp/host_key
@@ -123,8 +130,8 @@ Subsystem sftp internal-sftp
 SSHD
 exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
 '@
-    $setup = $setup.Replace("`r", '')
-    docker run -d --name $container -p '127.0.0.1::2222' alpine:3.21 sh -c $setup | Out-Null
+    $setup = $setup.Replace("`r", '').Replace('__OPENSSH_PACKAGE__', $serverProfile.Package)
+    docker run -d --name $container -p '127.0.0.1::2222' $serverProfile.Image sh -c $setup | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Failed to start disposable OpenSSH container' }
     $started = $true
 
@@ -149,6 +156,9 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
         $socket = [System.Net.Sockets.TcpClient]::new()
         try {
             $socket.Connect('127.0.0.1', $port)
+            $socket.ReceiveTimeout = 2000
+            $reader = [System.IO.StreamReader]::new($socket.GetStream())
+            $banner = $reader.ReadLine()
             $ready = $true
         }
         catch { Start-Sleep -Seconds 1 }
@@ -156,6 +166,12 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
         if ($ready) { break }
     }
     if (-not $ready) { throw 'OpenSSH did not become ready within 60 seconds' }
+    $package = docker exec $container apk list --installed openssh-server
+    if ($LASTEXITCODE -ne 0 -or -not ($package | Out-String).Trim().StartsWith($serverProfile.Installed, [System.StringComparison]::Ordinal) -or
+        $banner -notmatch $serverProfile.Banner) {
+        throw "Expected OpenSSH $ServerVersion package and SSH banner, got: $package; $banner"
+    }
+    Write-Output "OpenSSH $ServerVersion package and SSH banner verified"
     $fixtureFiles = @(
         'user_ed', 'user_p256', 'user_p384', 'user_p521', 'user_rsa', 'wrong_ed', 'wrong_p384', 'wrong_p521',
         'ca_trusted.pub', 'ca_other.pub', 'ca_krl.pub',
@@ -364,7 +380,7 @@ done
         Remove-Item Env:SCOPLEN_OPENSSH_USER_CERT, Env:SCOPLEN_OPENSSH_USER_CA_KEY
         Invoke-SecurityKeyExample "$algorithm raw key remains valid with KRL enabled" $algorithm
     }
-    Write-Output 'OpenSSH password, routes, software keys, security keys and certificates, user certificates, KRL revocation, and rejection paths passed'
+    Write-Output "OpenSSH $ServerVersion password, routes, software keys, security keys and certificates, user certificates, KRL revocation, and rejection paths passed"
 }
 catch {
     if ($started) {
@@ -377,7 +393,8 @@ catch {
 }
 finally {
     if ($started) { docker rm -f $container 2>$null | Out-Null }
-    if ($tempRoot.StartsWith($tempBase, [System.StringComparison]::OrdinalIgnoreCase) -and
+    if ([System.IO.Path]::GetDirectoryName($tempRoot) -eq $tempBase -and
+        [System.IO.Path]::GetFileName($tempRoot).StartsWith('scoplen-openssh-keys-', [System.StringComparison]::Ordinal) -and
         (Test-Path -LiteralPath $tempRoot)) {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force
     }
