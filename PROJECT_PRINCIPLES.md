@@ -7,7 +7,7 @@ This repository is a component of Scoplen, a Plystra project. The project-level 
 
 - Philosophy version reviewed: Plystra Craft 1.0.1
 - Source commit reviewed: `plystra/craft@dd617b370203d5dce1d30b8b81284d16d96a432c`
-- Review date and maintainer: 2026-10-06, immoses (Moses Qiu)
+- Review date and maintainer: 2026-10-06, Plystra LLC
 - Maturity: Exploration
 - Maintenance: Active
 - Components: Rust libraries and shared known-answer test vectors
