@@ -255,8 +255,9 @@ pub struct PublicKeyIdentity {
 impl PublicKeyIdentity {
     /// Create an identity from a canonical SSH algorithm name and key blob.
     ///
-    /// The first SSH string in `key_blob` must equal `algorithm`. This prevents an algorithm
-    /// substitution between the probe and signed request.
+    /// The first SSH string in `key_blob` must match `algorithm`, except that RSA SHA-2 requests
+    /// use the `ssh-rsa` key blob and RSA SHA-2 certificate requests use the legacy
+    /// `ssh-rsa-cert-v01@openssh.com` certificate blob.
     pub fn new(
         algorithm: impl Into<String>,
         key_blob: impl Into<Vec<u8>>,
@@ -265,17 +266,20 @@ impl PublicKeyIdentity {
         if !SignatureAlgorithm::supports_identity(&algorithm) {
             return Err(SignerError::InvalidInput("unsupported SSH public-key algorithm"));
         }
-        let rsa_request_algorithm = matches!(algorithm.as_str(), "rsa-sha2-256" | "rsa-sha2-512");
+        let encoded_name = match algorithm.as_str() {
+            "rsa-sha2-256" | "rsa-sha2-512" => "ssh-rsa",
+            "rsa-sha2-256-cert-v01@openssh.com" | "rsa-sha2-512-cert-v01@openssh.com" => {
+                "ssh-rsa-cert-v01@openssh.com"
+            }
+            _ => &algorithm,
+        };
         let key_blob = key_blob.into();
         if key_blob.is_empty() || key_blob.len() > MAX_KEY_BLOB {
             return Err(SignerError::EmptyPublicKey);
         }
         let (encoded_algorithm, _) = read_string(&key_blob)
             .ok_or(SignerError::InvalidInput("public-key blob is not an SSH string sequence"))?;
-        if !rsa_request_algorithm && encoded_algorithm != algorithm.as_bytes() {
-            return Err(SignerError::InvalidInput("public-key blob algorithm mismatch"));
-        }
-        if rsa_request_algorithm && encoded_algorithm != b"ssh-rsa" {
+        if encoded_algorithm != encoded_name.as_bytes() {
             return Err(SignerError::InvalidInput("public-key blob algorithm mismatch"));
         }
         let parsed = PublicKey::from_bytes(&key_blob)
@@ -284,9 +288,7 @@ impl PublicKeyIdentity {
             || parsed.algorithm().as_str().to_owned(),
             |certificate| certificate.algorithm().to_certificate_type(),
         );
-        if (!rsa_request_algorithm && parsed_algorithm != algorithm)
-            || (rsa_request_algorithm && parsed_algorithm != "ssh-rsa")
-        {
+        if parsed_algorithm != encoded_name {
             return Err(SignerError::InvalidInput("public-key algorithm does not match key data"));
         }
         let key_blob = parsed
@@ -295,7 +297,7 @@ impl PublicKeyIdentity {
         Ok(Self { algorithm, signing_key_blob: key_blob.clone(), key_blob })
     }
 
-    fn for_certificate(
+    pub(crate) fn for_certificate(
         algorithm: impl Into<String>,
         key_blob: impl Into<Vec<u8>>,
         signing_key_blob: impl Into<Vec<u8>>,
@@ -1952,13 +1954,57 @@ mod tests {
             .expect("identity");
         assert_eq!(identity.algorithm(), "ssh-rsa-cert-v01@openssh.com");
 
-        let signer =
-            RsaSshSigner::new(subject, SignatureAlgorithm::RsaSha2_256).expect("RSA signer");
         let context =
             PublicKeyAuthContext::new([3; 32], "alice", "ssh-connection").expect("context");
-        let request = PublicKeyAuthRequest::signed(context, identity, &signer).expect("signed");
-        let (signature_algorithm, _) = signature_parts(request.signature().expect("signature"));
-        assert_eq!(signature_algorithm, b"rsa-sha2-256");
+        for algorithm in [SignatureAlgorithm::RsaSha2_256, SignatureAlgorithm::RsaSha2_512] {
+            let signer = RsaSshSigner::new(subject.clone(), algorithm).expect("RSA signer");
+            let request_identity = PublicKeyIdentity::for_certificate(
+                algorithm.certificate_name(),
+                identity.key_blob().to_vec(),
+                identity.signing_key_blob().to_vec(),
+            )
+            .expect("RSA SHA-2 request uses the legacy certificate blob");
+            assert_eq!(request_identity.key_blob(), identity.key_blob());
+            assert_eq!(request_identity.algorithm(), algorithm.certificate_name());
+            let request =
+                PublicKeyAuthRequest::signed(context.clone(), request_identity.clone(), &signer)
+                    .expect("signed certificate request");
+            let (signature_algorithm, _) = signature_parts(request.signature().expect("signature"));
+            assert_eq!(signature_algorithm, algorithm.name().as_bytes());
+            assert_eq!(
+                PublicKeyAuthRequest::signed(
+                    context.clone(),
+                    request_identity,
+                    &RsaSshSigner::new(
+                        subject.clone(),
+                        match algorithm {
+                            SignatureAlgorithm::RsaSha2_256 => SignatureAlgorithm::RsaSha2_512,
+                            SignatureAlgorithm::RsaSha2_512 => SignatureAlgorithm::RsaSha2_256,
+                            _ => unreachable!(),
+                        },
+                    )
+                    .expect("other RSA hash signer"),
+                ),
+                Err(SignerError::AlgorithmMismatch {
+                    signer: match algorithm {
+                        SignatureAlgorithm::RsaSha2_256 => "rsa-sha2-512",
+                        SignatureAlgorithm::RsaSha2_512 => "rsa-sha2-256",
+                        _ => unreachable!(),
+                    }
+                    .into(),
+                    identity: algorithm.certificate_name().into(),
+                })
+            );
+        }
+        let signer =
+            RsaSshSigner::new(subject, SignatureAlgorithm::RsaSha2_256).expect("RSA signer");
+        assert_eq!(
+            PublicKeyIdentity::new(
+                signer.algorithm().certificate_name(),
+                signer.public_key_blob().expect("raw key")
+            ),
+            Err(SignerError::InvalidInput("public-key blob algorithm mismatch"))
+        );
     }
 
     #[test]
