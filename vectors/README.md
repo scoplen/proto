@@ -20,6 +20,10 @@ The set includes an empty `query`, named response 29, empty success 6, failures 
 names and nonempty success rejection. Public tests separately cover response-name binding,
 resource bounds, and forwarded refusal followed by healthy queries and authorized signing.
 
+`gateway-signed-ticket.json` contains a deterministic D-96 compact JWS signed by a synthetic
+Ed25519 key. The exact input bytes and expected UUIDv7 identifier/expiry are verified through the
+public `scoplen-crypto` API. It is test material, not a deployment credential or replay claim.
+
 `sync-changes.json` contains K-4 change-feed vectors. Query inputs are JSON objects with `after`
 and `limit`; expected values are the canonical query string. Response inputs are JSON objects with
 `changes`, `next_cursor`, and `more`; payloads are lowercase hexadecimal and a missing signer is

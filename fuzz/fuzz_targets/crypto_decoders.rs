@@ -30,5 +30,15 @@ fuzz_target!(|bytes: &[u8]| {
                 None,
             );
         }
+        if let Ok(ticket) = scoplen_crypto::GatewayTicket::parse(proof_text) {
+            let signer = scoplen_crypto::Ed25519SigningKey::from_bytes(&[0x42; 32])
+                .expect("fixed synthetic ticket key");
+            let mut trusted = scoplen_crypto::TrustedGatewayTicketKeys::new(
+                "https://control.example.com",
+            )
+            .expect("fixed canonical issuer");
+            trusted.insert("ticket-1", &signer.public_key()).expect("fixed ticket key");
+            let _ = ticket.verify(&trusted, 1_700_000_000);
+        }
     }
 });

@@ -9,6 +9,11 @@ All notable changes to the `proto` repository will be recorded here.
   remove-all management request, and valid reconnect controls. The source private key and build
   artifacts remain inside the container; Windows agent transports and the broader matrix remain
   unverified.
+- Added D-96 bounded Ed25519 gateway-ticket signing and stateless verification in
+  `scoplen-crypto`: dedicated trusted issuer/keyring, strict JOSE and claims, verified signer
+  output, exact 60-second validity, public signed vector and failure-path tests, and decoder fuzz
+  seeds. Issuance authorization, raw-TLS proof binding, SSH-key use, and atomic replay claims remain
+  consumer work.
 - Bounded the complete K-4 session request to 4,096 CBOR bytes and added caller-selected session
   response body budgets with a 4 MiB default. Encoders preflight exact size; decoders check the
   complete input before CBOR parsing. Seven portable budget recipes and public boundary tests
