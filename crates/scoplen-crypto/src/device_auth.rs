@@ -72,7 +72,15 @@ fn decode_nonce(value: &str) -> Result<[u8; 32], DeviceAuthError> {
     Ok(nonce)
 }
 
-pub(crate) fn validate_origin(origin: &str) -> Result<(), DeviceAuthError> {
+/// Validate a trusted server origin against the canonical K-3 HTTPS profile.
+///
+/// This performs no normalization, network access, or request-header trust decision.
+/// Callers must obtain the origin from trusted configuration.
+///
+/// # Errors
+///
+/// Returns [`DeviceAuthError::InvalidOrigin`] for noncanonical or oversized origins.
+pub fn validate_origin(origin: &str) -> Result<(), DeviceAuthError> {
     if origin.is_empty() || origin.len() > MAX_ORIGIN_BYTES || !origin.is_ascii() {
         return Err(DeviceAuthError::InvalidOrigin);
     }

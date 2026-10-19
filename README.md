@@ -506,6 +506,8 @@ requests above 4 MiB. Storage/router adoption remains separate.
 
 The K-3 authentication boundary now validates strict, bounded challenge and signed-device JSON
 requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. The
+shared `validate_server_origin` entrypoint applies the same canonical-origin rules to trusted
+deployment configuration without constructing a challenge or accepting request headers. The
 native refresh body requires one opaque token (at most 2,048 UTF-8 bytes); the browser body is
 exactly `{}` with its HttpOnly refresh cookie supplied by the browser. Both JSON bodies are capped
 at 4,096 encoded bytes. The browser response omits and rejects any `refresh_token` field while

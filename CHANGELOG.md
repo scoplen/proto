@@ -4,6 +4,8 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Exposed the existing shared canonical HTTPS origin validator for deployment configuration,
+  using the same rules as device authentication, DPoP, enrollment, and token contexts.
 - Added D-101 Personal enrollment possession-signature contexts with exact origin, token-digest,
   identity, key, and artifact binding, fallible device signing, public verification, redacted
   diagnostics, and independent signature-input/rejection vectors. Enrollment transactions remain

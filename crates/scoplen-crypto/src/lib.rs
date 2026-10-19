@@ -34,7 +34,9 @@ pub use device_access_token::{
     DeviceAccessTokenError, DeviceAccessTokenSigner, DeviceOrganizationSnapshot,
     MAX_DEVICE_ACCESS_TOKEN_BYTES, TrustedDeviceAccessTokenKeys, VerifiedDeviceAccessToken,
 };
-pub use device_auth::{DeviceAuthContext, DeviceAuthError};
+pub use device_auth::{
+    DeviceAuthContext, DeviceAuthError, validate_origin as validate_server_origin,
+};
 pub use dpop::{
     DpopError, DpopProof, DpopTarget, DpopToken, VerifiedDpopProof, dpop_jwk_thumbprint,
 };

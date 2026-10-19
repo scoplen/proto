@@ -3,6 +3,7 @@
 
 use scoplen_crypto::{
     DeviceAuthContext, DeviceAuthError, DeviceSigner, P256SigningKey, p256_verify,
+    validate_server_origin,
 };
 use scoplen_test_vectors::VectorDocument;
 use std::fmt::Write;
@@ -103,6 +104,7 @@ fn public_context_rejects_noncanonical_origin_nonce_and_device() {
         "https://192.0x0.2.1",
         "https://example.0x1",
     ] {
+        assert_eq!(validate_server_origin(origin), Err(DeviceAuthError::InvalidOrigin), "{origin}");
         assert_eq!(
             DeviceAuthContext::new(origin, NONCE, device_id()),
             Err(DeviceAuthError::InvalidOrigin),
@@ -120,6 +122,7 @@ fn public_context_rejects_noncanonical_origin_nonce_and_device() {
         "https://[2001:db8::1]",
         "https://0xabc.example.com",
     ] {
+        assert_eq!(validate_server_origin(origin), Ok(()), "{origin}");
         assert!(DeviceAuthContext::new(origin, NONCE, device_id()).is_ok(), "{origin}");
     }
     for nonce in ["00".repeat(31), "00".repeat(33), "AA".repeat(32), "zz".repeat(32)] {
