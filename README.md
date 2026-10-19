@@ -48,7 +48,14 @@ codecs, certificate validation, and host-verification callbacks are available. T
 exposes a `none` probe that reports the server's remaining methods, and handles bounded
 keyboard-interactive challenge rounds with prompt and response validation before sending answers
 to the SSH engine. It also authenticates with validated OpenSSH user certificates through the
-shared signer boundary, checking the requested principal and subject key before dispatch. Agent support
+shared signer boundary, checking the requested principal and subject key before dispatch. RSA
+certificates retain their legacy blob type while selecting the requested SHA-2 certificate
+algorithm; signing binds the complete certificate and selected hash. Authentication rejection
+reports `partial_success` and `remaining_methods` in server order, omitting unknown engine methods.
+Callers can complete another factor on the same connection. Until full authentication succeeds,
+channel opens and remote-forwarding operations return `NotAuthenticated` locally. Real SSH tests
+cover OTP followed by password, wrong factors, premature channel/forwarding operations, and both
+RSA certificate hashes. Concrete password-change support remains incomplete. Agent support
 includes bounded Unix-socket and Windows named-pipe streams, Pageant named-pipe compatibility,
 identity and signing requests, an `AgentSshSigner` that binds agent signatures to the concrete
 public-key authentication session, add/remove/lock/smart-card management, opaque extensions, and

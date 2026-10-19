@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Preserved multi-factor authentication continuation with method-neutral rejection errors,
+  partial-success state, and the engine-recognized remaining methods in peer order. Channel and
+  remote-forwarding operations now reject locally before full authentication. Fixed RSA SHA-2
+  certificate request aliases while binding the exact certificate and selected hash. Real SSH
+  tests cover same-connection OTP/password continuation, wrong factors, premature operations,
+  both RSA hashes, and hash/certificate substitution rejection. Adding `remaining_methods` to
+  `ClientError::AuthenticationRejected` is a pre-Stable source API change.
 - Updated russh to 0.64.1 in both dependency graphs, adopting enforced incoming/idle rekey,
   corrected RSA-SHA2 certificate probes, and the upstream agent constraint-allocation fix.
   Rust 1.99.0 is now pinned and the minimum supported version. The bounded native Pageant
