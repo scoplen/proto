@@ -270,9 +270,10 @@ unverified for this route. The disposable OpenSSH CI script above also runs this
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
 challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
 write-batch, bounded conflict problem, acknowledgement, snapshot, version-history, content-free
-notification, account key-bundle, shared-vault creation, key retrieval, epoch-publication,
-member-addition, and epoch-retirement response
-codecs in JSON and deterministic CBOR. K-6 now includes the bounded gateway client-hello
+notification, notification WebSocket opening context, first-message authentication and ready
+acknowledgement, account key-bundle, shared-vault creation, key retrieval, epoch-publication,
+member-addition, and epoch-retirement response codecs. The K-3 messages use JSON and the K-4
+messages use deterministic CBOR. K-6 now includes the bounded gateway client-hello
 frame (`ticket` and `dpop_proof`) with a published vector and failure-path coverage. OpenAPI
 resources now have an authored OpenAPI 3.1 document at `crates/scoplen-api/openapi/v1.yaml`,
 generated Rust envelope/query types, and the local `@scoplen/api` TypeScript package surface.
@@ -289,6 +290,11 @@ Challenge storage, credential verification, and token issuance are server respon
 library does not implement a production authentication service.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
+`SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR
+codec enforces the 4 KiB token, 8 KiB proof, and 16 KiB complete-message bounds and compact-JWS
+lexical form; it does not verify a JWT, DPoP claims, device state, proof replay, or the WebSocket
+lifecycle. Notification context and ready readers accept unknown response extensions but reject
+fields from other known notification message types.
 Challenge timestamps use the K-3 pre-Stable UTC profile: uppercase `T` and `Z`, optional fractional
 seconds, and seconds from `00` through `59` without leap-second labels.
 The internal `spl.gateway.v1.Control` and `spl.agent.v1.Agent` protobuf source contracts are
@@ -311,10 +317,10 @@ The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `
 in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-problem.json`,
 `vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
-`vectors/sync-notifications.json`, `vectors/sync-keys.json`, `vectors/sync-vaults.json`,
-`vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`, `vectors/sync-vault-members.json`,
-and `vectors/gateway.json`. The shared
-loader is usable by both workstreams.
+`vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
+`vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
+`vectors/sync-vault-members.json`, and `vectors/gateway.json`. The shared loader is usable by both
+workstreams.
 
 ## Development
 
