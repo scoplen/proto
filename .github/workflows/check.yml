@@ -83,3 +83,6 @@ jobs:
       - name: Constrained algorithms, Host isolation, and strict KEX
         shell: pwsh
         run: ./scripts/ssh-algorithm-interop.ps1
+      - name: Explicit per-Host 3DES and default rejection
+        shell: pwsh
+        run: ./scripts/ssh-algorithm-interop.ps1 -LegacyCipher 3des-cbc

@@ -24,6 +24,11 @@ const COMMAND_OUTPUT: &[u8] = b"scoplen-algorithm-ok";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let modern_port = env::var("SCOPLEN_ALGORITHM_MODERN_PORT")?.parse()?;
     let legacy_port = env::var("SCOPLEN_ALGORITHM_LEGACY_PORT")?.parse()?;
+    let legacy_cipher =
+        env::var("SCOPLEN_ALGORITHM_LEGACY_CIPHER").unwrap_or_else(|_| "aes256-cbc".to_owned());
+    if !matches!(legacy_cipher.as_str(), "aes256-cbc" | "3des-cbc") {
+        return Err("SCOPLEN_ALGORITHM_LEGACY_CIPHER must be aes256-cbc or 3des-cbc".into());
+    }
     let expected_key =
         PublicKey::from_openssh(&env::var("SCOPLEN_ALGORITHM_HOST_KEY")?)?.to_bytes()?;
     let username = env::var("SCOPLEN_ALGORITHM_USER")?;
@@ -41,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let legacy_policy = HostAlgorithmPolicy::with_legacy(&[
         (AlgorithmCategory::KeyExchange, "diffie-hellman-group14-sha256"),
-        (AlgorithmCategory::Cipher, "aes256-cbc"),
+        (AlgorithmCategory::Cipher, legacy_cipher.as_str()),
         (AlgorithmCategory::Mac, "hmac-sha1"),
     ])?;
     let (legacy, legacy_checks) = pinned_config("legacy.example.test", legacy_port, &expected_key)?;

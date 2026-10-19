@@ -487,6 +487,7 @@ fn russh_cipher(name: &str) -> Option<russh::cipher::Name> {
         "aes256-cbc" => Some(russh::cipher::AES_256_CBC),
         "aes192-cbc" => Some(russh::cipher::AES_192_CBC),
         "aes128-cbc" => Some(russh::cipher::AES_128_CBC),
+        "3des-cbc" => Some(russh::cipher::TRIPLE_DES_CBC),
         _ => None,
     }
 }
@@ -3686,6 +3687,7 @@ mod tests {
         let preferred = config.russh_config().preferred;
         assert!(preferred.kex.iter().any(|name| name.as_ref() == "curve25519-sha256"));
         assert!(!preferred.kex.iter().any(|name| name.as_ref() == "diffie-hellman-group14-sha256"));
+        assert!(!preferred.cipher.iter().any(|name| name.as_ref() == "3des-cbc"));
         assert!(
             preferred
                 .host_key_certificates
@@ -3708,6 +3710,7 @@ mod tests {
             (AlgorithmCategory::KeyExchange, "diffie-hellman-group14-sha256"),
             (AlgorithmCategory::HostKey, "ssh-rsa"),
             (AlgorithmCategory::Cipher, "aes256-cbc"),
+            (AlgorithmCategory::Cipher, "3des-cbc"),
             (AlgorithmCategory::Mac, "hmac-sha1"),
             (AlgorithmCategory::Compression, "zlib"),
         ])
@@ -3726,6 +3729,7 @@ mod tests {
         assert!(modern_kex < legacy_kex);
         assert!(preferred.key.iter().any(|algorithm| algorithm.as_str() == "ssh-rsa"));
         assert!(preferred.cipher.iter().any(|name| name.as_ref() == "aes256-cbc"));
+        assert!(preferred.cipher.iter().any(|name| name.as_ref() == "3des-cbc"));
         assert!(preferred.mac.iter().any(|name| name.as_ref() == "hmac-sha1"));
         assert!(preferred.compression.iter().any(|name| name.as_ref() == "zlib"));
     }
