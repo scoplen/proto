@@ -8,6 +8,9 @@ All notable changes to the `proto` repository will be recorded here.
   Windows-hosted Docker run verifies installed version and banner, password, Ed25519 and both
   RSA-SHA2 hashes, exact command output and exit status, plus credential and host-pin rejection.
   The remaining release, platform, certificate, SFTP, and forwarding matrix stays open.
+- Added continuous parser fuzz coverage for K-4 sync requests, responses, queries, and selected
+  resource limits beyond notifications. Two public-codec targets replay vector-derived positive,
+  malformed, truncated, and input-boundary seeds in Linux change checks and scheduled fuzzing.
 - Broadened external OpenSSH SFTP transfers to all byte values and verified that a rejected
   four-request write pipeline invalidates only its SFTP session. A fresh channel reads the
   unchanged file and an independent SSH session still opens on the same connection.

@@ -573,14 +573,21 @@ OpenSSH server/client pair, run `pwsh ./scripts/ssh-keystroke-latency.ps1`. The 
 comparison runs with `cargo run --locked --release -p scoplen-ssh --example keystroke_latency`.
 The methods and limits are in [docs/ssh-keystroke-latency.md](docs/ssh-keystroke-latency.md).
 
-The tracked `fuzz/corpus/<target>/seed-*` files provide small synthetic valid and malformed
-inputs for all eight parser targets. Valid model and certificate inputs come from the published
+The tracked `fuzz/corpus/<target>/seed-*` files provide synthetic valid and malformed
+inputs for all ten parser targets. Valid model and certificate inputs come from the published
 known-answer vectors in `vectors/baseline.json` and `vectors/crypto.json`; SSH, SFTP, and agent
 frames follow the public codec tests. The `sync_notification` target checks context, credentials,
 acknowledgements, and events through their public codecs and requires accepted messages to
 survive a canonical encode/decode round trip. Its seeds include the published notification
 vectors, truncated credentials, a zero sequence, and contexts exactly at and above the 16 KiB
-bound. The Linux change check replays every target's corpus, and
+bound. `sync_control` and `sync_data` select each remaining public K-4 request, response, or query
+parser by a one-byte prefix, including the ordinary K-4 CBOR problem body. They check accepted
+values through the public encoder and decoder,
+including canonical encoding stability after ignored response extensions. Explicit low and raised
+resource profiles exercise the bounded session, read, write, and version-history entrypoints.
+Their synthetic seeds derive from published K-4 vectors and include malformed key updates,
+truncated CBOR, and the exact and exceeded session, query, and acknowledgement input bounds.
+The Linux change check replays every target's corpus, and
 the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
 Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
