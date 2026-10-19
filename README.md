@@ -160,6 +160,11 @@ An interrupted or failed exchange that loses request correlation invalidates onl
 session. The failing call retains its original typed error; later operations return
 `SessionUnusable` until the caller opens a new SFTP channel on the same authenticated SSH
 connection. Local validation and fully correlated file-status rejections leave the session usable.
+An in-process SSH peer that stops replenishing one channel's write window exercises cancellation
+while `send_request` is still writing: the pending request slot is cleared, the affected SFTP
+session becomes unusable, and another SSH session and fresh SFTP channel remain usable on the
+parent connection. An independent peer-induced outbound write I/O error remains unverified;
+the locked `russh` stream reports a broken write queue when the connection itself ends.
 The concrete adapter also forwards bounded environment and signal requests and accepts
 server-opened `auth-agent@openssh.com` channels only while a live session on the connection has
 explicitly requested agent forwarding. A locally failed or canceled send and session close or drop
