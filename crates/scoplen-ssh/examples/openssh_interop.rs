@@ -7,8 +7,9 @@ use std::{
 use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
 use scoplen_ssh::{
     CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, ClientError,
-    Ed25519SshSigner, HostKey, HostKeyVerificationError, P256SshSigner, RsaSshSigner,
-    SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm, Signer, UserCertificate,
+    EcdsaSshSigner, Ed25519SshSigner, HostKey, HostKeyVerificationError, P256SshSigner,
+    RsaSshSigner, SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm, Signer,
+    UserCertificate,
 };
 use ssh_key::{Certificate, PrivateKey, PublicKey};
 use tokio::time::timeout;
@@ -92,8 +93,9 @@ async fn authenticate(
     let rsa_key = env::var("SCOPLEN_OPENSSH_RSA_KEY").ok();
     let ed25519_key = env::var("SCOPLEN_OPENSSH_ED25519_KEY").ok();
     let p256_key = env::var("SCOPLEN_OPENSSH_P256_KEY").ok();
+    let ecdsa_key = env::var("SCOPLEN_OPENSSH_ECDSA_KEY").ok();
     let user_certificate = env::var("SCOPLEN_OPENSSH_USER_CERT").ok();
-    let key_count = [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref()]
+    let key_count = [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref(), ecdsa_key.as_ref()]
         .iter()
         .filter(|key| key.is_some())
         .count();
@@ -127,6 +129,10 @@ async fn authenticate(
             return Err("expected a P-256 private key".into());
         }
         let signer = P256SshSigner::new(P256SigningKey::from_bytes(keypair.private_key_bytes())?);
+        authenticate_with_signer(connection, username, &signer, user_certificate.as_deref())
+            .await?;
+    } else if let Some(path) = ecdsa_key {
+        let signer = EcdsaSshSigner::new(PrivateKey::read_openssh_file(path)?)?;
         authenticate_with_signer(connection, username, &signer, user_certificate.as_deref())
             .await?;
     } else {

@@ -8,14 +8,14 @@ $tempRoot = [System.IO.Path]::GetFullPath((Join-Path $tempBase ('scoplen-openssh
 $started = $false
 $authVariables = @(
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH',
-    'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY',
+    'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY', 'SCOPLEN_OPENSSH_ECDSA_KEY',
     'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY'
 )
 $testVariables = @(
     'SCOPLEN_OPENSSH_HOST', 'SCOPLEN_OPENSSH_PORT', 'SCOPLEN_OPENSSH_USER',
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_HOST_KEY', 'SCOPLEN_OPENSSH_HOST_CA_KEY',
     'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH',
-    'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY',
+    'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY', 'SCOPLEN_OPENSSH_ECDSA_KEY',
     'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY',
     'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_FORWARD',
     'SCOPLEN_OPENSSH_JUMP_TARGET_PORT'
@@ -66,6 +66,10 @@ printf 'scoplen:scoplen-test-password\n' | chpasswd
 ssh-keygen -q -t ed25519 -N '' -f /tmp/host_key
 ssh-keygen -q -t ed25519 -N '' -f /tmp/user_ed
 ssh-keygen -q -t ecdsa -b 256 -N '' -f /tmp/user_p256
+ssh-keygen -q -t ecdsa -b 384 -N '' -f /tmp/user_p384
+ssh-keygen -q -t ecdsa -b 521 -N '' -f /tmp/user_p521
+ssh-keygen -q -t ecdsa -b 384 -N '' -f /tmp/wrong_p384
+ssh-keygen -q -t ecdsa -b 521 -N '' -f /tmp/wrong_p521
 ssh-keygen -q -t rsa -b 3072 -N '' -f /tmp/user_rsa
 ssh-keygen -q -t ed25519 -N '' -f /tmp/wrong_ed
 ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_trusted
@@ -74,6 +78,14 @@ ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_krl
 ssh-keygen -q -s /tmp/ca_trusted -I ed25519 -n scoplen -V -1m:+10m /tmp/user_ed.pub
 mv /tmp/user_ed-cert.pub /tmp/user_ed_good-cert.pub
 ssh-keygen -q -s /tmp/ca_trusted -I p256 -n scoplen -V -1m:+10m /tmp/user_p256.pub
+for curve in p384 p521; do
+    ssh-keygen -q -s /tmp/ca_trusted -I "${curve}-valid" -n scoplen -V -1m:+10m "/tmp/user_${curve}.pub"
+    mv "/tmp/user_${curve}-cert.pub" "/tmp/user_${curve}_valid-cert.pub"
+    ssh-keygen -q -s /tmp/ca_trusted -I "${curve}-wrong-principal" -n other -V -1m:+10m "/tmp/user_${curve}.pub"
+    mv "/tmp/user_${curve}-cert.pub" "/tmp/user_${curve}_wrong-principal-cert.pub"
+    mv "/tmp/user_${curve}_valid-cert.pub" "/tmp/user_${curve}-cert.pub"
+    ssh-keygen -q -s /tmp/ca_trusted -I "${curve}-wrong-subject" -n scoplen -V -1m:+10m "/tmp/wrong_${curve}.pub"
+done
 ssh-keygen -q -s /tmp/ca_trusted -I rsa -n scoplen -V -1m:+10m /tmp/user_rsa.pub
 ssh-keygen -q -s /tmp/ca_trusted -I wrong-principal -n other -V -1m:+10m /tmp/user_ed.pub
 mv /tmp/user_ed-cert.pub /tmp/user_ed_wrong-principal-cert.pub
@@ -91,7 +103,7 @@ id: krl-id-revoked
 KRL
 ssh-keygen -q -k -f /tmp/revoked.krl -s /tmp/ca_krl.pub /tmp/krl_spec
 mkdir -p /home/scoplen/.ssh /run/sshd
-cat /tmp/user_ed.pub /tmp/user_p256.pub /tmp/user_rsa.pub > /home/scoplen/.ssh/authorized_keys
+cat /tmp/user_ed.pub /tmp/user_p256.pub /tmp/user_p384.pub /tmp/user_p521.pub /tmp/user_rsa.pub > /home/scoplen/.ssh/authorized_keys
 cat /tmp/ca_trusted.pub /tmp/ca_krl.pub > /tmp/trusted_user_cas.pub
 chown -R scoplen:scoplen /home/scoplen/.ssh
 chmod 700 /home/scoplen/.ssh
@@ -145,9 +157,11 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
     }
     if (-not $ready) { throw 'OpenSSH did not become ready within 60 seconds' }
     $fixtureFiles = @(
-        'user_ed', 'user_p256', 'user_rsa', 'wrong_ed',
+        'user_ed', 'user_p256', 'user_p384', 'user_p521', 'user_rsa', 'wrong_ed', 'wrong_p384', 'wrong_p521',
         'ca_trusted.pub', 'ca_other.pub', 'ca_krl.pub',
-        'user_ed_good-cert.pub', 'user_p256-cert.pub', 'user_rsa-cert.pub',
+        'user_ed_good-cert.pub', 'user_p256-cert.pub', 'user_p384-cert.pub', 'user_p521-cert.pub', 'user_rsa-cert.pub',
+        'user_p384_wrong-principal-cert.pub', 'user_p521_wrong-principal-cert.pub',
+        'wrong_p384-cert.pub', 'wrong_p521-cert.pub',
         'user_ed_wrong-principal-cert.pub', 'user_ed_untrusted-cert.pub',
         'user_ed_krl-serial-cert.pub', 'user_ed_krl-id-cert.pub', 'user_ed_krl-allowed-cert.pub'
     )
@@ -236,6 +250,8 @@ done
     $keyCases = @(
         @{ Name = 'Ed25519'; Variable = 'SCOPLEN_OPENSSH_ED25519_KEY'; File = 'user_ed'; Certificate = 'user_ed_good-cert.pub' },
         @{ Name = 'P-256'; Variable = 'SCOPLEN_OPENSSH_P256_KEY'; File = 'user_p256'; Certificate = 'user_p256-cert.pub' },
+        @{ Name = 'P-384'; Variable = 'SCOPLEN_OPENSSH_ECDSA_KEY'; File = 'user_p384'; Certificate = 'user_p384-cert.pub' },
+        @{ Name = 'P-521'; Variable = 'SCOPLEN_OPENSSH_ECDSA_KEY'; File = 'user_p521'; Certificate = 'user_p521-cert.pub' },
         @{ Name = 'RSA-SHA2-256'; Variable = 'SCOPLEN_OPENSSH_RSA_KEY'; File = 'user_rsa'; Certificate = 'user_rsa-cert.pub'; Hash = '256' },
         @{ Name = 'RSA-SHA2-512'; Variable = 'SCOPLEN_OPENSSH_RSA_KEY'; File = 'user_rsa'; Certificate = 'user_rsa-cert.pub'; Hash = '512' }
     )
@@ -244,6 +260,12 @@ done
         Set-Item "Env:$($case.Variable)" (Join-Path $tempRoot $case.File)
         if ($case.Hash) { $env:SCOPLEN_OPENSSH_RSA_HASH = $case.Hash }
         Invoke-AuthExample "$($case.Name) public key"
+    }
+
+    foreach ($curve in @('p384', 'p521')) {
+        Clear-AuthMode
+        $env:SCOPLEN_OPENSSH_ECDSA_KEY = Join-Path $tempRoot "wrong_$curve"
+        Invoke-AuthExample "unauthorized $curve public key" 'AuthenticationRejected'
     }
 
     Clear-AuthMode
@@ -270,6 +292,16 @@ done
         $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot $case.Certificate
         $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
         Invoke-AuthExample "$($case.Name) user certificate"
+    }
+
+    foreach ($curve in @('p384', 'p521')) {
+        Clear-AuthMode
+        $env:SCOPLEN_OPENSSH_ECDSA_KEY = Join-Path $tempRoot "user_$curve"
+        $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
+        $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "wrong_$curve-cert.pub"
+        Invoke-AuthExample "$curve certificate wrong subject" 'KeyMismatch'
+        $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "user_${curve}_wrong-principal-cert.pub"
+        Invoke-AuthExample "$curve certificate wrong principal" 'PrincipalMismatch'
     }
 
     Clear-AuthMode

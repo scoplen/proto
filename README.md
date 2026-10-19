@@ -48,16 +48,18 @@ now composes bounded edge TCP dialing, TLS, the K-6 prelude, and the SSH handsha
 `AsyncGatewayTransport` and `connect_via_gateway_stream` remain available when a caller owns the TLS
 stream. The direct route applies a bounded timeout to the gateway handshake and maps a stalled edge
 to a typed failure.
-Software Ed25519, P-256, and RSA/SHA-2 signers, FIDO2 security-key signer integration,
-RFC 4252 `none`, password and keyboard-interactive codecs, certificate validation, and
+Software Ed25519, ECDSA P-256/P-384/P-521, and RSA/SHA-2 signers, FIDO2 security-key signer
+integration, RFC 4252 `none`, password and keyboard-interactive codecs, certificate validation, and
 host-verification callbacks are available. The concrete client
 exposes a `none` probe that reports the server's remaining methods, and handles bounded
 keyboard-interactive challenge rounds with prompt and response validation before sending answers
 to the SSH engine. It also authenticates with validated OpenSSH user certificates through the
 shared signer boundary, checking the requested principal and subject key before dispatch. RSA
 certificates retain their legacy blob type while selecting the requested SHA-2 certificate
-algorithm; signing binds the complete certificate and selected hash. Authentication rejection
-reports `partial_success` and `remaining_methods` in server order, omitting unknown engine methods.
+algorithm; signing binds the complete certificate and selected hash. `EcdsaSshSigner` selects the
+NIST curve from an imported OpenSSH private key, while `P256SshSigner` remains available for
+Scoplen's P-256 key type. Authentication rejection reports `partial_success` and
+`remaining_methods` in server order, omitting unknown engine methods.
 `ClientConnection::server_rsa_sha2_selection` reads the server's `server-sig-algs` once per
 connection and reports SHA-512, SHA-256, an advertised SHA-1-only RSA choice, or an undetermined
 choice. It never selects SHA-1 or sends an authentication probe. The complete query has a
@@ -149,13 +151,14 @@ one host trust pin and one authentication source are supplied. Set either
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's OpenSSH public-key line or
 `SCOPLEN_OPENSSH_HOST_CA_KEY` to a CA public-key file, and select
 `SCOPLEN_OPENSSH_PASSWORD`, `SCOPLEN_OPENSSH_RSA_KEY`,
-`SCOPLEN_OPENSSH_ED25519_KEY`, or `SCOPLEN_OPENSSH_P256_KEY`. The key variables contain paths to
-unencrypted OpenSSH private keys and are mutually exclusive. The optional
+`SCOPLEN_OPENSSH_ED25519_KEY`, `SCOPLEN_OPENSSH_P256_KEY`, or
+`SCOPLEN_OPENSSH_ECDSA_KEY`. The last selects P-256, P-384, or P-521 from the imported key. The
+key variables contain paths to unencrypted OpenSSH private keys and are mutually exclusive. The optional
 `SCOPLEN_OPENSSH_RSA_HASH=256|512` selects the RSA-SHA2 signature algorithm (default 512).
 Optional host, port, and username variables select the test server. It verifies the selected host
 trust pin, authentication, exact command output, and exit status zero. Password,
-both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
-wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
+both RSA-SHA2 variants, Ed25519, and ECDSA P-256/P-384/P-521 passed against a disposable Linux
+OpenSSH container; wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
 `pwsh ./scripts/ssh-rsa-selection-interop.ps1` starts three disposable OpenSSH listeners with
 `PubkeyAcceptedAlgorithms` constrained to RSA-SHA2-256, both RSA SHA-2 variants, and legacy
@@ -201,14 +204,15 @@ hop, session commands on each connection, wrong-pin and closed-target rejection,
 connection reuse after the failures. The disposable OpenSSH script below runs this example.
 `pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH server and runs
 the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump examples. It also tests raw keys
-and user certificates with Ed25519, P-256, RSA-SHA2-256, and RSA-SHA2-512. A software-generated
-authenticator fixture tests raw `sk-ssh-ed25519@openssh.com` and
+and user certificates with Ed25519, ECDSA P-256/P-384/P-521, RSA-SHA2-256, and RSA-SHA2-512. A
+software-generated authenticator fixture tests raw `sk-ssh-ed25519@openssh.com` and
 `sk-ecdsa-sha2-nistp256@openssh.com` authentication, including rejection of signatures from the
 wrong key, application, or session payload. The same fixture tests user certificates over both
 security-key types, with full certificate binding, wrong subject or application, principal,
 validity, CA pin, server CA trust, and KRL serial and key-ID rejection paths. Rejection checks cover
-wrong passwords, unauthorized keys, wrong certificate principals, wrong local CA pins, and
-locally valid certificates from a server-untrusted CA. A separate trusted CA signs three Ed25519
+wrong passwords, unauthorized keys including P-384/P-521, wrong P-384/P-521 certificate subjects
+and principals, wrong local CA pins, and locally valid certificates from a server-untrusted CA. A
+separate trusted CA signs three Ed25519
 certificates over one key: a KRL rejects one by serial and one by key ID, while an unrevoked
 certificate and the same raw public key still authenticate and run the exact command with exit
 status zero. OpenSSH enforces the KRL; the client does not load or parse it. The Linux CI workflow
@@ -248,8 +252,8 @@ file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The exa
 certificate signature, principal, validity, critical options, and CA pin before sending it.
 A disposable `linuxserver/openssh-server` container with `TrustedUserCAKeys` configured accepted
 the certificate; a certificate from another CA was rejected by OpenSSH. The automated Alpine
-fixture covers Ed25519, P-256, and both RSA-SHA2 variants, plus server-side KRL rejection of
-serial- and key-ID-revoked Ed25519 certificates. Other certificate revocation forms, algorithms,
+fixture covers Ed25519, ECDSA P-256/P-384/P-521, and both RSA-SHA2 variants, plus server-side KRL
+rejection of serial- and key-ID-revoked Ed25519 certificates. Other certificate revocation forms, algorithms,
 platforms, and server versions remain unverified.
 Set `SCOPLEN_OPENSSH_SFTP=1` for the same example against a disposable server to additionally
 exercise SFTP v3 on the authenticated connection. This verifies advertised OpenSSH transfer
