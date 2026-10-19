@@ -63,8 +63,14 @@ fuzz_target!(|bytes: &[u8]| {
     let _ = socks.finish();
 
     let mut strict = StrictKeyExchange::new(true, KeyExchangeFamily::Ecdh);
+    let mut rekey = StrictKeyExchange::new(true, KeyExchangeFamily::Ecdh);
+    rekey.on_send(StrictKexPacket::KexInit).unwrap();
+    rekey.on_receive(StrictKexPacket::KexInit).unwrap();
+    rekey.on_send(StrictKexPacket::NewKeys).unwrap();
+    rekey.on_receive(StrictKexPacket::NewKeys).unwrap();
+    rekey.begin_rekey().unwrap();
     for byte in bytes.iter().take(128) {
-        let packet = match byte % 14 {
+        let packet = match byte % 15 {
             0 => StrictKexPacket::KexInit,
             1 => StrictKexPacket::NewKeys,
             2 => StrictKexPacket::KexDhInit,
@@ -78,8 +84,14 @@ fuzz_target!(|bytes: &[u8]| {
             10 => StrictKexPacket::KexEcdhReply,
             11 => StrictKexPacket::KexHybridInit,
             12 => StrictKexPacket::KexHybridReply,
-            _ => StrictKexPacket::ExtInfo,
+            13 => StrictKexPacket::ExtInfo,
+            _ => StrictKexPacket::Other(2),
         };
         let _ = strict.on_receive(packet);
+        if rekey.phase() == scoplen_ssh::StrictKexPhase::Established {
+            rekey.begin_rekey().unwrap();
+        }
+        let _ = rekey.on_send(packet);
+        let _ = rekey.on_receive(packet);
     }
 });

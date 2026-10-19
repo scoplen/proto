@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Corrected D-98 strict-KEX helper admission: each direction resumes ordinary transport traffic
+  after its initial NEWKEYS, later rekeys allow interleaved ordinary packets, and sequence resets
+  remain per-direction after every strict NEWKEYS. KEX-control boundaries, family, and repetition
+  checks remain enforced; non-strict sequence numbers continue without reset. Public regressions
+  and a rekey fuzz seed cover the corrected helper boundary, not the encrypted engine.
 - Added a disposable external OpenSSH forwarded-agent fixture with a real second-hop public-key
   signature, exact command output, fail-closed disabled and denied policy checks, blocked
   remove-all management request, and valid reconnect controls. The source private key and build

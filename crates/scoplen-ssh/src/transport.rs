@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //! SSH transport negotiation and strict key-exchange state.
 //!
-//! This module is deliberately independent of the eventual SSH engine. It owns the K-7
-//! preference and state-machine boundary that an engine must use when encoding and processing
+//! This module is independent of the encrypted SSH engine. It owns the K-7
+//! preference and state-machine boundary for encoding and processing
 //! `SSH_MSG_KEXINIT`, key-exchange messages, and `SSH_MSG_NEWKEYS`.
 
 use thiserror::Error;
@@ -390,7 +390,10 @@ impl DirectionState {
     }
 }
 
-/// A strict-KEX packet admission and sequence-number state machine.
+/// A KEX-control admission and sequence-number state machine.
+///
+/// Strict initial packet restrictions end separately in each direction at `NEWKEYS`.
+/// Strict sequence numbers reset after every `NEWKEYS`, including later rekeys.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StrictKeyExchange {
     enabled: bool,
@@ -437,7 +440,7 @@ impl StrictKeyExchange {
         self.receive.sequence
     }
 
-    /// Begin a rekey exchange after the initial exchange is established.
+    /// Begin a rekey exchange after the preceding exchange is established.
     ///
     /// # Errors
     ///
@@ -457,7 +460,7 @@ impl StrictKeyExchange {
     /// # Errors
     ///
     /// Returns a [`StrictKexError`] when the packet violates the active KEX phase, message family,
-    /// message count, first-packet rule, or sequence-number bound.
+    /// message count, initial first-packet rule, or initial sequence-number bound.
     pub fn on_send(&mut self, packet: StrictKexPacket) -> Result<u32, StrictKexError> {
         self.process(TransportDirection::Send, packet)
     }
@@ -467,7 +470,7 @@ impl StrictKeyExchange {
     /// # Errors
     ///
     /// Returns a [`StrictKexError`] when the packet violates the active KEX phase, message family,
-    /// message count, first-packet rule, or sequence-number bound.
+    /// message count, initial first-packet rule, or initial sequence-number bound.
     pub fn on_receive(&mut self, packet: StrictKexPacket) -> Result<u32, StrictKexError> {
         self.process(TransportDirection::Receive, packet)
     }
@@ -478,35 +481,51 @@ impl StrictKeyExchange {
         packet: StrictKexPacket,
     ) -> Result<u32, StrictKexError> {
         let in_kex = self.phase != StrictKexPhase::Established;
-        let first_seen = match direction {
-            TransportDirection::Send => &mut self.send.first_packet,
-            TransportDirection::Receive => &mut self.receive.first_packet,
+        let direction_state = match direction {
+            TransportDirection::Send => &self.send,
+            TransportDirection::Receive => &self.receive,
         };
+        let first_seen = direction_state.first_packet;
+        let direction_completed = direction_state.new_keys;
+        let sequence = direction_state.sequence;
 
-        if self.enabled && in_kex {
-            if !*first_seen {
+        if self.enabled
+            && self.phase == StrictKexPhase::Initial
+            && !direction_completed
+            && sequence == u32::MAX
+        {
+            return Err(StrictKexError::SequenceNumberExhausted { direction });
+        }
+
+        if in_kex && packet.is_kex_control() {
+            if direction_completed && !packet.is_new_keys() {
+                return Err(StrictKexError::PacketAfterNewKeys { direction, packet });
+            }
+            if !first_seen {
                 if packet != StrictKexPacket::KexInit {
                     return Err(StrictKexError::FirstPacketMustBeKexInit { direction, packet });
                 }
-                *first_seen = true;
             } else if packet == StrictKexPacket::KexInit {
                 return Err(StrictKexError::KexMessageRepeated { direction, packet });
             }
-
-            if self.direction_completed(direction) && !packet.is_new_keys() {
-                return Err(StrictKexError::PacketAfterNewKeys { direction, packet });
-            }
             self.validate_kex_packet(direction, packet)?;
-        } else if self.enabled && packet.is_kex_control() {
+            if !first_seen {
+                match direction {
+                    TransportDirection::Send => self.send.first_packet = true,
+                    TransportDirection::Receive => self.receive.first_packet = true,
+                }
+            }
+        } else if in_kex
+            && self.enabled
+            && self.phase == StrictKexPhase::Initial
+            && !direction_completed
+        {
+            if !first_seen {
+                return Err(StrictKexError::FirstPacketMustBeKexInit { direction, packet });
+            }
+            return Err(StrictKexError::UnexpectedPacket { phase: self.phase, packet });
+        } else if !in_kex && packet.is_kex_control() {
             return Err(StrictKexError::RekeyNotStarted);
-        }
-
-        let sequence = match direction {
-            TransportDirection::Send => self.send.sequence,
-            TransportDirection::Receive => self.receive.sequence,
-        };
-        if self.enabled && in_kex && sequence == u32::MAX {
-            return Err(StrictKexError::SequenceNumberExhausted { direction });
         }
 
         let next = sequence.wrapping_add(1);
@@ -536,21 +555,11 @@ impl StrictKeyExchange {
         Ok(sequence)
     }
 
-    fn direction_completed(&self, direction: TransportDirection) -> bool {
-        match direction {
-            TransportDirection::Send => self.send.new_keys,
-            TransportDirection::Receive => self.receive.new_keys,
-        }
-    }
-
     fn validate_kex_packet(
         &mut self,
         direction: TransportDirection,
         packet: StrictKexPacket,
     ) -> Result<(), StrictKexError> {
-        if packet == StrictKexPacket::ExtInfo || matches!(packet, StrictKexPacket::Other(_)) {
-            return Err(StrictKexError::UnexpectedPacket { phase: self.phase, packet });
-        }
         if packet != StrictKexPacket::KexInit
             && packet != StrictKexPacket::NewKeys
             && !self.family.allows(packet)
@@ -586,23 +595,25 @@ pub enum TransportNegotiationError {
 /// An error raised by the strict-KEX packet gate.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum StrictKexError {
-    /// The first packet in one direction was not `SSH_MSG_KEXINIT`.
-    #[error("the first {direction:?} packet must be KEXINIT, got {packet:?}")]
+    /// The first packet in an initial direction, or first rekey control, was not `KEXINIT`.
+    #[error(
+        "the first {direction:?} initial packet or rekey KEX control must be KEXINIT, got {packet:?}"
+    )]
     FirstPacketMustBeKexInit { direction: TransportDirection, packet: StrictKexPacket },
     /// A KEX message was sent more than once in one direction.
-    #[error("strict KEX message {packet:?} was repeated in the {direction:?} direction")]
+    #[error("KEX control message {packet:?} was repeated in the {direction:?} direction")]
     KexMessageRepeated { direction: TransportDirection, packet: StrictKexPacket },
-    /// A packet was sent after that direction had already sent or received NEWKEYS.
-    #[error("packet {packet:?} arrived after NEWKEYS in the {direction:?} direction")]
+    /// A KEX control packet was sent after that direction had completed NEWKEYS.
+    #[error("KEX packet {packet:?} arrived after NEWKEYS in the {direction:?} direction")]
     PacketAfterNewKeys { direction: TransportDirection, packet: StrictKexPacket },
-    /// A non-KEX packet appeared before both NEWKEYS packets completed the exchange.
+    /// A non-KEX packet appeared before that direction completed initial NEWKEYS.
     #[error("packet {packet:?} is not permitted during {phase:?} strict KEX")]
     UnexpectedPacket { phase: StrictKexPhase, packet: StrictKexPacket },
     /// The packet type does not belong to the negotiated KEX family.
     #[error("packet {packet:?} is not valid for {family:?} KEX")]
     KexMessageNotAllowed { family: KeyExchangeFamily, packet: StrictKexPacket },
-    /// A strict sequence number would wrap before KEX completion.
-    #[error("the {direction:?} strict-KEX sequence number would wrap before NEWKEYS")]
+    /// A strict sequence number would wrap before that direction completed initial NEWKEYS.
+    #[error("the {direction:?} initial strict-KEX sequence number would wrap before NEWKEYS")]
     SequenceNumberExhausted { direction: TransportDirection },
     /// A rekey was requested before both endpoints completed the initial exchange.
     #[error("cannot begin rekey while the exchange is {phase:?}")]
@@ -628,5 +639,30 @@ mod tests {
             state.on_send(StrictKexPacket::KexEcdhInit),
             Err(StrictKexError::SequenceNumberExhausted { direction: TransportDirection::Send })
         );
+    }
+
+    #[test]
+    fn strict_sequence_can_wrap_during_rekey() {
+        let mut state = StrictKeyExchange::new(true, KeyExchangeFamily::Ecdh);
+        for direction in [TransportDirection::Send, TransportDirection::Receive] {
+            match direction {
+                TransportDirection::Send => {
+                    state.on_send(StrictKexPacket::KexInit).unwrap();
+                    state.on_send(StrictKexPacket::NewKeys).unwrap();
+                }
+                TransportDirection::Receive => {
+                    state.on_receive(StrictKexPacket::KexInit).unwrap();
+                    state.on_receive(StrictKexPacket::NewKeys).unwrap();
+                }
+            }
+        }
+        state.begin_rekey().unwrap();
+        state.send.sequence = u32::MAX;
+        state.receive.sequence = u32::MAX;
+        assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(u32::MAX));
+        assert_eq!(state.send_sequence(), 0);
+        assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(0));
+        assert_eq!(state.on_receive(StrictKexPacket::KexInit), Ok(u32::MAX));
+        assert_eq!(state.receive_sequence(), 0);
     }
 }
