@@ -14,6 +14,10 @@ All notable changes to the `proto` repository will be recorded here.
   output, exact 60-second validity, public signed vector and failure-path tests, and decoder fuzz
   seeds. Issuance authorization, raw-TLS proof binding, SSH-key use, and atomic replay claims remain
   consumer work.
+- Verified strict-KEX rekey against disposable OpenSSH in both initiation directions. DEBUG3
+  evidence now requires strict negotiation before authentication and a nonzero send/read sequence
+  reset after every initial and later NEWKEYS; repeated rekeys preserve exact channel bytes and
+  successful remote exit. The no-rekey control remains unchanged.
 - Bounded the complete K-4 session request to 4,096 CBOR bytes and added caller-selected session
   response body budgets with a 4 MiB default. Encoders preflight exact size; decoders check the
   complete input before CBOR parsing. Seven portable budget recipes and public boundary tests

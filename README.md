@@ -244,8 +244,11 @@ a one GiB control must not rekey. Each case verifies 128 KiB of exact binary dat
 session channel and a successful exit status. OpenSSH DEBUG3 logs must show post-authentication
 KEXINIT and NEWKEYS in both directions, with the first KEXINIT received by the server for a
 client-initiated exchange and sent by it for a server-initiated exchange. The control log must
-contain neither message after authentication. This observes OpenSSH's decrypted protocol logs,
-not encrypted packet sequence numbers; rekey strictness and the wider server, platform, and
+contain neither message after authentication. The same logs must show strict KEX negotiated before
+authentication and pair every initial and post-authentication NEWKEYS in both directions with a
+nonzero send/read sequence-number reset. The exact authenticated echo after repeated exchanges
+checks that the client and OpenSSH remain synchronized; the client's internal sequence counters
+are not logged directly. Cipher-dependent OpenSSH defaults and the wider server, platform, and
 algorithm matrix remain open.
 With a disposable OpenSSH server, `cargo run -p scoplen-ssh --example proxy_command_interop`
 exercises a real SSH handshake through a child process's standard streams. Set

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Verify bidirectional session data across client- and server-initiated OpenSSH rekey.
+//! Verify exact authenticated session data across client- and server-initiated OpenSSH rekey.
 
 use std::{env, error::Error, time::Duration};
 
@@ -49,7 +49,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for mode in [RekeyMode::Client, RekeyMode::Server, RekeyMode::Control] {
         let port = env::var(mode.port_variable())?.parse::<u16>()?;
         exercise(mode, port, &expected_key, &username, &password).await?;
-        println!("OpenSSH {} channel data passed", mode.name());
+        println!(
+            "OpenSSH {}: {} exact echo bytes and exit status zero",
+            mode.name(),
+            CHUNK_BYTES * CHUNKS
+        );
     }
     Ok(())
 }
