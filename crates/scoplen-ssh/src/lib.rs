@@ -83,7 +83,7 @@ pub use proxy::{
 pub use russh_adapter::{
     ChannelEvent, ClientChannel, ClientChannelStream, ClientConfig, ClientConfigError,
     ClientConnection, ClientError, ForwardedChannel, ForwardedChannelKind, HostKeyPolicy,
-    MAX_CLIENT_CHANNEL_LIMIT, NoneAuthOutcome, PublicKeyAuthError,
+    MAX_CLIENT_CHANNEL_LIMIT, NoneAuthOutcome, PublicKeyAuthError, ServerRsaSha2Selection,
 };
 pub use security_key::{
     SecurityKeyAlgorithm, SecurityKeyAuthRequest, SecurityKeyError, SecurityKeyProvider,

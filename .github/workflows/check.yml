@@ -73,6 +73,9 @@ jobs:
       - name: Authentication, certificates, SFTP, and routes
         shell: pwsh
         run: ./scripts/openssh-interop.ps1
+      - name: Constrained RSA signature advertisements and authentication
+        shell: pwsh
+        run: ./scripts/ssh-rsa-selection-interop.ps1
 
   openssh-algorithms:
     name: OpenSSH algorithm policy
