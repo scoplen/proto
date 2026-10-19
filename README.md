@@ -326,10 +326,18 @@ at 4,096 encoded bytes. The browser response omits and rejects any `refresh_toke
 retaining unrelated response extensions. OpenAPI and generated TypeScript types describe all three
 authentication paths, including the DPoP-only refresh operation and distinct browser response.
 Callers pass the returned bytes to the fallible K-2 `DeviceSigner::sign` boundary and propagate
-signer failures, including hardware-device failures.
+signer failures, including hardware-device failures. `scoplen-crypto` also constructs and verifies
+bounded ES256 DPoP proofs through `DpopTarget`, `DpopToken`, and `DpopProof`. Targets combine a
+trusted canonical HTTPS origin with the router's canonical absolute path; protected proofs bind an
+ASCII access token with `ath`, while refresh proofs omit it. Verification returns a JWK thumbprint,
+proof identifier, creation time, and last accepted second. It checks the signature, request,
+key/token binding, nonce, and 60-second past/future window, but does not authorize or prevent replay.
+Consumers must atomically claim `(jkt, jti)` across instances through the inclusive acceptance
+boundary before authorizing or rotating credentials. The published RFC 9449 vector exercises a
+signature and token hash from an independent source.
 Challenge storage, credential verification, and token issuance are server responsibilities; this
-library does not implement a production authentication service. DPoP proof verification, Origin
-and cookie handling, atomic refresh rotation, and reuse detection remain server responsibilities.
+library does not implement a production authentication service. Origin and cookie handling,
+atomic refresh rotation, and reuse detection remain server responsibilities.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR
@@ -357,7 +365,7 @@ identity, and audit storage remain owned by the server application.
 The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`, and
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
 in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
-remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-problem.json`,
+remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
 `vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
@@ -401,6 +409,9 @@ vectors, truncated credentials, a zero sequence, and contexts exactly at and abo
 bound. The Linux change check replays every target's corpus, and
 the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
 Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
+The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
+9449 context; tracked seeds include the RFC signed proof, malformed signature and duplicate JSON,
+truncation, and a proof one byte over the 8 KiB bound.
 Fuzz-discovered mutations remain ignored; review, minimize, and name useful regression inputs
 before tracking them as new seeds. The scheduled run's results and performance targets remain
 separate Gate S4 acceptance work.
