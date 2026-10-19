@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-100's dedicated enrolled-device Ed25519 access-token signer and stateless verifier,
+  bounded claims and keyring, complete membership and scope checks, redacted diagnostics, and
+  public signed/rejection vectors. DPoP replay, current-state and route authorization remain
+  consumer checks.
 - Extended the disposable OpenSSH 9.9p2 authentication, certificate, SFTP, and route fixture to
   current OpenSSH 10.6p1 with an exact package and SSH banner check. CI runs both server versions
   through the same positive and rejection paths; wider platform and implementation coverage remains open.

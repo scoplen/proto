@@ -7,6 +7,7 @@
 
 mod certificate;
 mod cpace;
+mod device_access_token;
 mod device_auth;
 mod dpop;
 mod envelope;
@@ -26,6 +27,11 @@ pub use certificate::{DeviceCertificate, RevocationStatement, verify_device_list
 pub use cpace::{
     CPACE_CHANNEL_IDENTIFIER, PairingCode, PairingContext, PairingError, PairingInitiator,
     PairingResponder, PairingRole, PairingSession,
+};
+pub use device_access_token::{
+    DEVICE_ACCESS_TOKEN_LIFETIME_SECONDS, DeviceAccessToken, DeviceAccessTokenClaims,
+    DeviceAccessTokenError, DeviceAccessTokenSigner, DeviceOrganizationSnapshot,
+    MAX_DEVICE_ACCESS_TOKEN_BYTES, TrustedDeviceAccessTokenKeys, VerifiedDeviceAccessToken,
 };
 pub use device_auth::{DeviceAuthContext, DeviceAuthError};
 pub use dpop::{
