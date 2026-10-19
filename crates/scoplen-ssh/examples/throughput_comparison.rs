@@ -20,6 +20,7 @@ const MIB: u64 = 1024 * 1024;
 const BLOCK_SIZE: u64 = 64 * 1024;
 const BUFFER_SIZE: usize = 64 * 1024;
 const TRIAL_TIMEOUT: Duration = Duration::from_secs(120);
+const MIN_THROUGHPUT_RATIO_PERCENT: f64 = 80.0;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -144,14 +145,19 @@ async fn compare() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    let openssh = median(&mut openssh_rates);
-    let scoplen = median(&mut scoplen_rates);
-    let ratio = 100.0 * scoplen / openssh;
+    let (openssh, scoplen, ratio) = summarize_rates(&mut openssh_rates, &mut scoplen_rates)?;
+    let meets_budget = meets_throughput_budget(ratio);
     println!(
         "median cipher={} openssh_mib_per_second={openssh:.2} scoplen_mib_per_second={scoplen:.2} ratio_percent={ratio:.2} meets_80_percent={}",
-        settings.cipher,
-        ratio >= 80.0
+        settings.cipher, meets_budget
     );
+    if !meets_budget {
+        return Err(format!(
+            "{} single-channel throughput was {ratio:.2}% of OpenSSH, below the {MIN_THROUGHPUT_RATIO_PERCENT:.0}% minimum; these same-host samples are diagnostic, not a fixed-hardware release result",
+            settings.cipher
+        )
+        .into());
+    }
     Ok(())
 }
 
@@ -236,6 +242,66 @@ fn median(values: &mut [f64]) -> f64 {
         f64::midpoint(values[middle - 1], values[middle])
     } else {
         values[middle]
+    }
+}
+
+fn summarize_rates(
+    openssh_rates: &mut [f64],
+    scoplen_rates: &mut [f64],
+) -> Result<(f64, f64, f64), &'static str> {
+    if openssh_rates.is_empty() || openssh_rates.len() != scoplen_rates.len() {
+        return Err("throughput comparison requires equal nonempty sample sets");
+    }
+    if openssh_rates
+        .iter()
+        .chain(scoplen_rates.iter())
+        .any(|rate| !rate.is_finite() || *rate <= 0.0)
+    {
+        return Err("throughput samples must be finite positive rates");
+    }
+    let openssh = median(openssh_rates);
+    let scoplen = median(scoplen_rates);
+    let ratio = 100.0 * (scoplen / openssh);
+    if !ratio.is_finite() {
+        return Err("throughput ratio must be finite");
+    }
+    Ok((openssh, scoplen, ratio))
+}
+
+fn meets_throughput_budget(ratio_percent: f64) -> bool {
+    ratio_percent >= MIN_THROUGHPUT_RATIO_PERCENT
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{meets_throughput_budget, summarize_rates};
+
+    #[test]
+    fn throughput_budget_uses_median_ratio_with_inclusive_boundary() {
+        for (scoplen, expected_ratio, expected_pass) in [
+            ([70.0, 79.0, 81.0], 79.0, false),
+            ([70.0, 80.0, 90.0], 80.0, true),
+            ([80.0, 81.0, 90.0], 81.0, true),
+        ] {
+            let mut openssh = [90.0, 100.0, 110.0];
+            let mut scoplen = scoplen;
+            let (openssh_median, scoplen_median, ratio) =
+                summarize_rates(&mut openssh, &mut scoplen).expect("valid paired samples");
+            assert_eq!(openssh_median, 100.0);
+            assert_eq!(scoplen_median, expected_ratio);
+            assert_eq!(ratio, expected_ratio);
+            assert_eq!(meets_throughput_budget(ratio), expected_pass);
+        }
+    }
+
+    #[test]
+    fn throughput_budget_rejects_invalid_samples() {
+        for invalid in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(summarize_rates(&mut [100.0], &mut [invalid]).is_err());
+        }
+        assert!(summarize_rates(&mut [], &mut []).is_err());
+        assert!(summarize_rates(&mut [100.0], &mut [80.0, 80.0]).is_err());
+        assert!(summarize_rates(&mut [f64::MIN_POSITIVE], &mut [f64::MAX]).is_err());
     }
 }
 

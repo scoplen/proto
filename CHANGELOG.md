@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- The paired SSH throughput comparison now exits with an error when either required cipher's
+  same-host median ratio falls below 80% of OpenSSH. It rejects invalid samples before computing
+  the ratio; a passing local diagnostic still does not establish the fixed-hardware release budget.
 - Bounded direct SSH setup with async DNS and family-interleaved Happy Eyeballs dialing under one
   ten-second resolve-and-TCP deadline, followed by a separate ten-second SSH handshake deadline.
   `connect_with_timeout` selects both budgets; typed direct transport and handshake timeout errors

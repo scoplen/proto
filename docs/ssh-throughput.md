@@ -33,7 +33,9 @@ One warmup per client is discarded. The clients then alternate order for each pa
 Each client's median MiB/s is computed independently; the reported percentage is
 `100 × median(Scoplen) / median(OpenSSH)` for that cipher. The script prints the host OS and CPU,
 both OpenSSH versions, image ID, code revision, per-sample times, medians, and whether the local
-ratio reaches 80%.
+ratio reaches 80%. After all samples for a cipher complete, an invalid rate or a median ratio
+below 80% fails the command with a nonzero exit status. A local failure is evidence to investigate
+under the recorded conditions; one run is not a fixed-hardware release judgment.
 
 The stdout pipe and zero-byte scan are shared measurement costs. The disposable server, Docker
 networking, host scheduler, and thermal state can affect either side. This local comparison is
