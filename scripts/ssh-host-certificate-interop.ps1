@@ -11,10 +11,10 @@ function Invoke-Case {
     param([string]$curve, [string]$mode, [int]$port)
 
     $env:SCOPLEN_HOST_CERT_PORT = $port.ToString()
-    $identity = if ($mode -eq 'raw') { 'raw' } else { 'certificate' }
-    $outcome = if ($mode -eq 'raw') { 'valid' } else { $mode }
+    $identity = if ($mode -eq 'raw') { 'raw' } elseif ($mode.StartsWith('mixed-')) { 'mixed' } else { 'certificate' }
+    $outcome = if ($mode -eq 'raw') { 'valid' } else { $mode.Replace('mixed-', '') }
     $output = & cargo run --quiet --locked -p scoplen-ssh --example host_certificate_interop -- $identity $outcome 2>&1 | Out-String
-    $expected = if ($mode -eq 'raw' -or $mode -eq 'valid') {
+    $expected = if ($mode -eq 'raw' -or $mode -eq 'valid' -or $mode -eq 'mixed-valid') {
         "host certificate $mode command ok"
     } else {
         "host certificate $mode rejected"
@@ -45,18 +45,26 @@ for curve in 384 521; do
     mv "/tmp/host_$curve-cert.pub" "/tmp/host_${curve}_wrong-principal-cert.pub"
     ssh-keygen -q -s /tmp/ca_trusted -h -I "p${curve}-expired" -n 127.0.0.1 -V -2h:-1h "/tmp/host_$curve.pub"
     mv "/tmp/host_$curve-cert.pub" "/tmp/host_${curve}_expired-cert.pub"
-    for mode in raw valid wrong-ca wrong-principal expired; do
+    for mode in raw valid wrong-ca wrong-principal expired mixed-valid mixed-wrong-ca mixed-wrong-principal mixed-expired; do
         case "$curve:$mode" in
             384:raw) port=23840 ;;
             384:valid) port=23841 ;;
             384:wrong-ca) port=23842 ;;
             384:wrong-principal) port=23843 ;;
             384:expired) port=23844 ;;
+            384:mixed-valid) port=23845 ;;
+            384:mixed-wrong-ca) port=23846 ;;
+            384:mixed-wrong-principal) port=23847 ;;
+            384:mixed-expired) port=23848 ;;
             521:raw) port=25210 ;;
             521:valid) port=25211 ;;
             521:wrong-ca) port=25212 ;;
             521:wrong-principal) port=25213 ;;
             521:expired) port=25214 ;;
+            521:mixed-valid) port=25215 ;;
+            521:mixed-wrong-ca) port=25216 ;;
+            521:mixed-wrong-principal) port=25217 ;;
+            521:mixed-expired) port=25218 ;;
         esac
         config="/tmp/sshd_${curve}_${mode}.conf"
         cat > "$config" <<SSHD
@@ -68,10 +76,25 @@ PerSourcePenalties no
 HostKeyAlgorithms $algorithm
 SSHD
         if [ "$mode" != raw ]; then
-            printf 'HostCertificate /tmp/host_%s_%s-cert.pub\nHostKeyAlgorithms %s-cert-v01@openssh.com\n' "$curve" "$mode" "$algorithm" >> "$config"
+            certificate_mode=${mode#mixed-}
+            if [ "$mode" != "$certificate_mode" ]; then
+                host_key_algorithms="$algorithm-cert-v01@openssh.com,$algorithm"
+            else
+                host_key_algorithms="$algorithm-cert-v01@openssh.com"
+            fi
+            printf 'HostCertificate /tmp/host_%s_%s-cert.pub\nHostKeyAlgorithms %s\n' "$curve" "$certificate_mode" "$host_key_algorithms" >> "$config"
             sed -i "/^HostKeyAlgorithms $algorithm$/d" "$config"
         fi
         /usr/sbin/sshd -t -f "$config"
+        case "$mode" in
+            mixed-*)
+                effective_algorithms=$(/usr/sbin/sshd -T -f "$config" | sed -n 's/^hostkeyalgorithms //p')
+                [ "$effective_algorithms" = "$host_key_algorithms" ] || {
+                    printf 'mixed listener did not offer certificate and raw key: %s\n' "$effective_algorithms" >&2
+                    exit 1
+                }
+                ;;
+        esac
         /usr/sbin/sshd -D -e -f "$config" &
     done
 done
@@ -79,7 +102,7 @@ wait
 '@
     $setup = $setup.Replace("`r", '')
     $publish = @()
-    foreach ($port in @(23840, 23841, 23842, 23843, 23844, 25210, 25211, 25212, 25213, 25214)) {
+    foreach ($port in @(23840, 23841, 23842, 23843, 23844, 23845, 23846, 23847, 23848, 25210, 25211, 25212, 25213, 25214, 25215, 25216, 25217, 25218)) {
         $publish += @('-p', "127.0.0.1::$port")
     }
     docker run -d --name $container @publish alpine:3.21 sh -c $setup | Out-Null
@@ -87,7 +110,7 @@ wait
     $started = $true
 
     $ports = @{}
-    foreach ($serverPort in @(23840, 23841, 23842, 23843, 23844, 25210, 25211, 25212, 25213, 25214)) {
+    foreach ($serverPort in @(23840, 23841, 23842, 23843, 23844, 23845, 23846, 23847, 23848, 25210, 25211, 25212, 25213, 25214, 25215, 25216, 25217, 25218)) {
         $published = docker port $container "$serverPort/tcp"
         if ($LASTEXITCODE -ne 0 -or $published -notmatch '^127\.0\.0\.1:(\d+)$') {
             throw "OpenSSH port $serverPort was not published on loopback"
@@ -132,6 +155,15 @@ wait
         )) {
             Invoke-Case $curve $case.Mode $ports[($base + $case.Offset)]
             Invoke-Case $curve 'valid' $ports[($base + 1)]
+        }
+        Invoke-Case $curve 'mixed-valid' $ports[($base + 5)]
+        foreach ($case in @(
+            @{ Mode = 'mixed-wrong-ca'; Offset = 6 },
+            @{ Mode = 'mixed-wrong-principal'; Offset = 7 },
+            @{ Mode = 'mixed-expired'; Offset = 8 }
+        )) {
+            Invoke-Case $curve $case.Mode $ports[($base + $case.Offset)]
+            Invoke-Case $curve 'mixed-valid' $ports[($base + 5)]
         }
     }
 }

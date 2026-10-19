@@ -14,6 +14,10 @@ All notable changes to the `proto` repository will be recorded here.
   certificates. It verifies pinned host and user CA keys, exact command output, exit zero, five
   rejection paths, and valid reconnection controls. A loopback TCP bridge exercises the agent wire
   protocol without claiming native Unix-socket, Windows pipe, or Pageant connector coverage.
+- The disposable OpenSSH host-certificate fixture now offers P-384/P-521 raw keys and host
+  certificates together on the same listeners. Thirty cases verify default certificate selection,
+  exact authenticated commands, wrong CA/principal/expiry rejection without raw-key fallback, and
+  healthy reconnects while retaining the separate raw and certificate controls.
 - Added bounded gateway-ticket issuance request/response JSON codecs, canonical SSH public-key
   and edge-address validation, redacted credentials, and the `gateway.invalid_request` problem
   code. OpenAPI, generated TypeScript, vectors, and both dependency graphs are synchronized;
