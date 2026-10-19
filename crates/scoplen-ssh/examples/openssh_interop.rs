@@ -8,8 +8,8 @@ use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
 use scoplen_ssh::{
     CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, ClientError,
     EcdsaSshSigner, Ed25519SshSigner, HostKey, HostKeyVerificationError, P256SshSigner,
-    RsaSshSigner, SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm, Signer,
-    UserCertificate,
+    RsaSshSigner, SftpAttributes, SftpChannelError, SftpPacket, SftpSession, SignatureAlgorithm,
+    Signer, UserCertificate,
 };
 use ssh_key::{Certificate, PrivateKey, PublicKey};
 use tokio::time::timeout;
@@ -989,6 +989,32 @@ fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+async fn verify_failed_pipelined_sftp_write(
+    connection: &ClientConnection,
+    mut session: SftpSession,
+    path: &[u8],
+    data: &[u8],
+) -> Result<SftpSession, Box<dyn std::error::Error>> {
+    let read_only = session.client_mut().open(path.to_vec(), 1, SftpAttributes::default())?;
+    let read_only_handle = match sftp_response(&mut session, read_only).await? {
+        SftpPacket::Handle { handle, .. } => handle,
+        other => return Err(format!("unexpected SFTP read-only open response: {other:?}").into()),
+    };
+    let rejected = session.upload(&read_only_handle, 0, &data[..16_384], 4096, 4, |_| {}).await;
+    if !matches!(rejected, Err(SftpChannelError::RemoteStatus { code: 1.. }))
+        || !matches!(session.read_response().await, Err(SftpChannelError::SessionUnusable))
+        || !matches!(session.request_limits().await, Err(SftpChannelError::SessionUnusable))
+    {
+        return Err("failed pipelined SFTP write did not isolate its channel".into());
+    }
+    drop(session);
+    let mut session = SftpSession::open(connection, 4).await?;
+    verify_sftp_bytes(&mut session, path, data).await?;
+    let independent = connection.open_session().await?;
+    independent.close().await?;
+    Ok(session)
+}
+
 async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
     let mut session = SftpSession::open(connection, 4).await?;
     verify_sftp_capabilities(&session)?;
@@ -1011,7 +1037,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
         SftpPacket::Handle { handle, .. } => handle,
         other => return Err(format!("unexpected SFTP create response: {other:?}").into()),
     };
-    let data: Vec<u8> = b"scoplen-sftp-v3".iter().copied().cycle().take(100_000).collect();
+    let data: Vec<u8> = (0..=u8::MAX).cycle().take(100_000).collect();
     let mut upload_progress = Vec::new();
     let first = session
         .upload(&write_handle, 0, &data[..40_000], 4096, 4, |event| {
@@ -1083,6 +1109,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
         return Err("SFTP read handle close failed".into());
     }
+    let mut session = verify_failed_pipelined_sftp_write(connection, session, &path, &data).await?;
     verify_hardlink(&mut session, &path, &linked_path, &missing_path, &data).await?;
     verify_expand_path(&mut session, &path, &missing_path, &data).await?;
     verify_standard_rename(&mut session, &path, &missing_path, &data).await?;
