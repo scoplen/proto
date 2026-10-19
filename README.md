@@ -357,11 +357,19 @@ interop evidence; the remaining version and platform matrix is open.
 `pwsh ./scripts/openssh-8-interop.ps1` runs the same public client example against the pinned
 OpenSSH 8.8p1 package in a disposable Alpine 3.15 container. It checks the installed package and
 SSH banner, then verifies password, Ed25519, and RSA-SHA2-256/512 authentication, exact command
-output and exit status, SFTP v3 operations described below, and rejection of a wrong password,
-unauthorized Ed25519 and RSA keys, and an unrelated host key. Docker publishes only a random
-loopback port; the container and temporary test identities are removed afterward. This
-Windows-hosted Linux-server run adds the 8.x major release but does not cover its certificates,
-forwarding, other algorithms, or OpenSSH for Windows.
+output and exit status, SFTP v3 operations described below, direct TCP forwarding and a two-hop
+jump chain, and rejection of a wrong password, unauthorized Ed25519 and RSA keys, an unrelated
+host key, and a nested target's wrong host pin. The jump check also verifies that the parent SSH
+connections remain usable after a failed nested connection. The same pinned server accepts a
+CA-pinned Ed25519 user certificate and rejects a wrong principal, wrong local CA pin,
+server-untrusted CA, and serial- or key-ID-revoked certificates in a real KRL. An unrevoked
+certificate succeeds before and after the KRL failures. Separate listeners offer both the raw
+Ed25519 host key and its certificate; the public client prefers the certificate, accepts the
+trusted valid one, and rejects a wrong CA pin, wrong principal, and expired certificate before
+authenticating. A fresh valid connection succeeds after each rejection. Docker publishes only
+random loopback ports; the container and temporary test identities are removed afterward. This
+Windows-hosted Linux-server run does not cover other algorithms, OpenSSH for Windows, or the
+remaining interoperability matrix.
 For a user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
 file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
 certificate signature, principal, validity, critical options, and CA pin before sending it.

@@ -76,7 +76,7 @@ jobs:
       - name: Current OpenSSH authentication, certificates, SFTP, and routes
         shell: pwsh
         run: ./scripts/openssh-interop.ps1 -ServerVersion 10.6p1
-      - name: OpenSSH 8.8p1 authentication, SFTP, and rejection paths
+      - name: OpenSSH 8.8p1 authentication, certificates, SFTP, and routes
         shell: pwsh
         run: ./scripts/openssh-8-interop.ps1
       - name: Constrained RSA signature advertisements and authentication

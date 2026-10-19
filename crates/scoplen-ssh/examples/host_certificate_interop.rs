@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Exercise P-384/P-521 host identities against disposable OpenSSH listeners.
+//! Exercise raw and certified host identities against disposable OpenSSH listeners.
 
 use std::{env, time::Duration};
 
