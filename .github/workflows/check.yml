@@ -93,6 +93,16 @@ jobs:
         shell: pwsh
         run: ./scripts/ssh-agent-unix-interop.ps1
 
+  openssh-agent-forwarded:
+    name: Forwarded OpenSSH agent interoperability
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Second-hop authentication and fail-closed forwarded-agent policy
+        shell: pwsh
+        run: ./scripts/ssh-agent-forwarded-interop.ps1
+
   openssh-algorithms:
     name: OpenSSH algorithm policy
     runs-on: ubuntu-latest

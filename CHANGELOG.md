@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added a disposable external OpenSSH forwarded-agent fixture with a real second-hop public-key
+  signature, exact command output, fail-closed disabled and denied policy checks, blocked
+  remove-all management request, and valid reconnect controls. The source private key and build
+  artifacts remain inside the container; Windows agent transports and the broader matrix remain
+  unverified.
 - Bounded the complete K-4 session request to 4,096 CBOR bytes and added caller-selected session
   response body budgets with a 4 MiB default. Encoders preflight exact size; decoders check the
   complete input before CBOR parsing. Seven portable budget recipes and public boundary tests
