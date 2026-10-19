@@ -157,9 +157,8 @@ connection. Local validation and fully correlated file-status rejections leave t
 The concrete adapter also forwards bounded environment and signal requests and accepts
 server-opened `auth-agent@openssh.com` channels. `ForwardedChannel::serve_agent` reassembles
 russh channel fragments, applies the fail-closed forwarding policy, and returns bounded agent
-responses; an in-process russh round trip covers the concrete lifecycle. External OpenSSH and
-Pageant interoperability, live gateway interoperability, and broader channel scheduling remain
-unverified. The agent-backed signer also completes the concrete public-key authentication flow
+responses; an in-process russh round trip covers the concrete lifecycle. The agent-backed signer
+also completes the concrete public-key authentication flow
 against the in-process russh server. `pwsh ./scripts/ssh-agent-interop.ps1` starts a disposable
 OpenSSH server and a real `ssh-agent` in one Alpine container. The `openssh_agent_interop` example
 selects an exact raw identity, signs through the agent protocol, and completes pinned-host-key
@@ -175,8 +174,19 @@ through the public `connect_unix_agent` connector against the agent socket, and 
 certificate, rejection, and healthy-reconnection cases. The container publishes no ports and
 mounts the source read-only; its keys, socket, and build outputs are discarded. The fixture's
 per-case process timeout bounds a stalled test; it does not add a cancellation deadline to the
-production synchronous agent API. Windows named-pipe and Pageant connectors, external agent
-forwarding, live gateway interoperability, and broader channel scheduling remain unverified.
+production synchronous agent API. `pwsh ./scripts/ssh-agent-forwarded-interop.ps1` builds a
+separate disposable Linux fixture with two loopback-only OpenSSH servers and a real source
+`ssh-agent`. The public client requests forwarding on the first hop; a server-opened agent channel
+is served through `ForwardedChannel::serve_agent` and `AgentServer`. The remote OpenSSH client
+authenticates to the second server using the source agent's private key and checks exact command
+output and exit zero. Disabled and denied per-signature policies reject authentication without
+reaching the source agent's signing operation; a forwarded standard remove-all request receives
+failure, and an identity query on the same channel plus subsequent valid connections prove the
+source key remains usable. The source key and build artifacts stay inside the disposable
+container; its repository mount is read-only, and it publishes no ports. Each case has a process
+deadline; this does not establish a production cancellation bound for the synchronous agent API.
+Windows named-pipe and Pageant connectors, live
+gateway interoperability, and the wider OpenSSH matrix remain unverified.
 The `openssh_interop` example provides a disposable external-server smoke test when
 one host trust pin and one authentication source are supplied. Set either
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's OpenSSH public-key line or
