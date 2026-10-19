@@ -14,17 +14,25 @@ const DEADLINE: Duration = Duration::from_secs(10);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mode =
-        env::args().nth(1).ok_or("expected raw, valid, wrong-ca, wrong-principal, or expired")?;
+    let mut args = env::args().skip(1);
+    let identity = args.next().ok_or("expected raw or certificate identity")?;
+    let outcome = args.next().ok_or("expected valid, wrong-ca, wrong-principal, or expired")?;
+    if !matches!(identity.as_str(), "raw" | "certificate")
+        || !matches!(outcome.as_str(), "valid" | "wrong-ca" | "wrong-principal" | "expired")
+        || (identity == "raw" && outcome != "valid")
+        || args.next().is_some()
+    {
+        return Err("invalid host-certificate interop case".into());
+    }
     let port = env::var("SCOPLEN_HOST_CERT_PORT")?.parse()?;
     let expected_raw =
         PublicKey::from_openssh(&env::var("SCOPLEN_HOST_CERT_RAW_KEY")?)?.to_bytes()?;
     let trusted_ca = PublicKey::from_openssh(&env::var("SCOPLEN_HOST_CERT_CA_KEY")?)?.to_bytes()?;
-    let expected_mode = mode.clone();
+    let expected_identity = identity.clone();
     let config = ClientConfig::new("127.0.0.1", port, move |_host: &str, key: &HostKey| {
-        match (&*expected_mode, key) {
+        match (&*expected_identity, key) {
             ("raw", HostKey::Raw { key_blob, .. }) if *key_blob == expected_raw => Ok(()),
-            ("valid" | "wrong-principal" | "expired", HostKey::Certificate(cert))
+            ("certificate", HostKey::Certificate(cert))
                 if cert.ca_public_key_blob() == trusted_ca =>
             {
                 Ok(())
@@ -36,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     let connection = timeout(DEADLINE, ClientConnection::connect(config)).await?;
-    match mode.as_str() {
+    match outcome.as_str() {
         "wrong-ca" => {
             if !matches!(
                 connection,
@@ -72,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             println!("host certificate expired rejected");
         }
-        "raw" | "valid" => {
+        "valid" => {
             let mut connection = connection?;
             timeout(
                 DEADLINE,
@@ -96,9 +104,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err(format!("unexpected command result: {status:?}, {output:?}").into());
             }
             timeout(DEADLINE, connection.disconnect()).await??;
-            println!("host certificate {mode} command ok");
+            let label = if identity == "raw" { "raw" } else { "valid" };
+            println!("host certificate {label} command ok");
         }
-        _ => return Err(format!("unknown mode: {mode}").into()),
+        _ => unreachable!("validated interop outcome"),
     }
     Ok(())
 }

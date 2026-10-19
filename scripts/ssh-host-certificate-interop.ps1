@@ -11,7 +11,9 @@ function Invoke-Case {
     param([string]$curve, [string]$mode, [int]$port)
 
     $env:SCOPLEN_HOST_CERT_PORT = $port.ToString()
-    $output = & cargo run --quiet --locked -p scoplen-ssh --example host_certificate_interop -- $mode 2>&1 | Out-String
+    $identity = if ($mode -eq 'raw') { 'raw' } else { 'certificate' }
+    $outcome = if ($mode -eq 'raw') { 'valid' } else { $mode }
+    $output = & cargo run --quiet --locked -p scoplen-ssh --example host_certificate_interop -- $identity $outcome 2>&1 | Out-String
     $expected = if ($mode -eq 'raw' -or $mode -eq 'valid') {
         "host certificate $mode command ok"
     } else {
