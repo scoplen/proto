@@ -19,6 +19,10 @@ All notable changes to the `proto` repository will be recorded here.
   TypeScript selector union, seven raw-key algorithms, request and 400/413 problem vectors,
   failure-path tests, and API JSON fuzz seeds. Existing 201 Resource and required idempotency
   header are retained; issuance and response-data binding remain separate work.
+- Added native Linux Unix-socket interoperability for the public OpenSSH agent connector, using
+  the same raw-key and user-certificate fixture with five rejection and reconnection controls.
+  The Linux test runs in a disposable container with a pinned Rust toolchain and bounded test
+  processes; Windows pipe and Pageant connectors remain unverified.
 - Added D-87 request/path-aware validation for six successful K-4 key-management mutation
   responses. Public tests bind decoded published vectors, reject mismatched and invalid inputs,
   and retain additive response extensions without changing CBOR bytes or error types.

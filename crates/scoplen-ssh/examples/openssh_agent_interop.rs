@@ -7,10 +7,12 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(unix)]
+use scoplen_ssh::connect_unix_agent;
 use scoplen_ssh::{
-    AgentClient, AgentSshSigner, CertificateValidationPolicy, ChannelEvent, ClientConfig,
-    ClientConnection, FramedAgentChannel, HostKey, HostKeyVerificationError, SignatureAlgorithm,
-    UserCertificate,
+    AgentChannel, AgentClient, AgentSshSigner, CertificateValidationPolicy, ChannelEvent,
+    ClientConfig, ClientConnection, FramedAgentChannel, HostKey, HostKeyVerificationError,
+    SignatureAlgorithm, UserCertificate,
 };
 use ssh_key::{Certificate, PublicKey};
 use tokio::time::timeout;
@@ -26,14 +28,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let host_key = PublicKey::from_openssh(&env::var("SCOPLEN_AGENT_HOST_KEY")?)?.to_bytes()?;
     let user_key = PublicKey::from_openssh(&env::var("SCOPLEN_AGENT_USER_KEY")?)?.to_bytes()?;
-    let agent_port = env::var("SCOPLEN_AGENT_PORT")?.parse::<u16>()?;
     let server_port = env::var("SCOPLEN_AGENT_SSH_PORT")?.parse::<u16>()?;
 
+    if let Ok(path) = env::var("SCOPLEN_AGENT_SOCKET") {
+        #[cfg(unix)]
+        return run(mode, host_key, user_key, server_port, connect_unix_agent(path)?).await;
+        #[cfg(not(unix))]
+        {
+            let _ = path;
+            return Err("Unix agent sockets are unavailable on this platform".into());
+        }
+    }
+
+    let agent_port = env::var("SCOPLEN_AGENT_PORT")?.parse::<u16>()?;
     let address = SocketAddr::from(([127, 0, 0, 1], agent_port));
     let stream = TcpStream::connect_timeout(&address, DEADLINE)?;
     stream.set_read_timeout(Some(DEADLINE))?;
     stream.set_write_timeout(Some(DEADLINE))?;
-    let mut agent = AgentClient::new(FramedAgentChannel::new(stream));
+    run(mode, host_key, user_key, server_port, AgentClient::new(FramedAgentChannel::new(stream)))
+        .await
+}
+
+async fn run<C: AgentChannel + Send + 'static>(
+    mode: String,
+    host_key: Vec<u8>,
+    user_key: Vec<u8>,
+    server_port: u16,
+    mut agent: AgentClient<C>,
+) -> Result<(), Box<dyn std::error::Error>> {
     if !agent.identities()?.iter().any(|identity| identity.key_blob() == user_key) {
         return Err("requested identity is absent from OpenSSH agent".into());
     }
