@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Reject repeated password, public-key, certificate, keyboard-interactive, and none-probe calls
+  after full authentication with the typed local `AlreadyAuthenticated` error. A bounded real
+  SSH regression verifies all five calls and continued channel use on the same connection.
 - Expanded the disposable OpenSSH check to cover raw Ed25519, P-256, RSA-SHA2-256/512 keys and
   all four user-certificate variants, with wrong-password, unauthorized-key, wrong-principal,
   local CA-pin, and server-untrusted CA failures. The shared example bounds SSH steps and
