@@ -35,6 +35,12 @@ errors, and closes pending dials or the engine-owned socket on cancellation. The
 system DNS resolver remains outside the cancellation guarantee.
 `ClientConnection::connect_via_socks5` and `connect_via_http_connect` compose the existing bounded
 proxy handshakes with the concrete async SSH client, preserving proxy rejection and timeout errors.
+Route field 8 carries a separate proxy username, paired with the password Credential reference for
+SOCKS5 and HTTP CONNECT routes. The shared model validates its scalar text shape, pairing, route
+kind, and printable ASCII bounds, with exact canonical and clear/merge vectors. HTTP CONNECT
+checks both Basic fields before dialing: each is 1-255 printable ASCII bytes, and the username
+cannot contain `:`. SOCKS5 retains its bounded byte-string credential profile. The proxy
+handshakes currently use plain TCP and send configured credentials without transport encryption.
 `ClientConnection::connect_via_proxy_command` composes a directly spawned, bounded desktop
 ProxyCommand with the same async SSH handoff; command arguments are passed without shell
 interpolation. Callers supply an SSH handshake timeout, and timeout or cancellation terminates

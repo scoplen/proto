@@ -112,6 +112,19 @@ impl ProxyCredentials {
     fn password(&self) -> &[u8] {
         self.password.as_bytes()
     }
+
+    pub(crate) fn validate_http_basic(&self) -> Result<(), ProxyError> {
+        for (field, name) in [(self.username(), "username"), (self.password(), "password")] {
+            if field.is_empty()
+                || field.len() > MAX_PROXY_CREDENTIAL
+                || field.iter().any(|byte| !(0x20..=0x7e).contains(byte))
+                || (name == "username" && field.contains(&b':'))
+            {
+                return Err(ProxyError::InvalidCredential { field: name });
+            }
+        }
+        Ok(())
+    }
 }
 
 impl From<ProxyError> for TransportError {
@@ -285,7 +298,9 @@ impl HttpConnectTransport {
     ///
     /// # Errors
     ///
-    /// Returns [`ProxyTransportError`] when the proxy TCP connection or bounded handshake fails.
+    /// Returns [`ProxyTransportError`] when the HTTP Basic credentials are outside the printable
+    /// ASCII profile or the proxy TCP connection or bounded handshake fails. Credentials are
+    /// checked before the proxy is dialed.
     pub fn connect_with_credentials(
         proxy_host: &str,
         proxy_port: u16,
@@ -295,6 +310,9 @@ impl HttpConnectTransport {
         timeout: Duration,
     ) -> Result<Self, ProxyTransportError> {
         validate_http_target_host(target_host).map_err(ProxyTransportError::Proxy)?;
+        if let Some(credentials) = credentials {
+            credentials.validate_http_basic().map_err(ProxyTransportError::Proxy)?;
+        }
         if timeout.is_zero() {
             return Err(ProxyTransportError::Transport(TransportError::InvalidTimeout));
         }
@@ -674,14 +692,15 @@ fn append_base64_bytes(output: &mut String, bytes: &[u8]) {
         let first = chunk[0];
         output.push(ALPHABET[(first >> 2) as usize] as char);
         let second = if chunk.len() > 1 { chunk[1] } else { 0 };
+        let third = if chunk.len() > 2 { chunk[2] } else { 0 };
         output.push(ALPHABET[(((first & 0x03) << 4) | (second >> 4)) as usize] as char);
         if chunk.len() > 1 {
-            output.push(ALPHABET[(((second & 0x0f) << 2) | (chunk[2] >> 6)) as usize] as char);
+            output.push(ALPHABET[(((second & 0x0f) << 2) | (third >> 6)) as usize] as char);
         } else {
             output.push('=');
         }
         if chunk.len() > 2 {
-            output.push(ALPHABET[(chunk[2] & 0x3f) as usize] as char);
+            output.push(ALPHABET[(third & 0x3f) as usize] as char);
         } else {
             output.push('=');
         }
@@ -940,6 +959,78 @@ mod tests {
             ProxyCredentials::new(vec![b'x'; MAX_PROXY_CREDENTIAL + 1], b"pass"),
             Err(ProxyError::InvalidCredential { field: "username" })
         ));
+        assert!(matches!(
+            ProxyCredentials::new(b"user", vec![b'x'; MAX_PROXY_CREDENTIAL + 1]),
+            Err(ProxyError::InvalidCredential { field: "password" })
+        ));
+        assert!(matches!(
+            ProxyCredentials::new([0x1f], b"pass"),
+            Err(ProxyError::InvalidCredential { field: "username" })
+        ));
+    }
+
+    #[test]
+    fn http_basic_rejects_invalid_credentials_before_dialing() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind proxy");
+        listener.set_nonblocking(true).expect("nonblocking proxy");
+        let port = listener.local_addr().expect("proxy addr").port();
+        let cases = [
+            (b"user:name".to_vec(), b"pass".to_vec(), "username"),
+            (vec![0x80], b"pass".to_vec(), "username"),
+            (b"user".to_vec(), vec![0x80], "password"),
+        ];
+        for (username, password, field) in cases {
+            let credentials = ProxyCredentials::new(username, password).expect("valid SOCKS bytes");
+            let error = HttpConnectTransport::connect_with_credentials(
+                "127.0.0.1",
+                port,
+                "target.example",
+                22,
+                Some(&credentials),
+                Duration::from_secs(1),
+            )
+            .expect_err("invalid HTTP Basic credentials");
+            assert_eq!(error, ProxyTransportError::Proxy(ProxyError::InvalidCredential { field }));
+            assert_eq!(
+                listener.accept().expect_err("no proxy socket may be opened").kind(),
+                io::ErrorKind::WouldBlock
+            );
+        }
+    }
+
+    #[test]
+    fn http_basic_accepts_maximum_ascii_fields_and_colon_in_password() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind proxy");
+        let port = listener.local_addr().expect("proxy addr").port();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept proxy");
+            let mut request = Vec::new();
+            let mut byte = [0; 1];
+            while !request.ends_with(b"\r\n\r\n") {
+                stream.read_exact(&mut byte).expect("read request");
+                request.push(byte[0]);
+                assert!(request.len() < MAX_HTTP_CONNECT_RESPONSE);
+            }
+            let request = String::from_utf8(request).expect("ASCII request");
+            assert!(request.contains("Proxy-Authorization: Basic "));
+            stream.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n").expect("reply");
+        });
+        let mut username = vec![b'~'; 255];
+        username[0] = b' ';
+        let mut password = vec![b'~'; 255];
+        password[0] = b' ';
+        password[1] = b':';
+        let credentials = ProxyCredentials::new(username, password).expect("bounded SOCKS bytes");
+        HttpConnectTransport::connect_with_credentials(
+            "127.0.0.1",
+            port,
+            "target.example",
+            22,
+            Some(&credentials),
+            Duration::from_secs(2),
+        )
+        .expect("bounded HTTP Basic credentials");
+        server.join().expect("proxy thread");
     }
 
     #[test]
