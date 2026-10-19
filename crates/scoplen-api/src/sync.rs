@@ -15,11 +15,11 @@ use uuid::Uuid;
 
 use crate::ProblemDetails;
 
-/// Maximum number of writes accepted in one atomic batch.
+/// Default maximum number of writes accepted in one atomic batch.
 pub const MAX_SYNC_BATCH_OBJECTS: usize = 500;
-/// Maximum encoded size of one write request body.
+/// Default maximum encoded size of one write request body.
 pub const MAX_SYNC_BATCH_BYTES: usize = 4 * 1024 * 1024;
-/// Maximum opaque payload in a current change returned with a write conflict.
+/// Default maximum opaque payload in a write or current conflict change.
 pub const MAX_SYNC_CONFLICT_PAYLOAD_BYTES: usize = 260 * 1024;
 /// Maximum encoded size of a conflict problem, including its required extension.
 pub const MAX_SYNC_CONFLICT_BODY_BYTES: usize = 128 * 1024 * 1024;
@@ -185,6 +185,73 @@ impl SyncLimits {
         };
         limits.validate()?;
         Ok(limits)
+    }
+}
+
+/// Caller-selected resource limits for a complete K-4 atomic write exchange.
+///
+/// Select these from deployment/session limits and a local resource budget. Do not allocate
+/// an advertised maximum merely because it appeared in a session response. Key-management and
+/// notification limits, and the fixed complete-conflict body cap, are independent.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyncWriteLimits {
+    /// Maximum opaque payload in a write or conflict current change.
+    pub max_envelope_bytes: usize,
+    /// Maximum writes, assignments, or conflicts in one exchange.
+    pub max_batch_objects: usize,
+    /// Maximum complete encoded write-request body.
+    pub max_batch_bytes: usize,
+}
+
+impl Default for SyncWriteLimits {
+    fn default() -> Self {
+        Self {
+            max_envelope_bytes: MAX_SYNC_CONFLICT_PAYLOAD_BYTES,
+            max_batch_objects: MAX_SYNC_BATCH_OBJECTS,
+            max_batch_bytes: MAX_SYNC_BATCH_BYTES,
+        }
+    }
+}
+
+impl TryFrom<&SyncLimits> for SyncWriteLimits {
+    type Error = SyncCodecError;
+
+    /// Convert advertised values after the caller has selected an acceptable local budget.
+    fn try_from(limits: &SyncLimits) -> Result<Self, Self::Error> {
+        limits.validate()?;
+        let selected = Self {
+            max_envelope_bytes: usize::try_from(limits.max_envelope_bytes)
+                .map_err(|_| invalid("max_envelope_bytes does not fit this platform"))?,
+            max_batch_objects: usize::try_from(limits.max_batch_objects)
+                .map_err(|_| invalid("max_batch_objects does not fit this platform"))?,
+            max_batch_bytes: usize::try_from(limits.max_batch_bytes)
+                .map_err(|_| invalid("max_batch_bytes does not fit this platform"))?,
+        };
+        selected.validate()?;
+        Ok(selected)
+    }
+}
+
+impl SyncWriteLimits {
+    /// Check positive limits and the derived assignment-response body budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero values or an unrepresentable derived body bound.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        if self.max_envelope_bytes == 0 || self.max_batch_objects == 0 || self.max_batch_bytes == 0
+        {
+            return Err(invalid("write limits must be positive"));
+        }
+        self.assignment_body_bytes()?;
+        Ok(())
+    }
+
+    fn assignment_body_bytes(self) -> Result<usize, SyncCodecError> {
+        self.max_batch_objects
+            .checked_mul(29)
+            .and_then(|size| size.checked_add(9))
+            .ok_or_else(|| invalid("assignment body bound overflows this platform"))
     }
 }
 
@@ -1643,17 +1710,42 @@ impl SyncWriteBatch {
     ///
     /// Returns an error for an empty or oversized batch, duplicate ids, or an invalid write.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.validate_with_limits(SyncWriteLimits::default())
+    }
+
+    /// Validate count, payloads, exact encoded-body size, and shape against selected limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, a malformed write, duplicates, or an exceeded bound.
+    pub fn validate_with_limits(&self, limits: SyncWriteLimits) -> Result<(), SyncCodecError> {
+        limits.validate()?;
         if self.writes.is_empty() {
             return Err(invalid("write batch must not be empty"));
         }
-        if self.writes.len() > MAX_SYNC_BATCH_OBJECTS {
-            return Err(invalid("write batch exceeds 500 objects"));
+        if self.writes.len() > limits.max_batch_objects {
+            return Err(invalid("write batch exceeds the object limit"));
         }
         let mut ids = BTreeSet::new();
+        let mut encoded_size = length_argument_bytes(self.writes.len())?;
         for write in &self.writes {
             write.validate()?;
+            if write.payload.len() > limits.max_envelope_bytes {
+                return Err(invalid("write payload exceeds the envelope limit"));
+            }
             if !ids.insert(write.object_id) {
                 return Err(invalid("duplicate write object id"));
+            }
+            // Four integer keys, map header, UUID byte string, and boolean occupy 23 bytes.
+            let overhead = 23
+                + write.base_seq.map_or(1, argument_bytes)
+                + length_argument_bytes(write.payload.len())?;
+            encoded_size = encoded_size
+                .checked_add(overhead)
+                .and_then(|size| size.checked_add(write.payload.len()))
+                .ok_or_else(|| invalid("write batch encoded size overflows this platform"))?;
+            if encoded_size > limits.max_batch_bytes {
+                return Err(invalid("write batch exceeds the encoded-body limit"));
             }
         }
         Ok(())
@@ -1665,14 +1757,20 @@ impl SyncWriteBatch {
     ///
     /// Returns an error when validation fails or the encoded body exceeds 4 MiB.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
-        self.validate()?;
-        let encoded = cbor::encode(&Value::Array(
+        self.to_cbor_with_limits(SyncWriteLimits::default())
+    }
+
+    /// Encode a write batch using caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, invalid writes, or an exceeded encoded-body budget.
+    pub fn to_cbor_with_limits(&self, limits: SyncWriteLimits) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate_with_limits(limits)?;
+        cbor::encode(&Value::Array(
             self.writes.iter().cloned().map(SyncWrite::into_value).collect(),
-        ))?;
-        if encoded.len() > MAX_SYNC_BATCH_BYTES {
-            return Err(invalid("write batch exceeds 4 MiB"));
-        }
-        Ok(encoded)
+        ))
+        .map_err(Into::into)
     }
 
     /// Decode a direct deterministic CBOR write array.
@@ -1681,20 +1779,49 @@ impl SyncWriteBatch {
     ///
     /// Returns an error for malformed or non-canonical CBOR, invalid entries, or batch limits.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
-        if input.len() > MAX_SYNC_BATCH_BYTES {
-            return Err(invalid("write batch exceeds 4 MiB"));
+        Self::from_cbor_with_limits(input, SyncWriteLimits::default())
+    }
+
+    /// Check the selected complete-body budget, then decode a deterministic write array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, malformed CBOR, invalid entries, or exceeded bounds.
+    pub fn from_cbor_with_limits(
+        input: &[u8],
+        limits: SyncWriteLimits,
+    ) -> Result<Self, SyncCodecError> {
+        limits.validate()?;
+        if input.len() > limits.max_batch_bytes {
+            return Err(invalid("write batch exceeds the encoded-body limit"));
         }
         let Value::Array(values) = cbor::decode(input)? else {
             return Err(invalid("write batch must be an array"));
         };
-        if values.len() > MAX_SYNC_BATCH_OBJECTS {
-            return Err(invalid("write batch exceeds 500 objects"));
+        if values.len() > limits.max_batch_objects {
+            return Err(invalid("write batch exceeds the object limit"));
         }
         let batch = Self {
             writes: values.into_iter().map(SyncWrite::from_value).collect::<Result<Vec<_>, _>>()?,
         };
-        batch.validate()?;
+        batch.validate_with_limits(limits)?;
         Ok(batch)
+    }
+}
+
+fn length_argument_bytes(length: usize) -> Result<usize, SyncCodecError> {
+    u64::try_from(length)
+        .map(argument_bytes)
+        .map_err(|_| invalid("CBOR length does not fit an unsigned 64-bit integer"))
+}
+
+fn argument_bytes(value: u64) -> usize {
+    match value {
+        0..=23 => 1,
+        24..=255 => 2,
+        256..=65_535 => 3,
+        65_536..=4_294_967_295 => 5,
+        _ => 9,
     }
 }
 
@@ -1745,11 +1872,21 @@ impl SyncWriteBatchResponse {
     /// Returns an error for an empty or oversized response, duplicate ids, invalid UUIDs, or
     /// non-increasing sequence numbers.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.validate_with_limits(SyncWriteLimits::default())
+    }
+
+    /// Validate assignment shape and count using the original exchange's selected limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, empty/oversized assignments, duplicates, or order.
+    pub fn validate_with_limits(&self, limits: SyncWriteLimits) -> Result<(), SyncCodecError> {
+        limits.validate()?;
         if self.assignments.is_empty() {
             return Err(invalid("write response must not be empty"));
         }
-        if self.assignments.len() > MAX_SYNC_BATCH_OBJECTS {
-            return Err(invalid("write response exceeds 500 assignments"));
+        if self.assignments.len() > limits.max_batch_objects {
+            return Err(invalid("write response exceeds the assignment limit"));
         }
         let mut ids = BTreeSet::new();
         let mut previous_seq = 0;
@@ -1772,8 +1909,21 @@ impl SyncWriteBatchResponse {
     ///
     /// Returns an error when either value is invalid or the assignment count/order differs.
     pub fn validate_for_batch(&self, batch: &SyncWriteBatch) -> Result<(), SyncCodecError> {
-        batch.validate()?;
-        self.validate()?;
+        self.validate_for_batch_with_limits(batch, SyncWriteLimits::default())
+    }
+
+    /// Bind assignments to a batch using the same selected limits for both values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, invalid values, or mismatched assignment count/order.
+    pub fn validate_for_batch_with_limits(
+        &self,
+        batch: &SyncWriteBatch,
+        limits: SyncWriteLimits,
+    ) -> Result<(), SyncCodecError> {
+        batch.validate_with_limits(limits)?;
+        self.validate_with_limits(limits)?;
         if self.assignments.len() != batch.writes.len() {
             return Err(invalid("assignment count does not match write batch"));
         }
@@ -1791,7 +1941,16 @@ impl SyncWriteBatchResponse {
     ///
     /// Returns an error when the response is invalid or cannot be encoded.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
-        self.validate()?;
+        self.to_cbor_with_limits(SyncWriteLimits::default())
+    }
+
+    /// Encode assignments using the original exchange's selected limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits or invalid assignments.
+    pub fn to_cbor_with_limits(&self, limits: SyncWriteLimits) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate_with_limits(limits)?;
         cbor::encode(&Value::Array(
             self.assignments.iter().cloned().map(SyncWriteAssignment::into_value).collect(),
         ))
@@ -1804,11 +1963,27 @@ impl SyncWriteBatchResponse {
     ///
     /// Returns an error for malformed or non-canonical CBOR, invalid entries, or response limits.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        Self::from_cbor_with_limits(input, SyncWriteLimits::default())
+    }
+
+    /// Check the derived complete-body bound before decoding assignments.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, oversized/malformed CBOR, or invalid assignments.
+    pub fn from_cbor_with_limits(
+        input: &[u8],
+        limits: SyncWriteLimits,
+    ) -> Result<Self, SyncCodecError> {
+        limits.validate()?;
+        if input.len() > limits.assignment_body_bytes()? {
+            return Err(invalid("write response exceeds the encoded-body limit"));
+        }
         let Value::Array(values) = cbor::decode(input)? else {
             return Err(invalid("write response must be an array"));
         };
-        if values.len() > MAX_SYNC_BATCH_OBJECTS {
-            return Err(invalid("write response exceeds 500 assignments"));
+        if values.len() > limits.max_batch_objects {
+            return Err(invalid("write response exceeds the assignment limit"));
         }
         let response = Self {
             assignments: values
@@ -1816,7 +1991,7 @@ impl SyncWriteBatchResponse {
                 .map(SyncWriteAssignment::from_value)
                 .collect::<Result<Vec<_>, _>>()?,
         };
-        response.validate()?;
+        response.validate_with_limits(limits)?;
         Ok(response)
     }
 }
@@ -1836,15 +2011,15 @@ pub struct SyncConflictEntry {
 }
 
 impl SyncConflictEntry {
-    fn validate(&self) -> Result<(), SyncCodecError> {
+    fn validate(&self, limits: SyncWriteLimits) -> Result<(), SyncCodecError> {
         valid_uuid(self.object_id, "conflict object id")?;
         if let Some(current) = &self.current {
             current.validate()?;
             if current.object_id != self.object_id {
                 return Err(invalid("current change object id does not match conflict object id"));
             }
-            if current.payload.len() > MAX_SYNC_CONFLICT_PAYLOAD_BYTES {
-                return Err(invalid("current change payload exceeds 260 KiB"));
+            if current.payload.len() > limits.max_envelope_bytes {
+                return Err(invalid("current change payload exceeds the envelope limit"));
             }
         }
         Ok(())
@@ -1857,7 +2032,7 @@ impl SyncConflictEntry {
         ])
     }
 
-    fn from_value(value: Value) -> Result<Self, SyncCodecError> {
+    fn from_value(value: Value, limits: SyncWriteLimits) -> Result<Self, SyncCodecError> {
         let mut fields = expect_map(value)?;
         let entry = Self {
             object_id: take_uuid(&mut fields, "object_id")?,
@@ -1867,7 +2042,7 @@ impl SyncConflictEntry {
                 None => return Err(invalid("missing current")),
             },
         };
-        entry.validate()?;
+        entry.validate(limits)?;
         Ok(entry)
     }
 }
@@ -1889,6 +2064,16 @@ impl SyncConflictProblem {
     /// Returns an error if the base problem is not a `409 sync.conflict`, the batch was changed,
     /// or the conflict extension is missing, oversized, duplicated, or malformed.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.validate_with_limits(SyncWriteLimits::default())
+    }
+
+    /// Validate a complete conflict against the original exchange's selected limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits or invalid, duplicated, or oversized conflict entries.
+    pub fn validate_with_limits(&self, limits: SyncWriteLimits) -> Result<(), SyncCodecError> {
+        limits.validate()?;
         self.problem.validate().map_err(|error| invalid(error.to_string()))?;
         if self.problem.status != 409 || self.problem.code.as_str() != "sync.conflict" {
             return Err(invalid("conflict problem must use 409 sync.conflict"));
@@ -1896,12 +2081,12 @@ impl SyncConflictProblem {
         if self.problem.changed {
             return Err(invalid("conflict problem must leave the batch unchanged"));
         }
-        if self.conflicts.is_empty() || self.conflicts.len() > MAX_SYNC_BATCH_OBJECTS {
-            return Err(invalid("conflicts must contain 1..500 entries"));
+        if self.conflicts.is_empty() || self.conflicts.len() > limits.max_batch_objects {
+            return Err(invalid("conflicts must be nonempty and within the object limit"));
         }
         let mut ids = BTreeSet::new();
         for entry in &self.conflicts {
-            entry.validate()?;
+            entry.validate(limits)?;
             if !ids.insert(entry.object_id) {
                 return Err(invalid("duplicate conflict object id"));
             }
@@ -1916,8 +2101,21 @@ impl SyncConflictProblem {
     /// Returns an error if the batch or problem is invalid, an object was not submitted, or the
     /// conflict order differs from the relative order of the submitted writes.
     pub fn validate_for_batch(&self, batch: &SyncWriteBatch) -> Result<(), SyncCodecError> {
-        batch.validate()?;
-        self.validate()?;
+        self.validate_for_batch_with_limits(batch, SyncWriteLimits::default())
+    }
+
+    /// Bind conflict objects to a batch using the same selected limits for both values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, invalid values, or foreign/out-of-order conflict ids.
+    pub fn validate_for_batch_with_limits(
+        &self,
+        batch: &SyncWriteBatch,
+        limits: SyncWriteLimits,
+    ) -> Result<(), SyncCodecError> {
+        batch.validate_with_limits(limits)?;
+        self.validate_with_limits(limits)?;
         let mut writes = batch.writes.iter();
         for conflict in &self.conflicts {
             if !writes.any(|write| write.object_id == conflict.object_id) {
@@ -1933,7 +2131,16 @@ impl SyncConflictProblem {
     ///
     /// Returns an error for invalid fields, encoding failure, or an encoded body above 128 MiB.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
-        self.validate()?;
+        self.to_cbor_with_limits(SyncWriteLimits::default())
+    }
+
+    /// Encode a complete conflict using selected limits and the fixed 128 MiB body cap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits/entries, encoding failure, or an oversized body.
+    pub fn to_cbor_with_limits(&self, limits: SyncWriteLimits) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate_with_limits(limits)?;
         let base = self.problem.to_cbor().map_err(|error| invalid(error.to_string()))?;
         let Value::Map(mut fields) = cbor::decode(&base)? else {
             return Err(invalid("base problem must be a map"));
@@ -1955,6 +2162,19 @@ impl SyncConflictProblem {
     ///
     /// Returns an error for malformed or oversized CBOR or an incomplete conflict extension.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        Self::from_cbor_with_limits(input, SyncWriteLimits::default())
+    }
+
+    /// Decode a complete conflict with selected limits, retaining the fixed body cap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, malformed/oversized CBOR, or invalid entries.
+    pub fn from_cbor_with_limits(
+        input: &[u8],
+        limits: SyncWriteLimits,
+    ) -> Result<Self, SyncCodecError> {
+        limits.validate()?;
         enforce_conflict_body_limit(input.len())?;
         let problem =
             ProblemDetails::from_cbor(input).map_err(|error| invalid(error.to_string()))?;
@@ -1962,17 +2182,17 @@ impl SyncConflictProblem {
         let Some(Value::Array(values)) = fields.remove("conflicts") else {
             return Err(invalid("conflicts must be an array"));
         };
-        if values.is_empty() || values.len() > MAX_SYNC_BATCH_OBJECTS {
-            return Err(invalid("conflicts must contain 1..500 entries"));
+        if values.is_empty() || values.len() > limits.max_batch_objects {
+            return Err(invalid("conflicts must be nonempty and within the object limit"));
         }
         let response = Self {
             problem,
             conflicts: values
                 .into_iter()
-                .map(SyncConflictEntry::from_value)
+                .map(|value| SyncConflictEntry::from_value(value, limits))
                 .collect::<Result<Vec<_>, _>>()?,
         };
-        response.validate()?;
+        response.validate_with_limits(limits)?;
         Ok(response)
     }
 }

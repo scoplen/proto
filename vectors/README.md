@@ -29,8 +29,15 @@ responses use `versions`, contain one object id in ascending sequence order, and
 the current entry plus 20 retained entries. All expected values are deterministic CBOR in lowercase
 hexadecimal. Conflict responses use `sync.writes.conflict` with a complete RFC 9457 `problem`
 and a `conflicts` array in request order. Each conflict names an `object_id` and carries a current
-change entry or JSON `null` for an absent object. The codec bounds the array to 1–500 unique ids,
-each current payload to 260 KiB, and the encoded problem body to 128 MiB.
+change entry or JSON `null` for an absent object. Default codecs bound the array to 1–500 unique
+ids and each current payload to 260 KiB; explicit exchange limits may raise or lower these
+defaults. The encoded conflict problem body remains capped at 128 MiB.
+
+`sync-write-limits.json` applies explicit profiles to exact write-request, assignment, and
+conflict CBOR. Each JSON `input` contains positive `max_envelope_bytes`, `max_batch_objects`,
+and `max_batch_bytes`, plus `cbor_hex`. `expected` is `accept` or `reject`. Accepted messages
+round-trip to those exact bytes. These vectors include low-limit rejection and a raised profile;
+public tests additionally generate 501-entry exchanges and requests above the default 4 MiB cap.
 
 `sync-notifications.json` contains the content-free K-4 notification events sent over the WebSocket.
 Vault advancement uses `{seq, vault}`, rotation pending uses `{rotation_pending, vault}`, and

@@ -374,6 +374,16 @@ the cursor sent. A higher stored maximum is valid when another acknowledgement h
 advanced it. Call this before applying acknowledgement metadata locally; the check does not
 establish the current vault sequence or server persistence. Existing CBOR bytes remain valid.
 
+Atomic write exchanges accept an explicit `SyncWriteLimits` profile in their `*_with_limits`
+methods. Select positive envelope, object-count, and encoded batch-byte budgets from trusted
+configuration or acceptable session values; an announcement does not authorize an allocation.
+Requests, assignments, conflicts, and their request-aware validators use the same profile.
+Defaults remain 260 KiB, 500 objects, and 4 MiB; the complete conflict cap stays fixed at 128 MiB.
+The request encoder checks its exact size before copying payloads, and decoders check complete
+body limits before CBOR parsing. `vectors/sync-write-limits.json` publishes exact CBOR hex and
+explicit profiles with `accept`/`reject` outcomes. Tests also round-trip 501-entry exchanges and
+requests above 4 MiB. Storage/router adoption and read-response resource budgets remain separate.
+
 The K-3 authentication boundary now validates strict, bounded challenge and signed-device JSON
 requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. The
 native refresh body requires one opaque token (at most 2,048 UTF-8 bytes); the browser body is

@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added explicit deployment-selected limits for complete K-4 write exchanges: requests,
+  assignments, conflicts, and request-aware checks accept raised or lowered budgets. Encoders
+  preflight exact request sizes and decoders check body bounds before CBOR parsing. Default
+  methods enforce 260 KiB envelopes, 500 writes, and 4 MiB requests; the complete conflict cap
+  remains 128 MiB. Nine public profile vectors and higher/lower/boundary tests cover the APIs.
 - Added request-aware K-4 acknowledgement validation that rejects a cursor below the request
   while preserving higher stored maxima, zero/maximum cursor bounds, and response extensions.
   Published acknowledgement vectors and CBOR bytes remain unchanged.
