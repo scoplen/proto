@@ -6,6 +6,7 @@ use scoplen_api::auth::{
     AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthRefreshRequest,
     AuthTokenResponse, BrowserAuthRefreshRequest, BrowserAuthTokenResponse,
 };
+use scoplen_api::certificate::CertificateIssuanceRequest;
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
 };
@@ -22,6 +23,7 @@ macro_rules! round_trip {
 }
 
 fuzz_target!(|bytes: &[u8]| {
+    round_trip!(CertificateIssuanceRequest, bytes);
     round_trip!(GatewayTicketRequest, bytes);
     round_trip!(GatewayTicketResponse, bytes);
     assert_eq!(

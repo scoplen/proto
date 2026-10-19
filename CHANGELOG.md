@@ -15,6 +15,10 @@ All notable changes to the `proto` repository will be recorded here.
 - Added request-aware K-4 acknowledgement validation that rejects a cursor below the request
   while preserving higher stored maxima, zero/maximum cursor bounds, and response extensions.
   Published acknowledgement vectors and CBOR bytes remain unchanged.
+- Added the bounded D-88 K-5 user-certificate issuance request codec with exact OpenAPI and
+  TypeScript selector union, seven raw-key algorithms, request and 400/413 problem vectors,
+  failure-path tests, and API JSON fuzz seeds. Existing 201 Resource and required idempotency
+  header are retained; issuance and response-data binding remain separate work.
 - Added D-87 request/path-aware validation for six successful K-4 key-management mutation
   responses. Public tests bind decoded published vectors, reject mismatched and invalid inputs,
   and retain additive response extensions without changing CBOR bytes or error types.

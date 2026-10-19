@@ -22,6 +22,8 @@ export interface components {
     PolicyEvaluationRequest: PolicyEvaluationRequest;
     PolicyEvaluationResponse: PolicyEvaluationResponse;
     CertificateRequest: CertificateRequest;
+    CertificateHostRequest: CertificateHostRequest;
+    CertificateHostGroupRequest: CertificateHostGroupRequest;
     CertificateResponse: CertificateResponse;
     Account: Resource;
     Device: Resource;
@@ -145,7 +147,25 @@ export interface WriteRequest { data: Record<string, unknown>; }
 export interface DecisionRequest { decision: "approve" | "deny"; reason?: string; }
 export interface PolicyEvaluationRequest { action: string; resource: Record<string, unknown>; context: Record<string, unknown>; }
 export interface PolicyEvaluationResponse { decision: "allow" | "deny"; policies: string[]; }
-export interface CertificateRequest { public_key: string; hosts?: string[]; host_groups?: string[]; remote_user: string; ttl_seconds: number; }
+// BEGIN GENERATED CertificateRequest
+export interface CertificateHostRequest {
+  public_key: string;
+  hosts: string[];
+  host_groups?: never;
+  remote_user: string;
+  ttl_seconds: number;
+}
+
+export interface CertificateHostGroupRequest {
+  public_key: string;
+  host_groups: string[];
+  hosts?: never;
+  remote_user: string;
+  ttl_seconds: number;
+}
+
+export type CertificateRequest = CertificateHostRequest | CertificateHostGroupRequest;
+// END GENERATED CertificateRequest
 export interface CertificateResponse { certificate: string; valid_after: string; valid_before: string; }
 
 export interface paths {

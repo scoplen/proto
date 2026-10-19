@@ -2126,11 +2126,25 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
+          "required": true,
+          "description": "The complete encoded UTF-8 JSON body, including whitespace and escapes, is at most 16384 bytes. Duplicate, unknown, missing, null, or mistyped fields are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CertificateRequest"
+              }
+            }
+          }
         },
         "responses": {
           "201": {
             "$ref": "#/components/responses/Resource"
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
           },
           "default": {
             "$ref": "#/components/responses/Problem"
@@ -3444,6 +3458,84 @@
           "refresh_expires_in": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      },
+      "CertificateRequest": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CertificateHostRequest"
+          },
+          {
+            "$ref": "#/components/schemas/CertificateHostGroupRequest"
+          }
+        ]
+      },
+      "CertificateHostRequest": {
+        "type": "object",
+        "required": ["public_key", "hosts", "remote_user", "ttl_seconds"],
+        "additionalProperties": false,
+        "properties": {
+          "public_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192,
+            "description": "Canonical ASCII OpenSSH single-line raw public key: exact algorithm, one space, padded Base64 blob; no options, certificate, newline, or comment."
+          },
+          "hosts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          "remote_user": {
+            "type": "string",
+            "minLength": 1,
+            "description": "1..255 UTF-8 bytes, no Unicode controls; preserved without trimming or normalization."
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400
+          }
+        }
+      },
+      "CertificateHostGroupRequest": {
+        "type": "object",
+        "required": ["public_key", "host_groups", "remote_user", "ttl_seconds"],
+        "additionalProperties": false,
+        "properties": {
+          "public_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192,
+            "description": "Canonical ASCII OpenSSH single-line raw public key: exact algorithm, one space, padded Base64 blob; no options, certificate, newline, or comment."
+          },
+          "host_groups": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          "remote_user": {
+            "type": "string",
+            "minLength": 1,
+            "description": "1..255 UTF-8 bytes, no Unicode controls; preserved without trimming or normalization."
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400
           }
         }
       },
