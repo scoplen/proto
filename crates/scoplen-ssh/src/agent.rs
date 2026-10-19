@@ -121,6 +121,9 @@ pub enum AgentError {
     /// The transport adapter failed before a response was received.
     #[error("SSH agent transport failed: {0}")]
     Transport(String),
+    /// An earlier framed exchange failed after I/O began, so response ordering is uncertain.
+    #[error("SSH agent channel is unusable; reconnect before retrying")]
+    ChannelUnusable,
     /// The legacy Pageant window was not found.
     #[error("Pageant WM_COPYDATA window was not found")]
     PageantWindowNotFound,
@@ -491,13 +494,14 @@ pub trait AgentChannel {
 /// A length-prefixed agent channel over any blocking byte stream.
 pub struct FramedAgentChannel<S> {
     stream: S,
+    unusable: bool,
 }
 
 impl<S> FramedAgentChannel<S> {
     /// Wrap a stream that carries SSH agent frames.
     #[must_use]
     pub fn new(stream: S) -> Self {
-        Self { stream }
+        Self { stream, unusable: false }
     }
 
     /// Return the wrapped byte stream.
@@ -509,30 +513,42 @@ impl<S> FramedAgentChannel<S> {
 
 impl<S: Read + Write> AgentChannel for FramedAgentChannel<S> {
     fn exchange(&mut self, request: &[u8]) -> Result<Vec<u8>, AgentError> {
+        if self.unusable {
+            return Err(AgentError::ChannelUnusable);
+        }
         AgentMessage::decode_frame(request)?;
-        self.stream.write_all(request).map_err(|error| AgentError::Transport(error.to_string()))?;
-        self.stream.flush().map_err(|error| AgentError::Transport(error.to_string()))?;
+        self.unusable = true;
+        let result = (|| {
+            self.stream
+                .write_all(request)
+                .map_err(|error| AgentError::Transport(error.to_string()))?;
+            self.stream.flush().map_err(|error| AgentError::Transport(error.to_string()))?;
 
-        let mut header = [0; 4];
-        self.stream
-            .read_exact(&mut header)
-            .map_err(|error| AgentError::Transport(error.to_string()))?;
-        let length =
-            usize::try_from(u32::from_be_bytes(header)).map_err(|_| AgentError::FrameTooLarge)?;
-        if length == 0 {
-            return Err(AgentError::MalformedFrame("empty agent payload"));
+            let mut header = [0; 4];
+            self.stream
+                .read_exact(&mut header)
+                .map_err(|error| AgentError::Transport(error.to_string()))?;
+            let length = usize::try_from(u32::from_be_bytes(header))
+                .map_err(|_| AgentError::FrameTooLarge)?;
+            if length == 0 {
+                return Err(AgentError::MalformedFrame("empty agent payload"));
+            }
+            if length > MAX_AGENT_FRAME {
+                return Err(AgentError::FrameTooLarge);
+            }
+            let mut response = Vec::with_capacity(4 + length);
+            response.extend_from_slice(&header);
+            response.resize(4 + length, 0);
+            self.stream
+                .read_exact(&mut response[4..])
+                .map_err(|error| AgentError::Transport(error.to_string()))?;
+            AgentMessage::decode_frame(&response)?;
+            Ok(response)
+        })();
+        if result.is_ok() {
+            self.unusable = false;
         }
-        if length > MAX_AGENT_FRAME {
-            return Err(AgentError::FrameTooLarge);
-        }
-        let mut response = Vec::with_capacity(4 + length);
-        response.extend_from_slice(&header);
-        response.resize(4 + length, 0);
-        self.stream
-            .read_exact(&mut response[4..])
-            .map_err(|error| AgentError::Transport(error.to_string()))?;
-        AgentMessage::decode_frame(&response)?;
-        Ok(response)
+        result
     }
 }
 
