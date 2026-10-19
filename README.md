@@ -193,6 +193,18 @@ container; its repository mount is read-only, and it publishes no ports. Each ca
 deadline; this does not establish a production cancellation bound for the synchronous agent API.
 Windows named-pipe and Pageant connectors, live
 gateway interoperability, and the wider OpenSSH matrix remain unverified.
+
+`pwsh ./scripts/ssh-remote-forwarding-interop.ps1` runs the native public client against a
+disposable Alpine OpenSSH server. It checks direct Unix-socket forwarding, remote TCP port
+allocation, and remote Unix-socket forwarding with exact binary bytes and EOF in both directions.
+It verifies server-opened channel metadata, cancellation refusing later connections, Unix-socket
+listener reuse, missing-target rejection, and explicit server policy denying all three paths.
+Session commands still return exact output and exit zero after forwarding failures. The fixture
+publishes SSH only on loopback, retains its private host key inside the container, and removes
+its container and sockets after the run. The SSH client does not require local Unix-socket
+support; these are sockets on the remote Linux host. Other server and platform combinations
+remain part of the broader matrix.
+
 The `openssh_interop` example provides a disposable external-server smoke test when
 one host trust pin and one authentication source are supplied. Set either
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's OpenSSH public-key line or
