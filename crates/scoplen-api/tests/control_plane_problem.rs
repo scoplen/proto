@@ -24,7 +24,7 @@ fn published_problem_json_vectors_use_registered_codes() {
         );
         count += 1;
     }
-    assert_eq!(count, 6);
+    assert_eq!(count, 8);
 }
 
 #[test]

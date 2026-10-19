@@ -10,10 +10,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 pub mod auth;
+pub mod certificate;
 pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
 pub mod internal_grpc;
+mod request_wire;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
 pub mod proto {
@@ -52,6 +54,7 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.invalid_dpop_proof",
     "auth.invalid_request",
     "auth.use_dpop_nonce",
+    "certificate.invalid_request",
     "gateway.invalid_request",
     "policy.denied",
     "sync.client_unsupported",

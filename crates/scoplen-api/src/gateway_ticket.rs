@@ -3,18 +3,14 @@
 
 use std::{collections::BTreeSet, fmt, net::IpAddr};
 
-use base64::{
-    Engine as _,
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use scoplen_model::validate_uuid_v7;
-use serde::{
-    Deserialize, Deserializer, Serialize,
-    de::{self, MapAccess, SeqAccess, Visitor},
-};
-use serde_json::{Map, Number, Value};
+use serde::Serialize;
+use serde_json::{Map, Value};
 use thiserror::Error;
 use uuid::Uuid;
+
+use crate::request_wire;
 
 /// Maximum complete UTF-8 request body, including JSON whitespace and escapes.
 pub const MAX_GATEWAY_TICKET_REQUEST_BYTES: usize = 16_384;
@@ -94,10 +90,7 @@ impl GatewayTicketRequest {
     /// Rejects an invalid Host id, SSH username, or public key.
     pub fn validate(&self) -> Result<(), GatewayTicketCodecError> {
         validate_uuid_v7(self.host).map_err(|_| GatewayTicketCodecError::InvalidField("host"))?;
-        if self.remote_user.is_empty()
-            || self.remote_user.len() > 255
-            || self.remote_user.chars().any(char::is_control)
-        {
+        if !request_wire::valid_remote_user(&self.remote_user) {
             return Err(GatewayTicketCodecError::InvalidField("remote_user"));
         }
         validate_ssh_public_key(&self.ssh_public_key, "ssh_public_key")
@@ -349,36 +342,9 @@ fn validate_ssh_public_key(
     value: &str,
     field: &'static str,
 ) -> Result<(), GatewayTicketCodecError> {
-    if value.is_empty() || value.len() > MAX_GATEWAY_SSH_PUBLIC_KEY_BYTES || !value.is_ascii() {
-        return Err(GatewayTicketCodecError::InvalidField(field));
-    }
-    let (algorithm, encoded_blob) =
-        value.split_once(' ').ok_or(GatewayTicketCodecError::InvalidField(field))?;
-    if !matches!(
-        algorithm,
-        "ssh-ed25519"
-            | "ecdsa-sha2-nistp256"
-            | "ecdsa-sha2-nistp384"
-            | "ecdsa-sha2-nistp521"
-            | "ssh-rsa"
-            | "sk-ssh-ed25519@openssh.com"
-            | "sk-ecdsa-sha2-nistp256@openssh.com"
-    ) || encoded_blob.is_empty()
-        || encoded_blob.contains(' ')
-    {
-        return Err(GatewayTicketCodecError::InvalidField(field));
-    }
-    let blob =
-        STANDARD.decode(encoded_blob).map_err(|_| GatewayTicketCodecError::InvalidField(field))?;
-    if STANDARD.encode(&blob) != encoded_blob {
-        return Err(GatewayTicketCodecError::InvalidField(field));
-    }
-    let key = ssh_key::PublicKey::from_bytes(&blob)
-        .map_err(|_| GatewayTicketCodecError::InvalidField(field))?;
-    if key.to_openssh().map_err(|_| GatewayTicketCodecError::InvalidField(field))? != value {
-        return Err(GatewayTicketCodecError::InvalidField(field));
-    }
-    Ok(())
+    request_wire::valid_raw_ssh_public_key(value)
+        .then_some(())
+        .ok_or(GatewayTicketCodecError::InvalidField(field))
 }
 
 fn validate_compact_jws(value: &str) -> Result<(), GatewayTicketCodecError> {
@@ -456,73 +422,5 @@ fn decode_object(
             GatewayTicketCodecError::ResponseTooLarge
         });
     }
-    let UniqueValue(value) =
-        serde_json::from_slice(input).map_err(|_| GatewayTicketCodecError::InvalidJson)?;
-    let Value::Object(fields) = value else {
-        return Err(GatewayTicketCodecError::InvalidJson);
-    };
-    Ok(fields)
-}
-
-struct UniqueValue(Value);
-
-impl<'de> Deserialize<'de> for UniqueValue {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_any(UniqueVisitor)
-    }
-}
-
-struct UniqueVisitor;
-
-impl<'de> Visitor<'de> for UniqueVisitor {
-    type Value = UniqueValue;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a JSON value without duplicate keys")
-    }
-    fn visit_bool<E: de::Error>(self, value: bool) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::Bool(value)))
-    }
-    fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::Number(Number::from(value))))
-    }
-    fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::Number(Number::from(value))))
-    }
-    fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
-        Number::from_f64(value)
-            .map(Value::Number)
-            .map(UniqueValue)
-            .ok_or_else(|| E::custom("invalid number"))
-    }
-    fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::String(value.to_owned())))
-    }
-    fn visit_string<E: de::Error>(self, value: String) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::String(value)))
-    }
-    fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::Null))
-    }
-    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::Null))
-    }
-    fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Self::Value, A::Error> {
-        let mut values = Vec::new();
-        while let Some(UniqueValue(value)) = sequence.next_element()? {
-            values.push(value);
-        }
-        Ok(UniqueValue(Value::Array(values)))
-    }
-    fn visit_map<A: MapAccess<'de>>(self, mut access: A) -> Result<Self::Value, A::Error> {
-        let mut values = Map::new();
-        while let Some(key) = access.next_key::<String>()? {
-            if values.contains_key(&key) {
-                return Err(de::Error::custom("duplicate JSON key"));
-            }
-            let UniqueValue(value) = access.next_value()?;
-            values.insert(key, value);
-        }
-        Ok(UniqueValue(Value::Object(values)))
-    }
+    request_wire::decode_unique_object(input).map_err(|()| GatewayTicketCodecError::InvalidJson)
 }

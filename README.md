@@ -350,7 +350,11 @@ notification, notification WebSocket opening context, first-message authenticati
 acknowledgement, account key-bundle, shared-vault creation, key retrieval, epoch-publication,
 member-addition, and epoch-retirement response codecs. The K-3 messages use JSON and the K-4
 messages use deterministic CBOR. K-5/K-6 includes bounded gateway-ticket issuance JSON
-messages, an ordered edge-address response, and the `gateway.invalid_request` problem code.
+messages, an ordered edge-address response, and the `gateway.invalid_request` problem code. The
+bounded D-88 user-certificate issuance request codec accepts exactly one ordered Host or HostGroup
+selector, a canonical raw SSH public key, a preserved SSH username, and an integer TTL. Its
+`certificate.invalid_request` 400/413 problem vectors are published. Issuance, authorization,
+response-data binding, and durable idempotency remain server responsibilities.
 These codecs validate syntax and size; the ticket remains opaque and issuance, signature
 verification, authorization, and single-use consumption belong to consumers. K-6 also includes
 the bounded gateway client-hello frame (`ticket` and `dpop_proof`) with a published vector and
@@ -421,7 +425,7 @@ remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
 `vectors/sync-vault-members.json`, `vectors/gateway.json`, and
-`vectors/gateway-ticket-issuance.json`. The shared loader is usable by both
+`vectors/gateway-ticket-issuance.json`, and `vectors/certificate-issuance-request.json`. The shared loader is usable by both
 workstreams.
 
 ## Development
@@ -464,11 +468,12 @@ Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sf
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
 9449 context; tracked seeds include the RFC signed proof, malformed signature and duplicate JSON,
 truncation, and a proof one byte over the 8 KiB bound.
-The `api_json` target exercises all seven authentication/refresh message types and both gateway-ticket
-issuance messages through public decoders. Accepted messages must preserve their values across
+The `api_json` target exercises all seven authentication/refresh message types, both gateway-ticket
+issuance messages, and the certificate issuance request through public decoders. Accepted messages must preserve their values across
 canonical encoding, and a second encode must preserve those bytes. Gateway request checks also
 enforce rejection of an idempotency header. Seeds include the published JSON vectors, duplicate
 fields, forbidden browser refresh tokens, ambiguous edge hosts, nested response extensions,
+invalid certificate selectors and duplicate fields,
 truncation, and complete bodies at and one byte above request and response limits. This checks
 message syntax; token authentication, ticket signatures, and authorization remain consumer work.
 Fuzz-discovered mutations remain ignored; review, minimize, and name useful regression inputs

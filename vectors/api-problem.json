@@ -55,6 +55,18 @@
       "kind": "api.problem.json",
       "input": "{\"type\":\"about:blank\",\"title\":\"Gateway ticket request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"gateway-2\",\"code\":\"gateway.invalid_request\",\"changed\":false,\"retryable\":false}",
       "expected": "{\"type\":\"about:blank\",\"title\":\"Gateway ticket request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"gateway-2\",\"code\":\"gateway.invalid_request\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-certificate-invalid-request-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Invalid certificate request\",\"status\":400,\"detail\":\"Correct the certificate request and retry.\",\"instance\":\"certificate-1\",\"code\":\"certificate.invalid_request\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Invalid certificate request\",\"status\":400,\"detail\":\"Correct the certificate request and retry.\",\"instance\":\"certificate-1\",\"code\":\"certificate.invalid_request\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-certificate-request-too-large-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Certificate request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"certificate-2\",\"code\":\"certificate.invalid_request\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Certificate request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"certificate-2\",\"code\":\"certificate.invalid_request\",\"changed\":false,\"retryable\":false}"
     }
   ]
 }

@@ -62,6 +62,12 @@ validate bounded canonical syntax, and preserve edge preference order. The respo
 opaque; these vectors do not prove a signature, authorization, expiry, or single-use consumption.
 `api-problem.json` also contains 400 and 413 `gateway.invalid_request` JSON problem vectors.
 
+`certificate-issuance-request.json` contains the D-88 K-5 JSON request vectors for ordered Host
+and HostGroup selectors. Inputs deliberately vary member order; expected values use the shared
+encoder's exact order and no whitespace. The raw public key is synthetic public test data. These
+vectors prove request syntax and bounds, not authorization or certificate issuance.
+`api-problem.json` also contains 400 and 413 `certificate.invalid_request` JSON problem vectors.
+
 `sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a
