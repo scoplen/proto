@@ -524,6 +524,14 @@ signature and token hash from an independent source.
 Challenge storage, credential verification, and token issuance are server responsibilities; this
 library does not implement a production authentication service. Origin and cookie handling,
 atomic refresh rotation, and reuse detection remain server responsibilities.
+`PersonalEnrollmentContext` constructs D-101's exact first-device signature input
+from the trusted HTTPS origin, decoded invitation-token digest, UUIDv7 account/vault
+ids, public account keys, and hashes of the exact uploaded artifacts. It signs through
+the fallible `DeviceSigner` and verifies with the certified P-256 public key. Diagnostics
+redact the input artifacts and token digest. Public signature-input and rejection vectors
+are in `vectors/personal-enrollment-proof.json`. The consumer still validates the K-4
+bundle and K-2 certificate, enforces the enrollment JSON bound, and atomically redeems
+the invitation; possession-proof verification alone does not enroll or authenticate a device.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR

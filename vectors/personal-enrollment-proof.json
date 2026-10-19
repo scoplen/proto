@@ -1,0 +1,30 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "personal-enrollment-signature-input-v1",
+      "kind": "enrollment.signature-input",
+      "input": "{\"origin\":\"https://example.com:8443\",\"invitation_token\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\",\"account_id\":\"00000000-0000-7000-8000-000000000001\",\"personal_vault_id\":\"00000000-0000-7000-8000-000000000002\",\"account_signing_public_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"account_kem_public_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"key_bundle_update\":\"a10101\",\"device_certificate\":\"a10102\",\"wrapped_personal_vault_key\":\"000102ff\"}",
+      "expected": "73706c2d706572736f6e616c2d656e726f6c6c2d7631001868747470733a2f2f6578616d706c652e636f6d3a38343433630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd000000000000700080000000000000010000000000007000800000000000000211111111111111111111111111111111111111111111111111111111111111112222222222222222222222222222222222222222222222222222222222222222c05585b695c0cf13d97459cc96a147584d9e25348328d86469cd31f861275843e8b11aaf3cb969b8987fcb10fdb473a6f0969c7b0b2bf166b47988f135cd2b4e3d1f57c984978ef98a18378c8166c1cb8ede02c03eeb6aee7e2f121dfeee3e56"
+    },
+    {
+      "id": "personal-enrollment-reject-http-origin",
+      "kind": "enrollment.invalid-context",
+      "input": "{\"origin\":\"http://example.com\",\"invitation_token\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\",\"account_id\":\"00000000-0000-7000-8000-000000000001\",\"personal_vault_id\":\"00000000-0000-7000-8000-000000000002\",\"account_signing_public_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"account_kem_public_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"key_bundle_update\":\"a10101\",\"device_certificate\":\"a10102\",\"wrapped_personal_vault_key\":\"000102ff\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "personal-enrollment-reject-account-v4",
+      "kind": "enrollment.invalid-context",
+      "input": "{\"origin\":\"https://example.com:8443\",\"invitation_token\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\",\"account_id\":\"00000000-0000-4000-8000-000000000001\",\"personal_vault_id\":\"00000000-0000-7000-8000-000000000002\",\"account_signing_public_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"account_kem_public_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"key_bundle_update\":\"a10101\",\"device_certificate\":\"a10102\",\"wrapped_personal_vault_key\":\"000102ff\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "personal-enrollment-reject-empty-vault-wrap",
+      "kind": "enrollment.invalid-context",
+      "input": "{\"origin\":\"https://example.com:8443\",\"invitation_token\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\",\"account_id\":\"00000000-0000-7000-8000-000000000001\",\"personal_vault_id\":\"00000000-0000-7000-8000-000000000002\",\"account_signing_public_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"account_kem_public_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"key_bundle_update\":\"a10101\",\"device_certificate\":\"a10102\",\"wrapped_personal_vault_key\":\"\"}",
+      "expected": "reject"
+    }
+  ]
+}

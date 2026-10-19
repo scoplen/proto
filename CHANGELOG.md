@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-101 Personal enrollment possession-signature contexts with exact origin, token-digest,
+  identity, key, and artifact binding, fallible device signing, public verification, redacted
+  diagnostics, and independent signature-input/rejection vectors. Enrollment transactions remain
+  a consumer responsibility.
 - Extended the cryptographic parser fuzz target to verify D-100 device access tokens through
   their public API, with signed valid and rejection seeds and exact encoded-size boundaries.
 - Added D-100's dedicated enrolled-device Ed25519 access-token signer and stateless verifier,
