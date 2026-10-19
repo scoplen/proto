@@ -83,6 +83,14 @@ encoder's exact order and no whitespace. The raw public key is synthetic public 
 vectors prove request syntax and bounds, not authorization or certificate issuance.
 `api-problem.json` also contains 400 and 413 `certificate.invalid_request` JSON problem vectors.
 
+`certificate-issuance-response.json` contains D-90 K-5 successful certificate Resource vectors
+for all seven supported subject-key algorithms, including both security-key forms. The synthetic
+OpenSSH user certificates carry valid CA signatures; `input` also includes the matching raw
+request public key, while `expected` is the exact compact Resource encoding. Public tests verify
+their signatures as fixture provenance, then exercise the shared parser and request-subject check.
+The response parser itself validates canonical syntax, role, bounds, and interval but does not
+establish CA trust, signature validity, authorization, current validity, or revocation.
+
 `sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a
