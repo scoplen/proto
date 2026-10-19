@@ -28,8 +28,9 @@ RFC 8305 style staggered Happy Eyeballs attempts, one total connect timeout, `TC
 read/write failures, and `Read`/`Write` adapters. Attempts run in one bounded runtime and are
 cancelled and joined before return, so a successful address is not held up by a slower candidate.
 It intentionally stops before SSH version exchange, key exchange, authentication, or channel
-scheduling. The engine-independent authentication boundary supplies Ed25519, P-256, and RSA/SHA-2
-`Signer` adapters, FIDO2 `SecurityKeyProvider` adapters, RFC 4252 publickey probes and signed requests,
+scheduling. The engine-independent authentication boundary supplies Ed25519, ECDSA
+P-256/P-384/P-521, and RSA/SHA-2 `Signer` adapters, FIDO2 `SecurityKeyProvider` adapters,
+RFC 4252 publickey probes and signed requests,
 bounded OpenSSH certificate parsing and validation, and a host-key trust callback that is called
 only after validation. Security-key requests preserve the OpenSSH application, user-presence and
 user-verification flags, and authenticator counter while rejecting malformed or unbounded input.
@@ -89,7 +90,9 @@ names, and forwarding failure reasons; the concrete engine and connection multip
 separate outcomes.
 The authentication boundary also encodes `none`, `password` and password-change, and
 keyboard-interactive exchanges with bounded context, prompt, and response fields; password and
-interactive response bytes are held in zeroizing secret containers. `RsaSshSigner` accepts only RSA
+interactive response bytes are held in zeroizing secret containers. `EcdsaSshSigner` accepts only
+OpenSSH ECDSA private keys and selects NIST P-256, P-384, or P-521 from the key; the existing
+`P256SshSigner` still wraps Scoplen's P-256 key type. `RsaSshSigner` accepts only RSA
 private keys and binds the selected `rsa-sha2-256` or `rsa-sha2-512` hash to the signature wrapper;
 raw `ssh-rsa` SHA-1 authentication is rejected. The SFTP boundary provides bounded v3 negotiation,
 core open/read/write/close/stat packets, directory and path operations (opendir, readdir, remove,

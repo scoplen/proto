@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added software ECDSA user authentication on NIST P-384 and P-521 through a curve-selecting
+  `EcdsaSshSigner` for imported OpenSSH private keys. The shared request and concrete client
+  bind the selected curve, complete certificate, subject key, and session. Public and disposable
+  OpenSSH tests cover raw keys, user certificates, unauthorized keys, and subject/principal
+  rejection; the existing P-256 signer and SSH wire formats remain unchanged.
 - The paired SSH throughput comparison now exits with an error when either required cipher's
   same-host median ratio falls below 80% of OpenSSH. It rejects invalid samples before computing
   the ratio; a passing local diagnostic still does not establish the fixed-hardware release budget.

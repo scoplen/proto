@@ -1913,6 +1913,8 @@ fn rsa_hash_algorithm(algorithm: SignatureAlgorithm) -> Option<HashAlg> {
         SignatureAlgorithm::RsaSha2_512 => Some(HashAlg::Sha512),
         SignatureAlgorithm::Ed25519
         | SignatureAlgorithm::EcdsaSha2Nistp256
+        | SignatureAlgorithm::EcdsaSha2Nistp384
+        | SignatureAlgorithm::EcdsaSha2Nistp521
         | SignatureAlgorithm::SkEd25519
         | SignatureAlgorithm::SkEcdsaSha2Nistp256 => None,
     }
@@ -2381,7 +2383,7 @@ mod tests {
 
     use russh::keys::PrivateKey;
     use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
-    use ssh_key::{Algorithm, certificate};
+    use ssh_key::{Algorithm, EcdsaCurve, certificate};
     use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional, duplex};
     use tokio::net::{TcpListener, TcpStream};
     use tokio::sync::mpsc;
@@ -2390,8 +2392,8 @@ mod tests {
     use super::*;
     use crate::{
         AgentChannel, AgentClient, AgentError, AgentForwardingAuthorizer, AgentForwardingPolicy,
-        AgentKeyStore, AgentMessage, AgentServer, AgentSshSigner, Ed25519SshSigner, HostKey,
-        P256SshSigner, ProxyError, ProxyOperation, ProxyProtocol, ProxyTransportError,
+        AgentKeyStore, AgentMessage, AgentServer, AgentSshSigner, EcdsaSshSigner, Ed25519SshSigner,
+        HostKey, P256SshSigner, ProxyError, ProxyOperation, ProxyProtocol, ProxyTransportError,
         RsaSshSigner,
     };
 
@@ -5517,9 +5519,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn publickey_authentication_completes_for_p256_and_rsa_sha2() {
+    async fn publickey_authentication_completes_for_ecdsa_and_rsa_sha2() {
         let p256 = P256SshSigner::new(P256SigningKey::from_bytes(&[1; 32]).expect("P-256 key"));
         assert_real_publickey_authentication(&p256).await;
+
+        for curve in [EcdsaCurve::NistP384, EcdsaCurve::NistP521] {
+            let key = PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ecdsa { curve },
+            )
+            .expect("ECDSA key");
+            let signer = EcdsaSshSigner::new(key).expect("ECDSA signer");
+            assert_publickey_adapter_round_trip(&signer).await;
+            assert_real_publickey_authentication(&signer).await;
+        }
 
         let mut rng = ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng);
         let rsa_key = PrivateKey::random(&mut rng, Algorithm::Rsa { hash: None }).expect("RSA key");

@@ -11,7 +11,7 @@
 use std::{collections::BTreeSet, fmt, net::IpAddr, sync::Mutex};
 
 use scoplen_crypto::{Ed25519SigningKey, P256SigningKey, PrimitiveError, SecretVec};
-use ssh_key::{Certificate, HashAlg, PublicKey};
+use ssh_key::{Certificate, EcdsaCurve, HashAlg, PublicKey};
 use thiserror::Error;
 
 use crate::agent::{
@@ -63,6 +63,10 @@ pub enum SignatureAlgorithm {
     Ed25519,
     /// ECDSA over NIST P-256 (`ecdsa-sha2-nistp256`).
     EcdsaSha2Nistp256,
+    /// ECDSA over NIST P-384 (`ecdsa-sha2-nistp384`).
+    EcdsaSha2Nistp384,
+    /// ECDSA over NIST P-521 (`ecdsa-sha2-nistp521`).
+    EcdsaSha2Nistp521,
     /// FIDO2 Ed25519 (`sk-ssh-ed25519@openssh.com`).
     SkEd25519,
     /// FIDO2 ECDSA over NIST P-256 (`sk-ecdsa-sha2-nistp256@openssh.com`).
@@ -80,6 +84,8 @@ impl SignatureAlgorithm {
         match self {
             Self::Ed25519 => "ssh-ed25519",
             Self::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256",
+            Self::EcdsaSha2Nistp384 => "ecdsa-sha2-nistp384",
+            Self::EcdsaSha2Nistp521 => "ecdsa-sha2-nistp521",
             Self::SkEd25519 => "sk-ssh-ed25519@openssh.com",
             Self::SkEcdsaSha2Nistp256 => "sk-ecdsa-sha2-nistp256@openssh.com",
             Self::RsaSha2_256 => "rsa-sha2-256",
@@ -93,6 +99,8 @@ impl SignatureAlgorithm {
         match self {
             Self::Ed25519 => "ssh-ed25519",
             Self::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256",
+            Self::EcdsaSha2Nistp384 => "ecdsa-sha2-nistp384",
+            Self::EcdsaSha2Nistp521 => "ecdsa-sha2-nistp521",
             Self::SkEd25519 => "sk-ssh-ed25519@openssh.com",
             Self::SkEcdsaSha2Nistp256 => "sk-ecdsa-sha2-nistp256@openssh.com",
             Self::RsaSha2_256 | Self::RsaSha2_512 => "ssh-rsa",
@@ -105,6 +113,8 @@ impl SignatureAlgorithm {
         match self {
             Self::Ed25519 => "ssh-ed25519-cert-v01@openssh.com",
             Self::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256-cert-v01@openssh.com",
+            Self::EcdsaSha2Nistp384 => "ecdsa-sha2-nistp384-cert-v01@openssh.com",
+            Self::EcdsaSha2Nistp521 => "ecdsa-sha2-nistp521-cert-v01@openssh.com",
             Self::SkEd25519 => "sk-ssh-ed25519-cert-v01@openssh.com",
             Self::SkEcdsaSha2Nistp256 => "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
             Self::RsaSha2_256 => "rsa-sha2-256-cert-v01@openssh.com",
@@ -119,6 +129,10 @@ impl SignatureAlgorithm {
                 | "ssh-ed25519-cert-v01@openssh.com"
                 | "ecdsa-sha2-nistp256"
                 | "ecdsa-sha2-nistp256-cert-v01@openssh.com"
+                | "ecdsa-sha2-nistp384"
+                | "ecdsa-sha2-nistp384-cert-v01@openssh.com"
+                | "ecdsa-sha2-nistp521"
+                | "ecdsa-sha2-nistp521-cert-v01@openssh.com"
                 | "sk-ssh-ed25519@openssh.com"
                 | "sk-ssh-ed25519-cert-v01@openssh.com"
                 | "sk-ecdsa-sha2-nistp256@openssh.com"
@@ -135,6 +149,8 @@ impl SignatureAlgorithm {
         match self {
             Self::Ed25519
             | Self::EcdsaSha2Nistp256
+            | Self::EcdsaSha2Nistp384
+            | Self::EcdsaSha2Nistp521
             | Self::SkEd25519
             | Self::SkEcdsaSha2Nistp256 => {
                 identity == self.name() || identity == self.certificate_name()
@@ -250,6 +266,8 @@ impl<C: AgentChannel + Send + 'static> Signer for AgentSshSigner<C> {
             SignatureAlgorithm::RsaSha2_512 => AGENT_SIGN_FLAG_RSA_SHA2_512,
             SignatureAlgorithm::Ed25519
             | SignatureAlgorithm::EcdsaSha2Nistp256
+            | SignatureAlgorithm::EcdsaSha2Nistp384
+            | SignatureAlgorithm::EcdsaSha2Nistp521
             | SignatureAlgorithm::SkEd25519
             | SignatureAlgorithm::SkEcdsaSha2Nistp256 => 0,
         };
@@ -922,6 +940,53 @@ impl Signer for P256SshSigner {
     }
 }
 
+/// A software ECDSA signer backed by an OpenSSH private key on a NIST curve.
+pub struct EcdsaSshSigner {
+    key: ssh_key::PrivateKey,
+    algorithm: SignatureAlgorithm,
+}
+
+impl EcdsaSshSigner {
+    /// Select P-256, P-384, or P-521 from the private key's actual curve.
+    pub fn new(key: ssh_key::PrivateKey) -> Result<Self, SignerError> {
+        let curve = key
+            .key_data()
+            .ecdsa()
+            .ok_or(SignerError::InvalidInput("ECDSA signer requires an ECDSA private key"))?
+            .curve();
+        let algorithm = match curve {
+            EcdsaCurve::NistP256 => SignatureAlgorithm::EcdsaSha2Nistp256,
+            EcdsaCurve::NistP384 => SignatureAlgorithm::EcdsaSha2Nistp384,
+            EcdsaCurve::NistP521 => SignatureAlgorithm::EcdsaSha2Nistp521,
+        };
+        Ok(Self { key, algorithm })
+    }
+}
+
+impl Signer for EcdsaSshSigner {
+    fn algorithm(&self) -> SignatureAlgorithm {
+        self.algorithm
+    }
+
+    fn public_key_blob(&self) -> Result<Vec<u8>, SignerError> {
+        self.key
+            .public_key()
+            .to_bytes()
+            .map_err(|_| SignerError::InvalidInput("ECDSA public-key encoding failed"))
+    }
+
+    fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignerError> {
+        let key = self
+            .key
+            .key_data()
+            .ecdsa()
+            .ok_or(SignerError::InvalidInput("ECDSA signer requires an ECDSA private key"))?;
+        let signature = signature::Signer::try_sign(key, message)
+            .map_err(|_| SignerError::Signing("ECDSA signing failed".to_owned()))?;
+        Ok(ssh_key::Signature::as_bytes(&signature).to_vec())
+    }
+}
+
 /// A cryptographic wrapper around an Ed25519 account or device key for SSH authentication.
 pub struct Ed25519SshSigner {
     key: Ed25519SigningKey,
@@ -1001,6 +1066,8 @@ impl Signer for RsaSshSigner {
             SignatureAlgorithm::RsaSha2_512 => HashAlg::Sha512,
             SignatureAlgorithm::Ed25519
             | SignatureAlgorithm::EcdsaSha2Nistp256
+            | SignatureAlgorithm::EcdsaSha2Nistp384
+            | SignatureAlgorithm::EcdsaSha2Nistp521
             | SignatureAlgorithm::SkEd25519
             | SignatureAlgorithm::SkEcdsaSha2Nistp256 => {
                 return Err(SignerError::InvalidInput("RSA signer requires rsa-sha2 algorithm"));
