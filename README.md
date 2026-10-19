@@ -151,10 +151,17 @@ The concrete engine includes 3DES support, but offers it only when that Host exp
 `3des-cbc` through `HostAlgorithmPolicy::with_legacy`. CI checks both constrained ciphers.
 The same script runs `strict_kex_interop`: a pinned-key, password-authenticated OpenSSH command
 succeeds, then a local relay inserts a valid `SSH_MSG_IGNORE` before and after the server's first
-KEXINIT in separate
-connections. The strict client rejects both before host-key verification, while a server that does
+KEXINIT in separate connections. The strict client rejects both before host-key verification, while a server that does
 not advertise strict KEX accepts the same packets. This covers one initial exchange and the
-selected modern algorithms; rekey and the wider server, platform, and algorithm matrix remain open.
+selected modern algorithms. The same script runs `rekey_interop` against three dedicated OpenSSH
+listeners. Client and server 32 KiB payload thresholds separately trigger authenticated rekey;
+a one GiB control must not rekey. Each case verifies 128 KiB of exact binary data echoed over one
+session channel and a successful exit status. OpenSSH DEBUG3 logs must show post-authentication
+KEXINIT and NEWKEYS in both directions, with the first KEXINIT received by the server for a
+client-initiated exchange and sent by it for a server-initiated exchange. The control log must
+contain neither message after authentication. This observes OpenSSH's decrypted protocol logs,
+not encrypted packet sequence numbers; rekey strictness and the wider server, platform, and
+algorithm matrix remain open.
 With a disposable OpenSSH server, `cargo run -p scoplen-ssh --example proxy_command_interop`
 exercises a real SSH handshake through a child process's standard streams. Set
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's public-key line and `SCOPLEN_OPENSSH_PASSWORD` to the

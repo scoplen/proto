@@ -194,7 +194,7 @@ async fn compare_in_process() -> Result<(), Box<dyn Error>> {
     let mut scoplen_samples = Vec::with_capacity(SAMPLES);
     let mut russh_samples = Vec::with_capacity(SAMPLES);
     println!(
-        "fixture=loopback-ssh server=russh-0.63.1 cipher=chacha20-poly1305@openssh.com warmup={WARMUP} samples={SAMPLES} payload_bytes=1 nodelay=true"
+        "fixture=loopback-ssh server=russh-0.64.1 cipher=chacha20-poly1305@openssh.com warmup={WARMUP} samples={SAMPLES} payload_bytes=1 nodelay=true"
     );
     for trial in 0..WARMUP + SAMPLES {
         let byte = u8::try_from(trial % 251)?;
