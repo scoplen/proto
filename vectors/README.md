@@ -24,6 +24,11 @@ resource bounds, and forwarded refusal followed by healthy queries and authorize
 Ed25519 key. The exact input bytes and expected UUIDv7 identifier/expiry are verified through the
 public `scoplen-crypto` API. It is test material, not a deployment credential or replay claim.
 
+`gateway-signed-proof.json` contains a synthetic D-97 ES256 raw-TLS proof and its signed ticket.
+The public verifier authenticates the ticket first, then checks the proof's exact-byte hash,
+device-key thumbprint, signature, audience, and lifetime. The `dpop_proof` client-hello field
+continues to carry the compact proof; this fixture does not establish replay prevention.
+
 `sync-changes.json` contains K-4 change-feed vectors. Query inputs are JSON objects with `after`
 and `limit`; expected values are the canonical query string. Response inputs are JSON objects with
 `changes`, `next_cursor`, and `more`; payloads are lowercase hexadecimal and a missing signer is

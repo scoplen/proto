@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-97 raw-TLS gateway possession proofs in `scoplen-crypto`, with dedicated ES256 type,
+  exact-ticket hash and device-key binding, combined trusted-ticket verification, strict lifetime,
+  signed vector, failure-path tests, and fuzz seeds. The `dpop_proof` CBOR carriage is unchanged;
+  authorization, edge adoption, and atomic ticket replay claims remain consumer work.
 - Added a disposable external OpenSSH forwarded-agent fixture with a real second-hop public-key
   signature, exact command output, fail-closed disabled and denied policy checks, blocked
   remove-all management request, and valid reconnect controls. The source private key and build
