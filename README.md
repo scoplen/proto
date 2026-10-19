@@ -92,6 +92,11 @@ handles and extension data. A concrete `russh` adapter now owns TCP or caller-su
 handshakes, validates raw keys and host certificates before invoking the trust callback, supports
 password authentication, and exposes opaque session and `direct-tcpip` channels with PTY, shell,
 exec, window-change, bounded data, EOF, close, and peer-event operations. `ClientConfig` carries
+the endpoint name as the default host-certificate principal and reads Unix time when a presented
+certificate is verified, including when a configuration is reused after a delay. If the clock
+cannot supply Unix time, validation returns `ClientError::HostKeyClock`. An explicit
+`HostKeyPolicy::new(principal, now)` retains its caller-supplied fixed validation time. Invalid
+certificates are rejected before the trust callback or authentication. `ClientConfig` also carries
 the per-Host `HostAlgorithmPolicy` into russh's ordered concrete offers, appending explicitly
 enabled legacy algorithms only when supported by the selected engine. A `ClientChannelStream`
 can carry a target handshake through a jump host with
@@ -163,6 +168,12 @@ open.
 then completes RSA public-key authentication and an exact command on the two SHA-2 listeners.
 The SHA-1-only case is discovery-only; it does not opt into SHA-1 authentication. The script
 removes the disposable container and key file on exit.
+`pwsh ./scripts/ssh-host-certificate-interop.ps1` starts disposable OpenSSH listeners for P-384
+and P-521 raw host keys and host certificates. For each curve it verifies exact authenticated
+command output and exit status zero for a pinned raw key and a trusted valid certificate. It
+rejects wrong CA, wrong principal, and expired certificates with typed errors, then completes a
+new valid connection after each rejection. The script removes its container on exit; this is one
+external OpenSSH fixture, not the complete host-key interoperability matrix.
 `pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners constrained to
 Curve25519/AES-CTR, ML-KEM/ChaCha20, and one legacy-only set. The `algorithm_interop` example
 verifies a pinned host key, authenticated command, exact output, and exit status for both modern

@@ -138,7 +138,7 @@ impl HostKeyPolicy {
 pub struct ClientConfig {
     host: String,
     port: u16,
-    host_key_policy: HostKeyPolicy,
+    host_key_policy: Option<HostKeyPolicy>,
     verifier: Arc<dyn HostKeyVerifier + Send + Sync>,
     inactivity_timeout: Option<Duration>,
     keepalive_interval: Option<Duration>,
@@ -215,11 +215,10 @@ impl ClientConfig {
         if port == 0 {
             return Err(ClientConfigError::InvalidPort);
         }
-        let host_key_policy = HostKeyPolicy::new(host.clone(), unix_time_seconds())?;
         Ok(Self {
             host,
             port,
-            host_key_policy,
+            host_key_policy: None,
             verifier: Arc::new(verifier),
             inactivity_timeout: None,
             keepalive_interval: None,
@@ -241,7 +240,7 @@ impl ClientConfig {
     /// Replace the host-certificate policy while retaining the endpoint and trust callback.
     #[must_use]
     pub fn with_host_key_policy(mut self, policy: HostKeyPolicy) -> Self {
-        self.host_key_policy = policy;
+        self.host_key_policy = Some(policy);
         self
     }
 
@@ -523,6 +522,9 @@ pub enum ClientError {
     /// The server key was malformed, failed certificate validation, or was rejected by policy.
     #[error("SSH host-key verification failed: {0}")]
     HostKey(#[from] HostKeyVerificationError),
+    /// The system clock could not supply a Unix timestamp for host certificate validation.
+    #[error("SSH host-certificate validity clock is unavailable")]
+    HostKeyClock,
     /// The supplied password cannot be represented by the current `russh` password API.
     #[error("SSH password must be valid UTF-8")]
     PasswordEncoding,
@@ -1993,7 +1995,7 @@ fn append_ssh_string(output: &mut Vec<u8>, value: &[u8]) -> Result<(), PublicKey
 
 struct ClientHandler {
     host: String,
-    host_key_policy: HostKeyPolicy,
+    host_key_policy: Option<HostKeyPolicy>,
     verifier: Arc<dyn HostKeyVerifier + Send + Sync>,
     channel_slots: Arc<Semaphore>,
     forwarded_tx: mpsc::Sender<ForwardedChannel>,
@@ -2203,10 +2205,18 @@ impl Handler for ClientHandler {
                 .to_bytes()
                 .map_err(|_| ClientError::HostKey(HostKeyVerificationError::InvalidEncoding))?,
         };
-        let certificate_policy = CertificateValidationPolicy::host(
-            &self.host_key_policy.expected_principal,
-            self.host_key_policy.now,
-        );
+        let (principal, now) = match &self.host_key_policy {
+            Some(policy) => (policy.expected_principal.as_str(), policy.now),
+            None => (
+                self.host.as_str(),
+                if matches!(server_public_key, PublicKeyOrCertificate::Certificate(_)) {
+                    unix_time_seconds()?
+                } else {
+                    0
+                },
+            ),
+        };
+        let certificate_policy = CertificateValidationPolicy::host(principal, now);
         verify_host_key(&self.host, &encoded, &certificate_policy, self.verifier.as_ref())
             .map(|_| true)
             .map_err(ClientError::HostKey)
@@ -2361,10 +2371,14 @@ fn validate_text(
     Ok(())
 }
 
-fn unix_time_seconds() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_secs())
+fn unix_time_seconds() -> Result<u64, ClientError> {
+    unix_time_at(std::time::SystemTime::now())
+}
+
+fn unix_time_at(time: std::time::SystemTime) -> Result<u64, ClientError> {
+    time.duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|_| ClientError::HostKeyClock)
 }
 
 #[cfg(test)]
@@ -2394,6 +2408,14 @@ mod tests {
         P256SshSigner, ProxyError, ProxyOperation, ProxyProtocol, ProxyTransportError,
         RsaSshSigner,
     };
+
+    #[test]
+    fn host_certificate_clock_failure_is_typed() {
+        assert!(matches!(
+            unix_time_at(std::time::UNIX_EPOCH - Duration::from_secs(1)),
+            Err(ClientError::HostKeyClock)
+        ));
+    }
 
     #[tokio::test]
     async fn rsa_selection_success_and_terminal_failures_are_cached() {
@@ -5540,7 +5562,7 @@ mod tests {
                 .expect("subject key");
         let mut rng = ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng);
         let ca = PrivateKey::random(&mut rng, Algorithm::Ed25519).expect("CA key");
-        let now = unix_time_seconds();
+        let now = unix_time_seconds().expect("system clock");
         let mut builder = certificate::Builder::new(vec![8; 16], subject, now - 60, now + 60)
             .expect("certificate builder");
         builder.cert_type(certificate::CertType::User).expect("user certificate");
@@ -5647,7 +5669,7 @@ mod tests {
         let subject =
             PrivateKey::random(&mut rng, Algorithm::Rsa { hash: None }).expect("RSA subject key");
         let ca = PrivateKey::random(&mut rng, Algorithm::Ed25519).expect("CA key");
-        let now = unix_time_seconds();
+        let now = unix_time_seconds().expect("system clock");
         let mut builder = certificate::Builder::new(
             vec![8; 16],
             subject.public_key().clone(),
