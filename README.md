@@ -357,11 +357,11 @@ interop evidence; the remaining version and platform matrix is open.
 `pwsh ./scripts/openssh-8-interop.ps1` runs the same public client example against the pinned
 OpenSSH 8.8p1 package in a disposable Alpine 3.15 container. It checks the installed package and
 SSH banner, then verifies password, Ed25519, and RSA-SHA2-256/512 authentication, exact command
-output and exit status, and rejection of a wrong password, unauthorized Ed25519 and RSA keys, and
-an unrelated host key. Docker publishes only a random loopback port; the container and temporary
-test identities are removed afterward. This Windows-hosted Linux-server run adds the 8.x major
-release but does not cover its SFTP, certificates, forwarding, other algorithms, OpenSSH for
-Windows, or the current OpenSSH release.
+output and exit status, SFTP v3 operations described below, and rejection of a wrong password,
+unauthorized Ed25519 and RSA keys, and an unrelated host key. Docker publishes only a random
+loopback port; the container and temporary test identities are removed afterward. This
+Windows-hosted Linux-server run adds the 8.x major release but does not cover its certificates,
+forwarding, other algorithms, or OpenSSH for Windows.
 For a user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
 file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
 certificate signature, principal, validity, critical options, and CA pin before sending it.
@@ -373,7 +373,8 @@ platforms, and server versions remain unverified.
 Set `SCOPLEN_OPENSSH_SFTP=1` for the same example against a disposable server to additionally
 exercise SFTP v3 on the authenticated connection. This verifies advertised OpenSSH transfer
 limits, a missing-file response with released request state, `statvfs@openssh.com` filesystem
-statistics and missing-path rejection, pipelined upload in two parts, resumed download with
+statistics and missing-path rejection, bounded async-reader upload in two parts with an explicit
+remote resume offset and unread source tail, resumed download with
 progress and byte comparison, `fsync@openssh.com` and `fstatvfs@openssh.com` on the open upload
 handle, rejection of both requests after closing that handle without retaining request state,
 standard SFTP v3 `FSTAT` reporting the uploaded file's exact size on the open handle and rejecting
@@ -390,6 +391,11 @@ and cleanup of the unique remote paths. It also verifies `lsetstat@openssh.com` 
 symbolic link: the link's changed timestamp is visible through `LSTAT` while `STAT` shows the
 target's timestamp unchanged. A missing path is rejected, request slots are released, and the
 temporary link is removed.
+The 8.8p1 fixture sets `SCOPLEN_OPENSSH_SFTP_PROFILE=8.8p1` for the shared example. It requires
+the same advertised `limits`, `statvfs`, `fstatvfs`, `fsync`, `hardlink`, `posix-rename`,
+`expand-path`, and `lsetstat` extensions and their success and failure checks. OpenSSH 8.8p1 does
+not advertise `copy-data`; the fixture checks its explicit unsupported status and released request
+slot. The 9.9p2 and 10.6p1 fixtures continue to require and exercise `copy-data`.
 The link setup follows OpenSSH's reversed `SYMLINK` wire order relative to the SFTP v3 draft.
 It also checks `READLINK` returns the exact target bytes, rejects a missing link and the removed
 link, and releases each request slot. The authenticated in-process server exercises the SFTP v3
