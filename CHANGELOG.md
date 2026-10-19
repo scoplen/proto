@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Framed SSH agent streams now fail closed after uncertain write, flush, read, or response-frame
+  failures. Later requests return typed `ChannelUnusable` without I/O, preventing a late response
+  from being assigned to a new request; complete agent refusals and pre-I/O validation errors remain
+  recoverable. Pageant named pipes share this behavior.
 - Added explicit deployment-selected limits for complete K-4 write exchanges: requests,
   assignments, conflicts, and request-aware checks accept raised or lowered budgets. Encoders
   preflight exact request sizes and decoders check body bounds before CBOR parsing. Default

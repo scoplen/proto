@@ -75,6 +75,11 @@ includes bounded Unix-socket and Windows named-pipe streams, Pageant named-pipe 
 identity and signing requests, an `AgentSshSigner` that binds agent signatures to the concrete
 public-key authentication session, add/remove/lock/smart-card management, opaque extensions, and
 fail-closed forwarding policy.
+Framed agent streams, including Pageant named pipes, become unusable after a write, flush, read,
+or response-frame failure. The failing exchange returns its original error; later exchanges return
+`ChannelUnusable` without I/O. Callers must reconnect before retrying. Local request rejection and
+a complete agent `Failure` response leave the stream usable. This does not add a blocking-I/O
+deadline or cancellation guarantee.
 Bounded RFC 4254 channel codecs cover session and forwarding requests. The engine-independent
 `AuthAgentChannel` composes the `auth-agent@openssh.com` channel lifecycle with bounded agent
 framing, per-signature forwarding authorization, peer packet limits, and clean/truncated close
