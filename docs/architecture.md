@@ -19,6 +19,9 @@ wire format or cryptographic construction.
 The K-7 crate owns the client algorithm preference lists from `10-protocol-core.md` §3.
 `HostAlgorithmPolicy::with_legacy` validates an explicit list for one Host and appends accepted
 legacy names after modern defaults. Host certificate algorithms precede raw host keys (D-42).
+`prefer_default` promotes one same-category default name to the front for one Host while retaining
+all other defaults in order and leaving any enabled legacy names at the tail. The default policy
+is unchanged; the concrete adapter offers only the engine-supported subset.
 `TransportOffer` turns those lists into role-specific KEXINIT offers, selects the first local
 preference present in each peer list, and enables RFC 8308 and strict-KEX markers only when both
 roles advertise them. `StrictKeyExchange` enforces the initial KEXINIT-first rule, KEX-family

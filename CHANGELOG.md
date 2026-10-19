@@ -12,6 +12,12 @@ All notable changes to the `proto` repository will be recorded here.
 - Reject bare hexadecimal IPv4 markers such as `0x` and `edge.0x` in device-authentication
   origins and DPoP targets, including non-default ports. This prevents signed origins from
   changing under URL host parsing; canonical IPv4 and ordinary non-final DNS labels remain valid.
+- Added per-Host promotion of a validated default SSH algorithm while preserving the defaults
+  of unconfigured Hosts and the legacy tail. A 15-case disposable OpenSSH matrix verifies every currently mapped modern
+  KEX and cipher, both SHA-2 ETM MACs under CTR, and `none` versus selected delayed zlib. It
+  checks actual bidirectional negotiation, host-key pinning and wrong-pin rejection, authentication,
+  exact binary command output, and exit status. Sntrup, UMAC, and the broader peer/platform matrix
+  remain open.
 - Added software ECDSA user authentication on NIST P-384 and P-521 through a curve-selecting
   `EcdsaSshSigner` for imported OpenSSH private keys. The shared request and concrete client
   bind the selected curve, complete certificate, subject key, and session. Public and disposable
