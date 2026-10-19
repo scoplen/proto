@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Extended the SSH protocol fuzz target to public security-key and SSH certificate boundaries,
+  including canonical round-trip assertions, certificate signature/role/principal/validity
+  validation, and tracked valid and malformed identity seeds.
 - Added a notification protocol fuzz target with published valid vectors, malformed and size-bound
   seeds, and canonical round-trip assertions for every accepted message. Linux change checks
   replay the corpus, and the daily fuzz matrix includes the new target.

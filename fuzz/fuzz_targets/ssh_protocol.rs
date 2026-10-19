@@ -3,11 +3,13 @@
 
 use libfuzzer_sys::fuzz_target;
 use scoplen_ssh::{
-    ChannelClose, ChannelData, ChannelEof, ChannelExtendedData, ChannelFailure, ChannelOpen,
-    ChannelOpenConfirmation, ChannelOpenFailure, ChannelRequest, ChannelSuccess,
-    ChannelWindowAdjust, GlobalRequest, GlobalRequestFailure, GlobalRequestSuccess,
-    KeyExchangeFamily, KeyboardInteractiveInfoRequest, KeyboardInteractiveResponse, SftpLimits,
-    SftpPacket, SftpStatvfs, SocksHandshake, StrictKexPacket, StrictKeyExchange,
+    CertificateValidationPolicy, ChannelClose, ChannelData, ChannelEof, ChannelExtendedData,
+    ChannelFailure, ChannelOpen, ChannelOpenConfirmation, ChannelOpenFailure, ChannelRequest,
+    ChannelSuccess, ChannelWindowAdjust, GlobalRequest, GlobalRequestFailure, GlobalRequestSuccess,
+    HostKey, HostKeyVerificationError, KeyExchangeFamily, KeyboardInteractiveInfoRequest,
+    KeyboardInteractiveResponse, SecurityKeyAlgorithm, SecurityKeyPublicKey, SecurityKeySignature,
+    SftpLimits, SftpPacket, SftpStatvfs, SocksHandshake, SshCertificate, StrictKexPacket,
+    StrictKeyExchange, UserCertificate, verify_host_key,
 };
 
 fuzz_target!(|bytes: &[u8]| {
@@ -30,6 +32,31 @@ fuzz_target!(|bytes: &[u8]| {
     let _ = SftpPacket::decode(bytes);
     let _ = SftpLimits::decode(bytes);
     let _ = SftpStatvfs::decode(bytes);
+
+    if let Ok(key) = SecurityKeyPublicKey::from_blob(bytes) {
+        let encoded = key.to_blob().expect("validated security key encodes");
+        assert_eq!(SecurityKeyPublicKey::from_blob(&encoded), Ok(key));
+    }
+    for algorithm in [SecurityKeyAlgorithm::Ed25519, SecurityKeyAlgorithm::EcdsaSha2Nistp256] {
+        if let Ok(signature) = SecurityKeySignature::from_ssh_blob(algorithm, bytes) {
+            let encoded =
+                signature.to_ssh_blob().expect("validated security-key signature encodes");
+            assert_eq!(SecurityKeySignature::from_ssh_blob(algorithm, &encoded), Ok(signature));
+        }
+    }
+
+    let user_policy = CertificateValidationPolicy::user("scoplen-fuzz", 1_790_000_000);
+    let host_policy = CertificateValidationPolicy::host("scoplen-fuzz", 1_790_000_000);
+    if let Ok(certificate) = SshCertificate::from_bytes(bytes) {
+        assert_eq!(SshCertificate::from_bytes(certificate.as_bytes()), Ok(certificate.clone()));
+        let _ = certificate.validate(&user_policy);
+        let _ = certificate.validate(&host_policy);
+    }
+    if let Ok(certificate) = UserCertificate::parse_and_validate(bytes, &user_policy) {
+        assert_eq!(certificate.identity().key_blob(), certificate.certificate().as_bytes());
+    }
+    let verifier = |_: &str, _: &HostKey| Ok::<(), HostKeyVerificationError>(());
+    let _ = verify_host_key("scoplen-fuzz", bytes, &host_policy, &verifier);
 
     let mut socks = SocksHandshake::new();
     let _ = socks.feed(bytes);

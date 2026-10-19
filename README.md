@@ -370,6 +370,13 @@ Fuzz-discovered mutations remain ignored; review, minimize, and name useful regr
 before tracking them as new seeds. The scheduled run's results and performance targets remain
 separate Gate S4 acceptance work.
 
+The `ssh_protocol` target also exercises security-key public keys and both signature-body
+algorithms, requiring accepted inputs to round-trip, and parses and validates SSH user/host
+certificates at a fixed clock and principal. Its identity seeds use the software-generated
+security-key interoperability identities and a disposable OpenSSH Ed25519 CA; signature-body
+seeds test syntax rather than prove a hardware signature. Malformed flags and truncated bodies
+are included. No production private keys or token credentials are part of the corpus.
+
 The local Cargo patch file used for cross-repository development is intentionally ignored. Do not
 publish crates, tags, or packages from an agent checkout.
 
