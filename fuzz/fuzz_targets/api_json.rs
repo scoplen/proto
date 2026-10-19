@@ -2,6 +2,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
+use scoplen_api::account_profile::AccountProfile;
 use scoplen_api::auth::{
     AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthRefreshRequest,
     AuthTokenResponse, BrowserAuthRefreshRequest, BrowserAuthTokenResponse,
@@ -23,6 +24,7 @@ macro_rules! round_trip {
 }
 
 fuzz_target!(|bytes: &[u8]| {
+    round_trip!(AccountProfile, bytes);
     round_trip!(CertificateIssuanceRequest, bytes);
     round_trip!(CertificateIssuanceResponse, bytes);
     round_trip!(GatewayTicketRequest, bytes);

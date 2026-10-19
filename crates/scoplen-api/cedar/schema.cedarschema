@@ -2,7 +2,7 @@
 // Canonical Cedar schema for the control-plane authorization boundary.
 
 entity Account {
-    email: String,
+    email?: String,
     groups: Set<Group>,
     status: String,
 };

@@ -9,6 +9,7 @@ use scoplen_model::cbor::{self, Value};
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
+pub mod account_profile;
 pub mod auth;
 pub mod certificate;
 pub mod control_plane;

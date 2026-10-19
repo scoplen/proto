@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-99's bounded current-account Resource codec, exact OpenAPI/TypeScript profile,
+  portable email/null/failure/budget vectors, and recursive duplicate-name rejection. Cedar
+  `Account.email` is optional, with strict guarded-policy validation and authorization tests
+  for present and absent addresses. The production GET route and email verification remain
+  server work.
 - Added a disposable external OpenSSH forwarded-agent fixture with a real second-hop public-key
   signature, exact command output, fail-closed disabled and denied policy checks, blocked
   remove-all management request, and valid reconnect controls. The source private key and build
