@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use scoplen_api::sync::{
-    SessionVault, SyncLimits, SyncSessionRequest, SyncSessionResponse, VaultKind,
+    MAX_SYNC_SESSION_REQUEST_BYTES, MAX_SYNC_SESSION_RESPONSE_BYTES, SessionVault, SyncCodecError,
+    SyncLimits, SyncSessionRequest, SyncSessionResponse, VaultKind,
 };
 use scoplen_model::cbor::{self, Value};
 use serde_json::Value as JsonValue;
@@ -59,6 +60,100 @@ fn published_session_vectors_match_public_codec() {
                 assert_eq!(SyncSessionResponse::from_cbor(&expected).expect("decode"), source);
             }
             other => panic!("unexpected vector kind {other}"),
+        }
+    }
+}
+
+#[test]
+fn published_session_budget_recipes_match_public_codecs() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors");
+    let bases = scoplen_test_vectors::VectorDocument::from_path(root.join("sync-session.json"))
+        .expect("session vectors");
+    let profiles =
+        scoplen_test_vectors::VectorDocument::from_path(root.join("sync-session-limits.json"))
+            .expect("budget vectors");
+    assert_eq!(profiles.vectors.len(), 7);
+    for vector in profiles.vectors {
+        let recipe: JsonValue = serde_json::from_str(&vector.input).expect("recipe");
+        let base_id = recipe["base"].as_str().expect("base id");
+        let base = bases.vectors.iter().find(|base| base.id == base_id).expect("base vector");
+        let base_wire = decode_hex(&base.expected);
+        let mut value = cbor::decode(&base_wire).expect("base CBOR");
+        let replacement = recipe["replace"].as_str();
+        if let Some(field) = replacement {
+            let repeat = recipe["repeat_ascii"].as_str().expect("repeat byte");
+            assert_eq!(repeat.len(), 1);
+            let length = usize::try_from(recipe["length"].as_u64().expect("length"))
+                .expect("platform length");
+            let Value::Map(ref mut fields) = value else { panic!("base map") };
+            let slot = fields
+                .iter_mut()
+                .find(|(key, _)| key == &Value::Text(field.into()))
+                .expect("replace field");
+            slot.1 = Value::Text(repeat.repeat(length));
+        }
+        let wire = cbor::encode(&value).expect("canonical recipe CBOR");
+        let (outcome, length) = vector.expected.split_once(':').expect("expected outcome:length");
+        assert_eq!(wire.len(), length.parse::<usize>().expect("length"), "{}", vector.id);
+        match vector.kind.as_str() {
+            "sync.session.limits.request" => {
+                assert_eq!(base_id, "sync-session-request-v1");
+                let mut source = SyncSessionRequest::from_cbor(&base_wire).expect("base request");
+                source.client_version = recipe["repeat_ascii"].as_str().expect("repeat").repeat(
+                    usize::try_from(recipe["length"].as_u64().expect("length")).expect("length"),
+                );
+                match outcome {
+                    "accept" => {
+                        assert_eq!(source.to_cbor().expect("encode"), wire);
+                        assert_eq!(SyncSessionRequest::from_cbor(&wire).expect("decode"), source);
+                    }
+                    "reject" => {
+                        assert!(source.to_cbor().is_err());
+                        assert!(SyncSessionRequest::from_cbor(&wire).is_err());
+                    }
+                    other => panic!("unknown outcome {other}"),
+                }
+            }
+            "sync.session.limits.response" => {
+                assert_eq!(base_id, "sync-session-response-v1");
+                let body_limit =
+                    usize::try_from(recipe["body_limit"].as_u64().expect("body limit"))
+                        .expect("platform body limit");
+                let mut source = SyncSessionResponse::from_cbor(&base_wire).expect("base response");
+                if replacement.is_some() {
+                    source.server_version =
+                        recipe["repeat_ascii"].as_str().expect("repeat").repeat(
+                            usize::try_from(recipe["length"].as_u64().expect("length"))
+                                .expect("length"),
+                        );
+                }
+                match outcome {
+                    "accept" => {
+                        assert_eq!(
+                            source.to_cbor_with_body_limit(body_limit).expect("encode"),
+                            wire
+                        );
+                        assert_eq!(
+                            SyncSessionResponse::from_cbor_with_body_limit(&wire, body_limit)
+                                .expect("decode"),
+                            source
+                        );
+                    }
+                    "reject" => {
+                        assert!(source.to_cbor_with_body_limit(body_limit).is_err());
+                        assert!(
+                            SyncSessionResponse::from_cbor_with_body_limit(&wire, body_limit)
+                                .is_err()
+                        );
+                    }
+                    other => panic!("unknown outcome {other}"),
+                }
+                if wire.len() > MAX_SYNC_SESSION_RESPONSE_BYTES {
+                    assert!(source.to_cbor().is_err());
+                    assert!(SyncSessionResponse::from_cbor(&wire).is_err());
+                }
+            }
+            other => panic!("unknown vector kind {other}"),
         }
     }
 }
@@ -221,6 +316,118 @@ fn response_rejects_duplicate_vaults_zero_limits_and_bad_nested_fields() {
         SyncSessionResponse::from_cbor(&cbor::encode(&Value::Map(fields)).expect("encode"))
             .is_err()
     );
+}
+
+#[test]
+fn request_body_limit_accepts_exact_bytes_and_rejects_one_more() {
+    let mut source = request();
+    source.client_version = "a".repeat(4_035);
+    let exact = source.to_cbor().expect("exact request");
+    assert_eq!(exact.len(), MAX_SYNC_SESSION_REQUEST_BYTES);
+    assert_eq!(SyncSessionRequest::from_cbor(&exact).expect("decode exact"), source);
+
+    source.client_version.push('a');
+    assert!(source.validate().is_err());
+    assert!(source.to_cbor().is_err());
+    let Value::Map(mut fields) = cbor::decode(&exact).expect("request map") else {
+        panic!("request map")
+    };
+    for (key, value) in &mut fields {
+        if key == &Value::Text("client_version".into()) {
+            *value = Value::Text(source.client_version.clone());
+        }
+    }
+    let over = cbor::encode(&Value::Map(fields)).expect("canonical oversized request");
+    assert_eq!(over.len(), MAX_SYNC_SESSION_REQUEST_BYTES + 1);
+    assert!(SyncSessionRequest::from_cbor(&over).is_err());
+    assert!(matches!(
+        SyncSessionRequest::from_cbor(&vec![0xff; MAX_SYNC_SESSION_REQUEST_BYTES + 1]),
+        Err(SyncCodecError::Invalid(message)) if message.contains("encoded-body limit")
+    ));
+}
+
+#[test]
+fn response_body_budget_accepts_exact_and_raised_values() {
+    let source = response();
+    let wire = source.to_cbor().expect("default response");
+    assert!(source.validate_with_body_limit(0).is_err());
+    assert!(source.to_cbor_with_body_limit(0).is_err());
+    assert!(SyncSessionResponse::from_cbor_with_body_limit(&wire, 0).is_err());
+    assert_eq!(source.to_cbor_with_body_limit(wire.len()).expect("exact"), wire);
+    assert_eq!(
+        SyncSessionResponse::from_cbor_with_body_limit(&wire, wire.len()).expect("exact"),
+        source
+    );
+    assert!(source.to_cbor_with_body_limit(wire.len() - 1).is_err());
+    assert!(SyncSessionResponse::from_cbor_with_body_limit(&wire, wire.len() - 1).is_err());
+
+    let mut large = source;
+    large.server_version = "a".repeat(MAX_SYNC_SESSION_RESPONSE_BYTES - wire.len() + 1);
+    let exact = large.to_cbor().expect("exact default response");
+    assert_eq!(exact.len(), MAX_SYNC_SESSION_RESPONSE_BYTES);
+    assert_eq!(SyncSessionResponse::from_cbor(&exact).expect("decode exact"), large);
+
+    large.server_version.push('a');
+    assert!(large.validate().is_err());
+    assert!(large.to_cbor().is_err());
+    let raised = MAX_SYNC_SESSION_RESPONSE_BYTES + 1;
+    let over = large.to_cbor_with_body_limit(raised).expect("raised budget");
+    assert_eq!(over.len(), raised);
+    assert!(SyncSessionResponse::from_cbor(&over).is_err());
+    assert_eq!(
+        SyncSessionResponse::from_cbor_with_body_limit(&over, raised).expect("raised decode"),
+        large
+    );
+}
+
+#[test]
+fn response_budget_tracks_version_kind_and_vault_header_lengths() {
+    for text_len in [1, 23, 24, 255, 256, 65_535, 65_536] {
+        let mut source = response();
+        source.server_version = "v".repeat(text_len);
+        source.vaults[0].kind = VaultKind::Unknown("k".repeat(text_len));
+        source.vaults[0].seq = u64::MAX;
+        source.vaults[0].key_epoch = u64::MAX;
+        let wire = source.to_cbor().expect("encode");
+        assert_eq!(source.to_cbor_with_body_limit(wire.len()).expect("exact"), wire);
+        assert_eq!(
+            SyncSessionResponse::from_cbor_with_body_limit(&wire, wire.len()).expect("decode"),
+            source
+        );
+        assert!(source.to_cbor_with_body_limit(wire.len() - 1).is_err());
+    }
+
+    let mut many = response();
+    many.vaults.clear();
+    for last in 1..=24 {
+        let mut vault = response().vaults.remove(0);
+        vault.id = Uuid::from_bytes([0, 0, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, last]);
+        many.vaults.push(vault);
+    }
+    let wire = many.to_cbor().expect("24 vaults");
+    assert_eq!(many.to_cbor_with_body_limit(wire.len()).expect("array header"), wire);
+    assert!(many.to_cbor_with_body_limit(wire.len() - 1).is_err());
+}
+
+#[test]
+fn ignored_extensions_count_toward_selected_response_budget() {
+    let source = response();
+    let wire = source.to_cbor().expect("response");
+    let Value::Map(mut fields) = cbor::decode(&wire).expect("map") else { panic!("map") };
+    fields.push((Value::Text("future".into()), Value::Bytes(vec![1, 2, 3])));
+    let extended = cbor::encode(&Value::Map(fields)).expect("extension");
+    assert!(extended.len() > wire.len());
+    assert_eq!(
+        SyncSessionResponse::from_cbor_with_body_limit(&extended, extended.len())
+            .expect("extension"),
+        source
+    );
+    assert!(SyncSessionResponse::from_cbor_with_body_limit(&extended, extended.len() - 1).is_err());
+    assert!(SyncSessionResponse::from_cbor_with_body_limit(&[0xff], 1).is_err());
+    assert!(matches!(
+        SyncSessionResponse::from_cbor_with_body_limit(&[0xff, 0xff], 1),
+        Err(SyncCodecError::Invalid(message)) if message.contains("encoded-body limit")
+    ));
 }
 
 fn decode_hex(input: &str) -> Vec<u8> {

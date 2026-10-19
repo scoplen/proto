@@ -25,6 +25,10 @@ pub const MAX_SYNC_CONFLICT_PAYLOAD_BYTES: usize = 260 * 1024;
 pub const MAX_SYNC_READ_ENVELOPE_BYTES: usize = 260 * 1024;
 /// Default maximum complete encoded change, snapshot, or version-history response.
 pub const MAX_SYNC_READ_BODY_BYTES: usize = 266_295_039;
+/// Maximum complete encoded session request.
+pub const MAX_SYNC_SESSION_REQUEST_BYTES: usize = 4 * 1024;
+/// Default maximum complete encoded session response.
+pub const MAX_SYNC_SESSION_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 /// Maximum encoded size of a conflict problem, including its required extension.
 pub const MAX_SYNC_CONFLICT_BODY_BYTES: usize = 128 * 1024 * 1024;
 /// Maximum number of retained historical versions in addition to the current version.
@@ -95,7 +99,12 @@ impl SyncSessionRequest {
     pub fn validate(&self) -> Result<(), SyncCodecError> {
         nonempty(&self.client_version, "client_version")?;
         positive(self.model_version, "model_version")?;
-        valid_uuid(self.device_id, "device_id")
+        valid_uuid(self.device_id, "device_id")?;
+        let size = session_request_body_bytes(self.client_version.len(), self.model_version)?;
+        if size > MAX_SYNC_SESSION_REQUEST_BYTES {
+            return Err(invalid("session request exceeds the encoded-body limit"));
+        }
+        Ok(())
     }
 
     /// Encode the request as deterministic CBOR.
@@ -118,6 +127,9 @@ impl SyncSessionRequest {
     ///
     /// Returns an error for malformed CBOR or invalid required fields.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        if input.len() > MAX_SYNC_SESSION_REQUEST_BYTES {
+            return Err(invalid("session request exceeds the encoded-body limit"));
+        }
         let mut fields = decode_map(input)?;
         let request = Self {
             client_version: take_text(&mut fields, "client_version")?,
@@ -1414,6 +1426,21 @@ impl SyncSessionResponse {
     ///
     /// Returns an error for invalid required fields or duplicate vault identifiers.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.validate_with_body_limit(MAX_SYNC_SESSION_RESPONSE_BYTES)
+    }
+
+    /// Validate the response against a caller-selected complete-body budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a zero budget, an oversized body, or invalid required fields.
+    pub fn validate_with_body_limit(&self, body_limit: usize) -> Result<(), SyncCodecError> {
+        if body_limit == 0 {
+            return Err(invalid("session response body limit must be positive"));
+        }
+        if session_response_body_bytes(self)? > body_limit {
+            return Err(invalid("session response exceeds the encoded-body limit"));
+        }
         nonempty(&self.server_version, "server_version")?;
         positive(self.max_model_version, "max_model_version")?;
         self.limits.validate()?;
@@ -1433,7 +1460,16 @@ impl SyncSessionResponse {
     ///
     /// Returns an error if fields are invalid or cannot be encoded canonically.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
-        self.validate()?;
+        self.to_cbor_with_body_limit(MAX_SYNC_SESSION_RESPONSE_BYTES)
+    }
+
+    /// Preflight the exact encoded body before copying version strings or vaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a zero budget, an oversized body, or invalid required fields.
+    pub fn to_cbor_with_body_limit(&self, body_limit: usize) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate_with_body_limit(body_limit)?;
         encode_map(vec![
             ("server_version", Value::Text(self.server_version.clone())),
             ("max_model_version", Value::UInt(self.max_model_version)),
@@ -1451,6 +1487,24 @@ impl SyncSessionResponse {
     ///
     /// Returns an error for malformed CBOR or invalid required fields.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        Self::from_cbor_with_body_limit(input, MAX_SYNC_SESSION_RESPONSE_BYTES)
+    }
+
+    /// Check the complete response budget, including ignored extensions, before CBOR decoding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a zero budget, oversized input, or invalid required fields.
+    pub fn from_cbor_with_body_limit(
+        input: &[u8],
+        body_limit: usize,
+    ) -> Result<Self, SyncCodecError> {
+        if body_limit == 0 {
+            return Err(invalid("session response body limit must be positive"));
+        }
+        if input.len() > body_limit {
+            return Err(invalid("session response exceeds the encoded-body limit"));
+        }
         let mut fields = decode_map(input)?;
         let vaults = match fields.remove("vaults") {
             Some(Value::Array(values)) => {
@@ -1467,8 +1521,70 @@ impl SyncSessionResponse {
             limits,
             vaults,
         };
-        response.validate()?;
+        response.validate_with_body_limit(body_limit)?;
         Ok(response)
+    }
+}
+
+fn session_text_bytes(length: usize) -> Result<usize, SyncCodecError> {
+    length
+        .checked_add(length_argument_bytes(length)?)
+        .ok_or_else(|| invalid("session text encoded size overflows this platform"))
+}
+
+fn session_request_body_bytes(
+    version_len: usize,
+    model_version: u64,
+) -> Result<usize, SyncCodecError> {
+    // Three-entry map, text keys, and the 16-byte device-id bstr occupy 57 bytes.
+    57usize
+        .checked_add(session_text_bytes(version_len)?)
+        .and_then(|size| size.checked_add(argument_bytes(model_version)))
+        .ok_or_else(|| invalid("session request encoded size overflows this platform"))
+}
+
+fn session_response_body_bytes(response: &SyncSessionResponse) -> Result<usize, SyncCodecError> {
+    // Four-entry map and its text keys occupy 48 bytes.
+    let limits_bytes = cbor::encode(&response.limits.clone().into_value())?.len();
+    let vaults_header = length_argument_bytes(response.vaults.len())?;
+    let mut size = 48usize
+        .checked_add(session_text_bytes(response.server_version.len())?)
+        .and_then(|size| size.checked_add(argument_bytes(response.max_model_version)))
+        .and_then(|size| size.checked_add(limits_bytes))
+        .and_then(|size| size.checked_add(vaults_header))
+        .ok_or_else(|| invalid("session response encoded size overflows this platform"))?;
+    for vault in &response.vaults {
+        let entry =
+            session_vault_body_bytes(vault.kind.as_str().len(), vault.seq, vault.key_epoch)?;
+        size = size
+            .checked_add(entry)
+            .ok_or_else(|| invalid("session response encoded size overflows this platform"))?;
+    }
+    Ok(size)
+}
+
+fn session_vault_body_bytes(
+    kind_len: usize,
+    seq: u64,
+    key_epoch: u64,
+) -> Result<usize, SyncCodecError> {
+    // Five-entry map, text keys, UUID bstr, and boolean occupy 58 bytes.
+    58usize
+        .checked_add(session_text_bytes(kind_len)?)
+        .and_then(|size| size.checked_add(argument_bytes(seq)))
+        .and_then(|size| size.checked_add(argument_bytes(key_epoch)))
+        .ok_or_else(|| invalid("session vault encoded size overflows this platform"))
+}
+
+#[cfg(test)]
+mod session_size_tests {
+    use super::{session_request_body_bytes, session_text_bytes, session_vault_body_bytes};
+
+    #[test]
+    fn synthetic_unrepresentable_text_lengths_fail_without_allocation() {
+        assert!(session_text_bytes(usize::MAX).is_err());
+        assert!(session_request_body_bytes(usize::MAX, u64::MAX).is_err());
+        assert!(session_vault_body_bytes(usize::MAX, u64::MAX, u64::MAX).is_err());
     }
 }
 

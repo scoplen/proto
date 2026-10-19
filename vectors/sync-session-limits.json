@@ -1,0 +1,48 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "sync-session-limits-request-exact-v1",
+      "kind": "sync.session.limits.request",
+      "input": "{\"base\":\"sync-session-request-v1\",\"replace\":\"client_version\",\"repeat_ascii\":\"a\",\"length\":4035}",
+      "expected": "accept:4096"
+    },
+    {
+      "id": "sync-session-limits-request-over-v1",
+      "kind": "sync.session.limits.request",
+      "input": "{\"base\":\"sync-session-request-v1\",\"replace\":\"client_version\",\"repeat_ascii\":\"a\",\"length\":4036}",
+      "expected": "reject:4097"
+    },
+    {
+      "id": "sync-session-limits-response-base-exact-v1",
+      "kind": "sync.session.limits.response",
+      "input": "{\"base\":\"sync-session-response-v1\",\"body_limit\":329}",
+      "expected": "accept:329"
+    },
+    {
+      "id": "sync-session-limits-response-base-over-v1",
+      "kind": "sync.session.limits.response",
+      "input": "{\"base\":\"sync-session-response-v1\",\"body_limit\":328}",
+      "expected": "reject:329"
+    },
+    {
+      "id": "sync-session-limits-response-default-exact-v1",
+      "kind": "sync.session.limits.response",
+      "input": "{\"base\":\"sync-session-response-v1\",\"replace\":\"server_version\",\"repeat_ascii\":\"a\",\"length\":4193976,\"body_limit\":4194304}",
+      "expected": "accept:4194304"
+    },
+    {
+      "id": "sync-session-limits-response-default-over-v1",
+      "kind": "sync.session.limits.response",
+      "input": "{\"base\":\"sync-session-response-v1\",\"replace\":\"server_version\",\"repeat_ascii\":\"a\",\"length\":4193977,\"body_limit\":4194304}",
+      "expected": "reject:4194305"
+    },
+    {
+      "id": "sync-session-limits-response-raised-v1",
+      "kind": "sync.session.limits.response",
+      "input": "{\"base\":\"sync-session-response-v1\",\"replace\":\"server_version\",\"repeat_ascii\":\"a\",\"length\":4193977,\"body_limit\":4194305}",
+      "expected": "accept:4194305"
+    }
+  ]
+}

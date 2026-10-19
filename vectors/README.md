@@ -186,6 +186,16 @@ lowercase hexadecimal. UUIDs are written as canonical text in the vector input a
 16-byte CBOR byte strings. The public codec tests consume both vectors and reject missing fields,
 invalid limits, duplicate vaults, and malformed nested values.
 
+`sync-session-limits.json` contains bounded generation recipes against those two published base
+vectors. `base` names the exact `sync-session.json` vector. An optional `replace` selects its
+version text field; `repeat_ascii` is one ASCII character repeated `length` times before canonical
+CBOR encoding. Response recipes set a positive `body_limit`; requests use the fixed 4,096-byte
+limit. Each `expected` is `accept:<exact encoded bytes>` or `reject:<exact encoded bytes>`. The
+recipes cover request 4,096/4,097, the existing response bytes at exact and one-byte-short local
+budgets, and default 4 MiB/one-byte-over response bodies with a raised accepting budget. This
+keeps multi-megabyte hex out of the repository while allowing both workstreams to reproduce exact
+CBOR boundary inputs.
+
 `gateway.json` contains K-6 client-hello vectors. The `input` object has compact-JWS `ticket` and
 `dpop_proof` strings. `gateway.client_hello.cbor` expects the deterministic CBOR map, while
 `gateway.client_hello.frame` adds the four-byte big-endian body length. The public codec rejects
