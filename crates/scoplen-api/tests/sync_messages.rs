@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use scoplen_api::sync::{
-    MAX_SYNC_BATCH_BYTES, MAX_SYNC_BATCH_OBJECTS, MAX_SYNC_CONFLICT_BODY_BYTES,
-    MAX_SYNC_CONFLICT_PAYLOAD_BYTES, MAX_SYNC_RETAINED_VERSIONS, SyncAckRequest, SyncAckResponse,
-    SyncChange, SyncChangesQuery, SyncConflictEntry, SyncConflictProblem, SyncSnapshotResponse,
-    SyncVersionsResponse, SyncWrite, SyncWriteAssignment, SyncWriteBatch, SyncWriteBatchResponse,
+    MAX_SYNC_ACK_REQUEST_BYTES, MAX_SYNC_BATCH_BYTES, MAX_SYNC_BATCH_OBJECTS,
+    MAX_SYNC_CONFLICT_BODY_BYTES, MAX_SYNC_CONFLICT_PAYLOAD_BYTES, MAX_SYNC_RETAINED_VERSIONS,
+    SyncAckRequest, SyncAckResponse, SyncChange, SyncChangesQuery, SyncCodecError,
+    SyncConflictEntry, SyncConflictProblem, SyncSnapshotResponse, SyncVersionsResponse, SyncWrite,
+    SyncWriteAssignment, SyncWriteBatch, SyncWriteBatchResponse,
 };
 use scoplen_api::{ErrorCode, ProblemDetails};
 use scoplen_model::cbor::{self, Value};
@@ -44,8 +45,19 @@ fn published_sync_message_vectors_match_public_codecs() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/sync-messages.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vectors");
-    assert_eq!(document.vectors.len(), 8);
+    assert_eq!(document.vectors.len(), 10);
     for vector in &document.vectors {
+        if vector.kind == "sync.ack.request.reject" {
+            assert_eq!(vector.expected, "reject");
+            let input = decode_hex(&vector.input);
+            assert_eq!(
+                SyncAckRequest::from_cbor(&input),
+                Err(SyncCodecError::Invalid("acknowledgement request exceeds 17 bytes".into())),
+                "{}",
+                vector.id
+            );
+            continue;
+        }
         let expected = decode_hex(&vector.expected);
         match vector.kind.as_str() {
             "sync.writes.request" => {
@@ -341,7 +353,19 @@ fn conflict_decoder_ignores_future_response_fields() {
 fn acknowledgements_use_canonical_text_maps_and_response_extensions() {
     let request = SyncAckRequest { cursor: u64::MAX };
     let encoded = request.to_cbor().expect("encode");
+    assert_eq!(encoded.len(), MAX_SYNC_ACK_REQUEST_BYTES);
     assert_eq!(SyncAckRequest::from_cbor(&encoded).expect("decode"), request);
+    let mut over = encoded.clone();
+    over.push(0);
+    assert_eq!(over.len(), MAX_SYNC_ACK_REQUEST_BYTES + 1);
+    assert_eq!(
+        SyncAckRequest::from_cbor(&over),
+        Err(SyncCodecError::Invalid("acknowledgement request exceeds 17 bytes".into()))
+    );
+    assert_eq!(
+        SyncAckRequest::from_cbor(&vec![0; 128 * 1024]),
+        Err(SyncCodecError::Invalid("acknowledgement request exceeds 17 bytes".into()))
+    );
     let response = SyncAckResponse { cursor: 7 };
     let Value::Map(mut fields) =
         cbor::decode(&response.to_cbor().expect("encode")).expect("decode")

@@ -15,6 +15,18 @@
       "expected": "after=12&limit=25"
     },
     {
+      "id": "sync-changes-query-max-bytes-v1",
+      "kind": "sync.changes.query",
+      "input": "{\"after\":18446744073709551615,\"limit\":1000}",
+      "expected": "after=18446744073709551615&limit=1000"
+    },
+    {
+      "id": "sync-changes-query-over-bytes-v1",
+      "kind": "sync.changes.query.reject",
+      "input": "after=18446744073709551615&limit=10000",
+      "expected": "reject"
+    },
+    {
       "id": "sync-changes-response-page-v1",
       "kind": "sync.changes.response",
       "input": "{\"changes\":[{\"object_id\":\"00000000-0000-7000-8000-000000000001\",\"seq\":2,\"payload\":\"dead\",\"tombstone\":false,\"signer_device_id\":\"00000000-0000-7000-8000-000000000003\"},{\"object_id\":\"00000000-0000-7000-8000-000000000002\",\"seq\":5,\"payload\":\"beef\",\"tombstone\":true,\"signer_device_id\":null}],\"next_cursor\":5,\"more\":true}",

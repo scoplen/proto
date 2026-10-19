@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Bound raw K-4 change-feed and snapshot queries to 37 bytes and acknowledgement requests to
+  17 complete CBOR bytes before parsing. Exact-boundary and rejection vectors and public tests
+  preserve all valid query and CBOR bytes.
 - Added D-99's bounded current-account Resource codec, exact OpenAPI/TypeScript profile,
   portable email/null/failure/budget vectors, and recursive duplicate-name rejection. Cedar
   `Account.email` is optional, with strict guarded-policy validation and authorization tests

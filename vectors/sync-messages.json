@@ -33,6 +33,18 @@
       "expected": "a166637572736f7207"
     },
     {
+      "id": "sync-ack-request-max-bytes-v1",
+      "kind": "sync.ack.request",
+      "input": "{\"cursor\":18446744073709551615}",
+      "expected": "a166637572736f721bffffffffffffffff"
+    },
+    {
+      "id": "sync-ack-request-over-bytes-v1",
+      "kind": "sync.ack.request.reject",
+      "input": "a166637572736f721bffffffffffffffff00",
+      "expected": "reject"
+    },
+    {
       "id": "sync-ack-response-v1",
       "kind": "sync.ack.response",
       "input": "{\"cursor\":7}",

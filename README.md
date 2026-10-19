@@ -429,6 +429,12 @@ the cursor sent. A higher stored maximum is valid when another acknowledgement h
 advanced it. Call this before applying acknowledgement metadata locally; the check does not
 establish the current vault sequence or server persistence. Existing CBOR bytes remain valid.
 
+`SyncChangesQuery::from_query` rejects raw change-feed and snapshot queries longer than 37 bytes
+before parsing; canonical `after` and `limit` values fit within that bound in either order.
+`SyncAckRequest::from_cbor` rejects complete request bodies longer than the 17-byte maximum for
+the exact `{cursor: uint}` map before CBOR parsing. These checks retain the existing valid wire
+shapes and return the shared invalid-input error; HTTP consumers must bound collection as well.
+
 The K-4 session request codec caps its complete CBOR body at 4,096 bytes. Session responses use a
 4 MiB default complete-body budget; `SyncSessionResponse` also provides
 `validate_with_body_limit`, `to_cbor_with_body_limit`, and `from_cbor_with_body_limit` for a positive
