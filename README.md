@@ -607,9 +607,11 @@ The Linux change check replays every target's corpus, and
 the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
 Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
-9449 context and signed gateway tickets against a fixed synthetic trusted issuer and key. Tracked
-seeds include the RFC proof, the published gateway ticket, malformed signatures and duplicate JSON,
-truncation, and a proof one byte over the 8 KiB bound.
+9449 context and signed gateway tickets and D-100 device access tokens against separate fixed
+synthetic keyrings. Tracked seeds include the RFC proof, published gateway and access tokens,
+signed wrong-purpose and wrong-audience access tokens, signed duplicate header and nested claims,
+malformed signatures, truncation, a proof one byte over the 8 KiB bound, and access tokens at and
+one byte over their 4 KiB bound.
 The `api_json` target exercises all seven authentication/refresh message types, both gateway-ticket
 issuance messages, the certificate issuance request and response, and the current-account profile
 through public decoders. Accepted messages must preserve their values across canonical encoding,

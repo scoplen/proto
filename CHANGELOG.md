@@ -4,6 +4,8 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Extended the cryptographic parser fuzz target to verify D-100 device access tokens through
+  their public API, with signed valid and rejection seeds and exact encoded-size boundaries.
 - Added D-100's dedicated enrolled-device Ed25519 access-token signer and stateless verifier,
   bounded claims and keyring, complete membership and scope checks, redacted diagnostics, and
   public signed/rejection vectors. DPoP replay, current-state and route authorization remain

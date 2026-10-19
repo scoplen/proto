@@ -40,6 +40,15 @@ fuzz_target!(|bytes: &[u8]| {
             trusted.insert("ticket-1", &signer.public_key()).expect("fixed ticket key");
             let _ = ticket.verify(&trusted, 1_700_000_000);
         }
+        if let Ok(token) = scoplen_crypto::DeviceAccessToken::parse(proof_text) {
+            let signer = scoplen_crypto::Ed25519SigningKey::from_bytes(&[0x42; 32])
+                .expect("fixed synthetic access-token key");
+            let mut trusted =
+                scoplen_crypto::TrustedDeviceAccessTokenKeys::new("https://control.example.com")
+                    .expect("fixed canonical issuer");
+            trusted.insert("access-1", &signer.public_key()).expect("fixed access-token key");
+            let _ = token.verify(&trusted, 1_700_000_000);
+        }
         if let Some((ticket_text, gateway_proof_text)) = proof_text.split_once('\n')
             && let (Ok(ticket), Ok(gateway_proof)) = (
                 scoplen_crypto::GatewayTicket::parse(
