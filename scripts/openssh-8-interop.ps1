@@ -78,17 +78,23 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
             Start-Sleep -Seconds 1
             continue
         }
+        docker exec $container pidof sshd 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Start-Sleep -Seconds 1
+            continue
+        }
         $socket = [System.Net.Sockets.TcpClient]::new()
         try {
             $socket.Connect('127.0.0.1', $port)
             $socket.ReceiveTimeout = 2000
             $reader = [System.IO.StreamReader]::new($socket.GetStream())
             $banner = $reader.ReadLine()
-            $ready = $true
+            $ready = -not [string]::IsNullOrEmpty($banner)
         }
-        catch { Start-Sleep -Seconds 1 }
+        catch { $ready = $false }
         finally { $socket.Dispose() }
         if ($ready) { break }
+        Start-Sleep -Seconds 1
     }
     if (-not $ready) { throw 'OpenSSH 8.8p1 did not become ready within 60 seconds' }
     $package = docker exec $container apk list --installed openssh-server
