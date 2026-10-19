@@ -32,7 +32,7 @@ jobs:
         run: |
           rustup toolchain install nightly --profile minimal --component rust-src
           cargo +nightly install cargo-fuzz --locked
-          for target in vector_loader object_decoder crypto_decoders agent_decoder sftp_decoder ssh_protocol sync_notification; do
+          for target in vector_loader object_decoder crypto_decoders agent_decoder sftp_decoder ssh_protocol sync_notification api_json; do
             test -n "$(find "fuzz/corpus/$target" -maxdepth 1 -type f -name 'seed-*' -print -quit)"
             cargo +nightly fuzz run "$target" "fuzz/corpus/$target" -- -runs=0 -timeout=10
           done
