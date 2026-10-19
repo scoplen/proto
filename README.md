@@ -122,6 +122,10 @@ read, and write limits, and supports resume-by-offset uploads/downloads with pro
 on that channel. Pipelined downloads fill short-read gaps before advancing contiguous progress;
 an early EOF for a caller-specified end offset and an empty data response fail instead of
 silently returning a partial file.
+An interrupted or failed exchange that loses request correlation invalidates only its SFTP
+session. The failing call retains its original typed error; later operations return
+`SessionUnusable` until the caller opens a new SFTP channel on the same authenticated SSH
+connection. Local validation and fully correlated file-status rejections leave the session usable.
 The concrete adapter also forwards bounded environment and signal requests and accepts
 server-opened `auth-agent@openssh.com` channels. `ForwardedChannel::serve_agent` reassembles
 russh channel fragments, applies the fail-closed forwarding policy, and returns bounded agent
