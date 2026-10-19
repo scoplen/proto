@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Covered D-77 cancellation during a blocked outbound SFTP write through an authenticated SSH
+  channel whose peer stops replenishing its write window. The canceled session releases its
+  request slot; independent and replacement channels still work on the parent connection.
+  Peer-induced outbound write I/O error isolation remains unverified.
 - Added D-101 Personal invitation and enrollment JSON codecs, HTTP header/origin checks,
   artifact identity validation, OpenAPI and generated TypeScript, public vectors and parser
   corpus coverage. Structural decoding remains separate from signature verification,

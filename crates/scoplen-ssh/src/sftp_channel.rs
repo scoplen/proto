@@ -645,7 +645,7 @@ mod tests {
 
     use russh::keys::PrivateKey;
     use ssh_key::Algorithm;
-    use tokio::net::TcpListener;
+    use tokio::{net::TcpListener, sync::oneshot};
 
     use super::*;
     use crate::{ClientConfig, HostKey, SftpAttributes, SftpNameEntry, SftpStatvfs};
@@ -766,6 +766,7 @@ mod tests {
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
+        outbound_window_signal: Option<oneshot::Sender<()>>,
     }
 
     impl SftpServer {
@@ -1313,6 +1314,15 @@ mod tests {
     impl russh::server::Handler for SftpServer {
         type Error = russh::Error;
 
+        fn adjust_window(&mut self, _channel: russh::ChannelId, current: u32) -> u32 {
+            if let Some(signal) = self.outbound_window_signal.take() {
+                let _ = signal.send(());
+                1
+            } else {
+                current
+            }
+        }
+
         async fn auth_password(
             &mut self,
             _user: &str,
@@ -1342,6 +1352,15 @@ mod tests {
             } else {
                 let _ = session.channel_failure(channel);
             }
+            Ok(())
+        }
+
+        async fn channel_close(
+            &mut self,
+            _channel: russh::ChannelId,
+            _session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            self.buffer.clear();
             Ok(())
         }
 
@@ -1458,7 +1477,28 @@ mod tests {
         reorder_first_reads: bool,
         directory: bool,
     ) -> (ClientConnection, SftpSession) {
+        transfer_session_with_outbound_window(
+            file,
+            read_reply_limit,
+            reorder_first_reads,
+            directory,
+            None,
+        )
+        .await
+    }
+
+    async fn transfer_session_with_outbound_window(
+        file: Vec<u8>,
+        read_reply_limit: Option<usize>,
+        reorder_first_reads: bool,
+        directory: bool,
+        outbound_window_signal: Option<oneshot::Sender<()>>,
+    ) -> (ClientConnection, SftpSession) {
         let mut server_config = russh::server::Config::default();
+        if outbound_window_signal.is_some() {
+            server_config.window_size = 64;
+            server_config.maximum_packet_size = 32;
+        }
         server_config.keys.push(
             PrivateKey::random(
                 &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
@@ -1489,6 +1529,7 @@ mod tests {
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
+                    outbound_window_signal,
                 },
             )
             .await;
@@ -1783,6 +1824,53 @@ mod tests {
             fresh.read_response().await.expect("fresh response"),
             SftpPacket::Name { .. }
         ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn exhausted_peer_write_window_invalidates_only_the_sftp_session() {
+        let (window_signal, window_observed) = oneshot::channel();
+        let (connection, mut session) = transfer_session_with_outbound_window(
+            Vec::new(),
+            None,
+            false,
+            false,
+            Some(window_signal),
+        )
+        .await;
+        let request = session.client_mut().realpath(vec![b'x'; 1024]).expect("large request");
+        {
+            let send = session.send_request(&request);
+            tokio::pin!(send);
+            tokio::select! {
+                result = &mut send => panic!("outbound write completed: {result:?}"),
+                observed = window_observed => observed.expect("peer consumed the write window"),
+            }
+            assert!(
+                tokio::time::timeout(std::time::Duration::from_millis(100), &mut send)
+                    .await
+                    .is_err(),
+                "outbound write remained blocked by the peer's exhausted window"
+            );
+        }
+        assert_eq!(session.pending_requests(), 0);
+        assert!(matches!(
+            session.send_request(&request).await,
+            Err(SftpChannelError::SessionUnusable)
+        ));
+        assert!(matches!(session.read_response().await, Err(SftpChannelError::SessionUnusable)));
+        assert!(matches!(session.request_limits().await, Err(SftpChannelError::SessionUnusable)));
+
+        let independent = connection.open_session().await.expect("independent SSH session");
+        independent.close().await.expect("close independent session");
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
+        ));
+        assert_eq!(fresh.pending_requests(), 0);
         connection.disconnect().await.expect("disconnect client");
     }
 
@@ -2278,6 +2366,7 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    outbound_window_signal: None,
                 },
             )
             .await;
@@ -2374,6 +2463,7 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    outbound_window_signal: None,
                 },
             )
             .await;
@@ -2466,6 +2556,7 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    outbound_window_signal: None,
                 },
             )
             .await;
@@ -2532,6 +2623,7 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    outbound_window_signal: None,
                 },
             )
             .await;
