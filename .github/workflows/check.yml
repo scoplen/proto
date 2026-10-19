@@ -76,6 +76,9 @@ jobs:
       - name: Constrained RSA signature advertisements and authentication
         shell: pwsh
         run: ./scripts/ssh-rsa-selection-interop.ps1
+      - name: P-384 and P-521 host keys and host certificates
+        shell: pwsh
+        run: ./scripts/ssh-host-certificate-interop.ps1
 
   openssh-algorithms:
     name: OpenSSH algorithm policy

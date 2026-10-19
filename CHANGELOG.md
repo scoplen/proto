@@ -9,6 +9,12 @@ All notable changes to the `proto` repository will be recorded here.
   bind the selected curve, complete certificate, subject key, and session. Public and disposable
   OpenSSH tests cover raw keys, user certificates, unauthorized keys, and subject/principal
   rejection; the existing P-256 signer and SSH wire formats remain unchanged.
+- Validate default host certificates against the system Unix time at verification, so delayed or
+  reused client configurations cannot accept expired certificates. Clock failure is typed;
+  explicit fixed-time policies retain their behavior. In-process regression tests cover delayed
+  expiry and callback suppression, while a disposable OpenSSH fixture covers P-384/P-521 raw host
+  keys, valid certificates, wrong CA, wrong principal, expired certificates, and fresh connections
+  after rejection.
 - The paired SSH throughput comparison now exits with an error when either required cipher's
   same-host median ratio falls below 80% of OpenSSH. It rejects invalid samples before computing
   the ratio; a passing local diagnostic still does not establish the fixed-hardware release budget.
