@@ -39,6 +39,14 @@ and `max_batch_bytes`, plus `cbor_hex`. `expected` is `accept` or `reject`. Acce
 round-trip to those exact bytes. These vectors include low-limit rejection and a raised profile;
 public tests additionally generate 501-entry exchanges and requests above the default 4 MiB cap.
 
+`sync-read-limits.json` applies explicit profiles to the existing change-feed, snapshot, and
+version-history CBOR bytes. Each JSON `input` contains positive `max_envelope_bytes` and
+`max_body_bytes`, plus `cbor_hex`; `expected` is `accept` or `reject`. For each response, the
+exact-body vector sets `max_body_bytes` to half the hex string length, while the two rejection
+vectors subtract one byte from either the body or the two-byte payload limit. Accepted responses
+round-trip to the exact published bytes. Public tests additionally cover larger historical
+payloads, CBOR length transitions, overflow, ignored extensions, and request/path correlation.
+
 `sync-notifications.json` contains the content-free K-4 notification events sent over the WebSocket.
 Vault advancement uses `{seq, vault}`, rotation pending uses `{rotation_pending, vault}`, and
 device revocation uses the boolean marker `{device_revoked: true}` until the specification defines

@@ -382,6 +382,14 @@ the cursor sent. A higher stored maximum is valid when another acknowledgement h
 advanced it. Call this before applying acknowledgement metadata locally; the check does not
 establish the current vault sequence or server persistence. Existing CBOR bytes remain valid.
 
+Change-feed, snapshot, and version-history responses accept an explicit `SyncReadLimits` profile
+through their `*_with_limits` methods, including query/path-aware validators. The independent
+default read budgets are 260 KiB per opaque payload and 266,295,039 bytes for the complete CBOR
+body. Select positive budgets from trusted local policy; retained payloads may exceed the current
+write limit. Decoders reject over-budget complete input, including ignored extensions, before CBOR
+parsing. Encoders check exact encoded size before copying payloads. HTTP consumers must also bound
+decompressed bytes while collecting the response; a codec check alone cannot limit that allocation.
+
 Atomic write exchanges accept an explicit `SyncWriteLimits` profile in their `*_with_limits`
 methods. Select positive envelope, object-count, and encoded batch-byte budgets from trusted
 configuration or acceptable session values; an announcement does not authorize an allocation.
@@ -390,7 +398,7 @@ Defaults remain 260 KiB, 500 objects, and 4 MiB; the complete conflict cap stays
 The request encoder checks its exact size before copying payloads, and decoders check complete
 body limits before CBOR parsing. `vectors/sync-write-limits.json` publishes exact CBOR hex and
 explicit profiles with `accept`/`reject` outcomes. Tests also round-trip 501-entry exchanges and
-requests above 4 MiB. Storage/router adoption and read-response resource budgets remain separate.
+requests above 4 MiB. Storage/router adoption remains separate.
 
 The K-3 authentication boundary now validates strict, bounded challenge and signed-device JSON
 requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. The
@@ -441,6 +449,7 @@ The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `
 in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
 `vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
+`vectors/sync-read-limits.json`,
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
 `vectors/sync-keys-failures.json`,
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
