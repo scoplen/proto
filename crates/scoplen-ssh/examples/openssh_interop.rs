@@ -8,10 +8,16 @@ use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
 use scoplen_ssh::{
     CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, ClientError,
     Ed25519SshSigner, HostKey, HostKeyVerificationError, P256SshSigner, RsaSshSigner,
-    SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm, UserCertificate,
+    SftpAttributes, SftpPacket, SftpSession, SignatureAlgorithm, Signer, UserCertificate,
 };
 use ssh_key::{Certificate, PrivateKey, PublicKey};
 use tokio::time::timeout;
+
+const SSH_STEP_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[derive(Debug, thiserror::Error)]
+#[error("user certificate CA is not trusted")]
+struct UntrustedUserCa;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,18 +26,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         env::var("SCOPLEN_OPENSSH_PORT").unwrap_or_else(|_| "22223".to_owned()).parse::<u16>()?;
     let username = env::var("SCOPLEN_OPENSSH_USER").unwrap_or_else(|_| "scoplen".to_owned());
     let config = client_config(host, port)?;
-    let mut connection = ClientConnection::connect(config).await?;
-    authenticate(&mut connection, &username).await?;
-    let channel = connection.open_session().await?;
-    channel.exec(true, b"printf scoplen-openssh-ok").await?;
+    let mut connection = timeout(SSH_STEP_TIMEOUT, ClientConnection::connect(config)).await??;
+    timeout(SSH_STEP_TIMEOUT, authenticate(&mut connection, &username)).await??;
+    let channel = timeout(SSH_STEP_TIMEOUT, connection.open_session()).await??;
+    timeout(SSH_STEP_TIMEOUT, channel.exec(true, b"printf scoplen-openssh-ok")).await??;
     let mut channel = channel;
     let mut output = Vec::new();
+    let mut exited_successfully = false;
     loop {
         let event = timeout(Duration::from_secs(5), channel.next_event()).await??;
         match event {
             Some(ChannelEvent::Data(data)) => output.extend_from_slice(&data),
-            Some(ChannelEvent::Eof | ChannelEvent::Close) | None => break,
-            Some(ChannelEvent::Success | ChannelEvent::ExitStatus(0)) => {}
+            Some(ChannelEvent::Eof | ChannelEvent::Success) => {}
+            Some(ChannelEvent::Close) | None => break,
+            Some(ChannelEvent::ExitStatus(0)) => exited_successfully = true,
             Some(ChannelEvent::ExitStatus(status)) => {
                 return Err(format!("remote command exited with {status}").into());
             }
@@ -41,13 +49,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if output != b"scoplen-openssh-ok" {
         return Err(format!("unexpected output: {output:?}").into());
     }
+    if !exited_successfully {
+        return Err("remote command did not report a successful exit status".into());
+    }
     if env::var("SCOPLEN_OPENSSH_SFTP").as_deref() == Ok("1") {
         timeout(Duration::from_secs(30), verify_sftp(&connection)).await??;
     }
     if env::var("SCOPLEN_OPENSSH_FORWARD").as_deref() == Ok("1") {
         timeout(Duration::from_secs(10), verify_forwarding(&connection)).await??;
     }
-    connection.disconnect().await?;
+    timeout(SSH_STEP_TIMEOUT, connection.disconnect()).await??;
     println!("openssh interop ok");
     Ok(())
 }
@@ -82,16 +93,15 @@ async fn authenticate(
     let ed25519_key = env::var("SCOPLEN_OPENSSH_ED25519_KEY").ok();
     let p256_key = env::var("SCOPLEN_OPENSSH_P256_KEY").ok();
     let user_certificate = env::var("SCOPLEN_OPENSSH_USER_CERT").ok();
-    if user_certificate.is_some() && ed25519_key.is_none() {
-        return Err("user certificate requires SCOPLEN_OPENSSH_ED25519_KEY".into());
-    }
-    if [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref()]
+    let key_count = [rsa_key.as_ref(), ed25519_key.as_ref(), p256_key.as_ref()]
         .iter()
         .filter(|key| key.is_some())
-        .count()
-        > 1
-    {
+        .count();
+    if key_count > 1 {
         return Err("set only one OpenSSH private-key path".into());
+    }
+    if user_certificate.is_some() && key_count == 0 {
+        return Err("user certificate requires an OpenSSH private-key path".into());
     }
     if let Some(path) = rsa_key {
         let key = PrivateKey::read_openssh_file(path)?;
@@ -101,29 +111,15 @@ async fn authenticate(
             _ => return Err("SCOPLEN_OPENSSH_RSA_HASH must be 256 or 512".into()),
         };
         let signer = RsaSshSigner::new(key, algorithm)?;
-        connection.authenticate_publickey(username, &signer).await?;
+        authenticate_with_signer(connection, username, &signer, user_certificate.as_deref())
+            .await?;
     } else if let Some(path) = ed25519_key {
         let key = PrivateKey::read_openssh_file(path)?;
         let keypair = key.key_data().ed25519().ok_or("expected an Ed25519 private key")?;
         let signer =
             Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(keypair.private.as_ref())?);
-        if let Some(cert_path) = user_certificate {
-            let ca_path = env::var("SCOPLEN_OPENSSH_USER_CA_KEY")
-                .map_err(|_| "user certificate requires a pinned CA public-key path")?;
-            let certificate = Certificate::read_file(Path::new(&cert_path))?;
-            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-            let certificate = UserCertificate::parse_and_validate(
-                &certificate.to_bytes()?,
-                &CertificateValidationPolicy::user(username, now),
-            )?;
-            let pinned_ca = PublicKey::read_openssh_file(ca_path)?.to_bytes()?;
-            if certificate.certificate().ca_public_key_blob() != pinned_ca {
-                return Err("user certificate CA is not trusted".into());
-            }
-            connection.authenticate_certificate(username, &certificate, &signer).await?;
-        } else {
-            connection.authenticate_publickey(username, &signer).await?;
-        }
+        authenticate_with_signer(connection, username, &signer, user_certificate.as_deref())
+            .await?;
     } else if let Some(path) = p256_key {
         let key = PrivateKey::read_openssh_file(path)?;
         let keypair = key.key_data().ecdsa().ok_or("expected a P-256 private key")?;
@@ -131,11 +127,42 @@ async fn authenticate(
             return Err("expected a P-256 private key".into());
         }
         let signer = P256SshSigner::new(P256SigningKey::from_bytes(keypair.private_key_bytes())?);
-        connection.authenticate_publickey(username, &signer).await?;
+        authenticate_with_signer(connection, username, &signer, user_certificate.as_deref())
+            .await?;
     } else {
         let password = env::var("SCOPLEN_OPENSSH_PASSWORD")
             .map_err(|_| "password or an OpenSSH private-key path is required")?;
         connection.authenticate_password(username, password.as_bytes()).await?;
+    }
+    Ok(())
+}
+
+async fn authenticate_with_signer<S: Signer + Sync>(
+    connection: &mut ClientConnection,
+    username: &str,
+    signer: &S,
+    certificate_path: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(certificate_path) = certificate_path {
+        let ca_path = env::var("SCOPLEN_OPENSSH_USER_CA_KEY")
+            .map_err(|_| "user certificate requires a pinned CA public-key path")?;
+        let certificate = Certificate::read_file(Path::new(certificate_path))?;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let certificate = UserCertificate::parse_and_validate(
+            &certificate.to_bytes()?,
+            &CertificateValidationPolicy::user(username, now),
+        )?;
+        let pinned_ca = PublicKey::read_openssh_file(ca_path)?.to_bytes()?;
+        if certificate.certificate().ca_public_key_blob() != pinned_ca {
+            return Err(UntrustedUserCa.into());
+        }
+        timeout(
+            SSH_STEP_TIMEOUT,
+            connection.authenticate_certificate(username, &certificate, signer),
+        )
+        .await??;
+    } else {
+        timeout(SSH_STEP_TIMEOUT, connection.authenticate_publickey(username, signer)).await??;
     }
     Ok(())
 }

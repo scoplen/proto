@@ -65,12 +65,12 @@ jobs:
         run: ./scripts/dropbear-interop.ps1
 
   openssh-interop:
-    name: OpenSSH SFTP and routes
+    name: OpenSSH client interoperability
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: SFTP, forwarding, ProxyCommand, SOCKS, and rejected password
+      - name: Authentication, certificates, SFTP, and routes
         shell: pwsh
         run: ./scripts/openssh-interop.ps1
 

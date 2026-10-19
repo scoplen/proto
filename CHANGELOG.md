@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Expanded the disposable OpenSSH check to cover raw Ed25519, P-256, RSA-SHA2-256/512 keys and
+  all four user-certificate variants, with wrong-password, unauthorized-key, wrong-principal,
+  local CA-pin, and server-untrusted CA failures. The shared example bounds SSH steps and
+  requires exact output and a successful exit status. CI runs the expanded fixture alongside
+  existing SFTP and route checks; the wider interoperability matrix remains incomplete.
 - Preserved multi-factor authentication continuation with method-neutral rejection errors,
   partial-success state, and the engine-recognized remaining methods in peer order. Channel and
   remote-forwarding operations now reject locally before full authentication. Fixed RSA SHA-2

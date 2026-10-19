@@ -3,20 +3,85 @@
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $container = 'scoplen-openssh-interop-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
+$tempBase = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+$tempRoot = [System.IO.Path]::GetFullPath((Join-Path $tempBase ('scoplen-openssh-keys-' + [guid]::NewGuid().ToString('N'))))
 $started = $false
+$authVariables = @(
+    'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH',
+    'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY',
+    'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY'
+)
 $testVariables = @(
     'SCOPLEN_OPENSSH_HOST', 'SCOPLEN_OPENSSH_PORT', 'SCOPLEN_OPENSSH_USER',
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_HOST_KEY', 'SCOPLEN_OPENSSH_HOST_CA_KEY',
-    'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY',
+    'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH',
+    'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY',
     'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY',
     'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_FORWARD',
     'SCOPLEN_OPENSSH_JUMP_TARGET_PORT'
 )
 foreach ($name in $testVariables) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 
+function Clear-AuthMode {
+    foreach ($name in $authVariables) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
+}
+
+function Invoke-AuthExample {
+    param([string]$caseName, [string]$expectedError = '')
+
+    $output = & cargo run --quiet --locked -p scoplen-ssh --example openssh_interop 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    if ($expectedError) {
+        if ($exitCode -eq 0 -or $output -notmatch [regex]::Escape($expectedError)) {
+            throw "$caseName did not fail as expected (exit $exitCode): $output"
+        }
+    }
+    elseif ($exitCode -ne 0 -or $output -notmatch '(?m)^openssh interop ok\s*$') {
+        throw "$caseName failed (exit $exitCode): $output"
+    }
+}
+
 try {
-    $setup = "apk add --no-cache openssh-server && adduser -D scoplen && printf 'scoplen:scoplen-test-password\n' | chpasswd && ssh-keygen -q -t ed25519 -N '' -f /tmp/host_key && mkdir -p /run/sshd && printf 'Port 2222\nListenAddress 0.0.0.0\nHostKey /tmp/host_key\nPasswordAuthentication yes\nAllowTcpForwarding yes\nSubsystem sftp internal-sftp\n' > /tmp/sshd_config && exec /usr/sbin/sshd -D -e -f /tmp/sshd_config"
-    docker run -d --rm --name $container -p '127.0.0.1::2222' alpine:3.21 sh -c $setup | Out-Null
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    $setup = @'
+set -eu
+apk add --no-cache openssh-server
+adduser -D scoplen
+printf 'scoplen:scoplen-test-password\n' | chpasswd
+ssh-keygen -q -t ed25519 -N '' -f /tmp/host_key
+ssh-keygen -q -t ed25519 -N '' -f /tmp/user_ed
+ssh-keygen -q -t ecdsa -b 256 -N '' -f /tmp/user_p256
+ssh-keygen -q -t rsa -b 3072 -N '' -f /tmp/user_rsa
+ssh-keygen -q -t ed25519 -N '' -f /tmp/wrong_ed
+ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_trusted
+ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_other
+ssh-keygen -q -s /tmp/ca_trusted -I ed25519 -n scoplen -V -1m:+10m /tmp/user_ed.pub
+mv /tmp/user_ed-cert.pub /tmp/user_ed_good-cert.pub
+ssh-keygen -q -s /tmp/ca_trusted -I p256 -n scoplen -V -1m:+10m /tmp/user_p256.pub
+ssh-keygen -q -s /tmp/ca_trusted -I rsa -n scoplen -V -1m:+10m /tmp/user_rsa.pub
+ssh-keygen -q -s /tmp/ca_trusted -I wrong-principal -n other -V -1m:+10m /tmp/user_ed.pub
+mv /tmp/user_ed-cert.pub /tmp/user_ed_wrong-principal-cert.pub
+ssh-keygen -q -s /tmp/ca_other -I untrusted-ca -n scoplen -V -1m:+10m /tmp/user_ed.pub
+mv /tmp/user_ed-cert.pub /tmp/user_ed_untrusted-cert.pub
+mkdir -p /home/scoplen/.ssh /run/sshd
+cat /tmp/user_ed.pub /tmp/user_p256.pub /tmp/user_rsa.pub > /home/scoplen/.ssh/authorized_keys
+chown -R scoplen:scoplen /home/scoplen/.ssh
+chmod 700 /home/scoplen/.ssh
+chmod 600 /home/scoplen/.ssh/authorized_keys
+cat > /tmp/sshd_config <<'SSHD'
+Port 2222
+ListenAddress 0.0.0.0
+HostKey /tmp/host_key
+PasswordAuthentication yes
+PubkeyAuthentication yes
+TrustedUserCAKeys /tmp/ca_trusted.pub
+AllowTcpForwarding yes
+Subsystem sftp internal-sftp
+SSHD
+exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
+'@
+    $setup = $setup.Replace("`r", '')
+    docker run -d --name $container -p '127.0.0.1::2222' alpine:3.21 sh -c $setup | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Failed to start disposable OpenSSH container' }
     $started = $true
 
@@ -48,6 +113,16 @@ try {
         if ($ready) { break }
     }
     if (-not $ready) { throw 'OpenSSH did not become ready within 60 seconds' }
+    $fixtureFiles = @(
+        'user_ed', 'user_p256', 'user_rsa', 'wrong_ed',
+        'ca_trusted.pub', 'ca_other.pub',
+        'user_ed_good-cert.pub', 'user_p256-cert.pub', 'user_rsa-cert.pub',
+        'user_ed_wrong-principal-cert.pub', 'user_ed_untrusted-cert.pub'
+    )
+    foreach ($name in $fixtureFiles) {
+        docker cp "${container}:/tmp/$name" (Join-Path $tempRoot $name) | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Could not copy disposable OpenSSH fixture $name" }
+    }
     $env:SCOPLEN_OPENSSH_HOST = '127.0.0.1'
     $env:SCOPLEN_OPENSSH_PORT = $port.ToString()
     $env:SCOPLEN_OPENSSH_USER = 'scoplen'
@@ -67,11 +142,63 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH nested jump interop failed' }
 
     $env:SCOPLEN_OPENSSH_PASSWORD = 'wrong-password'
-    cargo run --quiet --locked -p scoplen-ssh --example openssh_interop 2>$null
-    if ($LASTEXITCODE -eq 0) { throw 'OpenSSH accepted an incorrect password' }
-    Write-Output 'OpenSSH SFTP, forwarding, ProxyCommand, SOCKS, nested jump, and wrong-password interop passed'
+    Invoke-AuthExample 'wrong password' 'AuthenticationRejected'
+
+    Remove-Item Env:SCOPLEN_OPENSSH_SFTP, Env:SCOPLEN_OPENSSH_FORWARD, Env:SCOPLEN_OPENSSH_JUMP_TARGET_PORT
+    $keyCases = @(
+        @{ Name = 'Ed25519'; Variable = 'SCOPLEN_OPENSSH_ED25519_KEY'; File = 'user_ed'; Certificate = 'user_ed_good-cert.pub' },
+        @{ Name = 'P-256'; Variable = 'SCOPLEN_OPENSSH_P256_KEY'; File = 'user_p256'; Certificate = 'user_p256-cert.pub' },
+        @{ Name = 'RSA-SHA2-256'; Variable = 'SCOPLEN_OPENSSH_RSA_KEY'; File = 'user_rsa'; Certificate = 'user_rsa-cert.pub'; Hash = '256' },
+        @{ Name = 'RSA-SHA2-512'; Variable = 'SCOPLEN_OPENSSH_RSA_KEY'; File = 'user_rsa'; Certificate = 'user_rsa-cert.pub'; Hash = '512' }
+    )
+    foreach ($case in $keyCases) {
+        Clear-AuthMode
+        Set-Item "Env:$($case.Variable)" (Join-Path $tempRoot $case.File)
+        if ($case.Hash) { $env:SCOPLEN_OPENSSH_RSA_HASH = $case.Hash }
+        Invoke-AuthExample "$($case.Name) public key"
+    }
+
+    Clear-AuthMode
+    $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'wrong_ed'
+    Invoke-AuthExample 'unauthorized Ed25519 public key' 'AuthenticationRejected'
+
+    Clear-AuthMode
+    $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'user_ed'
+    $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot 'user_ed_wrong-principal-cert.pub'
+    $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
+    Invoke-AuthExample 'wrong user-certificate principal' 'PrincipalMismatch'
+
+    $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot 'user_ed_good-cert.pub'
+    $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_other.pub'
+    Invoke-AuthExample 'wrong local user-certificate CA pin' 'UntrustedUserCa'
+
+    $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot 'user_ed_untrusted-cert.pub'
+    Invoke-AuthExample 'server-untrusted user-certificate CA' 'AuthenticationRejected'
+
+    foreach ($case in $keyCases) {
+        Clear-AuthMode
+        Set-Item "Env:$($case.Variable)" (Join-Path $tempRoot $case.File)
+        if ($case.Hash) { $env:SCOPLEN_OPENSSH_RSA_HASH = $case.Hash }
+        $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot $case.Certificate
+        $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
+        Invoke-AuthExample "$($case.Name) user certificate"
+    }
+    Write-Output 'OpenSSH password, routes, software keys, user certificates, and rejection paths passed'
+}
+catch {
+    if ($started) {
+        $state = docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' $container 2>$null
+        if ($LASTEXITCODE -eq 0) { Write-Warning "Disposable OpenSSH state: $state" }
+        $logs = docker logs --tail 30 $container 2>&1
+        if ($LASTEXITCODE -eq 0 -and $logs) { Write-Warning "Disposable OpenSSH log:`n$($logs | Out-String)" }
+    }
+    throw
 }
 finally {
-    if ($started) { docker stop $container | Out-Null }
+    if ($started) { docker rm -f $container 2>$null | Out-Null }
+    if ($tempRoot.StartsWith($tempBase, [System.StringComparison]::OrdinalIgnoreCase) -and
+        (Test-Path -LiteralPath $tempRoot)) {
+        Remove-Item -LiteralPath $tempRoot -Recurse -Force
+    }
     foreach ($name in $testVariables) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 }
