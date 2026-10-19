@@ -73,6 +73,9 @@ jobs:
       - name: Authentication, certificates, SFTP, and routes
         shell: pwsh
         run: ./scripts/openssh-interop.ps1
+      - name: OpenSSH 8.8p1 authentication, command output, and rejection paths
+        shell: pwsh
+        run: ./scripts/openssh-8-interop.ps1
       - name: Constrained RSA signature advertisements and authentication
         shell: pwsh
         run: ./scripts/ssh-rsa-selection-interop.ps1
