@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Extended external OpenSSH repeated-rekey verification to ChaCha20-Poly1305 and AES256-GCM
+  alongside AES256-CTR, with exact bidirectional cipher/MAC logs, client/server initiation,
+  high-limit controls, binary echo, and strict NEWKEYS sequence resets. Explicit limits do not
+  establish cipher-dependent OpenSSH defaults.
 - Bound raw K-4 change-feed and snapshot queries to 37 bytes and acknowledgement requests to
   17 complete CBOR bytes before parsing. Exact-boundary and rejection vectors and public tests
   preserve all valid query and CBOR bytes.

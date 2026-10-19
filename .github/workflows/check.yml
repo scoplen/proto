@@ -112,7 +112,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Constrained algorithms, Host isolation, and strict KEX
+      - name: Constrained algorithms, Host isolation, strict KEX, and repeated rekey
         shell: pwsh
         run: ./scripts/ssh-algorithm-interop.ps1
       - name: Explicit per-Host 3DES and default rejection

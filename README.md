@@ -257,7 +257,9 @@ succeeds, then a local relay inserts a valid `SSH_MSG_IGNORE` before and after t
 KEXINIT in separate connections. The strict client rejects both before host-key verification, while a server that does
 not advertise strict KEX accepts the same packets. This covers one initial exchange and the
 selected modern algorithms. The same script runs `rekey_interop` against three dedicated OpenSSH
-listeners. Client and server 32 KiB payload thresholds separately trigger authenticated rekey;
+listeners for each of AES256-CTR, ChaCha20-Poly1305, and AES256-GCM. DEBUG3 logs verify the exact
+cipher and MAC negotiated in both directions. Client and server 32 KiB payload thresholds
+separately trigger authenticated rekey;
 a one GiB control must not rekey. Each case verifies 128 KiB of exact binary data echoed over one
 session channel and a successful exit status. OpenSSH DEBUG3 logs must show post-authentication
 KEXINIT and NEWKEYS in both directions, with the first KEXINIT received by the server for a
