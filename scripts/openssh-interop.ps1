@@ -55,6 +55,7 @@ ssh-keygen -q -t rsa -b 3072 -N '' -f /tmp/user_rsa
 ssh-keygen -q -t ed25519 -N '' -f /tmp/wrong_ed
 ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_trusted
 ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_other
+ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_krl
 ssh-keygen -q -s /tmp/ca_trusted -I ed25519 -n scoplen -V -1m:+10m /tmp/user_ed.pub
 mv /tmp/user_ed-cert.pub /tmp/user_ed_good-cert.pub
 ssh-keygen -q -s /tmp/ca_trusted -I p256 -n scoplen -V -1m:+10m /tmp/user_p256.pub
@@ -63,8 +64,20 @@ ssh-keygen -q -s /tmp/ca_trusted -I wrong-principal -n other -V -1m:+10m /tmp/us
 mv /tmp/user_ed-cert.pub /tmp/user_ed_wrong-principal-cert.pub
 ssh-keygen -q -s /tmp/ca_other -I untrusted-ca -n scoplen -V -1m:+10m /tmp/user_ed.pub
 mv /tmp/user_ed-cert.pub /tmp/user_ed_untrusted-cert.pub
+ssh-keygen -q -s /tmp/ca_krl -I krl-serial-revoked -z 4101 -n scoplen -V -1m:+10m /tmp/user_ed.pub
+mv /tmp/user_ed-cert.pub /tmp/user_ed_krl-serial-cert.pub
+ssh-keygen -q -s /tmp/ca_krl -I krl-id-revoked -z 4102 -n scoplen -V -1m:+10m /tmp/user_ed.pub
+mv /tmp/user_ed-cert.pub /tmp/user_ed_krl-id-cert.pub
+ssh-keygen -q -s /tmp/ca_krl -I krl-allowed -z 4103 -n scoplen -V -1m:+10m /tmp/user_ed.pub
+mv /tmp/user_ed-cert.pub /tmp/user_ed_krl-allowed-cert.pub
+cat > /tmp/krl_spec <<'KRL'
+serial: 4101
+id: krl-id-revoked
+KRL
+ssh-keygen -q -k -f /tmp/revoked.krl -s /tmp/ca_krl.pub /tmp/krl_spec
 mkdir -p /home/scoplen/.ssh /run/sshd
 cat /tmp/user_ed.pub /tmp/user_p256.pub /tmp/user_rsa.pub > /home/scoplen/.ssh/authorized_keys
+cat /tmp/ca_trusted.pub /tmp/ca_krl.pub > /tmp/trusted_user_cas.pub
 chown -R scoplen:scoplen /home/scoplen/.ssh
 chmod 700 /home/scoplen/.ssh
 chmod 600 /home/scoplen/.ssh/authorized_keys
@@ -74,7 +87,10 @@ ListenAddress 0.0.0.0
 HostKey /tmp/host_key
 PasswordAuthentication yes
 PubkeyAuthentication yes
-TrustedUserCAKeys /tmp/ca_trusted.pub
+TrustedUserCAKeys /tmp/trusted_user_cas.pub
+RevokedKeys /tmp/revoked.krl
+# Avoid source penalties from intentional auth failures blocking later control connections.
+PerSourcePenalties no
 AllowTcpForwarding yes
 Subsystem sftp internal-sftp
 SSHD
@@ -115,9 +131,10 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
     if (-not $ready) { throw 'OpenSSH did not become ready within 60 seconds' }
     $fixtureFiles = @(
         'user_ed', 'user_p256', 'user_rsa', 'wrong_ed',
-        'ca_trusted.pub', 'ca_other.pub',
+        'ca_trusted.pub', 'ca_other.pub', 'ca_krl.pub',
         'user_ed_good-cert.pub', 'user_p256-cert.pub', 'user_rsa-cert.pub',
-        'user_ed_wrong-principal-cert.pub', 'user_ed_untrusted-cert.pub'
+        'user_ed_wrong-principal-cert.pub', 'user_ed_untrusted-cert.pub',
+        'user_ed_krl-serial-cert.pub', 'user_ed_krl-id-cert.pub', 'user_ed_krl-allowed-cert.pub'
     )
     foreach ($name in $fixtureFiles) {
         docker cp "${container}:/tmp/$name" (Join-Path $tempRoot $name) | Out-Null
@@ -183,7 +200,23 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
         $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
         Invoke-AuthExample "$($case.Name) user certificate"
     }
-    Write-Output 'OpenSSH password, routes, software keys, user certificates, and rejection paths passed'
+
+    Clear-AuthMode
+    $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'user_ed'
+    $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_krl.pub'
+    $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot 'user_ed_krl-allowed-cert.pub'
+    Invoke-AuthExample 'unrevoked certificate from KRL-trusted CA'
+
+    $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot 'user_ed_krl-serial-cert.pub'
+    Invoke-AuthExample 'serial-revoked user certificate' 'AuthenticationRejected'
+
+    $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot 'user_ed_krl-id-cert.pub'
+    Invoke-AuthExample 'key-ID-revoked user certificate' 'AuthenticationRejected'
+
+    Clear-AuthMode
+    $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'user_ed'
+    Invoke-AuthExample 'raw public key remains valid with KRL enabled'
+    Write-Output 'OpenSSH password, routes, software keys, user certificates, KRL revocation, and rejection paths passed'
 }
 catch {
     if ($started) {

@@ -180,9 +180,13 @@ connection reuse after the failures. The disposable OpenSSH script below runs th
 the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump examples. It also tests raw keys
 and user certificates with Ed25519, P-256, RSA-SHA2-256, and RSA-SHA2-512. Rejection checks cover
 wrong passwords, unauthorized keys, wrong certificate principals, wrong local CA pins, and
-locally valid certificates from a server-untrusted CA. The Linux CI workflow runs the same script
-on each change; disposable keys and the container are removed afterward. This fixture does not
-complete the required version, platform, revocation, agent, and security-key matrix.
+locally valid certificates from a server-untrusted CA. A separate trusted CA signs three Ed25519
+certificates over one key: a KRL rejects one by serial and one by key ID, while an unrevoked
+certificate and the same raw public key still authenticate and run the exact command with exit
+status zero. OpenSSH enforces the KRL; the client does not load or parse it. The Linux CI workflow
+runs the same script on each change; disposable keys and the container are removed afterward.
+This fixture does not complete the required version, platform, agent, security-key, and broader
+certificate-revocation matrix.
 For host-certificate mode, the concrete adapter checks the certificate signature, host principal,
 validity, and critical options before the callback checks the CA pin. A disposable
 `linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and
@@ -206,8 +210,9 @@ file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The exa
 certificate signature, principal, validity, critical options, and CA pin before sending it.
 A disposable `linuxserver/openssh-server` container with `TrustedUserCAKeys` configured accepted
 the certificate; a certificate from another CA was rejected by OpenSSH. The automated Alpine
-fixture covers Ed25519, P-256, and both RSA-SHA2 variants. Revocation and the remaining certificate
-algorithms, platforms, and server versions remain unverified.
+fixture covers Ed25519, P-256, and both RSA-SHA2 variants, plus server-side KRL rejection of
+serial- and key-ID-revoked Ed25519 certificates. Other certificate revocation forms, algorithms,
+platforms, and server versions remain unverified.
 Set `SCOPLEN_OPENSSH_SFTP=1` for the same example against a disposable server to additionally
 exercise SFTP v3 on the authenticated connection. This verifies advertised OpenSSH transfer
 limits, a missing-file response with released request state, `statvfs@openssh.com` filesystem
