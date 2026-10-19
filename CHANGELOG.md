@@ -19,6 +19,11 @@ All notable changes to the `proto` repository will be recorded here.
   security-key signatures preserve those fields. A disposable OpenSSH fixture verifies both raw
   algorithms and rejects wrong-key, wrong-application, and wrong-payload signatures. Physical
   token adapters and security-key user certificates remain open.
+- Made SFTP sessions fail closed after interrupted or uncorrelated exchanges. Canceled transfers,
+  transport and protocol errors, and pipelined failures now isolate stale responses on the old
+  channel; callers receive a typed `SessionUnusable` error on later use and can open a fresh SFTP
+  channel without reconnecting the SSH transport. Fully correlated file-status rejection remains
+  reusable.
 - Verified the default ML-KEM/ChaCha20 negotiation against a disposable OpenSSH listener that
   offers only those algorithms. Pinned-key authentication, exact command output, and exit status
   pass alongside the existing modern, legacy, strict-KEX, and rekey checks; the full algorithm

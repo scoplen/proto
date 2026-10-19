@@ -45,6 +45,9 @@ pub enum SftpChannelError {
     /// The server rejected a transfer request with an SFTP status code.
     #[error("SFTP server returned status code {code}")]
     RemoteStatus { code: u32 },
+    /// An earlier exchange lost request/response correlation on this SFTP channel.
+    #[error("SFTP session is unusable; open a new SFTP channel")]
+    SessionUnusable,
 }
 
 /// Progress reported after a contiguous transfer chunk is committed.
@@ -72,9 +75,32 @@ pub struct SftpChannel {
 /// A negotiated SFTP channel with bounded request correlation and pipelining.
 #[derive(Debug)]
 pub struct SftpSession {
-    channel: SftpChannel,
+    channel: Option<SftpChannel>,
     client: SftpClient,
     limits: Option<SftpLimits>,
+}
+
+struct ActiveExchange<'a> {
+    session: &'a mut SftpSession,
+    complete: bool,
+}
+
+impl<'a> ActiveExchange<'a> {
+    fn new(session: &'a mut SftpSession) -> Self {
+        Self { session, complete: false }
+    }
+
+    fn complete(&mut self) {
+        self.complete = true;
+    }
+}
+
+impl Drop for ActiveExchange<'_> {
+    fn drop(&mut self) {
+        if !self.complete {
+            self.session.invalidate();
+        }
+    }
 }
 
 impl SftpSession {
@@ -94,7 +120,7 @@ impl SftpSession {
             version: 3,
             extensions: channel.extensions.clone(),
         })?;
-        let mut session = Self { channel, client, limits: None };
+        let mut session = Self { channel: Some(channel), client, limits: None };
         session.limits = session.request_limits().await?;
         Ok(session)
     }
@@ -102,7 +128,7 @@ impl SftpSession {
     /// Return the bounded extensions advertised by the server.
     #[must_use]
     pub fn extensions(&self) -> &[SftpExtension] {
-        self.channel.extensions()
+        self.channel.as_ref().map_or(&[], SftpChannel::extensions)
     }
 
     /// Borrow the request builder and bounded correlation state.
@@ -136,6 +162,7 @@ impl SftpSession {
     /// Returns an error when the request cannot be queued, the channel I/O fails, the response
     /// references an unknown request, or the peer returns a malformed limits body.
     pub async fn request_limits(&mut self) -> Result<Option<SftpLimits>, SftpChannelError> {
+        self.ensure_usable()?;
         if self.limits.is_some() {
             return Ok(self.limits);
         }
@@ -144,11 +171,27 @@ impl SftpSession {
             return Ok(None);
         }
         let request = self.client.request_limits()?;
-        self.send_request(&request).await?;
-        let response = self.read_response().await?;
+        let mut exchange = ActiveExchange::new(self);
+        exchange.session.send_request(&request).await?;
+        let response = exchange.session.read_response().await?;
         let limits = response.limits_response()?;
-        self.limits = Some(limits);
+        exchange.session.limits = Some(limits);
+        exchange.complete();
         Ok(Some(limits))
+    }
+
+    fn ensure_usable(&self) -> Result<(), SftpChannelError> {
+        if self.channel.is_some() { Ok(()) } else { Err(SftpChannelError::SessionUnusable) }
+    }
+
+    fn channel_mut(&mut self) -> Result<&mut SftpChannel, SftpChannelError> {
+        self.channel.as_mut().ok_or(SftpChannelError::SessionUnusable)
+    }
+
+    fn invalidate(&mut self) {
+        self.client.clear_pending();
+        // russh closes the channel on drop; no close wait can hold the parent connection.
+        drop(self.channel.take());
     }
 
     /// Send a request previously built by [`Self::client_mut`].
@@ -156,18 +199,26 @@ impl SftpSession {
     /// # Errors
     ///
     /// Returns an error when the packet does not refer to a request tracked by this session or
-    /// the channel cannot write it. A failed write releases its request slot.
+    /// the channel cannot write it. A failed or canceled in-progress write invalidates this SFTP
+    /// session; local packet rejection before dispatch leaves it usable.
     pub async fn send_request(&mut self, packet: &SftpPacket) -> Result<(), SftpChannelError> {
+        self.ensure_usable()?;
         let Some(id) = packet.request_id() else {
             return Err(SftpError::Malformed("request has no request id").into());
         };
         if !self.client.tracks_request(id) {
             return Err(SftpError::UnknownRequest.into());
         }
-        if let Err(error) = self.channel.write_packet(packet).await {
-            self.client.release_request(id);
-            return Err(error);
-        }
+        let frame = match packet.encode() {
+            Ok(frame) => frame,
+            Err(error) => {
+                self.client.release_request(id);
+                return Err(error.into());
+            }
+        };
+        let mut exchange = ActiveExchange::new(self);
+        exchange.session.channel_mut()?.write_frame(&frame).await?;
+        exchange.complete();
         Ok(())
     }
 
@@ -176,10 +227,13 @@ impl SftpSession {
     /// # Errors
     ///
     /// Returns an error when the channel ends, the packet is malformed, or its request id is not
-    /// currently pending.
+    /// currently pending. A failed or canceled response read invalidates this SFTP session.
     pub async fn read_response(&mut self) -> Result<SftpPacket, SftpChannelError> {
-        let packet = self.channel.read_packet().await?;
-        self.client.accept_response(&packet)?;
+        self.ensure_usable()?;
+        let mut exchange = ActiveExchange::new(self);
+        let packet = exchange.session.channel_mut()?.read_packet().await?;
+        exchange.session.client.accept_response(&packet)?;
+        exchange.complete();
         Ok(packet)
     }
 
@@ -192,7 +246,9 @@ impl SftpSession {
     /// # Errors
     ///
     /// Returns an error for invalid bounds, a failed or rejected request, malformed responses,
-    /// or sink I/O. A failed transfer releases all request slots reserved by this operation.
+    /// or sink I/O. A failed or canceled active transfer invalidates this SFTP session, except a
+    /// fully correlated remote-status rejection with no pending responses. Local validation before
+    /// dispatch leaves it usable.
     #[allow(clippy::too_many_arguments)]
     pub async fn download_to<W, F>(
         &mut self,
@@ -208,16 +264,22 @@ impl SftpSession {
         W: AsyncWrite + Unpin,
         F: FnMut(SftpTransferProgress),
     {
+        self.ensure_usable()?;
         if total.is_some_and(|end| end < start_offset) {
             return Err(SftpError::InvalidValue("transfer range").into());
         }
         let chunk_size = effective_chunk_size(chunk_size, self.limits, true)?;
         validate_transfer(handle, chunk_size, pipeline, self.pending_requests())?;
-        let result = self
+        let mut exchange = ActiveExchange::new(self);
+        let result = exchange
+            .session
             .download_to_inner(handle, start_offset, total, chunk_size, pipeline, sink, progress)
             .await;
-        if result.is_err() {
-            self.client.clear_pending();
+        if result.is_ok()
+            || (matches!(result, Err(SftpChannelError::RemoteStatus { .. }))
+                && exchange.session.pending_requests() == 0)
+        {
+            exchange.complete();
         }
         result
     }
@@ -347,7 +409,9 @@ impl SftpSession {
     /// # Errors
     ///
     /// Returns an error for invalid bounds, failed writes, malformed responses, or a non-zero
-    /// remote status. A failed transfer releases all request slots reserved by this operation.
+    /// remote status. A failed or canceled active transfer invalidates this SFTP session, except a
+    /// fully correlated remote-status rejection with no pending responses. Local validation before
+    /// dispatch leaves it usable.
     pub async fn upload(
         &mut self,
         handle: &[u8],
@@ -357,15 +421,22 @@ impl SftpSession {
         pipeline: usize,
         progress: impl FnMut(SftpTransferProgress),
     ) -> Result<u64, SftpChannelError> {
+        self.ensure_usable()?;
         start_offset
             .checked_add(data.len() as u64)
             .ok_or(SftpError::InvalidValue("transfer length"))?;
         let chunk_size = effective_chunk_size(chunk_size, self.limits, false)?;
         validate_transfer(handle, chunk_size, pipeline, self.pending_requests())?;
-        let result =
-            self.upload_inner(handle, start_offset, data, chunk_size, pipeline, progress).await;
-        if result.is_err() {
-            self.client.clear_pending();
+        let mut exchange = ActiveExchange::new(self);
+        let result = exchange
+            .session
+            .upload_inner(handle, start_offset, data, chunk_size, pipeline, progress)
+            .await;
+        if result.is_ok()
+            || (matches!(result, Err(SftpChannelError::RemoteStatus { .. }))
+                && exchange.session.pending_requests() == 0)
+        {
+            exchange.complete();
         }
         result
     }
@@ -520,7 +591,11 @@ impl SftpChannel {
     /// accept the complete frame.
     pub async fn write_packet(&mut self, packet: &SftpPacket) -> Result<(), SftpChannelError> {
         let frame = packet.encode()?;
-        self.stream.write_all(&frame).await?;
+        self.write_frame(&frame).await
+    }
+
+    async fn write_frame(&mut self, frame: &[u8]) -> Result<(), SftpChannelError> {
+        self.stream.write_all(frame).await?;
         self.stream.flush().await?;
         Ok(())
     }
@@ -1116,6 +1191,45 @@ mod tests {
             }
         }
 
+        fn write_response(
+            &mut self,
+            id: u32,
+            handle: &[u8],
+            offset: u64,
+            data: &[u8],
+        ) -> Option<SftpPacket> {
+            let code = if handle == b"reject" {
+                4
+            } else {
+                let start = usize::try_from(offset).ok()?;
+                let end = start.saturating_add(data.len());
+                if end > self.file.len() {
+                    self.file.resize(end, 0);
+                }
+                self.file[start..end].copy_from_slice(data);
+                0
+            };
+            Some(SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() })
+        }
+
+        fn corrupt_read_response(
+            packet: &SftpPacket,
+            channel: russh::ChannelId,
+            session: &mut russh::server::Session,
+        ) -> bool {
+            let SftpPacket::Read { handle, .. } = packet else { return false };
+            if handle == b"malformed-wire" {
+                let _ = session.data(channel, vec![0, 0, 0, 1, 0xff]);
+                return true;
+            }
+            if handle == b"truncated-wire" {
+                let _ = session.data(channel, vec![0, 0, 0, 8, 0x67]);
+                let _ = session.close(channel);
+                return true;
+            }
+            false
+        }
+
         fn realpath_response(id: u32, path: &[u8]) -> SftpPacket {
             let resolved = match path {
                 b"." => b"/srv".to_vec(),
@@ -1250,6 +1364,9 @@ mod tests {
                 let Ok(packet) = SftpPacket::decode(&frame) else {
                     return Ok(());
                 };
+                if Self::corrupt_read_response(&packet, channel, session) {
+                    continue;
+                }
                 let is_read = matches!(packet, SftpPacket::Read { .. });
                 let response = if let Some(response) = self
                     .directory_response(&packet)
@@ -1296,21 +1413,18 @@ mod tests {
                         {
                             self.remove_extension_file(id, &path)
                         }
-                        SftpPacket::Write { id, offset, data, .. } => {
-                            let Ok(start) = usize::try_from(offset) else {
+                        SftpPacket::Write { id, handle, offset, data } => {
+                            if handle == b"stall" || handle == b"close" {
+                                if handle == b"close" {
+                                    let _ = session.close(channel);
+                                }
+                                continue;
+                            }
+                            let Some(response) = self.write_response(id, &handle, offset, &data)
+                            else {
                                 return Ok(());
                             };
-                            let end = start.saturating_add(data.len());
-                            if end > self.file.len() {
-                                self.file.resize(end, 0);
-                            }
-                            self.file[start..end].copy_from_slice(&data);
-                            SftpPacket::Status {
-                                id,
-                                code: 0,
-                                message: Vec::new(),
-                                language: Vec::new(),
-                            }
+                            response
                         }
                         SftpPacket::Extended { id, name, data } => {
                             let Some(response) = self.extension_response(id, &name, &data) else {
@@ -1511,6 +1625,216 @@ mod tests {
         assert!(matches!(
             error,
             SftpChannelError::Protocol(SftpError::Malformed("empty read response"))
+        ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn failed_pipelined_download_does_not_accept_new_work_on_stale_channel() {
+        let (connection, mut session) =
+            transfer_session(b"abc".to_vec(), Some(0), false, false).await;
+        let mut downloaded = Vec::new();
+        let error = session
+            .download_to(b"h", 0, Some(4), 2, 2, &mut downloaded, |_| {})
+            .await
+            .expect_err("empty response with another read in flight");
+        assert!(matches!(
+            error,
+            SftpChannelError::Protocol(SftpError::Malformed("empty read response"))
+        ));
+        let next = session.client_mut().realpath(b"/first").expect("next request");
+        assert!(matches!(
+            session.send_request(&next).await,
+            Err(SftpChannelError::SessionUnusable)
+        ));
+        assert!(matches!(session.read_response().await, Err(SftpChannelError::SessionUnusable)));
+        assert!(matches!(session.request_limits().await, Err(SftpChannelError::SessionUnusable)));
+
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
+        ));
+        let independent = connection.open_session().await.expect("independent SSH session");
+        independent.close().await.expect("close independent session");
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn fully_correlated_file_rejection_and_local_validation_keep_session_usable() {
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+        let validation = session.upload(b"", 0, b"data", 2, 1, |_| {}).await;
+        assert!(matches!(validation, Err(SftpChannelError::Protocol(SftpError::InvalidValue(_)))));
+        let rejection = session.upload(b"reject", 0, b"ab", 2, 1, |_| {}).await;
+        assert!(matches!(rejection, Err(SftpChannelError::RemoteStatus { code: 4 })));
+        assert_eq!(session.pending_requests(), 0);
+        let request = session.client_mut().realpath(b"/first").expect("follow-up request");
+        session.send_request(&request).await.expect("same session remains usable");
+        assert!(matches!(
+            session.read_response().await.expect("follow-up"),
+            SftpPacket::Name { .. }
+        ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn pipelined_file_rejection_invalidates_only_its_sftp_channel() {
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+        let rejection = session.upload(b"reject", 0, b"abcd", 2, 2, |_| {}).await;
+        assert!(matches!(rejection, Err(SftpChannelError::RemoteStatus { code: 4 })));
+        assert_eq!(session.pending_requests(), 0);
+        let request = session.client_mut().realpath(b"/first").expect("follow-up request");
+        assert!(matches!(
+            session.send_request(&request).await,
+            Err(SftpChannelError::SessionUnusable)
+        ));
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
+        ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn canceled_or_timed_out_exchanges_invalidate_only_the_sftp_session() {
+        let (connection, mut session) = transfer_session(b"data".to_vec(), None, true, false).await;
+        let mut downloaded = Vec::new();
+        assert!(
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                session.download_to(b"h", 0, Some(2), 2, 1, &mut downloaded, |_| {})
+            )
+            .await
+            .is_err()
+        );
+        assert!(matches!(
+            session.upload(b"h", 0, b"x", 1, 1, |_| {}).await,
+            Err(SftpChannelError::SessionUnusable)
+        ));
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
+        ));
+        connection.disconnect().await.expect("disconnect client");
+
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+        assert!(
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                session.upload(b"stall", 0, b"x", 1, 1, |_| {})
+            )
+            .await
+            .is_err()
+        );
+        assert!(matches!(session.read_response().await, Err(SftpChannelError::SessionUnusable)));
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/second").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
+        ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn canceled_low_level_response_wait_invalidates_its_channel() {
+        let (connection, mut session) = transfer_session(b"data".to_vec(), None, true, false).await;
+        let request = session.client_mut().read(b"h", 0, 2).expect("read request");
+        session.send_request(&request).await.expect("send read");
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), session.read_response())
+                .await
+                .is_err()
+        );
+        assert!(matches!(session.read_response().await, Err(SftpChannelError::SessionUnusable)));
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
+        ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn channel_transport_failure_invalidates_sftp_but_keeps_parent_connection() {
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+        let error =
+            session.upload(b"close", 0, b"data", 2, 1, |_| {}).await.expect_err("closed channel");
+        assert!(matches!(
+            error,
+            SftpChannelError::Closed | SftpChannelError::Truncated | SftpChannelError::Io(_)
+        ));
+        assert!(matches!(session.request_limits().await, Err(SftpChannelError::SessionUnusable)));
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
+        ));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn malformed_or_truncated_packets_invalidate_only_the_sftp_channel() {
+        for (handle, expected_truncated) in
+            [(b"malformed-wire".as_slice(), false), (b"truncated-wire".as_slice(), true)]
+        {
+            let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+            let mut downloaded = Vec::new();
+            let error = session
+                .download_to(handle, 0, Some(2), 2, 1, &mut downloaded, |_| {})
+                .await
+                .expect_err("bad wire");
+            if expected_truncated {
+                assert!(matches!(error, SftpChannelError::Truncated));
+            } else {
+                assert!(matches!(error, SftpChannelError::Protocol(_)));
+            }
+            assert!(matches!(
+                session.read_response().await,
+                Err(SftpChannelError::SessionUnusable)
+            ));
+            let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+            let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+            fresh.send_request(&request).await.expect("fresh send");
+            assert!(matches!(
+                fresh.read_response().await.expect("fresh response"),
+                SftpPacket::Name { .. }
+            ));
+            connection.disconnect().await.expect("disconnect client");
+        }
+    }
+
+    #[tokio::test]
+    async fn sink_failure_with_inflight_responses_invalidates_sftp_channel() {
+        let (connection, mut session) =
+            transfer_session(b"abcd".to_vec(), None, false, false).await;
+        let (mut sink, reader) = tokio::io::duplex(1);
+        drop(reader);
+        let error = session
+            .download_to(b"h", 0, Some(4), 2, 2, &mut sink, |_| {})
+            .await
+            .expect_err("closed sink");
+        assert!(matches!(error, SftpChannelError::Io(_)));
+        assert!(matches!(session.request_limits().await, Err(SftpChannelError::SessionUnusable)));
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(
+            fresh.read_response().await.expect("fresh response"),
+            SftpPacket::Name { .. }
         ));
         connection.disconnect().await.expect("disconnect client");
     }
