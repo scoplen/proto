@@ -2366,6 +2366,7 @@ dependencies = [
 name = "scoplen-api"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "prost",
  "prost-build",
  "prost-types",
@@ -2373,6 +2374,7 @@ dependencies = [
  "scoplen-model",
  "serde",
  "serde_json",
+ "ssh-key",
  "thiserror",
  "tokio-stream",
  "tonic",

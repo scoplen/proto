@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added bounded gateway-ticket issuance request/response JSON codecs, canonical SSH public-key
+  and edge-address validation, redacted credentials, and the `gateway.invalid_request` problem
+  code. OpenAPI, generated TypeScript, vectors, and both dependency graphs are synchronized;
+  provisional ticket resource CRUD and idempotency are removed. Ticket claims/signatures,
+  authorization, raw-TLS proof binding, and atomic single-use consumption remain incomplete.
 - Reject bare hexadecimal IPv4 markers such as `0x` and `edge.0x` in device-authentication
   origins and DPoP targets, including non-default ports. This prevents signed origins from
   changing under URL host parsing; canonical IPv4 and ordinary non-final DNS labels remain valid.
