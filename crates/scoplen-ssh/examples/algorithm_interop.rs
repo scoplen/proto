@@ -23,6 +23,7 @@ const COMMAND_OUTPUT: &[u8] = b"scoplen-algorithm-ok";
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let modern_port = env::var("SCOPLEN_ALGORITHM_MODERN_PORT")?.parse()?;
+    let mlkem_port = env::var("SCOPLEN_ALGORITHM_MLKEM_PORT")?.parse()?;
     let legacy_port = env::var("SCOPLEN_ALGORITHM_LEGACY_PORT")?.parse()?;
     let legacy_cipher =
         env::var("SCOPLEN_ALGORITHM_LEGACY_CIPHER").unwrap_or_else(|_| "aes256-cbc".to_owned());
@@ -38,6 +39,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connection = connect(modern, modern_port).await?;
     verify_command(connection, &username, &password).await?;
     require_checks(&modern_checks, 1, "modern Host")?;
+
+    let (mlkem, mlkem_checks) = pinned_config("mlkem.example.test", mlkem_port, &expected_key)?;
+    let connection = connect(mlkem, mlkem_port).await?;
+    verify_command(connection, &username, &password).await?;
+    require_checks(&mlkem_checks, 1, "ML-KEM Host")?;
 
     let (legacy_default, default_checks) =
         pinned_config("legacy-default.example.test", legacy_port, &expected_key)?;
@@ -58,7 +64,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     reject_unshared_algorithms(other, legacy_port).await?;
     require_checks(&other_checks, 0, "other default Host")?;
 
-    println!("OpenSSH constrained modern, legacy opt-in, and Host isolation passed");
+    println!(
+        "OpenSSH constrained Curve25519/AES-CTR, ML-KEM/ChaCha20, legacy opt-in, and Host isolation passed"
+    );
     Ok(())
 }
 

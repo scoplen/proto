@@ -7,7 +7,8 @@ $PSNativeCommandUseErrorActionPreference = $false
 $container = 'scoplen-algorithm-interop-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
 $started = $false
 $testVariables = @(
-    'SCOPLEN_ALGORITHM_MODERN_PORT', 'SCOPLEN_ALGORITHM_LEGACY_PORT',
+    'SCOPLEN_ALGORITHM_MODERN_PORT', 'SCOPLEN_ALGORITHM_MLKEM_PORT',
+    'SCOPLEN_ALGORITHM_LEGACY_PORT',
     'SCOPLEN_ALGORITHM_HOST_KEY', 'SCOPLEN_ALGORITHM_USER', 'SCOPLEN_ALGORITHM_PASSWORD',
     'SCOPLEN_ALGORITHM_LEGACY_CIPHER',
     'SCOPLEN_REKEY_CLIENT_PORT', 'SCOPLEN_REKEY_SERVER_PORT', 'SCOPLEN_REKEY_CONTROL_PORT'
@@ -62,6 +63,17 @@ Ciphers aes256-ctr
 MACs hmac-sha2-256-etm@openssh.com
 Compression no
 SSHD
+cat > /tmp/mlkem.conf <<'SSHD'
+Port 2227
+ListenAddress 0.0.0.0
+HostKey /tmp/host_key
+PasswordAuthentication yes
+KexAlgorithms mlkem768x25519-sha256
+HostKeyAlgorithms ssh-ed25519
+Ciphers chacha20-poly1305@openssh.com
+MACs hmac-sha2-256-etm@openssh.com
+Compression no
+SSHD
 cat > /tmp/legacy.conf <<'SSHD'
 Port 2223
 ListenAddress 0.0.0.0
@@ -96,19 +108,21 @@ SSHD
     /usr/sbin/sshd -D -E "/tmp/rekey-$mode.log" -f "/tmp/rekey-$mode.conf" &
 done
 /usr/sbin/sshd -t -f /tmp/modern.conf
+/usr/sbin/sshd -t -f /tmp/mlkem.conf
 /usr/sbin/sshd -t -f /tmp/legacy.conf
 /usr/sbin/sshd -D -e -f /tmp/modern.conf &
+/usr/sbin/sshd -D -e -f /tmp/mlkem.conf &
 exec /usr/sbin/sshd -D -e -f /tmp/legacy.conf
 '@
     # A CRLF checkout leaves carriage returns in PowerShell here-strings; Alpine sh rejects them.
     $setup = $setup.Replace("`r", '')
     $setup = $setup.Replace('Ciphers aes256-cbc', "Ciphers $LegacyCipher")
-    docker run -d --name $container -p '127.0.0.1::2222' -p '127.0.0.1::2223' -p '127.0.0.1::2224' -p '127.0.0.1::2225' -p '127.0.0.1::2226' alpine:3.21 sh -c $setup | Out-Null
+    docker run -d --name $container -p '127.0.0.1::2222' -p '127.0.0.1::2223' -p '127.0.0.1::2224' -p '127.0.0.1::2225' -p '127.0.0.1::2226' -p '127.0.0.1::2227' alpine:3.21 sh -c $setup | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Failed to start disposable OpenSSH algorithm container' }
     $started = $true
 
     $ports = @{}
-    foreach ($serverPort in @(2222, 2223, 2224, 2225, 2226)) {
+    foreach ($serverPort in @(2222, 2223, 2224, 2225, 2226, 2227)) {
         $published = docker port $container "$serverPort/tcp"
         if ($LASTEXITCODE -ne 0 -or $published -notmatch '^127\.0\.0\.1:(\d+)$') {
             throw "Disposable OpenSSH port $serverPort was not published on loopback"
@@ -137,6 +151,7 @@ exec /usr/sbin/sshd -D -e -f /tmp/legacy.conf
     if (-not $ready) { throw 'Constrained OpenSSH listeners did not become ready within 60 seconds' }
 
     $env:SCOPLEN_ALGORITHM_MODERN_PORT = $ports[2222].ToString()
+    $env:SCOPLEN_ALGORITHM_MLKEM_PORT = $ports[2227].ToString()
     $env:SCOPLEN_ALGORITHM_LEGACY_PORT = $ports[2223].ToString()
     $env:SCOPLEN_ALGORITHM_LEGACY_CIPHER = $LegacyCipher
     $env:SCOPLEN_ALGORITHM_HOST_KEY = $hostKey

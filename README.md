@@ -142,13 +142,15 @@ trust pin, authentication, exact command output, and exit status zero. Password,
 both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
 wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
-`pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners with one modern
-algorithm set and one legacy-only set. The `algorithm_interop` example verifies an authenticated
-command on the modern set, handshake rejection by the default policy on the legacy set, a working
-command after per-Host legacy opt-in, and rejection by another default Host. Pass
+`pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners constrained to
+Curve25519/AES-CTR, ML-KEM/ChaCha20, and one legacy-only set. The `algorithm_interop` example
+verifies a pinned host key, authenticated command, exact output, and exit status for both modern
+sets, handshake rejection by the default policy on the legacy set, a working command after per-Host
+legacy opt-in, and rejection by another default Host. Pass
 `-LegacyCipher 3des-cbc` to constrain the legacy listener to 3DES instead of AES-CBC.
 The concrete engine includes 3DES support, but offers it only when that Host explicitly enables
-`3des-cbc` through `HostAlgorithmPolicy::with_legacy`. CI checks both constrained ciphers.
+`3des-cbc` through `HostAlgorithmPolicy::with_legacy`. CI checks both constrained ciphers. The
+remaining algorithm and platform interoperability matrix is incomplete.
 The same script runs `strict_kex_interop`: a pinned-key, password-authenticated OpenSSH command
 succeeds, then a local relay inserts a valid `SSH_MSG_IGNORE` before and after the server's first
 KEXINIT in separate connections. The strict client rejects both before host-key verification, while a server that does
