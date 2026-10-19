@@ -4,6 +4,19 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Extended the pinned OpenSSH 8.8p1 fixture with the existing SFTP v3 workflow, including exact
+  streaming-upload length and resume offset, directory and metadata operations, advertised
+  extensions, and explicit `copy-data` unsupported response. CI runs this shared example against
+  the 8.8 server while newer fixtures retain their full extension checks.
+- Added D-102 Route proxy-username field validation and canonical clear/merge vectors. HTTP CONNECT
+  now rejects non-ASCII Basic credentials and usernames containing `:` before opening a proxy
+  socket, while SOCKS5 retains its byte-string credential interface. Public proxy transport and
+  SSH-route tests cover authenticated success, rejection, and invalid-credential preflight. Basic
+  encoding also handles a two-byte final Base64 group without aborting the connection task.
+- Added bounded async-reader SFTP uploads with explicit byte count and remote resume offset.
+  Slice and stream uploads share contiguous progress and pipeline accounting, including
+  out-of-order acknowledgements. Source failures isolate the SFTP channel; the OpenSSH
+  interoperability fixture exercises streaming resume with exact byte comparison.
 - Covered D-77 cancellation during a blocked outbound SFTP write through an authenticated SSH
   channel whose peer stops replenishing its write window. The canceled session releases its
   request slot; independent and replacement channels still work on the parent connection.

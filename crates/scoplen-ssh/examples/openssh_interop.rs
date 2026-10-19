@@ -961,7 +961,10 @@ async fn verify_standard_rename(
     Ok(())
 }
 
-fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::error::Error>> {
+fn verify_sftp_capabilities(
+    session: &SftpSession,
+    openssh_8: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     if session.limits().is_none() {
         return Err("OpenSSH did not advertise SFTP transfer limits".into());
     }
@@ -980,8 +983,9 @@ fn verify_sftp_capabilities(session: &SftpSession) -> Result<(), Box<dyn std::er
     if !session.extensions().iter().any(|extension| extension.name == b"expand-path@openssh.com") {
         return Err("OpenSSH did not advertise expand-path@openssh.com".into());
     }
-    if !session.extensions().iter().any(|extension| extension.name == b"copy-data") {
-        return Err("OpenSSH did not advertise copy-data".into());
+    let copy_data = session.extensions().iter().any(|extension| extension.name == b"copy-data");
+    if copy_data == openssh_8 {
+        return Err("OpenSSH copy-data advertisement did not match the selected fixture".into());
     }
     if !session.extensions().iter().any(|extension| extension.name == b"lsetstat@openssh.com") {
         return Err("OpenSSH did not advertise lsetstat@openssh.com".into());
@@ -1015,9 +1019,49 @@ async fn verify_failed_pipelined_sftp_write(
     Ok(session)
 }
 
+async fn upload_sftp_stream(
+    session: &mut SftpSession,
+    handle: &[u8],
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut source_with_tail = data.to_vec();
+    source_with_tail.extend_from_slice(b"unread-after-declared-length");
+    let mut source = source_with_tail.as_slice();
+    let mut progress = Vec::new();
+    let first = session
+        .upload_from(handle, 0, 40_000, 4096, 4, &mut source, |event| progress.push(event))
+        .await?;
+    if progress.last().is_none_or(|event| {
+        event.offset != first || event.transferred != first || event.total != Some(first)
+    }) {
+        return Err("SFTP first upload offset or progress mismatch".into());
+    }
+    let second = session
+        .upload_from(handle, first, 60_000, 4096, 4, &mut source, |event| progress.push(event))
+        .await?;
+    if first != 40_000
+        || second != 60_000
+        || source != b"unread-after-declared-length"
+        || progress.last().is_none_or(|event| {
+            event.offset != data.len() as u64
+                || event.transferred != second
+                || event.total != Some(data.len() as u64)
+        })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP upload or progress mismatch".into());
+    }
+    Ok(())
+}
+
 async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
+    let openssh_8 = match env::var("SCOPLEN_OPENSSH_SFTP_PROFILE") {
+        Ok(profile) if profile == "8.8p1" => true,
+        Err(env::VarError::NotPresent) => false,
+        _ => return Err("SCOPLEN_OPENSSH_SFTP_PROFILE must be 8.8p1 when set".into()),
+    };
     let mut session = SftpSession::open(connection, 4).await?;
-    verify_sftp_capabilities(&session)?;
+    verify_sftp_capabilities(&session, openssh_8)?;
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let path = format!(".scoplen-interop-{}-{nonce}", std::process::id()).into_bytes();
     let linked_path = [path.as_slice(), b"-link"].concat();
@@ -1038,28 +1082,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
         other => return Err(format!("unexpected SFTP create response: {other:?}").into()),
     };
     let data: Vec<u8> = (0..=u8::MAX).cycle().take(100_000).collect();
-    let mut upload_progress = Vec::new();
-    let first = session
-        .upload(&write_handle, 0, &data[..40_000], 4096, 4, |event| {
-            upload_progress.push(event);
-        })
-        .await?;
-    let second = session
-        .upload(&write_handle, first, &data[40_000..], 4096, 4, |event| {
-            upload_progress.push(event);
-        })
-        .await?;
-    if first != 40_000
-        || second != 60_000
-        || upload_progress.last().is_none_or(|event| {
-            event.offset != data.len() as u64
-                || event.transferred != second
-                || event.total != Some(data.len() as u64)
-        })
-        || session.pending_requests() != 0
-    {
-        return Err("SFTP upload or progress mismatch".into());
-    }
+    upload_sftp_stream(&mut session, &write_handle, &data).await?;
     verify_fsync(&mut session, &write_handle, true).await?;
     verify_fstatvfs(&mut session, &write_handle, true).await?;
     verify_fstat(&mut session, &write_handle, Some(data.len() as u64)).await?;
@@ -1104,7 +1127,19 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     {
         return Err("SFTP resumed download or progress mismatch".into());
     }
-    verify_copy_data(&mut session, &read_handle, &path, &data).await?;
+    if openssh_8 {
+        let unsupported =
+            session.client_mut().copy_data(read_handle.clone(), 0, 1, read_handle.clone(), 0)?;
+        if !matches!(
+            sftp_response(&mut session, unsupported).await?,
+            SftpPacket::Status { code: 8, .. }
+        ) || session.pending_requests() != 0
+        {
+            return Err("OpenSSH 8.8p1 did not reject unsupported copy-data cleanly".into());
+        }
+    } else {
+        verify_copy_data(&mut session, &read_handle, &path, &data).await?;
+    }
     let close = session.client_mut().close(read_handle)?;
     if !matches!(sftp_response(&mut session, close).await?, SftpPacket::Status { code: 0, .. }) {
         return Err("SFTP read handle close failed".into());
