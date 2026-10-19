@@ -368,6 +368,10 @@ those success and failure responses too.
 The standard SFTP v3 `RENAME` request separately checks missing-source rejection, refusal to
 replace an existing file, byte-preserving moves in both directions, request-slot release, and
 cleanup. The authenticated in-process server covers the same lifecycle.
+The transfer uses 100,000 bytes cycling through every byte value. Four pipelined writes to a
+read-only handle must return a remote status failure and leave that SFTP session unusable. A
+fresh SFTP channel reads the unchanged file, and an independent SSH session still opens on the
+same authenticated connection.
 The same SFTP run creates a unique directory and file, reads directory entries until EOF, rejects
 a missing directory, a nonempty directory removal, and a read from a closed directory handle,
 then removes both paths and checks that the directory is gone. Each response releases its request

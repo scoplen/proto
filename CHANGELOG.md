@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Broadened external OpenSSH SFTP transfers to all byte values and verified that a rejected
+  four-request write pipeline invalidates only its SFTP session. A fresh channel reads the
+  unchanged file and an independent SSH session still opens on the same connection.
 - Extended external OpenSSH repeated-rekey verification to ChaCha20-Poly1305 and AES256-GCM
   alongside AES256-CTR, with exact bidirectional cipher/MAC logs, client/server initiation,
   high-limit controls, binary echo, and strict NEWKEYS sequence resets. Explicit limits do not
