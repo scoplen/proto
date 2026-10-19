@@ -386,8 +386,76 @@ const accountStartIndex = finalGeneratedTypes.indexOf(accountStart);
 const accountEndIndex = finalGeneratedTypes.indexOf(accountEnd, accountStartIndex + accountStart.length);
 if (accountStartIndex < 0 || accountEndIndex < 0) throw new Error("types.ts is missing its generated account-profile section");
 const completeGeneratedTypes = `${finalGeneratedTypes.slice(0, accountStartIndex + accountStart.length)}${accountLines.join("\n")}\n${finalGeneratedTypes.slice(accountEndIndex)}`;
+const personalShapes = {
+  PersonalInvitationRequest: [],
+  PersonalInvitationResponse: ["invitation_url", "expires_at"],
+  PersonalEnrollmentRequest: ["invitation_token", "account_id", "personal_vault_id", "account_signing_public_key", "account_kem_public_key", "key_bundle_update", "device_certificate", "wrapped_personal_vault_key", "device_signature"],
+  PersonalEnrollmentResponse: ["account_id", "device_id", "personal_vault_id"],
+};
+const personalLines = [];
+for (const [name, fields] of Object.entries(personalShapes)) {
+  const schema = document.components?.schemas?.[name];
+  const isRequest = name.endsWith("Request");
+  if (schema?.type !== "object" || schema.additionalProperties !== !isRequest ||
+      JSON.stringify(schema.required) !== JSON.stringify(fields) ||
+      JSON.stringify(Object.keys(schema.properties ?? {})) !== JSON.stringify(fields)) {
+    throw new Error(`${name} differs from D-101`);
+  }
+  if (fields.length === 0) {
+    personalLines.push(`export type ${name} = Record<string, never>;`, "");
+    continue;
+  }
+  personalLines.push(`export interface ${name} {`);
+  for (const field of fields) {
+    const property = schema.properties[field];
+    if (property.type !== "string" ||
+        (["account_id", "device_id", "personal_vault_id"].includes(field) &&
+          (property.format !== "uuid" || property.pattern !== authPatterns.device_id)) ||
+        (field === "expires_at" && (property.format !== "date-time" || property.pattern !== authPatterns.server_time)) ||
+        (["invitation_token", "account_signing_public_key", "account_kem_public_key"].includes(field) &&
+          (property.minLength !== 43 || property.maxLength !== 43 || property.pattern !== "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$")) ||
+        (field === "device_signature" && (property.minLength !== 86 || property.maxLength !== 86 || property.pattern !== "^[A-Za-z0-9_-]{85}[AQgw]$")) ||
+        (["device_certificate", "wrapped_personal_vault_key"].includes(field) && property.maxLength !== 87382) ||
+        (field === "key_bundle_update" && !property.description?.includes("K-4")) ||
+        (field === "invitation_url" && (property.maxLength !== 2105 || !property.description?.includes("bearer credential")))) {
+      throw new Error(`${name}.${field} differs from D-101`);
+    }
+    personalLines.push(`  ${field}: string;`);
+  }
+  if (!isRequest) personalLines.push("  [extension: string]: unknown;");
+  personalLines.push("}", "");
+}
+for (const [path, operationId, request, response, maxRequest, maxResponse, referrer] of [
+  ["/admin/personal-invitations", "issuePersonalInvitation", "PersonalInvitationRequest", "PersonalInvitationResponse", 256, 4096, true],
+  ["/auth/personal-enroll", "enrollPersonalDevice", "PersonalEnrollmentRequest", "PersonalEnrollmentResponse", 1048576, 256, false],
+]) {
+  const operation = document.paths?.[path]?.post;
+  const success = operation?.responses?.["201"];
+  if (operation?.operationId !== operationId ||
+      (path.includes("/auth/") && JSON.stringify(operation.security) !== "[]") ||
+      !operation.description?.includes("Idempotency-Key") ||
+      (path.includes("/auth/") && !operation.description?.includes("401 auth.enrollment_denied")) ||
+      operation.requestBody?.required !== true ||
+      !operation.requestBody.description?.includes(`${maxRequest} bytes`) ||
+      operation.requestBody.content?.["application/json"]?.schema?.$ref !== `#/components/schemas/${request}` ||
+      !success?.description?.includes(`${maxResponse} bytes`) ||
+      success.content?.["application/json"]?.schema?.$ref !== `#/components/schemas/${response}` ||
+      success.headers?.["Cache-Control"]?.schema?.const !== "no-store" ||
+      success.headers?.Pragma?.schema?.const !== "no-cache" ||
+      (referrer && success.headers?.["Referrer-Policy"]?.schema?.const !== "no-referrer") ||
+      !["400", "401", "403", "413", "415", "503", "default"].every((status) =>
+        operation.responses?.[status]?.$ref === "#/components/responses/Problem")) {
+    throw new Error(`${path} differs from D-101`);
+  }
+}
+const personalStart = "// BEGIN GENERATED PersonalEnrollment\n";
+const personalEnd = "// END GENERATED PersonalEnrollment";
+const personalStartIndex = completeGeneratedTypes.indexOf(personalStart);
+const personalEndIndex = completeGeneratedTypes.indexOf(personalEnd, personalStartIndex + personalStart.length);
+if (personalStartIndex < 0 || personalEndIndex < 0) throw new Error("types.ts is missing its generated Personal enrollment section");
+const completePersonalTypes = `${completeGeneratedTypes.slice(0, personalStartIndex + personalStart.length)}${personalLines.join("\n")}${completeGeneratedTypes.slice(personalEndIndex)}`;
 const generatedPaths = `// SPDX-License-Identifier: Apache-2.0\n// Generated by openapi/generate.mjs.\nexport const controlPlanePaths = ${JSON.stringify(paths, null, 2)} as const;\n`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeGeneratedTypes]];
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completePersonalTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

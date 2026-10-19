@@ -3,9 +3,11 @@
 export const controlPlanePaths = [
   "/accounts/me",
   "/accounts/me/devices",
+  "/admin/personal-invitations",
   "/admin/settings",
   "/auth/challenge",
   "/auth/device",
+  "/auth/personal-enroll",
   "/auth/refresh",
   "/orgs/{org}",
   "/orgs/{org}/access-profiles",

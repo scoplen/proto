@@ -2371,6 +2371,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "protoc-bin-vendored",
+ "scoplen-crypto",
  "scoplen-model",
  "serde",
  "serde_json",

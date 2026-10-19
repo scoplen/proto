@@ -26,6 +26,10 @@ export interface components {
     CertificateHostGroupRequest: CertificateHostGroupRequest;
     CertificateIssuanceResponse: CertificateIssuanceResponse;
     AccountProfile: AccountProfile;
+    PersonalInvitationRequest: PersonalInvitationRequest;
+    PersonalInvitationResponse: PersonalInvitationResponse;
+    PersonalEnrollmentRequest: PersonalEnrollmentRequest;
+    PersonalEnrollmentResponse: PersonalEnrollmentResponse;
     Account: Resource;
     Device: Resource;
     Organization: Resource;
@@ -84,6 +88,34 @@ export interface AccountProfileData {
   [extension: string]: unknown;
 }
 // END GENERATED AccountProfile
+// BEGIN GENERATED PersonalEnrollment
+export type PersonalInvitationRequest = Record<string, never>;
+
+export interface PersonalInvitationResponse {
+  invitation_url: string;
+  expires_at: string;
+  [extension: string]: unknown;
+}
+
+export interface PersonalEnrollmentRequest {
+  invitation_token: string;
+  account_id: string;
+  personal_vault_id: string;
+  account_signing_public_key: string;
+  account_kem_public_key: string;
+  key_bundle_update: string;
+  device_certificate: string;
+  wrapped_personal_vault_key: string;
+  device_signature: string;
+}
+
+export interface PersonalEnrollmentResponse {
+  account_id: string;
+  device_id: string;
+  personal_vault_id: string;
+  [extension: string]: unknown;
+}
+// END GENERATED PersonalEnrollment
 // BEGIN GENERATED ProblemDetails
 export interface ProblemDetails {
   type: string;
