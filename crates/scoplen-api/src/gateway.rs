@@ -42,13 +42,13 @@ pub enum GatewayCodecError {
 
 /// The one client-hello message sent after negotiating ALPN `spl-gw/1`.
 ///
-/// The values are compact JWS strings. Signature, expiry, single-use, and `DPoP` verification are
-/// owned by the edge; this type only enforces the bounded wire shape and compact-JWS alphabet.
+/// The values are compact JWS strings. Ticket and raw-TLS possession-proof verification, expiry,
+/// and single-use enforcement are owned by the edge; this type only enforces bounded wire shape.
 #[derive(Clone, Eq, PartialEq)]
 pub struct GatewayClientHello {
     /// The single-use control-plane gateway ticket.
     pub ticket: String,
-    /// The `DPoP` proof bound to the access-token/device key.
+    /// The dedicated raw-TLS application proof bound to this ticket and the device `DPoP` key.
     pub dpop_proof: String,
 }
 
@@ -294,6 +294,21 @@ mod tests {
             };
             assert_eq!(decoded, hello, "{}", vector.id);
         }
+    }
+
+    #[test]
+    fn signed_ticket_and_raw_tls_proof_keep_the_existing_client_hello_carriage() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../vectors/gateway-signed-proof.json");
+        let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vector");
+        let pair: JsonValue = serde_json::from_str(&document.vectors[0].input).expect("pair");
+        let hello = GatewayClientHello::new(
+            pair["ticket"].as_str().expect("ticket"),
+            pair["proof"].as_str().expect("proof"),
+        )
+        .expect("bounded hello");
+        let frame = hello.encode_frame().expect("frame");
+        assert_eq!(GatewayClientHello::from_frame(&frame).expect("round trip"), hello);
     }
 
     #[test]

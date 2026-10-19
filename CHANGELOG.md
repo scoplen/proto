@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-97 raw-TLS gateway possession proofs in `scoplen-crypto`, with dedicated ES256 type,
+  exact-ticket hash and device-key binding, combined trusted-ticket verification, strict lifetime,
+  signed vector, failure-path tests, and fuzz seeds. The `dpop_proof` CBOR carriage is unchanged;
+  authorization, edge adoption, and atomic ticket replay claims remain consumer work.
+
 - Added D-96 bounded Ed25519 gateway-ticket signing and stateless verification in
   `scoplen-crypto`: dedicated trusted issuer/keyring, strict JOSE and claims, verified signer
   output, exact 60-second validity, public signed vector and failure-path tests, and decoder fuzz

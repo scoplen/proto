@@ -312,14 +312,14 @@ pub fn dpop_jwk_thumbprint(public_key_sec1: &[u8]) -> Result<String, DpopError> 
     Ok(PublicJwk::from_sec1(public_key_sec1)?.thumbprint())
 }
 
-struct PublicJwk {
-    x: String,
-    y: String,
-    sec1: [u8; 65],
+pub(crate) struct PublicJwk {
+    pub(crate) x: String,
+    pub(crate) y: String,
+    pub(crate) sec1: [u8; 65],
 }
 
 impl PublicJwk {
-    fn from_sec1(value: &[u8]) -> Result<Self, DpopError> {
+    pub(crate) fn from_sec1(value: &[u8]) -> Result<Self, DpopError> {
         let sec1: [u8; 65] = value.try_into().map_err(|_| DpopError::InvalidProof)?;
         if sec1[0] != 4 || p256::PublicKey::from_sec1_bytes(&sec1).is_err() {
             return Err(DpopError::InvalidProof);
@@ -331,7 +331,7 @@ impl PublicJwk {
         })
     }
 
-    fn from_value(value: &Value) -> Result<Self, DpopError> {
+    pub(crate) fn from_value(value: &Value) -> Result<Self, DpopError> {
         let object = value.as_object().ok_or(DpopError::InvalidProof)?;
         if object.contains_key("d")
             || object.get("kty").and_then(Value::as_str) != Some("EC")
@@ -350,7 +350,7 @@ impl PublicJwk {
         Self::from_sec1(&sec1)
     }
 
-    fn thumbprint(&self) -> String {
+    pub(crate) fn thumbprint(&self) -> String {
         let json = format!(
             "{{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"{}\",\"y\":\"{}\"}}",
             self.x, self.y

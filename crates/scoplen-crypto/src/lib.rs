@@ -11,6 +11,7 @@ mod device_auth;
 mod dpop;
 mod envelope;
 mod escrow;
+mod gateway_proof;
 mod gateway_ticket;
 mod hpke;
 mod keys;
@@ -36,6 +37,7 @@ pub use escrow::{
     open_escrow_share_from_account, open_escrow_share_from_device, rewrap_escrow_share_to_device,
     verify_escrow_verification_code, wrap_escrow_share_to_account,
 };
+pub use gateway_proof::{GatewayProof, GatewayProofError, VerifiedGatewayProof};
 pub use gateway_ticket::{
     GatewayTicket, GatewayTicketClaims, GatewayTicketError, GatewayTicketSigner,
     TrustedGatewayTicketKeys, VerifiedGatewayTicket, gateway_ssh_key_sha256,

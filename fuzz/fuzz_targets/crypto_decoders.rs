@@ -15,6 +15,7 @@ fuzz_target!(|bytes: &[u8]| {
     let _ = scoplen_crypto::RecoveryKey::parse_display(&text);
 
     if let Ok(proof_text) = std::str::from_utf8(bytes) {
+        let _ = scoplen_crypto::GatewayProof::parse(proof_text);
         if let Ok(proof) = scoplen_crypto::DpopProof::parse(proof_text) {
             let target = scoplen_crypto::DpopTarget::new(
                 "GET",
@@ -33,12 +34,32 @@ fuzz_target!(|bytes: &[u8]| {
         if let Ok(ticket) = scoplen_crypto::GatewayTicket::parse(proof_text) {
             let signer = scoplen_crypto::Ed25519SigningKey::from_bytes(&[0x42; 32])
                 .expect("fixed synthetic ticket key");
-            let mut trusted = scoplen_crypto::TrustedGatewayTicketKeys::new(
-                "https://control.example.com",
-            )
-            .expect("fixed canonical issuer");
+            let mut trusted =
+                scoplen_crypto::TrustedGatewayTicketKeys::new("https://control.example.com")
+                    .expect("fixed canonical issuer");
             trusted.insert("ticket-1", &signer.public_key()).expect("fixed ticket key");
             let _ = ticket.verify(&trusted, 1_700_000_000);
+        }
+        if let Some((ticket_text, gateway_proof_text)) = proof_text.split_once('\n')
+            && let (Ok(ticket), Ok(gateway_proof)) = (
+                scoplen_crypto::GatewayTicket::parse(
+                    ticket_text.strip_suffix('\r').unwrap_or(ticket_text),
+                ),
+                scoplen_crypto::GatewayProof::parse(
+                    gateway_proof_text
+                        .strip_suffix("\r\n")
+                        .or_else(|| gateway_proof_text.strip_suffix('\n'))
+                        .unwrap_or(gateway_proof_text),
+                ),
+            )
+        {
+            let signer = scoplen_crypto::Ed25519SigningKey::from_bytes(&[0x42; 32])
+                .expect("fixed synthetic ticket key");
+            let mut trusted =
+                scoplen_crypto::TrustedGatewayTicketKeys::new("https://control.example.com")
+                    .expect("fixed canonical issuer");
+            trusted.insert("ticket-1", &signer.public_key()).expect("fixed ticket key");
+            let _ = gateway_proof.verify(&ticket, &trusted, 1_700_000_000);
         }
     }
 });

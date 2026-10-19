@@ -377,8 +377,11 @@ These API codecs validate syntax and size; their ticket field remains opaque. `s
 signs and statelessly verifies the D-96 dedicated Ed25519 gateway-ticket profile with a trusted
 issuer and ticket-only keyring, exact 60-second validity, UUIDv7 claims, and DPoP-key and SSH-key
 hashes. It checks fallible signer output and redacts ticket diagnostics. Consumers still own
-authenticated issuance, authorization, SSH-key use, raw-TLS proof binding, and atomic single-use
-consumption. K-6 also includes
+authenticated issuance, authorization, SSH-key use, and atomic single-use consumption. The D-97
+raw-TLS proof uses a separate `spl-gw-proof+jwt` ES256 profile, signs the exact ticket hash, and
+requires the verified ticket's device-key thumbprint and 60-second window. The shared verifier
+checks ticket and proof together; edge adoption, current policy, and replay storage remain
+consumer work. K-6 also includes
 the bounded gateway client-hello frame (`ticket` and `dpop_proof`) with a published vector and
 failure-path coverage. OpenAPI
 resources now have an authored OpenAPI 3.1 document at `crates/scoplen-api/openapi/v1.yaml`,
