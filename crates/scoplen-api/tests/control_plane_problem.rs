@@ -7,7 +7,7 @@ use scoplen_model::cbor::{self, Value};
 use serde_json::json;
 
 #[test]
-fn published_refresh_problem_json_vectors_use_registered_codes() {
+fn published_problem_json_vectors_use_registered_codes() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-problem.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("problem vectors");
@@ -24,7 +24,7 @@ fn published_refresh_problem_json_vectors_use_registered_codes() {
         );
         count += 1;
     }
-    assert_eq!(count, 4);
+    assert_eq!(count, 6);
 }
 
 #[test]

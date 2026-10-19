@@ -1,0 +1,18 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "gateway-ticket-issuance-request-v1",
+      "kind": "gateway.ticket_issuance.request_json",
+      "input": "{\"host\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"remote_user\":\"deploy\",\"ssh_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\"}",
+      "expected": "{\"host\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"remote_user\":\"deploy\",\"ssh_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\"}"
+    },
+    {
+      "id": "gateway-ticket-issuance-response-v1",
+      "kind": "gateway.ticket_issuance.response_json",
+      "input": "{\"ticket\":\"e30.e30.c2ln\",\"edge_addresses\":[{\"host\":\"edge.example\",\"port\":443},{\"host\":\"2001:db8::1\",\"port\":8443}],\"gateway_host_ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\"}",
+      "expected": "{\"ticket\":\"e30.e30.c2ln\",\"edge_addresses\":[{\"host\":\"edge.example\",\"port\":443},{\"host\":\"2001:db8::1\",\"port\":8443}],\"gateway_host_ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\"}"
+    }
+  ]
+}

@@ -325,8 +325,12 @@ write-batch, bounded conflict problem, acknowledgement, snapshot, version-histor
 notification, notification WebSocket opening context, first-message authentication and ready
 acknowledgement, account key-bundle, shared-vault creation, key retrieval, epoch-publication,
 member-addition, and epoch-retirement response codecs. The K-3 messages use JSON and the K-4
-messages use deterministic CBOR. K-6 now includes the bounded gateway client-hello
-frame (`ticket` and `dpop_proof`) with a published vector and failure-path coverage. OpenAPI
+messages use deterministic CBOR. K-5/K-6 includes bounded gateway-ticket issuance JSON
+messages, an ordered edge-address response, and the `gateway.invalid_request` problem code.
+These codecs validate syntax and size; the ticket remains opaque and issuance, signature
+verification, authorization, and single-use consumption belong to consumers. K-6 also includes
+the bounded gateway client-hello frame (`ticket` and `dpop_proof`) with a published vector and
+failure-path coverage. OpenAPI
 resources now have an authored OpenAPI 3.1 document at `crates/scoplen-api/openapi/v1.yaml`,
 generated Rust envelope/query types, and the local `@scoplen/api` TypeScript package surface.
 The control-plane and shared `ProblemDetails` Rust paths use the same validated eight-field
@@ -384,7 +388,8 @@ remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.
 `vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
-`vectors/sync-vault-members.json`, and `vectors/gateway.json`. The shared loader is usable by both
+`vectors/sync-vault-members.json`, `vectors/gateway.json`, and
+`vectors/gateway-ticket-issuance.json`. The shared loader is usable by both
 workstreams.
 
 ## Development

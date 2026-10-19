@@ -12,6 +12,7 @@ use thiserror::Error;
 pub mod auth;
 pub mod control_plane;
 pub mod gateway;
+pub mod gateway_ticket;
 pub mod internal_grpc;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
@@ -51,6 +52,7 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.invalid_dpop_proof",
     "auth.invalid_request",
     "auth.use_dpop_nonce",
+    "gateway.invalid_request",
     "policy.denied",
     "sync.client_unsupported",
     "sync.conflict",
