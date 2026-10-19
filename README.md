@@ -433,6 +433,14 @@ The Cedar `Account.email` attribute is optional; policies reading it must use a 
 These contracts do not authenticate the account or verify an address. The production GET route and
 email enrollment remain server work.
 
+The D-101 Personal invitation and first-device enrollment codecs bound complete JSON bodies,
+reject duplicate and unknown request fields, enforce canonical base64url and revision-one
+artifact identities, and redact secret-bearing diagnostics. HTTP helpers reject prohibited
+headers and a foreign browser Origin. OpenAPI, generated TypeScript, public vectors, and parser
+fuzz seeds describe the same messages. A parsed request does not verify signatures or invitation
+state; the server must authenticate the issuing operator and atomically create the account,
+device, key bundle, and Personal vault while consuming the invitation.
+
 `scoplen-crypto` also signs and statelessly verifies D-100 enrolled-device access tokens as bounded
 Ed25519 compact JWS values. The `spl-device-access+jwt` profile uses its own trusted issuer and
 configured keyring, an exact 600-second lifetime, complete ordered organization and SSO snapshots,
@@ -531,8 +539,8 @@ from the trusted HTTPS origin, decoded invitation-token digest, UUIDv7 account/v
 ids, public account keys, and hashes of the exact uploaded artifacts. It signs through
 the fallible `DeviceSigner` and verifies with the certified P-256 public key. Diagnostics
 redact the input artifacts and token digest. Public signature-input and rejection vectors
-are in `vectors/personal-enrollment-proof.json`. The consumer still validates the K-4
-bundle and K-2 certificate, enforces the enrollment JSON bound, and atomically redeems
+are in `vectors/personal-enrollment-proof.json`. The consumer still verifies the K-4
+bundle and K-2 certificate signatures, uses the bounded enrollment codec, and atomically redeems
 the invitation; possession-proof verification alone does not enroll or authenticate a device.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.

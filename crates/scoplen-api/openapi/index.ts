@@ -11,5 +11,9 @@ export type {
   AuthTokenResponse,
   BrowserAuthRefreshRequest,
   BrowserAuthTokenResponse,
+  PersonalInvitationRequest,
+  PersonalInvitationResponse,
+  PersonalEnrollmentRequest,
+  PersonalEnrollmentResponse,
 } from "./types";
 export * from "./proto";

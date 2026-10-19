@@ -11,6 +11,10 @@ use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceRe
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
 };
+use scoplen_api::personal_enrollment::{
+    PersonalEnrollmentRequest, PersonalEnrollmentResponse, PersonalInvitationRequest,
+    PersonalInvitationResponse,
+};
 
 macro_rules! round_trip {
     ($message:ty, $input:expr) => {
@@ -29,6 +33,12 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(CertificateIssuanceResponse, bytes);
     round_trip!(GatewayTicketRequest, bytes);
     round_trip!(GatewayTicketResponse, bytes);
+    round_trip!(PersonalInvitationResponse, bytes);
+    round_trip!(PersonalEnrollmentRequest, bytes);
+    round_trip!(PersonalEnrollmentResponse, bytes);
+    if let Ok(request) = PersonalInvitationRequest::from_json(bytes) {
+        assert_eq!(PersonalInvitationRequest::from_json(&request.to_json()), Ok(request));
+    }
     assert_eq!(
         GatewayTicketRequest::from_http_json(bytes, true),
         Err(GatewayTicketCodecError::IdempotencyKey)

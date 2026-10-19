@@ -67,6 +67,18 @@
       "kind": "api.problem.json",
       "input": "{\"type\":\"about:blank\",\"title\":\"Certificate request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"certificate-2\",\"code\":\"certificate.invalid_request\",\"changed\":false,\"retryable\":false}",
       "expected": "{\"type\":\"about:blank\",\"title\":\"Certificate request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"certificate-2\",\"code\":\"certificate.invalid_request\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-personal-enrollment-denied-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Enrollment denied\",\"status\":401,\"detail\":\"The enrollment could not be completed. Request a new invitation.\",\"instance\":\"enroll-1\",\"code\":\"auth.enrollment_denied\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Enrollment denied\",\"status\":401,\"detail\":\"The enrollment could not be completed. Request a new invitation.\",\"instance\":\"enroll-1\",\"code\":\"auth.enrollment_denied\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-personal-storage-unavailable-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Enrollment unavailable\",\"status\":503,\"detail\":\"Storage is temporarily unavailable; retry later.\",\"instance\":\"enroll-2\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Enrollment unavailable\",\"status\":503,\"detail\":\"Storage is temporarily unavailable; retry later.\",\"instance\":\"enroll-2\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}"
     }
   ]
 }

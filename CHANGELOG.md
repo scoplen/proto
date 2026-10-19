@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-101 Personal invitation and enrollment JSON codecs, HTTP header/origin checks,
+  artifact identity validation, OpenAPI and generated TypeScript, public vectors and parser
+  corpus coverage. Structural decoding remains separate from signature verification,
+  operator authorization, and atomic invitation redemption.
 - Exposed the existing shared canonical HTTPS origin validator for deployment configuration,
   using the same rules as device authentication, DPoP, enrollment, and token contexts.
 - Added D-101 Personal enrollment possession-signature contexts with exact origin, token-digest,

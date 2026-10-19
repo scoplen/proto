@@ -16,6 +16,80 @@
     }
   ],
   "paths": {
+    "/admin/personal-invitations": {
+      "post": {
+        "operationId": "issuePersonalInvitation",
+        "description": "Authenticated deployment operator only; organization roles do not grant authority. Idempotency-Key is forbidden. Each authorized POST creates a fresh 24-hour invitation. The response contains a one-use bearer URL and must not be logged or replayed.",
+        "requestBody": {
+          "required": true,
+          "description": "Exactly {} as application/json; complete UTF-8 body at most 256 bytes, including whitespace.",
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PersonalInvitationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "One-time invitation; complete encoded response at most 4096 bytes.",
+            "headers": {
+              "Cache-Control": { "required": true, "schema": { "const": "no-store" } },
+              "Pragma": { "required": true, "schema": { "const": "no-cache" } },
+              "Referrer-Policy": { "required": true, "schema": { "const": "no-referrer" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PersonalInvitationResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "413": { "$ref": "#/components/responses/Problem" },
+          "415": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "default": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/auth/personal-enroll": {
+      "post": {
+        "operationId": "enrollPersonalDevice",
+        "security": [],
+        "description": "First-device Personal enrollment requires a one-use invitation and possession proof. Authorization, DPoP, and Idempotency-Key headers are forbidden. Origin, when present, must equal the trusted canonical HTTPS deployment origin. The server verifies both artifact signatures, invitation state, unique ids, and atomic account creation; structural decoding alone does not verify signatures. Malformed CBOR or fields return 400 auth.invalid_request; mismatched account/certificate/wrap identity or rejected proofs return 401 auth.enrollment_denied without an invitation-validity signal. Credentialed cross-origin requests are forbidden.",
+        "requestBody": {
+          "required": true,
+          "description": "Complete application/json UTF-8 body at most 1048576 bytes, including whitespace and escapes.",
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PersonalEnrollmentRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created Personal account and first device; complete encoded response at most 256 bytes. This is not an authentication token.",
+            "headers": {
+              "Cache-Control": { "required": true, "schema": { "const": "no-store" } },
+              "Pragma": { "required": true, "schema": { "const": "no-cache" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PersonalEnrollmentResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "413": { "$ref": "#/components/responses/Problem" },
+          "415": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "default": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
     "/auth/challenge": {
       "post": {
         "operationId": "createAuthChallenge",
@@ -3362,6 +3436,55 @@
       }
     },
     "schemas": {
+      "PersonalInvitationRequest": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "PersonalInvitationResponse": {
+        "type": "object",
+        "required": ["invitation_url", "expires_at"],
+        "additionalProperties": true,
+        "properties": {
+          "invitation_url": {
+            "type": "string",
+            "maxLength": 2105,
+            "description": "Canonical HTTPS deployment origin plus /invite#token= and exactly 43 canonical unpadded base64url characters encoding 32 random bytes. The fragment is a bearer credential."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          }
+        }
+      },
+      "PersonalEnrollmentRequest": {
+        "type": "object",
+        "required": ["invitation_token", "account_id", "personal_vault_id", "account_signing_public_key", "account_kem_public_key", "key_bundle_update", "device_certificate", "wrapped_personal_vault_key", "device_signature"],
+        "additionalProperties": false,
+        "properties": {
+          "invitation_token": { "type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$", "description": "Canonical unpadded base64url of exactly 32 invitation-token bytes." },
+          "account_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+          "personal_vault_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+          "account_signing_public_key": { "type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$", "description": "Canonical unpadded base64url of exactly 32 raw Ed25519 public-key bytes." },
+          "account_kem_public_key": { "type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$", "description": "Canonical unpadded base64url of exactly 32 raw X25519 public-key bytes." },
+          "key_bundle_update": { "type": "string", "minLength": 1, "maxLength": 1048576, "description": "Canonical unpadded base64url of the exact deterministic K-4 CBOR key-bundle-update at revision 1 with one device wrap and account signature. Existing K-4 artifact bounds apply." },
+          "device_certificate": { "type": "string", "minLength": 1, "maxLength": 87382, "description": "Canonical unpadded base64url of the exact deterministic K-2 signed device certificate, at most 65536 decoded bytes." },
+          "wrapped_personal_vault_key": { "type": "string", "minLength": 2, "maxLength": 87382, "description": "Canonical unpadded base64url of 1..65536 opaque bytes wrapping the epoch-1 Personal vault key to the ARK." },
+          "device_signature": { "type": "string", "minLength": 86, "maxLength": 86, "pattern": "^[A-Za-z0-9_-]{85}[AQgw]$", "description": "Canonical unpadded base64url of the fixed-width 64-byte P-256 r || s possession signature over the D-101 input." }
+        }
+      },
+      "PersonalEnrollmentResponse": {
+        "type": "object",
+        "required": ["account_id", "device_id", "personal_vault_id"],
+        "additionalProperties": true,
+        "properties": {
+          "account_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+          "device_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+          "personal_vault_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }
+        }
+      },
       "AuthChallengeRequest": {
         "type": "object",
         "required": [

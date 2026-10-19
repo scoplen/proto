@@ -16,6 +16,7 @@ pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
 pub mod internal_grpc;
+pub mod personal_enrollment;
 mod request_wire;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
@@ -52,8 +53,10 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.authentication_required",
     "auth.client_unsupported",
     "auth.device_revoked",
+    "auth.enrollment_denied",
     "auth.invalid_dpop_proof",
     "auth.invalid_request",
+    "auth.storage_unavailable",
     "auth.use_dpop_nonce",
     "certificate.invalid_request",
     "gateway.invalid_request",
