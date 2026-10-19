@@ -10,6 +10,9 @@ export interface components {
     AuthChallengeResponse: AuthChallengeResponse;
     AuthDeviceRequest: AuthDeviceRequest;
     AuthTokenResponse: AuthTokenResponse;
+    AuthRefreshRequest: AuthRefreshRequest;
+    BrowserAuthRefreshRequest: BrowserAuthRefreshRequest;
+    BrowserAuthTokenResponse: BrowserAuthTokenResponse;
     ListQuery: ListQuery;
     WriteRequest: WriteRequest;
     DecisionRequest: DecisionRequest;
@@ -91,12 +94,27 @@ export interface AuthDeviceRequest {
   signature: string;
 }
 
+export interface AuthRefreshRequest {
+  refresh_token: string;
+}
+
+export type BrowserAuthRefreshRequest = Record<string, never>;
+
 export interface AuthTokenResponse {
   access_token: string;
   token_type: "DPoP";
   expires_in: number;
   refresh_token: string;
   refresh_expires_in: number;
+  [extension: string]: unknown;
+}
+
+export interface BrowserAuthTokenResponse {
+  access_token: string;
+  token_type: "DPoP";
+  expires_in: number;
+  refresh_expires_in: number;
+  refresh_token?: never;
   [extension: string]: unknown;
 }
 // END GENERATED Authentication

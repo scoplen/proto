@@ -48,7 +48,10 @@ const authShapes = {
   AuthChallengeRequest: ["device_id"],
   AuthChallengeResponse: ["nonce", "server_time"],
   AuthDeviceRequest: ["device_id", "nonce", "signature"],
+  AuthRefreshRequest: ["refresh_token"],
+  BrowserAuthRefreshRequest: [],
   AuthTokenResponse: ["access_token", "token_type", "expires_in", "refresh_token", "refresh_expires_in"],
+  BrowserAuthTokenResponse: ["access_token", "token_type", "expires_in", "refresh_expires_in"],
 };
 const authPatterns = {
   device_id: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -65,6 +68,10 @@ for (const [name, fields] of Object.entries(authShapes)) {
       JSON.stringify(Object.keys(schema.properties ?? {})) !== JSON.stringify(fields)) {
     throw new Error(`${name} differs from the shared authentication shape`);
   }
+  if (name === "BrowserAuthRefreshRequest") {
+    authLines.push("export type BrowserAuthRefreshRequest = Record<string, never>;", "");
+    continue;
+  }
   authLines.push(`export interface ${name} {`);
   for (const field of fields) {
     const property = schema.properties[field];
@@ -79,6 +86,16 @@ for (const [name, fields] of Object.entries(authShapes)) {
       throw new Error(`${name}.${field} differs from the shared authentication contract`);
     }
     authLines.push(`  ${field}: ${field === "token_type" ? '"DPoP"' : expectedType === "integer" ? "number" : "string"};`);
+  }
+  if (name === "AuthRefreshRequest" &&
+      !schema.properties.refresh_token.description?.includes("2048 UTF-8 bytes")) {
+    throw new Error("AuthRefreshRequest must document its UTF-8 credential limit");
+  }
+  if (name === "BrowserAuthTokenResponse") {
+    if (JSON.stringify(schema.not) !== JSON.stringify({ required: ["refresh_token"] })) {
+      throw new Error("BrowserAuthTokenResponse must reject native refresh_token presence");
+    }
+    authLines.push("  refresh_token?: never;");
   }
   if (schema.additionalProperties) authLines.push("  [extension: string]: unknown;");
   authLines.push("}", "");
@@ -99,6 +116,25 @@ for (const [path, requestName, responseName, maxBytes] of [
 }
 if (document.paths["/auth/device"].post.responses?.["401"]?.$ref !== "#/components/responses/Problem") {
   throw new Error("/auth/device must describe authentication failure");
+}
+const refresh = document.paths?.["/auth/refresh"]?.post;
+const refreshRequest = refresh?.requestBody;
+const refs = (schema) => schema?.oneOf?.map((member) => member.$ref);
+if (JSON.stringify(refresh?.security) !== JSON.stringify([{ dpopProof: [] }]) ||
+    refreshRequest?.required !== true ||
+    !refreshRequest.description?.includes("4096 bytes") ||
+    !refreshRequest.description?.includes("2048 UTF-8 bytes") ||
+    JSON.stringify(refs(refreshRequest.content?.["application/json"]?.schema)) !==
+      JSON.stringify(["#/components/schemas/AuthRefreshRequest", "#/components/schemas/BrowserAuthRefreshRequest"]) ||
+    JSON.stringify(refs(refresh.responses?.["200"]?.content?.["application/json"]?.schema)) !==
+      JSON.stringify(["#/components/schemas/AuthTokenResponse", "#/components/schemas/BrowserAuthTokenResponse"]) ||
+    !refresh.responses?.["200"]?.headers?.["Set-Cookie"] ||
+    refresh.responses?.["400"]?.content?.["application/problem+json"]?.schema?.$ref !==
+      "#/components/schemas/ProblemDetails" ||
+    !refresh.responses?.["400"]?.headers?.["DPoP-Nonce"] ||
+    !["401", "403", "413", "415", "default"].every((status) =>
+      refresh.responses?.[status]?.$ref === "#/components/responses/Problem")) {
+  throw new Error("/auth/refresh differs from the shared refresh contract");
 }
 
 const typesUrl = new URL("types.ts", root);

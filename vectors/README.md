@@ -44,6 +44,12 @@ Inputs are JSON objects; expected values are deterministic CBOR in lowercase hex
 compact-JWS strings are synthetic public test data. The shared codec validates their lexical wire
 shape and limits, not signatures, claims, device state, key binding, or proof replay.
 
+`api-auth.json` includes K-3 challenge/device vectors and D-78 native/browser refresh request
+and response JSON vectors. The browser response has no `refresh_token`; its rotated credential
+travels in an HttpOnly cookie managed by the server. `api-problem.json` includes refresh failure
+examples as canonical JSON with the registered codes and `changed`/`retryable` fields; its older
+CBOR vectors remain valid. All token strings are synthetic public test data.
+
 `sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a

@@ -7,6 +7,27 @@ use scoplen_model::cbor::{self, Value};
 use serde_json::json;
 
 #[test]
+fn published_refresh_problem_json_vectors_use_registered_codes() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-problem.json");
+    let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("problem vectors");
+    let mut count = 0;
+    for vector in document.vectors.iter().filter(|vector| vector.kind == "api.problem.json") {
+        let problem: SharedProblemDetails =
+            serde_json::from_str(&vector.input).expect("valid published problem");
+        assert!(problem.code.is_known(), "{}", vector.id);
+        assert_eq!(
+            serde_json::to_string(&problem).expect("canonical JSON"),
+            vector.expected,
+            "{}",
+            vector.id
+        );
+        count += 1;
+    }
+    assert_eq!(count, 4);
+}
+
+#[test]
 fn control_plane_problem_requires_the_shared_error_fields() {
     let complete = json!({
         "type": "about:blank",

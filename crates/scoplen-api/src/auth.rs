@@ -4,7 +4,11 @@
 use std::fmt;
 
 use scoplen_model::validate_uuid_v7;
-use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct};
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{self, IgnoredAny, MapAccess, Visitor},
+    ser::SerializeStruct,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -16,6 +20,10 @@ pub const REFRESH_TOKEN_EXPIRES_IN: u64 = 2_592_000;
 pub const MAX_CHALLENGE_REQUEST_BYTES: usize = 256;
 /// Maximum encoded body for a signed device authentication request.
 pub const MAX_DEVICE_REQUEST_BYTES: usize = 4_096;
+/// Maximum encoded body for a refresh request, including JSON whitespace.
+pub const MAX_REFRESH_REQUEST_BYTES: usize = 4_096;
+/// Maximum UTF-8 byte length of a native refresh credential.
+pub const MAX_REFRESH_TOKEN_BYTES: usize = 2_048;
 
 /// Errors returned while decoding or validating K-3 authentication JSON.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -298,7 +306,184 @@ impl<'de> Deserialize<'de> for AuthDeviceRequest {
     }
 }
 
-/// The successful response from `POST /api/v1/auth/device`.
+/// The native JSON body for `POST /api/v1/auth/refresh`.
+#[derive(Clone, Eq, PartialEq)]
+pub struct AuthRefreshRequest {
+    /// Opaque single-use credential; never log its value.
+    pub refresh_token: String,
+}
+
+impl fmt::Debug for AuthRefreshRequest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("AuthRefreshRequest").field("refresh_token", &"[REDACTED]").finish()
+    }
+}
+
+impl AuthRefreshRequest {
+    /// Construct a native refresh request with a bounded opaque credential.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the credential is empty or exceeds the byte limit.
+    pub fn new(refresh_token: impl Into<String>) -> Result<Self, AuthCodecError> {
+        let request = Self { refresh_token: refresh_token.into() };
+        request.validate()?;
+        Ok(request)
+    }
+
+    /// Validate the credential without revealing it in an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty or oversized credential.
+    pub fn validate(&self) -> Result<(), AuthCodecError> {
+        if self.refresh_token.is_empty() || self.refresh_token.len() > MAX_REFRESH_TOKEN_BYTES {
+            return Err(AuthCodecError::Invalid(
+                "refresh_token must be non-empty and at most 2048 UTF-8 bytes".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Decode a strict native JSON body after checking the complete byte bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed, ambiguous, or oversized requests.
+    pub fn from_json(input: &str) -> Result<Self, AuthCodecError> {
+        enforce_body_limit(input, MAX_REFRESH_REQUEST_BYTES)?;
+        serde_json::from_str(input)
+            .map_err(|_| AuthCodecError::Json("invalid native refresh request JSON".into()))
+    }
+
+    /// Encode the native body with deterministic field order and its byte bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid credentials or oversized JSON.
+    pub fn to_json(&self) -> Result<String, AuthCodecError> {
+        self.validate()?;
+        let json = serde_json::to_string(self)
+            .map_err(|_| AuthCodecError::Json("cannot encode native refresh request".into()))?;
+        enforce_body_limit(&json, MAX_REFRESH_REQUEST_BYTES)?;
+        Ok(json)
+    }
+}
+
+impl Serialize for AuthRefreshRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.validate().map_err(serde::ser::Error::custom)?;
+        let mut state = serializer.serialize_struct("AuthRefreshRequest", 1)?;
+        state.serialize_field("refresh_token", &self.refresh_token)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for AuthRefreshRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct RefreshVisitor;
+
+        impl<'de> Visitor<'de> for RefreshVisitor {
+            type Value = AuthRefreshRequest;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a native refresh JSON object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut refresh_token = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    if key != "refresh_token" {
+                        return Err(de::Error::custom("unknown native refresh request field"));
+                    }
+                    if refresh_token.is_some() {
+                        return Err(de::Error::custom("duplicate refresh_token field"));
+                    }
+                    refresh_token = Some(map.next_value::<String>()?);
+                }
+                AuthRefreshRequest::new(
+                    refresh_token
+                        .ok_or_else(|| de::Error::custom("missing refresh_token field"))?,
+                )
+                .map_err(de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_map(RefreshVisitor)
+    }
+}
+
+/// The empty JSON body used when the browser supplies its refresh cookie.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BrowserAuthRefreshRequest;
+
+impl BrowserAuthRefreshRequest {
+    /// Decode an exact empty JSON object after checking the complete byte bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for another JSON shape or an oversized body.
+    pub fn from_json(input: &str) -> Result<Self, AuthCodecError> {
+        enforce_body_limit(input, MAX_REFRESH_REQUEST_BYTES)?;
+        serde_json::from_str(input)
+            .map_err(|_| AuthCodecError::Json("invalid browser refresh request JSON".into()))
+    }
+
+    /// Encode the browser body.
+    #[must_use]
+    pub fn to_json(&self) -> &'static str {
+        "{}"
+    }
+}
+
+impl Serialize for BrowserAuthRefreshRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_struct("BrowserAuthRefreshRequest", 0)?.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for BrowserAuthRefreshRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct EmptyMapVisitor;
+
+        impl<'de> Visitor<'de> for EmptyMapVisitor {
+            type Value = BrowserAuthRefreshRequest;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("an empty browser refresh JSON object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                if map.next_key::<IgnoredAny>()?.is_some() {
+                    return Err(de::Error::custom("browser refresh body must be empty"));
+                }
+                Ok(BrowserAuthRefreshRequest)
+            }
+        }
+
+        deserializer.deserialize_map(EmptyMapVisitor)
+    }
+}
+
+/// The successful native response from device authentication or refresh.
 #[derive(Clone, Eq, PartialEq)]
 pub struct AuthTokenResponse {
     /// Opaque DPoP-bound access token.
@@ -379,7 +564,8 @@ impl AuthTokenResponse {
     ///
     /// Returns an error when the JSON is malformed or a required field is invalid.
     pub fn from_json(input: &str) -> Result<Self, AuthCodecError> {
-        serde_json::from_str(input).map_err(|error| AuthCodecError::Json(error.to_string()))
+        serde_json::from_str(input)
+            .map_err(|_| AuthCodecError::Json("invalid token response JSON".into()))
     }
 
     /// Encode a token response as deterministic JSON fields.
@@ -389,7 +575,8 @@ impl AuthTokenResponse {
     /// Returns an error when a field is invalid or JSON serialization fails.
     pub fn to_json(&self) -> Result<String, AuthCodecError> {
         self.validate()?;
-        serde_json::to_string(self).map_err(|error| AuthCodecError::Json(error.to_string()))
+        serde_json::to_string(self)
+            .map_err(|_| AuthCodecError::Json("cannot encode token response".into()))
     }
 }
 
@@ -433,6 +620,183 @@ impl<'de> Deserialize<'de> for AuthTokenResponse {
         };
         response.validate().map_err(serde::de::Error::custom)?;
         Ok(response)
+    }
+}
+
+/// The browser-safe refresh response; the rotated credential is sent only in `Set-Cookie`.
+#[derive(Clone, Eq, PartialEq)]
+pub struct BrowserAuthTokenResponse {
+    /// Opaque DPoP-bound access token.
+    pub access_token: String,
+    /// Always the literal `DPoP` token type.
+    pub token_type: String,
+    /// Access-token lifetime in seconds.
+    pub expires_in: u64,
+    /// Lifetime of the new `HttpOnly` refresh cookie in seconds.
+    pub refresh_expires_in: u64,
+}
+
+impl fmt::Debug for BrowserAuthTokenResponse {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("BrowserAuthTokenResponse")
+            .field("access_token", &"[REDACTED]")
+            .field("token_type", &self.token_type)
+            .field("expires_in", &self.expires_in)
+            .field("refresh_expires_in", &self.refresh_expires_in)
+            .finish()
+    }
+}
+
+impl BrowserAuthTokenResponse {
+    /// Construct a browser response using the contract's default lifetimes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the access token is empty.
+    pub fn new(access_token: impl Into<String>) -> Result<Self, AuthCodecError> {
+        let response = Self {
+            access_token: access_token.into(),
+            token_type: "DPoP".into(),
+            expires_in: ACCESS_TOKEN_EXPIRES_IN,
+            refresh_expires_in: REFRESH_TOKEN_EXPIRES_IN,
+        };
+        response.validate()?;
+        Ok(response)
+    }
+
+    /// Validate the browser-safe token fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty access token, another token type, or zero lifetime.
+    pub fn validate(&self) -> Result<(), AuthCodecError> {
+        if self.access_token.is_empty() {
+            return Err(AuthCodecError::Invalid("access_token must not be empty".into()));
+        }
+        if self.token_type != "DPoP" {
+            return Err(AuthCodecError::Invalid("token_type must be DPoP".into()));
+        }
+        if self.expires_in == 0 || self.refresh_expires_in == 0 {
+            return Err(AuthCodecError::Invalid("token lifetimes must be positive".into()));
+        }
+        Ok(())
+    }
+
+    /// Decode a browser response, rejecting the known native-only `refresh_token` field.
+    /// Unknown response extensions remain compatible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing or invalid fields, including `refresh_token` of any type.
+    pub fn from_json(input: &str) -> Result<Self, AuthCodecError> {
+        serde_json::from_str(input)
+            .map_err(|_| AuthCodecError::Json("invalid browser token response JSON".into()))
+    }
+
+    /// Encode only the four browser-safe fields in deterministic order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a field is invalid or JSON encoding fails.
+    pub fn to_json(&self) -> Result<String, AuthCodecError> {
+        self.validate()?;
+        serde_json::to_string(self)
+            .map_err(|_| AuthCodecError::Json("cannot encode browser token response".into()))
+    }
+}
+
+impl Serialize for BrowserAuthTokenResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.validate().map_err(serde::ser::Error::custom)?;
+        let mut state = serializer.serialize_struct("BrowserAuthTokenResponse", 4)?;
+        state.serialize_field("access_token", &self.access_token)?;
+        state.serialize_field("token_type", &self.token_type)?;
+        state.serialize_field("expires_in", &self.expires_in)?;
+        state.serialize_field("refresh_expires_in", &self.refresh_expires_in)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for BrowserAuthTokenResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BrowserTokenVisitor;
+
+        impl<'de> Visitor<'de> for BrowserTokenVisitor {
+            type Value = BrowserAuthTokenResponse;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a browser-safe token response object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut access_token = None;
+                let mut token_type = None;
+                let mut expires_in = None;
+                let mut refresh_expires_in = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "access_token" => {
+                            if access_token.is_some() {
+                                return Err(de::Error::custom("duplicate access_token field"));
+                            }
+                            access_token = Some(map.next_value::<String>()?);
+                        }
+                        "token_type" => {
+                            if token_type.is_some() {
+                                return Err(de::Error::custom("duplicate token_type field"));
+                            }
+                            token_type = Some(map.next_value::<String>()?);
+                        }
+                        "expires_in" => {
+                            if expires_in.is_some() {
+                                return Err(de::Error::custom("duplicate expires_in field"));
+                            }
+                            expires_in = Some(map.next_value::<u64>()?);
+                        }
+                        "refresh_expires_in" => {
+                            if refresh_expires_in.is_some() {
+                                return Err(de::Error::custom(
+                                    "duplicate refresh_expires_in field",
+                                ));
+                            }
+                            refresh_expires_in = Some(map.next_value::<u64>()?);
+                        }
+                        "refresh_token" => {
+                            return Err(de::Error::custom(
+                                "refresh_token is forbidden in browser response",
+                            ));
+                        }
+                        _ => {
+                            map.next_value::<IgnoredAny>()?;
+                        }
+                    }
+                }
+                let response = BrowserAuthTokenResponse {
+                    access_token: access_token
+                        .ok_or_else(|| de::Error::custom("missing access_token field"))?,
+                    token_type: token_type
+                        .ok_or_else(|| de::Error::custom("missing token_type field"))?,
+                    expires_in: expires_in
+                        .ok_or_else(|| de::Error::custom("missing expires_in field"))?,
+                    refresh_expires_in: refresh_expires_in
+                        .ok_or_else(|| de::Error::custom("missing refresh_expires_in field"))?,
+                };
+                response.validate().map_err(de::Error::custom)?;
+                Ok(response)
+            }
+        }
+
+        deserializer.deserialize_map(BrowserTokenVisitor)
     }
 }
 

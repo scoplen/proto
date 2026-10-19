@@ -19,6 +19,30 @@
       "kind": "api.problem.cbor",
       "input": "{\"type\":\"about:blank\",\"title\":\"Sync write rate exceeded\",\"status\":429,\"detail\":\"Retry after one second.\",\"instance\":\"rate-1\",\"code\":\"sync.rate_limited\",\"changed\":false,\"retryable\":true}",
       "expected": "a864636f64657173796e632e726174655f6c696d6974656464747970656b61626f75743a626c616e6b657469746c65781853796e6320777269746520726174652065786365656465646664657461696c775265747279206166746572206f6e65207365636f6e642e667374617475731901ad676368616e676564f468696e7374616e636566726174652d3169726574727961626c65f5"
+    },
+    {
+      "id": "api-problem-auth-refresh-invalid-request-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Invalid refresh request\",\"status\":400,\"detail\":\"The refresh body is invalid; no state changed. Correct the request.\",\"instance\":\"refresh-1\",\"code\":\"auth.invalid_request\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Invalid refresh request\",\"status\":400,\"detail\":\"The refresh body is invalid; no state changed. Correct the request.\",\"instance\":\"refresh-1\",\"code\":\"auth.invalid_request\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-auth-refresh-invalid-proof-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Invalid refresh proof\",\"status\":400,\"detail\":\"The DPoP proof was rejected; no state changed. Sign a new valid proof.\",\"instance\":\"refresh-2\",\"code\":\"auth.invalid_dpop_proof\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Invalid refresh proof\",\"status\":400,\"detail\":\"The DPoP proof was rejected; no state changed. Sign a new valid proof.\",\"instance\":\"refresh-2\",\"code\":\"auth.invalid_dpop_proof\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-auth-refresh-nonce-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"DPoP nonce required\",\"status\":400,\"detail\":\"The proof needs the supplied nonce; no state changed. Sign a new proof and retry.\",\"instance\":\"refresh-3\",\"code\":\"auth.use_dpop_nonce\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"DPoP nonce required\",\"status\":400,\"detail\":\"The proof needs the supplied nonce; no state changed. Sign a new proof and retry.\",\"instance\":\"refresh-3\",\"code\":\"auth.use_dpop_nonce\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "api-problem-auth-refresh-reuse-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Refresh credential rejected\",\"status\":401,\"detail\":\"The refresh credential cannot be used and its family was revoked. Sign in again.\",\"instance\":\"refresh-4\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Refresh credential rejected\",\"status\":401,\"detail\":\"The refresh credential cannot be used and its family was revoked. Sign in again.\",\"instance\":\"refresh-4\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}"
     }
   ]
 }

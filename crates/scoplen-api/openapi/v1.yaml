@@ -95,6 +95,95 @@
         }
       }
     },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "refreshAuthentication",
+        "description": "Scoplen JSON refresh profile (not the OAuth form-encoded token endpoint). Exactly one DPoP proof is required without an access token. Native callers supply a body token; browser callers supply an empty body and one endpoint-scoped HttpOnly refresh cookie. Mixed or absent credentials, Authorization and Idempotency-Key headers are rejected. Browser Origin must match the configured console origin. All responses use Cache-Control: no-store and Pragma: no-cache. Proof, cookie, Origin, atomic rotation, and family-reuse checks are server responsibilities.",
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON body must not exceed 4096 bytes, including whitespace. Native refresh_token is limited to 2048 UTF-8 bytes; browser body is exactly {}.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AuthRefreshRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BrowserAuthRefreshRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A rotated DPoP-bound token pair. Browser responses omit refresh_token and rotate it only through Set-Cookie: __Secure-spl-refresh with Path=/api/v1/auth/refresh, HttpOnly, Secure, SameSite=Strict, no Domain, and Max-Age=refresh_expires_in.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Required for browser mode and absent for native mode; contains the rotated refresh credential.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AuthTokenResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BrowserAuthTokenResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "RFC 9457 problem. A required or stale DPoP nonce uses auth.use_dpop_nonce and includes DPoP-Nonce; malformed requests or other proof failures use auth.invalid_request or auth.invalid_dpop_proof.",
+            "headers": {
+              "DPoP-Nonce": {
+                "description": "Required only for auth.use_dpop_nonce; retry with a new proof and jti without consuming the refresh token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
     "/accounts/me": {
       "get": {
         "operationId": "getCurrentAccount",
@@ -3342,6 +3431,60 @@
           "refresh_token": {
             "type": "string",
             "minLength": 1
+          },
+          "refresh_expires_in": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "AuthRefreshRequest": {
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque native refresh token, at most 2048 UTF-8 bytes; the complete encoded JSON body is at most 4096 bytes."
+          }
+        }
+      },
+      "BrowserAuthRefreshRequest": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {},
+        "description": "Exactly {}, accompanied by one endpoint-scoped __Secure-spl-refresh cookie."
+      },
+      "BrowserAuthTokenResponse": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "refresh_expires_in"
+        ],
+        "additionalProperties": true,
+        "not": {
+          "required": [
+            "refresh_token"
+          ]
+        },
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "token_type": {
+            "type": "string",
+            "const": "DPoP"
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 1
           },
           "refresh_expires_in": {
             "type": "integer",
