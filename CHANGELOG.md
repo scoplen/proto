@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added disposable OpenSSH client- and server-initiated rekey checks using constrained modern
+  algorithms. Each transfers 128 KiB of exact binary echo on one authenticated channel;
+  OpenSSH DEBUG3 logs establish post-authentication KEXINIT direction and completed NEWKEYS, while
+  a high-limit control must show no rekey. Corrected the keystroke benchmark's russh version label.
 - Preserved multi-factor authentication continuation with method-neutral rejection errors,
   partial-success state, and the engine-recognized remaining methods in peer order. Channel and
   remote-forwarding operations now reject locally before full authentication. Fixed RSA SHA-2
