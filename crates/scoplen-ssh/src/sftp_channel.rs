@@ -6,7 +6,7 @@ use std::{
 };
 
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::{
     ChannelEvent, ClientChannelStream, ClientConnection, ClientError, MAX_SFTP_PACKET, SftpClient,
@@ -14,6 +14,7 @@ use crate::{
 };
 
 const LIMITS_EXTENSION: &[u8] = b"limits@openssh.com";
+const WRITE_PACKET_FIXED_BYTES: usize = 4 + 1 + 4 + 4 + 8 + 4;
 
 /// Errors raised while opening or using an SFTP SSH channel.
 #[derive(Debug, Error)]
@@ -403,8 +404,8 @@ impl SftpSession {
     /// Upload bytes to a remote handle with bounded pipelining and resume-by-offset.
     ///
     /// `start_offset` is the remote offset represented by the first byte in `data`; callers can
-    /// resume a local source by slicing it at the matching offset. The callback runs after each
-    /// successful write response.
+    /// resume a local source by slicing it at the matching offset. Progress advances only after
+    /// a contiguous prefix of successful write responses.
     ///
     /// # Errors
     ///
@@ -421,16 +422,48 @@ impl SftpSession {
         pipeline: usize,
         progress: impl FnMut(SftpTransferProgress),
     ) -> Result<u64, SftpChannelError> {
+        let length =
+            u64::try_from(data.len()).map_err(|_| SftpError::InvalidValue("transfer length"))?;
+        let mut source = data;
+        self.upload_from(handle, start_offset, length, chunk_size, pipeline, &mut source, progress)
+            .await
+    }
+
+    /// Upload exactly `length` bytes from the reader's current position to a remote handle.
+    ///
+    /// The caller positions `source` for a resumed transfer. This method does not seek or read
+    /// beyond `length`; a zero-length upload does not read the source or send writes. Progress
+    /// advances only through the contiguous acknowledged prefix.
+    ///
+    /// # Errors
+    ///
+    /// Invalid bounds fail before reading or dispatch. Premature source EOF returns an I/O error
+    /// with `UnexpectedEof`; other source errors retain their kind. A failed or canceled active
+    /// transfer invalidates this SFTP session, except a fully correlated remote-status rejection
+    /// with no pending responses.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn upload_from<R, F>(
+        &mut self,
+        handle: &[u8],
+        start_offset: u64,
+        length: u64,
+        chunk_size: u32,
+        pipeline: usize,
+        source: &mut R,
+        progress: F,
+    ) -> Result<u64, SftpChannelError>
+    where
+        R: AsyncRead + Unpin,
+        F: FnMut(SftpTransferProgress),
+    {
         self.ensure_usable()?;
-        start_offset
-            .checked_add(data.len() as u64)
-            .ok_or(SftpError::InvalidValue("transfer length"))?;
-        let chunk_size = effective_chunk_size(chunk_size, self.limits, false)?;
+        start_offset.checked_add(length).ok_or(SftpError::InvalidValue("transfer length"))?;
+        let chunk_size = effective_upload_chunk_size(chunk_size, self.limits, handle.len())?;
         validate_transfer(handle, chunk_size, pipeline, self.pending_requests())?;
         let mut exchange = ActiveExchange::new(self);
         let result = exchange
             .session
-            .upload_inner(handle, start_offset, data, chunk_size, pipeline, progress)
+            .upload_inner(handle, start_offset, length, chunk_size, pipeline, source, progress)
             .await;
         if result.is_ok()
             || (matches!(result, Err(SftpChannelError::RemoteStatus { .. }))
@@ -441,40 +474,50 @@ impl SftpSession {
         result
     }
 
-    async fn upload_inner(
+    #[allow(clippy::too_many_arguments)]
+    async fn upload_inner<R, F>(
         &mut self,
         handle: &[u8],
         start_offset: u64,
-        data: &[u8],
+        length: u64,
         chunk_size: u32,
         pipeline: usize,
-        mut progress: impl FnMut(SftpTransferProgress),
-    ) -> Result<u64, SftpChannelError> {
-        let total = start_offset + data.len() as u64;
-        let mut next = 0_usize;
+        source: &mut R,
+        mut progress: F,
+    ) -> Result<u64, SftpChannelError>
+    where
+        R: AsyncRead + Unpin,
+        F: FnMut(SftpTransferProgress),
+    {
+        let total = start_offset + length;
+        let mut next = 0_u64;
         let mut transferred = 0_u64;
         let mut committed_offset = start_offset;
         let mut inflight = BTreeMap::<u32, (u64, usize)>::new();
         let mut completed = BTreeMap::<u64, usize>::new();
+        let mut chunk = vec![0_u8; chunk_size as usize];
         progress(SftpTransferProgress { offset: start_offset, transferred, total: Some(total) });
 
         loop {
-            while next < data.len()
-                && inflight.len() < pipeline
+            while next < length
+                && inflight.len() + completed.len() < pipeline
                 && self.client.available_requests() > 0
             {
-                let end = (next + chunk_size as usize).min(data.len());
-                let request = self.client.write(
-                    handle.to_vec(),
-                    start_offset + next as u64,
-                    data[next..end].to_vec(),
-                )?;
+                let chunk_len = usize::try_from((length - next).min(u64::from(chunk_size)))
+                    .map_err(|_| SftpError::InvalidValue("transfer chunk size"))?;
+                source.read_exact(&mut chunk[..chunk_len]).await?;
+                let offset = start_offset + next;
+                let request =
+                    self.client.write(handle.to_vec(), offset, chunk[..chunk_len].to_vec())?;
                 let id = request.request_id().ok_or(SftpError::Malformed("write request id"))?;
                 self.send_request(&request).await?;
-                inflight.insert(id, (start_offset + next as u64, end - next));
-                next = end;
+                inflight.insert(id, (offset, chunk_len));
+                next += chunk_len as u64;
             }
             if inflight.is_empty() {
+                if next != length || !completed.is_empty() {
+                    return Err(SftpError::Malformed("non-contiguous write responses").into());
+                }
                 break;
             }
             let response = self.read_response().await?;
@@ -520,6 +563,24 @@ fn effective_chunk_size(
         packet_limit.min(if read { limits.max_read_length } else { limits.max_write_length })
     });
     let bounded = u64::from(requested).min(server_limit).min(local_limit);
+    u32::try_from(bounded).map_err(|_| SftpError::InvalidValue("transfer chunk size").into())
+}
+
+fn effective_upload_chunk_size(
+    requested: u32,
+    limits: Option<SftpLimits>,
+    handle_len: usize,
+) -> Result<u32, SftpChannelError> {
+    let overhead = WRITE_PACKET_FIXED_BYTES.saturating_add(handle_len);
+    let local_data_limit = MAX_SFTP_PACKET - 64;
+    let local_packet_limit = MAX_SFTP_PACKET.saturating_sub(overhead);
+    let peer_limit = limits.map_or(u64::MAX, |limits| {
+        limits.max_write_length.min(limits.max_packet_length.saturating_sub(overhead as u64))
+    });
+    let bounded = u64::from(requested)
+        .min(local_data_limit as u64)
+        .min(local_packet_limit as u64)
+        .min(peer_limit);
     u32::try_from(bounded).map_err(|_| SftpError::InvalidValue("transfer chunk size").into())
 }
 
@@ -641,11 +702,15 @@ async fn read_exact(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{
+        pin::Pin,
+        sync::Arc,
+        task::{Context, Poll},
+    };
 
     use russh::keys::PrivateKey;
     use ssh_key::Algorithm;
-    use tokio::{net::TcpListener, sync::oneshot};
+    use tokio::{io::ReadBuf, net::TcpListener, sync::oneshot};
 
     use super::*;
     use crate::{ClientConfig, HostKey, SftpAttributes, SftpNameEntry, SftpStatvfs};
@@ -656,6 +721,40 @@ mod tests {
         Renamed,
         Replaced,
         Removed,
+    }
+
+    #[derive(Clone, Copy, Default)]
+    enum WriteAckMode {
+        #[default]
+        Normal,
+        ReorderFirstTwo,
+        HoldFirst,
+    }
+
+    struct TestReader<'a> {
+        bytes: &'a [u8],
+        position: usize,
+        fail_at: Option<usize>,
+    }
+
+    impl AsyncRead for TestReader<'_> {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buffer: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            if self.fail_at.is_some_and(|at| self.position >= at) {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "source failed",
+                )));
+            }
+            let remaining = &self.bytes[self.position..];
+            let count = remaining.len().min(buffer.remaining());
+            buffer.put_slice(&remaining[..count]);
+            self.position += count;
+            Poll::Ready(Ok(()))
+        }
     }
 
     #[derive(Default, PartialEq, Eq)]
@@ -766,6 +865,8 @@ mod tests {
         read_reply_limit: Option<usize>,
         reorder_first_reads: bool,
         deferred_read_response: Option<SftpPacket>,
+        write_ack_mode: WriteAckMode,
+        deferred_write_response: Option<SftpPacket>,
         outbound_window_signal: Option<oneshot::Sender<()>>,
     }
 
@@ -1213,6 +1314,53 @@ mod tests {
             Some(SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() })
         }
 
+        fn dispatch_write_ack(
+            &mut self,
+            response: &SftpPacket,
+            channel: russh::ChannelId,
+            session: &mut russh::server::Session,
+        ) -> bool {
+            match self.write_ack_mode {
+                WriteAckMode::ReorderFirstTwo => {
+                    if self.deferred_write_response.is_none() {
+                        self.deferred_write_response = Some(response.clone());
+                        return true;
+                    }
+                    self.write_ack_mode = WriteAckMode::Normal;
+                    let _ = session.data(channel, response.encode().expect("SFTP response"));
+                    let deferred = self.deferred_write_response.take().expect("deferred write");
+                    let _ =
+                        session.data(channel, deferred.encode().expect("deferred SFTP response"));
+                    true
+                }
+                WriteAckMode::HoldFirst if self.deferred_write_response.is_none() => {
+                    self.deferred_write_response = Some(response.clone());
+                    true
+                }
+                WriteAckMode::Normal | WriteAckMode::HoldFirst => false,
+            }
+        }
+
+        fn dispatch_read_response(
+            &mut self,
+            response: &SftpPacket,
+            channel: russh::ChannelId,
+            session: &mut russh::server::Session,
+        ) -> bool {
+            if !self.reorder_first_reads {
+                return false;
+            }
+            if self.deferred_read_response.is_none() {
+                self.deferred_read_response = Some(response.clone());
+                return true;
+            }
+            self.reorder_first_reads = false;
+            let _ = session.data(channel, response.encode().expect("SFTP response"));
+            let deferred = self.deferred_read_response.take().expect("deferred read");
+            let _ = session.data(channel, deferred.encode().expect("deferred SFTP response"));
+            true
+        }
+
         fn corrupt_read_response(
             packet: &SftpPacket,
             channel: russh::ChannelId,
@@ -1387,6 +1535,7 @@ mod tests {
                     continue;
                 }
                 let is_read = matches!(packet, SftpPacket::Read { .. });
+                let is_write = matches!(packet, SftpPacket::Write { .. });
                 let response = if let Some(response) = self
                     .directory_response(&packet)
                     .or_else(|| self.path_or_metadata_response(&packet))
@@ -1454,16 +1603,10 @@ mod tests {
                         _ => continue,
                     }
                 };
-                if is_read && self.reorder_first_reads {
-                    if self.deferred_read_response.is_none() {
-                        self.deferred_read_response = Some(response);
-                        continue;
-                    }
-                    self.reorder_first_reads = false;
-                    let _ = session.data(channel, response.encode().expect("SFTP response"));
-                    let deferred = self.deferred_read_response.take().expect("deferred read");
-                    let _ =
-                        session.data(channel, deferred.encode().expect("deferred SFTP response"));
+                if is_read && self.dispatch_read_response(&response, channel, session) {
+                    continue;
+                }
+                if is_write && self.dispatch_write_ack(&response, channel, session) {
                     continue;
                 }
                 let _ = session.data(channel, response.encode().expect("SFTP response"));
@@ -1483,6 +1626,7 @@ mod tests {
             reorder_first_reads,
             directory,
             None,
+            WriteAckMode::Normal,
         )
         .await
     }
@@ -1493,6 +1637,7 @@ mod tests {
         reorder_first_reads: bool,
         directory: bool,
         outbound_window_signal: Option<oneshot::Sender<()>>,
+        write_ack_mode: WriteAckMode,
     ) -> (ClientConnection, SftpSession) {
         let mut server_config = russh::server::Config::default();
         if outbound_window_signal.is_some() {
@@ -1529,6 +1674,8 @@ mod tests {
                     read_reply_limit,
                     reorder_first_reads,
                     deferred_read_response: None,
+                    write_ack_mode,
+                    deferred_write_response: None,
                     outbound_window_signal,
                 },
             )
@@ -1721,6 +1868,185 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn streaming_upload_reads_only_declared_bytes_and_reports_contiguous_progress() {
+        let (connection, mut session) = transfer_session_with_outbound_window(
+            b"abcdef".to_vec(),
+            None,
+            false,
+            false,
+            None,
+            WriteAckMode::ReorderFirstTwo,
+        )
+        .await;
+        let mut source = TestReader { bytes: b"ghijextra", position: 0, fail_at: None };
+        let mut progress = Vec::new();
+        let count = session
+            .upload_from(b"h", 6, 4, 2, 2, &mut source, |event| progress.push(event))
+            .await
+            .expect("streaming upload");
+        assert_eq!(count, 4);
+        assert_eq!(source.position, 4);
+        assert_eq!(progress.iter().map(|event| event.offset).collect::<Vec<_>>(), [6, 8, 10]);
+        assert!(progress.iter().all(|event| event.total == Some(10)));
+        assert_eq!(session.pending_requests(), 0);
+
+        let mut downloaded = Vec::new();
+        session
+            .download_to(b"h", 0, Some(10), 4, 2, &mut downloaded, |_| {})
+            .await
+            .expect("read uploaded bytes");
+        assert_eq!(downloaded, b"abcdefghij");
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn streaming_upload_validates_before_read_and_handles_zero_length() {
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+        let mut source = TestReader { bytes: b"bytes", position: 0, fail_at: Some(0) };
+        for (handle, offset, length, chunk, pipeline) in [
+            (b"h".as_slice(), u64::MAX, 2, 2, 1),
+            (b"".as_slice(), 0, 1, 2, 1),
+            (b"h".as_slice(), 0, 1, 0, 1),
+            (b"h".as_slice(), 0, 1, 2, 0),
+        ] {
+            assert!(matches!(
+                session
+                    .upload_from(handle, offset, length, chunk, pipeline, &mut source, |_| {})
+                    .await,
+                Err(SftpChannelError::Protocol(SftpError::InvalidValue(_)))
+            ));
+            assert_eq!(source.position, 0);
+            assert_eq!(session.pending_requests(), 0);
+        }
+        let mut progress = Vec::new();
+        assert_eq!(
+            session
+                .upload_from(b"h", 4, 0, 2, 1, &mut source, |event| progress.push(event))
+                .await
+                .expect("empty upload"),
+            0
+        );
+        assert_eq!(source.position, 0);
+        assert_eq!(progress, [SftpTransferProgress { offset: 4, transferred: 0, total: Some(4) }]);
+        let request = session.client_mut().realpath(b"/first").expect("follow-up request");
+        session.send_request(&request).await.expect("same session remains usable");
+        assert!(matches!(session.read_response().await, Ok(SftpPacket::Name { .. })));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn streaming_upload_preflights_write_frame_and_peer_packet_bounds() {
+        let handle = vec![b'h'; crate::MAX_SFTP_HANDLE];
+        let bytes = vec![b'x'; MAX_SFTP_PACKET - 64];
+        let requested_chunk = u32::try_from(MAX_SFTP_PACKET).expect("SFTP packet fits u32");
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+        let mut source = TestReader { bytes: &bytes, position: 0, fail_at: None };
+        assert_eq!(
+            session
+                .upload_from(
+                    &handle,
+                    0,
+                    bytes.len() as u64,
+                    requested_chunk,
+                    2,
+                    &mut source,
+                    |_| {},
+                )
+                .await
+                .expect("maximum-handle upload"),
+            bytes.len() as u64
+        );
+        assert_eq!(source.position, bytes.len());
+        connection.disconnect().await.expect("disconnect client");
+
+        let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+        session.limits = Some(SftpLimits {
+            max_packet_length: 300,
+            max_read_length: 1024,
+            max_write_length: 1024,
+            max_open_handles: 8,
+        });
+        let mut source = TestReader { bytes: &bytes, position: 0, fail_at: None };
+        assert_eq!(
+            session
+                .upload_from(&handle, 0, 38, requested_chunk, 2, &mut source, |_| {})
+                .await
+                .expect("peer-packet-limited upload"),
+            38
+        );
+        assert_eq!(source.position, 38);
+
+        session.limits = Some(SftpLimits { max_packet_length: 280, ..session.limits.unwrap() });
+        source.position = 0;
+        assert!(matches!(
+            session.upload_from(&handle, 0, 1, requested_chunk, 2, &mut source, |_| {}).await,
+            Err(SftpChannelError::Protocol(SftpError::InvalidValue("transfer chunk size")))
+        ));
+        assert_eq!(source.position, 0);
+        let request = session.client_mut().realpath(b"/first").expect("follow-up request");
+        session.send_request(&request).await.expect("same session remains usable");
+        assert!(matches!(session.read_response().await, Ok(SftpPacket::Name { .. })));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
+    async fn streaming_upload_source_eof_and_error_invalidate_only_sftp_session() {
+        for (bytes, fail_at, expected) in [
+            (b"a".as_slice(), None, io::ErrorKind::UnexpectedEof),
+            (b"ab".as_slice(), Some(2), io::ErrorKind::PermissionDenied),
+        ] {
+            let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
+            let mut source = TestReader { bytes, position: 0, fail_at };
+            let error = session
+                .upload_from(b"h", 0, 4, 2, 1, &mut source, |_| {})
+                .await
+                .expect_err("source failure");
+            assert!(matches!(error, SftpChannelError::Io(error) if error.kind() == expected));
+            assert_eq!(session.pending_requests(), 0);
+            assert!(matches!(
+                session.read_response().await,
+                Err(SftpChannelError::SessionUnusable)
+            ));
+            let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+            let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+            fresh.send_request(&request).await.expect("fresh send");
+            assert!(matches!(fresh.read_response().await, Ok(SftpPacket::Name { .. })));
+            connection.disconnect().await.expect("disconnect client");
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_upload_bounds_read_ahead_when_first_ack_is_withheld() {
+        let (connection, mut session) = transfer_session_with_outbound_window(
+            Vec::new(),
+            None,
+            false,
+            false,
+            None,
+            WriteAckMode::HoldFirst,
+        )
+        .await;
+        let bytes = [b'x'; 64];
+        let mut source = TestReader { bytes: &bytes, position: 0, fail_at: None };
+        assert!(
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                session.upload_from(b"h", 0, 64, 2, 2, &mut source, |_| {}),
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(source.position, 4, "completed replies must retain pipeline slots");
+        assert_eq!(session.pending_requests(), 0);
+        assert!(matches!(session.read_response().await, Err(SftpChannelError::SessionUnusable)));
+        let mut fresh = SftpSession::open(&connection, 2).await.expect("fresh SFTP channel");
+        let request = fresh.client_mut().realpath(b"/first").expect("fresh request");
+        fresh.send_request(&request).await.expect("fresh send");
+        assert!(matches!(fresh.read_response().await, Ok(SftpPacket::Name { .. })));
+        connection.disconnect().await.expect("disconnect client");
+    }
+
+    #[tokio::test]
     async fn pipelined_file_rejection_invalidates_only_its_sftp_channel() {
         let (connection, mut session) = transfer_session(Vec::new(), None, false, false).await;
         let rejection = session.upload(b"reject", 0, b"abcd", 2, 2, |_| {}).await;
@@ -1836,6 +2162,7 @@ mod tests {
             false,
             false,
             Some(window_signal),
+            WriteAckMode::Normal,
         )
         .await;
         let request = session.client_mut().realpath(vec![b'x'; 1024]).expect("large request");
@@ -2366,6 +2693,8 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    write_ack_mode: WriteAckMode::Normal,
+                    deferred_write_response: None,
                     outbound_window_signal: None,
                 },
             )
@@ -2463,6 +2792,8 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    write_ack_mode: WriteAckMode::Normal,
+                    deferred_write_response: None,
                     outbound_window_signal: None,
                 },
             )
@@ -2556,6 +2887,8 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    write_ack_mode: WriteAckMode::Normal,
+                    deferred_write_response: None,
                     outbound_window_signal: None,
                 },
             )
@@ -2623,6 +2956,8 @@ mod tests {
                     read_reply_limit: None,
                     reorder_first_reads: false,
                     deferred_read_response: None,
+                    write_ack_mode: WriteAckMode::Normal,
+                    deferred_write_response: None,
                     outbound_window_signal: None,
                 },
             )

@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added bounded async-reader SFTP uploads with explicit byte count and remote resume offset.
+  Slice and stream uploads share contiguous progress and pipeline accounting, including
+  out-of-order acknowledgements. Source failures isolate the SFTP channel; the OpenSSH
+  interoperability fixture exercises streaming resume with exact byte comparison.
 - Covered D-77 cancellation during a blocked outbound SFTP write through an authenticated SSH
   channel whose peer stops replenishing its write window. The canceled session releases its
   request slot; independent and replacement channels still work on the parent connection.
