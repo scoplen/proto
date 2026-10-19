@@ -39,6 +39,10 @@ fn shared_vault_epoch_codecs_round_trip_and_accept_response_extensions() {
         SyncPublishVaultEpochResponse::from_cbor(&extended).expect("extension decode"),
         response
     );
+    SyncPublishVaultEpochResponse::from_cbor(&extended)
+        .expect("extension decode")
+        .validate_for_request(&request())
+        .expect("extended publication response matches request");
 
     let retired = SyncRetireVaultEpochResponse { epoch: 1 };
     let encoded = retired.to_cbor().expect("encode retirement response");
@@ -46,6 +50,36 @@ fn shared_vault_epoch_codecs_round_trip_and_accept_response_extensions() {
         SyncRetireVaultEpochResponse::from_cbor(&encoded).expect("decode retirement response"),
         retired
     );
+    let Value::Map(mut fields) = cbor::decode(&encoded).expect("retirement response map") else {
+        panic!("retirement response must be a map");
+    };
+    fields.push((Value::Text("future".into()), Value::UInt(1)));
+    SyncRetireVaultEpochResponse::from_cbor(&cbor::encode(&Value::Map(fields)).expect("extension"))
+        .expect("retirement extension decode")
+        .validate_for_epoch(1)
+        .expect("extended retirement response matches path");
+}
+
+#[test]
+fn shared_vault_epoch_responses_bind_to_request_and_path() {
+    let published = SyncPublishVaultEpochResponse { epoch: 2 };
+    published.validate_for_request(&request()).expect("matching publication epoch");
+    let mut different = request();
+    different.epoch = 3;
+    assert!(published.validate_for_request(&different).is_err(), "different valid epoch");
+    let mut invalid = request();
+    invalid.wrapped_keys.clear();
+    assert!(published.validate_for_request(&invalid).is_err(), "invalid request");
+    assert!(
+        SyncPublishVaultEpochResponse { epoch: 0 }.validate_for_request(&request()).is_err(),
+        "invalid publication response"
+    );
+
+    let retired = SyncRetireVaultEpochResponse { epoch: 1 };
+    retired.validate_for_epoch(1).expect("matching path epoch");
+    assert!(retired.validate_for_epoch(2).is_err(), "different valid path epoch");
+    assert!(retired.validate_for_epoch(0).is_err(), "invalid path epoch");
+    assert!(SyncRetireVaultEpochResponse { epoch: 0 }.validate_for_epoch(1).is_err());
 }
 
 #[test]
@@ -153,18 +187,20 @@ fn published_shared_vault_epoch_vectors_match_public_codecs() {
             "sync.vaults.epochs.publish.response" => {
                 let source = SyncPublishVaultEpochResponse { epoch: 2 };
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
-                assert_eq!(
-                    SyncPublishVaultEpochResponse::from_cbor(&expected).expect("decode"),
-                    source
-                );
+                let decoded = SyncPublishVaultEpochResponse::from_cbor(&expected).expect("decode");
+                assert_eq!(decoded, source);
+                decoded.validate_for_request(&request()).expect("published response binding");
+                let mut different = request();
+                different.epoch = 3;
+                assert!(decoded.validate_for_request(&different).is_err());
             }
             "sync.vaults.epochs.retire.response" => {
                 let source = SyncRetireVaultEpochResponse { epoch: 1 };
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
-                assert_eq!(
-                    SyncRetireVaultEpochResponse::from_cbor(&expected).expect("decode"),
-                    source
-                );
+                let decoded = SyncRetireVaultEpochResponse::from_cbor(&expected).expect("decode");
+                assert_eq!(decoded, source);
+                decoded.validate_for_epoch(1).expect("published response binding");
+                assert!(decoded.validate_for_epoch(2).is_err());
             }
             other => panic!("unexpected vector kind {other}"),
         }

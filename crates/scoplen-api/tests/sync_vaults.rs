@@ -43,6 +43,28 @@ fn shared_vault_codecs_round_trip_and_accept_response_extensions() {
     fields.push((Value::Text("future".into()), Value::UInt(1)));
     let extended = cbor::encode(&Value::Map(fields)).expect("response extension");
     assert_eq!(SyncCreateVaultResponse::from_cbor(&extended).expect("extension decode"), source);
+    SyncCreateVaultResponse::from_cbor(&extended)
+        .expect("extension decode")
+        .validate_for_request(&request())
+        .expect("extended response matches request");
+}
+
+#[test]
+fn shared_vault_creation_response_binds_to_valid_request() {
+    let response = response();
+    response.validate_for_request(&request()).expect("matching vault id");
+
+    let mut different = request();
+    different.vault_id = id(2);
+    assert!(response.validate_for_request(&different).is_err(), "different valid vault id");
+
+    let mut invalid_request = request();
+    invalid_request.wrapped_vault_key.clear();
+    assert!(response.validate_for_request(&invalid_request).is_err(), "invalid request");
+
+    let mut invalid_response = response;
+    invalid_response.vault.key_epoch = 0;
+    assert!(invalid_response.validate_for_request(&request()).is_err(), "invalid response");
 }
 
 #[test]
@@ -105,7 +127,12 @@ fn published_shared_vault_vectors_match_public_codecs() {
             "sync.vaults.create.response" => {
                 let source = response();
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
-                assert_eq!(SyncCreateVaultResponse::from_cbor(&expected).expect("decode"), source);
+                let decoded = SyncCreateVaultResponse::from_cbor(&expected).expect("decode");
+                assert_eq!(decoded, source);
+                decoded.validate_for_request(&request()).expect("published response binding");
+                let mut different = request();
+                different.vault_id = id(2);
+                assert!(decoded.validate_for_request(&different).is_err());
             }
             other => panic!("unexpected vector kind {other}"),
         }

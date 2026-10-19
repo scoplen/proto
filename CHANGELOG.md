@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-87 request/path-aware validation for six successful K-4 key-management mutation
+  responses. Public tests bind decoded published vectors, reject mismatched and invalid inputs,
+  and retain additive response extensions without changing CBOR bytes or error types.
 - Added bounded gateway-ticket issuance request/response JSON codecs, canonical SSH public-key
   and edge-address validation, redacted credentials, and the `gateway.invalid_request` problem
   code. OpenAPI, generated TypeScript, vectors, and both dependency graphs are synchronized;

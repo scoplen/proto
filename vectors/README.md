@@ -70,6 +70,11 @@ replay vector. The signature-input vector covers the `spl-sync-keys-v1` domain p
 map bytes. The successful PUT response is `{revision}`. These vectors exercise transport encoding
 only; key authenticity is owned by `scoplen-crypto`.
 
+The existing `sync-vaults.json`, `sync-vault-epochs.json`, `sync-vault-members.json`, and
+`sync-keys.json` success-response vectors also exercise D-87 request/path binding through the
+public codecs. Binding changes validation behavior only; their deterministic CBOR bytes remain
+unchanged.
+
 `crypto.json` contains K-2 known answers. All private keys and plaintexts in this document are
 synthetic, public test material and must never be used for real data. Every binary field is
 lowercase hexadecimal; fields in `input` are separated by `|`. Decimal integer fields and the
