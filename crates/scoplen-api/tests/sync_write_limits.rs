@@ -189,6 +189,27 @@ fn higher_payload_and_complete_body_limits_round_trip_without_default_fallback()
 }
 
 #[test]
+fn conflict_encoder_retains_its_fixed_complete_body_cap_under_raised_limits() {
+    let source = batch(1, 1);
+    let limits = SyncWriteLimits {
+        max_envelope_bytes: MAX_SYNC_CONFLICT_BODY_BYTES,
+        max_batch_bytes: MAX_SYNC_CONFLICT_BODY_BYTES * 2,
+        ..SyncWriteLimits::default()
+    };
+    let mut response = conflicts(&source);
+    let small = response.to_cbor_with_limits(limits).expect("baseline conflict").len();
+    // A long byte string adds four header bytes while replacing one baseline payload byte.
+    response.conflicts[0].current.as_mut().expect("current").payload =
+        vec![0x41; MAX_SYNC_CONFLICT_BODY_BYTES - small - 3];
+    let encoded = response.to_cbor_with_limits(limits).expect("exact fixed cap");
+    assert_eq!(encoded.len(), MAX_SYNC_CONFLICT_BODY_BYTES);
+    drop(encoded);
+    response.conflicts[0].current.as_mut().expect("current").payload.push(0x41);
+    let error = response.to_cbor_with_limits(limits).expect_err("fixed cap plus one");
+    assert!(error.to_string().contains("128 MiB"));
+}
+
+#[test]
 fn exact_encoded_budget_tracks_cbor_length_and_base_integer_transitions() {
     for count in [1, 23, 24, 255, 256] {
         for payload in [0, 23, 24, 255, 256, 65_535, 65_536] {
