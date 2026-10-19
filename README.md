@@ -430,7 +430,7 @@ comparison runs with `cargo run --locked --release -p scoplen-ssh --example keys
 The methods and limits are in [docs/ssh-keystroke-latency.md](docs/ssh-keystroke-latency.md).
 
 The tracked `fuzz/corpus/<target>/seed-*` files provide small synthetic valid and malformed
-inputs for all seven parser targets. Valid model and certificate inputs come from the published
+inputs for all eight parser targets. Valid model and certificate inputs come from the published
 known-answer vectors in `vectors/baseline.json` and `vectors/crypto.json`; SSH, SFTP, and agent
 frames follow the public codec tests. The `sync_notification` target checks context, credentials,
 acknowledgements, and events through their public codecs and requires accepted messages to
@@ -442,6 +442,13 @@ Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sf
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
 9449 context; tracked seeds include the RFC signed proof, malformed signature and duplicate JSON,
 truncation, and a proof one byte over the 8 KiB bound.
+The `api_json` target exercises all seven authentication/refresh message types and both gateway-ticket
+issuance messages through public decoders. Accepted messages must preserve their values across
+canonical encoding, and a second encode must preserve those bytes. Gateway request checks also
+enforce rejection of an idempotency header. Seeds include the published JSON vectors, duplicate
+fields, forbidden browser refresh tokens, ambiguous edge hosts, nested response extensions,
+truncation, and complete bodies at and one byte above request and response limits. This checks
+message syntax; token authentication, ticket signatures, and authorization remain consumer work.
 Fuzz-discovered mutations remain ignored; review, minimize, and name useful regression inputs
 before tracking them as new seeds. The scheduled run's results and performance targets remain
 separate Gate S4 acceptance work.
