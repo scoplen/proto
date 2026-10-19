@@ -212,6 +212,112 @@ fn published_key_bundle_vectors_match_public_codecs() {
     }
 }
 
+#[test]
+fn published_key_bundle_failure_vectors_reject_at_the_documented_boundary() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors");
+    let success = scoplen_test_vectors::VectorDocument::from_path(root.join("sync-keys.json"))
+        .expect("success vectors");
+    let base = decode_hex(
+        &success
+            .vectors
+            .iter()
+            .find(|vector| vector.id == "sync-keys-put-request-v1")
+            .expect("base request")
+            .expected,
+    );
+    let failures =
+        scoplen_test_vectors::VectorDocument::from_path(root.join("sync-keys-failures.json"))
+            .expect("failure vectors");
+    assert_eq!(failures.vectors.len(), 11);
+
+    for vector in &failures.vectors {
+        assert_eq!(vector.expected, "reject", "{}", vector.id);
+        let (current, encoded) = match vector.kind.as_str() {
+            "sync.keys.put.decode-reject" => (None, decode_hex(&vector.input)),
+            "sync.keys.put.decode-reject-generated" => {
+                (None, generated_failure_body(&vector.input, &base))
+            }
+            "sync.keys.put.next-revision-reject" => {
+                let (current, encoded) = vector.input.split_once('|').expect("revision fixture");
+                (Some(current.parse::<u64>().expect("current revision")), decode_hex(encoded))
+            }
+            other => panic!("unexpected failure vector kind {other}"),
+        };
+        let decoded = cbor::decode(&encoded).expect("failure input remains valid CBOR");
+        assert_eq!(cbor::encode(&decoded).expect("canonical re-encode"), encoded, "{}", vector.id);
+        if let Some(current) = current {
+            SyncAccountKeyBundleUpdate::from_cbor(&encoded)
+                .expect("revision rejection is contextual, not a wire error")
+                .validate_next_revision(current)
+                .expect_err(&vector.id);
+        } else {
+            SyncAccountKeyBundleUpdate::from_cbor(&encoded).expect_err(&vector.id);
+        }
+    }
+
+    let mut different_signature = update();
+    different_signature.signature[0] ^= 0xff;
+    SyncAccountKeyBundleUpdate::from_cbor(
+        &different_signature.to_cbor().expect("fixed-width signature encodes"),
+    )
+    .expect("K-4 checks signature width, not cryptographic authenticity");
+}
+
+fn generated_failure_body(input: &str, base: &[u8]) -> Vec<u8> {
+    let recipe: JsonValue = serde_json::from_str(input).expect("generation recipe");
+    assert_eq!(recipe["base"], "sync-keys-put-request-v1");
+    let Value::Map(mut fields) = cbor::decode(base).expect("base map") else {
+        panic!("base request must be a map");
+    };
+    let (name, replacement) = match recipe["replace"].as_str().expect("replacement field") {
+        "account_kem_key" => {
+            let byte = decode_hex(recipe["byte"].as_str().expect("repeat byte"));
+            assert_eq!(byte.len(), 1);
+            let length = usize::try_from(recipe["length"].as_u64().expect("repeat length"))
+                .expect("length fits usize");
+            assert_eq!(length, MAX_SYNC_KEY_ARTIFACT_BYTES + 1);
+            ("account_kem_key", Value::Bytes(vec![byte[0]; length]))
+        }
+        "device_wraps" => {
+            assert_eq!(recipe["first_device_id"], "00000000-0000-7000-8000-000000000001");
+            let byte = decode_hex(recipe["wrapped_ark_byte"].as_str().expect("repeat byte"));
+            assert_eq!(byte.len(), 1);
+            let count = u16::try_from(recipe["count"].as_u64().expect("wrap count"))
+                .expect("count fits u16");
+            assert_eq!(usize::from(count), MAX_SYNC_KEY_DEVICE_WRAPS);
+            let length =
+                usize::try_from(recipe["wrapped_ark_length"].as_u64().expect("wrap length"))
+                    .expect("length fits usize");
+            assert!(length <= MAX_SYNC_KEY_ARTIFACT_BYTES);
+            let wraps = (1..=count)
+                .map(|number| {
+                    Value::Map(vec![
+                        (
+                            Value::Text("device_id".into()),
+                            Value::Bytes(numbered_id(number).as_bytes().to_vec()),
+                        ),
+                        (Value::Text("wrapped_ark".into()), Value::Bytes(vec![byte[0]; length])),
+                    ])
+                })
+                .collect();
+            ("device_wraps", Value::Array(wraps))
+        }
+        other => panic!("unexpected replacement field {other}"),
+    };
+    let value = fields
+        .iter_mut()
+        .find(|(key, _)| key == &Value::Text(name.into()))
+        .expect("replace existing field");
+    value.1 = replacement;
+    let encoded = cbor::encode(&Value::Map(fields)).expect("generated canonical CBOR");
+    if name == "account_kem_key" {
+        assert!(encoded.len() <= MAX_SYNC_KEY_BODY_BYTES);
+    } else {
+        assert!(encoded.len() > MAX_SYNC_KEY_BODY_BYTES);
+    }
+    encoded
+}
+
 fn bundle_from_json(input: &str) -> SyncAccountKeyBundle {
     let value: JsonValue = serde_json::from_str(input).expect("bundle JSON");
     SyncAccountKeyBundle {

@@ -9,6 +9,9 @@ All notable changes to the `proto` repository will be recorded here.
   preflight exact request sizes and decoders check body bounds before CBOR parsing. Default
   methods enforce 260 KiB envelopes, 500 writes, and 4 MiB requests; the complete conflict cap
   remains 128 MiB. Nine public profile vectors and higher/lower/boundary tests cover the APIs.
+- Published portable account-key PUT failure vectors for malformed fields, UUIDs, wrap order,
+  revision progression and overflow, artifact/body limits, and signature width. Public tests
+  exercise canonical CBOR input and the request decoder or contextual revision validator.
 - Added request-aware K-4 acknowledgement validation that rejects a cursor below the request
   while preserving higher stored maxima, zero/maximum cursor bounds, and response extensions.
   Published acknowledgement vectors and CBOR bytes remain unchanged.

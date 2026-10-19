@@ -77,6 +77,23 @@ replay vector. The signature-input vector covers the `spl-sync-keys-v1` domain p
 map bytes. The successful PUT response is `{revision}`. These vectors exercise transport encoding
 only; key authenticity is owned by `scoplen-crypto`.
 
+`sync-keys-failures.json` publishes the §8.1 negative PUT fixtures. Every `expected` value is
+`reject`. For `sync.keys.put.decode-reject`, `input` is lowercase hexadecimal deterministic CBOR;
+the public request decoder must reject it. For `sync.keys.put.next-revision-reject`, `input` is
+`current|cbor_hex`; the decoder must accept the request, then the next-revision check must reject
+it against the decimal `current` revision. This includes a skipped revision and unsigned overflow.
+All literal CBOR fixtures decode canonically before the K-4 field checks run.
+
+The two large `sync.keys.put.decode-reject-generated` fixtures use a compact JSON recipe in
+`input`. Both start from the encoded `sync-keys-put-request-v1` value. The `account_kem_key` recipe
+replaces that byte string with `length` repetitions of the single hexadecimal `byte`. The
+`device_wraps` recipe replaces the array with `count` wraps; its UUIDv7 device ids are consecutive
+16-bit suffixes starting at `first_device_id`, and each wrap uses `wrapped_ark_length` repetitions
+of `wrapped_ark_byte`. Encode the resulting map as deterministic CBOR, then require decoder
+rejection. The first fixture exceeds only the 64 KiB artifact bound; the second uses 1,000 sorted
+wraps of 4,200 bytes each to exceed only the 4 MiB body bound. A 63-byte signature fails the K-4
+wire width check; cryptographic verification of any 64-byte signature belongs to K-2 consumers.
+
 The existing `sync-vaults.json`, `sync-vault-epochs.json`, `sync-vault-members.json`, and
 `sync-keys.json` success-response vectors also exercise D-87 request/path binding through the
 public codecs. Binding changes validation behavior only; their deterministic CBOR bytes remain
