@@ -39,6 +39,7 @@ const UNLOCK: u8 = 23;
 const ADD_IDENTITY_CONSTRAINED: u8 = 25;
 const EXTENSION: u8 = 27;
 const EXTENSION_FAILURE: u8 = 28;
+const EXTENSION_RESPONSE: u8 = 29;
 
 const CONSTRAIN_LIFETIME: u8 = 1;
 const CONSTRAIN_CONFIRM: u8 = 2;
@@ -76,7 +77,7 @@ pub const MAX_AGENT_PROVIDER: usize = 4096;
 pub const MAX_AGENT_PRIVATE_KEY: usize = 128 * 1024;
 /// Maximum number of constraints accepted on one added identity.
 pub const MAX_AGENT_CONSTRAINTS: usize = 256;
-/// Maximum extension name accepted by an identity constraint.
+/// Maximum extension name accepted by an agent extension or identity constraint.
 pub const MAX_AGENT_EXTENSION_NAME: usize = 4096;
 /// Maximum extension details accepted by an identity constraint.
 pub const MAX_AGENT_EXTENSION_DETAILS: usize = 64 * 1024;
@@ -118,6 +119,9 @@ pub enum AgentError {
     /// The external agent refused a request.
     #[error("SSH agent returned failure")]
     AgentFailure,
+    /// The local key store does not implement this extension.
+    #[error("SSH agent extension is not supported")]
+    UnsupportedExtension,
     /// The transport adapter failed before a response was received.
     #[error("SSH agent transport failed: {0}")]
     Transport(String),
@@ -263,8 +267,8 @@ pub enum AgentMessage {
     SignResponse { signature: Vec<u8> },
     /// Send an opaque extension request to the agent.
     ExtensionRequest { name: Vec<u8>, contents: Vec<u8> },
-    /// Return opaque contents from a successful extension request.
-    ExtensionResponse { contents: Vec<u8> },
+    /// Return a named extension response with raw, opaque contents.
+    ExtensionResponse { name: Vec<u8>, contents: Vec<u8> },
     /// Report an extension-specific failure.
     ExtensionFailure,
     /// Add one software identity without constraints.
@@ -316,8 +320,9 @@ impl fmt::Debug for AgentMessage {
                 .field("name_len", &name.len())
                 .field("contents_len", &contents.len())
                 .finish(),
-            Self::ExtensionResponse { contents } => formatter
+            Self::ExtensionResponse { name, contents } => formatter
                 .debug_struct("ExtensionResponse")
+                .field("name_len", &name.len())
                 .field("contents_len", &contents.len())
                 .finish(),
             Self::ExtensionFailure => formatter.write_str("ExtensionFailure"),
@@ -433,8 +438,8 @@ impl AgentMessage {
             Self::ExtensionRequest { name, contents } => {
                 encode_extension_request(&mut payload, name, contents)?;
             }
-            Self::ExtensionResponse { contents } => {
-                encode_extension_response(&mut payload, contents)?;
+            Self::ExtensionResponse { name, contents } => {
+                encode_extension_response(&mut payload, name, contents)?;
             }
             Self::ExtensionFailure => payload.push(EXTENSION_FAILURE),
             Self::AddIdentity { private_key, comment } => {
@@ -969,14 +974,21 @@ impl<C: AgentChannel> AgentClient<C> {
     }
 
     /// Send one bounded opaque extension request and return its response contents.
+    ///
+    /// An empty generic success returns empty contents. Named responses must echo `name`.
     pub fn extension(&mut self, name: &[u8], contents: &[u8]) -> Result<Vec<u8>, AgentError> {
-        validate_blob(name, MAX_AGENT_EXTENSION_NAME, "extension name")?;
+        validate_extension_name(name)?;
         validate_size(contents, MAX_AGENT_EXTENSION_DATA, "extension contents")?;
         match self.exchange(&AgentMessage::ExtensionRequest {
             name: name.to_vec(),
             contents: contents.to_vec(),
         })? {
-            AgentMessage::ExtensionResponse { contents } => Ok(contents),
+            AgentMessage::Success => Ok(Vec::new()),
+            AgentMessage::ExtensionResponse { name: response_name, contents }
+                if response_name == name =>
+            {
+                Ok(contents)
+            }
             AgentMessage::ExtensionFailure | AgentMessage::Failure => Err(AgentError::AgentFailure),
             _ => Err(AgentError::UnexpectedResponse),
         }
@@ -1088,9 +1100,12 @@ pub trait AgentKeyStore {
     /// Sign data for a key that exactly matches one stored identity.
     fn sign(&self, key_blob: &[u8], data: &[u8], flags: u32) -> Result<Vec<u8>, AgentError>;
 
-    /// Handle one bounded opaque agent extension request.
+    /// Handle one bounded opaque agent extension request, returning raw response contents.
+    ///
+    /// Return `UnsupportedExtension` for unknown names; other errors signal a failed supported
+    /// extension. The default supports no extensions. Successful replies echo the request name.
     fn extension(&self, _name: &[u8], _contents: &[u8]) -> Result<Vec<u8>, AgentError> {
-        Err(AgentError::AgentFailure)
+        Err(AgentError::UnsupportedExtension)
     }
 
     /// Add one private identity and its optional bounded constraints.
@@ -1166,8 +1181,11 @@ impl<S: AgentKeyStore> AgentServer<S> {
             }
             AgentMessage::ExtensionRequest { name, contents } => {
                 match self.store.extension(&name, &contents) {
-                    Ok(contents) => AgentMessage::ExtensionResponse { contents },
-                    Err(_) => AgentMessage::ExtensionFailure,
+                    Ok(contents) if contents.len() <= MAX_AGENT_EXTENSION_DATA => {
+                        AgentMessage::ExtensionResponse { name, contents }
+                    }
+                    Err(AgentError::UnsupportedExtension) => AgentMessage::Failure,
+                    Ok(_) | Err(_) => AgentMessage::ExtensionFailure,
                 }
             }
             AgentMessage::AddIdentity { private_key, comment } => {
@@ -1771,7 +1789,8 @@ fn decode_payload(payload: &[u8]) -> Result<AgentMessage, AgentError> {
             Ok(AgentMessage::Unlock { passphrase: passphrase.to_vec() })
         }
         SUCCESS if rest.is_empty() => Ok(AgentMessage::Success),
-        SUCCESS => decode_extension_response(rest),
+        SUCCESS => Err(AgentError::MalformedFrame("success payload")),
+        EXTENSION_RESPONSE => decode_extension_response(rest),
         FAILURE if rest.is_empty() => Ok(AgentMessage::Failure),
         FAILURE => Err(AgentError::MalformedFrame("failure payload")),
         EXTENSION_FAILURE if rest.is_empty() => Ok(AgentMessage::ExtensionFailure),
@@ -1781,21 +1800,17 @@ fn decode_payload(payload: &[u8]) -> Result<AgentMessage, AgentError> {
 }
 
 fn decode_extension_request(rest: &[u8]) -> Result<AgentMessage, AgentError> {
-    let (name, rest) = read_string(rest, MAX_AGENT_EXTENSION_NAME, "extension name")?;
-    validate_blob(name, MAX_AGENT_EXTENSION_NAME, "extension name")?;
-    let (contents, trailing) = read_string(rest, MAX_AGENT_EXTENSION_DATA, "extension contents")?;
-    if !trailing.is_empty() {
-        return Err(AgentError::MalformedFrame("extension request trailing data"));
-    }
+    let (name, contents) = read_string(rest, MAX_AGENT_EXTENSION_NAME, "extension name")?;
+    validate_extension_name(name)?;
+    validate_size(contents, MAX_AGENT_EXTENSION_DATA, "extension contents")?;
     Ok(AgentMessage::ExtensionRequest { name: name.to_vec(), contents: contents.to_vec() })
 }
 
 fn decode_extension_response(rest: &[u8]) -> Result<AgentMessage, AgentError> {
-    let (contents, trailing) = read_string(rest, MAX_AGENT_EXTENSION_DATA, "extension response")?;
-    if !trailing.is_empty() {
-        return Err(AgentError::MalformedFrame("extension response trailing data"));
-    }
-    Ok(AgentMessage::ExtensionResponse { contents: contents.to_vec() })
+    let (name, contents) = read_string(rest, MAX_AGENT_EXTENSION_NAME, "extension name")?;
+    validate_extension_name(name)?;
+    validate_size(contents, MAX_AGENT_EXTENSION_DATA, "extension response")?;
+    Ok(AgentMessage::ExtensionResponse { name: name.to_vec(), contents: contents.to_vec() })
 }
 
 fn decode_add_identity(input: &[u8], constrained: bool) -> Result<AgentMessage, AgentError> {
@@ -1861,18 +1876,30 @@ fn encode_extension_request(
     name: &[u8],
     contents: &[u8],
 ) -> Result<(), AgentError> {
-    validate_blob(name, MAX_AGENT_EXTENSION_NAME, "extension name")?;
+    validate_extension_name(name)?;
     validate_size(contents, MAX_AGENT_EXTENSION_DATA, "extension contents")?;
     output.push(EXTENSION);
     append_string(output, name, MAX_AGENT_EXTENSION_NAME, "extension name")?;
-    append_string(output, contents, MAX_AGENT_EXTENSION_DATA, "extension contents")?;
+    output.extend_from_slice(contents);
     Ok(())
 }
 
-fn encode_extension_response(output: &mut Vec<u8>, contents: &[u8]) -> Result<(), AgentError> {
+fn encode_extension_response(
+    output: &mut Vec<u8>,
+    name: &[u8],
+    contents: &[u8],
+) -> Result<(), AgentError> {
+    validate_extension_name(name)?;
     validate_size(contents, MAX_AGENT_EXTENSION_DATA, "extension response")?;
-    output.push(SUCCESS);
-    append_string(output, contents, MAX_AGENT_EXTENSION_DATA, "extension response")?;
+    output.push(EXTENSION_RESPONSE);
+    append_string(output, name, MAX_AGENT_EXTENSION_NAME, "extension name")?;
+    output.extend_from_slice(contents);
+    Ok(())
+}
+
+fn validate_extension_name(name: &[u8]) -> Result<(), AgentError> {
+    validate_blob(name, MAX_AGENT_EXTENSION_NAME, "extension name")?;
+    std::str::from_utf8(name).map_err(|_| AgentError::MalformedFrame("extension name"))?;
     Ok(())
 }
 
@@ -2762,7 +2789,10 @@ mod tests {
                 name: b"query".to_vec(),
                 contents: b"supported".to_vec(),
             },
-            AgentMessage::ExtensionResponse { contents: b"query\0extension".to_vec() },
+            AgentMessage::ExtensionResponse {
+                name: b"query".to_vec(),
+                contents: b"query\0extension".to_vec(),
+            },
             AgentMessage::ExtensionFailure,
             AgentMessage::AddIdentity {
                 private_key: ed25519_private_key(),
@@ -3377,14 +3407,12 @@ mod tests {
         );
 
         let mut payload = vec![EXTENSION];
-        append_test_string(&mut payload, b"query");
-        append_test_string(&mut payload, b"contents");
-        payload.push(0x01);
+        append_test_string(&mut payload, &[0xff]);
         let mut frame = (u32::try_from(payload.len()).expect("test frame")).to_be_bytes().to_vec();
         frame.extend_from_slice(&payload);
         assert_eq!(
             AgentMessage::decode_frame(&frame),
-            Err(AgentError::MalformedFrame("extension request trailing data"))
+            Err(AgentError::MalformedFrame("extension name"))
         );
 
         let mut payload = vec![EXTENSION_FAILURE, 0];

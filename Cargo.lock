@@ -3016,6 +3016,7 @@ dependencies = [
  "rustls",
  "scoplen-api",
  "scoplen-crypto",
+ "scoplen-test-vectors",
  "signature 3.0.0",
  "ssh-key",
  "thiserror",

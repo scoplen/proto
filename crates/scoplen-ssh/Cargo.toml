@@ -21,3 +21,6 @@ thiserror.workspace = true
 tokio = { version = "1.17.0", features = ["io-util", "net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = { version = "=0.26.6", default-features = false, features = ["ring"] }
 zeroize = "1.8"
+
+[dev-dependencies]
+scoplen-test-vectors = { path = "../scoplen-test-vectors", version = "0.1.0" }

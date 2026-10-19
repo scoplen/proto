@@ -4,5 +4,8 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|bytes: &[u8]| {
-    let _ = scoplen_ssh::AgentMessage::decode_frame(bytes);
+    if let Ok(message) = scoplen_ssh::AgentMessage::decode_frame(bytes) {
+        let encoded = message.encode_frame().expect("decoded message re-encodes");
+        assert_eq!(scoplen_ssh::AgentMessage::decode_frame(&encoded), Ok(message));
+    }
 });

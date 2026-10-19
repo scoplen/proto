@@ -8,6 +8,13 @@ All notable changes to the `proto` repository will be recorded here.
   response body budgets with a 4 MiB default. Encoders preflight exact size; decoders check the
   complete input before CBOR parsing. Seven portable budget recipes and public boundary tests
   retain the existing session bytes and future-vault-kind behavior.
+- Corrected generic SSH agent extensions to RFC 9987: raw request contents, named response 29,
+  request-name binding, empty success, and unsupported-versus-failed dispatch. Forwarded
+  session-bind-shaped requests are refused without ending the channel. The provisional extra
+  contents string and nonempty success encoding are removed; the response name and unsupported
+  error are pre-Stable source-breaking changes. Nine portable vectors, public boundary/recovery
+  regressions, and decoder fuzz seeds cover the correction.
+
 - Framed SSH agent streams now fail closed after uncertain write, flush, read, or response-frame
   failures. Later requests return typed `ChannelUnusable` without I/O, preventing a late response
   from being assigned to a new request; complete agent refusals and pre-I/O validation errors remain
