@@ -1,0 +1,60 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "agent-extension-query-request",
+      "kind": "ssh.agent.extension.valid",
+      "input": "0000000a1b000000057175657279",
+      "expected": "0000000a1b000000057175657279"
+    },
+    {
+      "id": "agent-extension-query-response",
+      "kind": "ssh.agent.extension.valid",
+      "input": "0000002f1d0000000571756572790000001873657373696f6e2d62696e64406f70656e7373682e636f6d000000057175657279",
+      "expected": "0000002f1d0000000571756572790000001873657373696f6e2d62696e64406f70656e7373682e636f6d000000057175657279"
+    },
+    {
+      "id": "agent-extension-session-bind-request",
+      "kind": "ssh.agent.extension.valid",
+      "input": "000000631b0000001873657373696f6e2d62696e64406f70656e7373682e636f6d0000001273796e7468657469632d686f73742d6b65790000001473796e7468657469632d73657373696f6e2d69640000001373796e7468657469632d7369676e617475726501",
+      "expected": "000000631b0000001873657373696f6e2d62696e64406f70656e7373682e636f6d0000001273796e7468657469632d686f73742d6b65790000001473796e7468657469632d73657373696f6e2d69640000001373796e7468657469632d7369676e617475726501"
+    },
+    {
+      "id": "agent-extension-empty-success",
+      "kind": "ssh.agent.extension.valid",
+      "input": "0000000106",
+      "expected": "0000000106"
+    },
+    {
+      "id": "agent-extension-unsupported",
+      "kind": "ssh.agent.extension.valid",
+      "input": "0000000105",
+      "expected": "0000000105"
+    },
+    {
+      "id": "agent-extension-extension-failure",
+      "kind": "ssh.agent.extension.valid",
+      "input": "000000011c",
+      "expected": "000000011c"
+    },
+    {
+      "id": "agent-extension-nonempty-success",
+      "kind": "ssh.agent.extension.invalid",
+      "input": "000000020600",
+      "expected": "reject"
+    },
+    {
+      "id": "agent-extension-invalid-name-utf8",
+      "kind": "ssh.agent.extension.invalid",
+      "input": "000000061b00000001ff",
+      "expected": "reject"
+    },
+    {
+      "id": "agent-extension-truncated-name",
+      "kind": "ssh.agent.extension.invalid",
+      "input": "000000061d0000000571",
+      "expected": "reject"
+    }
+  ]
+}

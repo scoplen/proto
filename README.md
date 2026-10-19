@@ -75,6 +75,11 @@ includes bounded Unix-socket and Windows named-pipe streams, Pageant named-pipe 
 identity and signing requests, an `AgentSshSigner` that binds agent signatures to the concrete
 public-key authentication session, add/remove/lock/smart-card management, opaque extensions, and
 fail-closed forwarding policy.
+Generic extensions use RFC 9987 request 27 and named response 29 with raw opaque contents,
+including an empty `query` body. Client responses must echo the requested extension name;
+empty success 6 is also accepted. Unknown local extensions return failure 5 and failed supported
+extensions return failure 28. Forwarded extensions remain refused with ordinary failure without
+terminating a healthy channel; session-bind and destination constraints are not implemented.
 Framed agent streams, including Pageant named pipes, become unusable after a write, flush, read,
 or response-frame failure. The failing exchange returns its original error; later exchanges return
 `ChannelUnusable` without I/O. Callers must reconnect before retrying. Local request rejection and

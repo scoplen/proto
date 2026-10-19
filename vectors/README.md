@@ -12,6 +12,14 @@ by `|` in `input`, with the expected merged envelope in `expected`. Contract-spe
 and additional canonical encodings are added with the corresponding contract gate and are
 consumed by both client and server workstreams.
 
+`ssh-agent-extensions.json` contains K-7 RFC 9987 section 5.8 agent-extension frames.
+Inputs are complete agent frames as lowercase hex. Valid vectors expect exact re-encoded hex;
+invalid vectors expect `reject`. The synthetic session-bind-shaped body has multiple raw SSH
+fields and a boolean; it tests opaque framing, not session-bind signature or semantic validation.
+The set includes an empty `query`, named response 29, empty success 6, failures 5/28, malformed
+names and nonempty success rejection. Public tests separately cover response-name binding,
+resource bounds, and forwarded refusal followed by healthy queries and authorized signing.
+
 `sync-changes.json` contains K-4 change-feed vectors. Query inputs are JSON objects with `after`
 and `limit`; expected values are the canonical query string. Response inputs are JSON objects with
 `changes`, `next_cursor`, and `more`; payloads are lowercase hexadecimal and a missing signer is
