@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Expanded the disposable OpenSSH fixture with a real KRL: the server rejects Ed25519 user
+  certificates revoked by serial and key ID, while a certificate from the same trusted CA and
+  the same raw public key still complete authenticated commands. The test disables OpenSSH's
+  source penalties so deliberate rejection cases do not block later controls.
 - Enabled the released SSH engine's 3DES implementation and mapped `3des-cbc` only for explicit
   per-Host legacy selection. The constrained OpenSSH fixture now tests AES-CBC and 3DES
   separately, including default-policy rejection, exact command output, exit status, and Host
