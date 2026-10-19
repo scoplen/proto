@@ -208,6 +208,20 @@ fn refresh_proofs_omit_and_do_not_require_ath() {
 }
 
 #[test]
+fn target_rejects_bare_hexadecimal_host_marker() {
+    for origin in ["https://0x", "https://edge.0x", "https://0x:8443", "https://edge.0x:8443"] {
+        assert_eq!(
+            DpopTarget::new("POST", origin, "/api/v1/auth/refresh"),
+            Err(DpopError::InvalidTarget),
+            "{origin}"
+        );
+    }
+    for origin in ["https://0.0.0.0", "https://0.0.0.0:8443", "https://0x.example.com"] {
+        assert!(DpopTarget::new("POST", origin, "/api/v1/auth/refresh").is_ok(), "{origin}");
+    }
+}
+
+#[test]
 fn target_rejects_route_aliases_and_noncanonical_origins() {
     let invalid = [
         "", "relative", "//double", "/a//b", "/.", "/..", "/a/./b", "/a/../b", "/a%2Fb", "/a%5Cb",

@@ -65,6 +65,20 @@ fn published_signature_input_is_exact_and_signs_with_device_boundary() {
 }
 
 #[test]
+fn bare_hexadecimal_host_marker_cannot_change_signed_origin() {
+    for origin in ["https://0x", "https://edge.0x", "https://0x:8443", "https://edge.0x:8443"] {
+        assert_eq!(
+            DeviceAuthContext::new(origin, NONCE, device_id()),
+            Err(DeviceAuthError::InvalidOrigin),
+            "{origin}"
+        );
+    }
+    for origin in ["https://0.0.0.0", "https://0.0.0.0:8443", "https://0x.example.com"] {
+        assert!(DeviceAuthContext::new(origin, NONCE, device_id()).is_ok(), "{origin}");
+    }
+}
+
+#[test]
 fn public_context_rejects_noncanonical_origin_nonce_and_device() {
     for origin in [
         "http://example.com",

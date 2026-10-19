@@ -94,9 +94,9 @@ pub(crate) fn validate_origin(origin: &str) -> Result<(), DeviceAuthError> {
         } else {
             let final_label = host.rsplit('.').next().ok_or(DeviceAuthError::InvalidOrigin)?;
             let ambiguous_ip = final_label.bytes().all(|byte| byte.is_ascii_digit())
-                || final_label.strip_prefix("0x").is_some_and(|digits| {
-                    !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_hexdigit())
-                });
+                || final_label
+                    .strip_prefix("0x")
+                    .is_some_and(|digits| digits.bytes().all(|byte| byte.is_ascii_hexdigit()));
             if ambiguous_ip {
                 return Err(DeviceAuthError::InvalidOrigin);
             }
