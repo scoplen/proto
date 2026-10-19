@@ -72,6 +72,8 @@ fn strict_kex_rejects_non_kex_messages_and_resets_each_direction() {
     assert_eq!(state.on_receive(StrictKexPacket::KexEcdhReply), Ok(1));
     assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(2));
     assert_eq!(state.send_sequence(), 0);
+    assert_eq!(state.on_send(StrictKexPacket::ExtInfo), Ok(0));
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(1));
     assert_eq!(
         state.on_receive(StrictKexPacket::ExtInfo),
         Err(StrictKexError::UnexpectedPacket {
@@ -109,9 +111,8 @@ fn strict_kex_rejects_wrong_or_repeated_messages_and_requires_rekey_boundary() {
     );
 }
 
-#[test]
-fn strict_kex_applies_again_after_rekey() {
-    let mut state = StrictKeyExchange::new(true, KeyExchangeFamily::Ecdh);
+fn established_kex(strict: bool) -> StrictKeyExchange {
+    let mut state = StrictKeyExchange::new(strict, KeyExchangeFamily::Ecdh);
     for direction in [TransportDirection::Send, TransportDirection::Receive] {
         let result = match direction {
             TransportDirection::Send => state.on_send(StrictKexPacket::KexInit),
@@ -124,16 +125,173 @@ fn strict_kex_applies_again_after_rekey() {
     assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(2));
     assert_eq!(state.on_receive(StrictKexPacket::NewKeys), Ok(2));
     assert_eq!(state.phase(), StrictKexPhase::Established);
+    state
+}
+
+#[test]
+fn strict_initial_kex_allows_each_completed_direction_to_resume() {
+    for first in [TransportDirection::Send, TransportDirection::Receive] {
+        let mut state = StrictKeyExchange::new(true, KeyExchangeFamily::Ecdh);
+        assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(0));
+        assert_eq!(state.on_receive(StrictKexPacket::KexInit), Ok(0));
+        assert_eq!(state.on_send(StrictKexPacket::KexEcdhInit), Ok(1));
+        assert_eq!(state.on_receive(StrictKexPacket::KexEcdhReply), Ok(1));
+        match first {
+            TransportDirection::Send => {
+                assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(2));
+                assert_eq!(
+                    state.on_send(StrictKexPacket::KexEcdhInit),
+                    Err(StrictKexError::PacketAfterNewKeys {
+                        direction: TransportDirection::Send,
+                        packet: StrictKexPacket::KexEcdhInit,
+                    })
+                );
+                assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(0));
+                assert_eq!(state.on_receive(StrictKexPacket::NewKeys), Ok(2));
+            }
+            TransportDirection::Receive => {
+                assert_eq!(state.on_receive(StrictKexPacket::NewKeys), Ok(2));
+                assert_eq!(
+                    state.on_receive(StrictKexPacket::KexEcdhReply),
+                    Err(StrictKexError::PacketAfterNewKeys {
+                        direction: TransportDirection::Receive,
+                        packet: StrictKexPacket::KexEcdhReply,
+                    })
+                );
+                assert_eq!(state.on_receive(StrictKexPacket::ExtInfo), Ok(0));
+                assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(2));
+            }
+        }
+        assert_eq!(state.phase(), StrictKexPhase::Established);
+    }
+}
+
+#[test]
+fn strict_rekey_allows_interleaved_ordinary_packets_and_resets_each_direction() {
+    let mut state = established_kex(true);
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(0));
+    assert_eq!(state.on_receive(StrictKexPacket::Other(4)), Ok(0));
 
     state.begin_rekey().expect("initial KEX is complete");
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(1));
+    assert_eq!(state.on_receive(StrictKexPacket::Other(4)), Ok(1));
     assert_eq!(
-        state.on_send(StrictKexPacket::Other(2)),
+        state.on_send(StrictKexPacket::NewKeys),
         Err(StrictKexError::FirstPacketMustBeKexInit {
             direction: TransportDirection::Send,
-            packet: StrictKexPacket::Other(2)
+            packet: StrictKexPacket::NewKeys,
         })
     );
-    assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(0));
+    assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(2));
+    assert_eq!(state.on_receive(StrictKexPacket::KexInit), Ok(2));
+    assert_eq!(state.on_send(StrictKexPacket::KexEcdhInit), Ok(3));
+    assert_eq!(state.on_receive(StrictKexPacket::KexEcdhReply), Ok(3));
+    assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(4));
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(0));
+    assert_eq!(state.on_receive(StrictKexPacket::Other(4)), Ok(4));
+    assert_eq!(state.on_receive(StrictKexPacket::NewKeys), Ok(5));
+    assert_eq!(state.phase(), StrictKexPhase::Established);
+    assert_eq!(state.send_sequence(), 1);
+    assert_eq!(state.receive_sequence(), 0);
+
+    state.begin_rekey().expect("first rekey is complete");
+    assert_eq!(state.on_receive(StrictKexPacket::Other(4)), Ok(0));
+    assert_eq!(state.on_receive(StrictKexPacket::KexInit), Ok(1));
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(1));
+    assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(2));
+    assert_eq!(state.on_receive(StrictKexPacket::KexEcdhReply), Ok(2));
+    assert_eq!(state.on_send(StrictKexPacket::KexEcdhInit), Ok(3));
+    assert_eq!(state.on_receive(StrictKexPacket::NewKeys), Ok(3));
+    assert_eq!(state.on_receive(StrictKexPacket::Other(4)), Ok(0));
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(4));
+    assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(5));
+    assert_eq!(state.phase(), StrictKexPhase::Established);
+    assert_eq!(state.send_sequence(), 0);
+    assert_eq!(state.receive_sequence(), 1);
+}
+
+#[test]
+fn non_strict_kex_keeps_advancing_sequences_through_rekey() {
+    let mut state = established_kex(false);
+    assert_eq!(state.send_sequence(), 3);
+    assert_eq!(state.receive_sequence(), 3);
+    state.begin_rekey().expect("initial KEX is complete");
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(3));
+    assert_eq!(state.on_receive(StrictKexPacket::Other(4)), Ok(3));
+    assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(4));
+    assert_eq!(state.on_receive(StrictKexPacket::KexInit), Ok(4));
+    assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(5));
+    assert_eq!(state.on_receive(StrictKexPacket::NewKeys), Ok(5));
+    assert_eq!(state.phase(), StrictKexPhase::Established);
+    assert_eq!(state.send_sequence(), 6);
+    assert_eq!(state.receive_sequence(), 6);
+}
+
+#[test]
+fn non_strict_initial_exchange_allows_ordinary_packets_before_kex_control() {
+    let mut state = StrictKeyExchange::new(false, KeyExchangeFamily::Ecdh);
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(0));
+    assert_eq!(state.on_receive(StrictKexPacket::Other(4)), Ok(0));
+    assert_eq!(
+        state.on_send(StrictKexPacket::NewKeys),
+        Err(StrictKexError::FirstPacketMustBeKexInit {
+            direction: TransportDirection::Send,
+            packet: StrictKexPacket::NewKeys,
+        })
+    );
+    assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(1));
+    assert_eq!(state.on_receive(StrictKexPacket::KexInit), Ok(1));
+    assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(2));
+    assert_eq!(state.on_receive(StrictKexPacket::NewKeys), Ok(2));
+    assert_eq!(state.send_sequence(), 3);
+    assert_eq!(state.receive_sequence(), 3);
+    assert_eq!(state.on_receive(StrictKexPacket::KexInit), Err(StrictKexError::RekeyNotStarted));
+}
+
+#[test]
+fn strict_rekey_rejects_invalid_kex_control_without_consuming_sequence() {
+    let mut state = established_kex(true);
+    assert_eq!(state.on_send(StrictKexPacket::KexInit), Err(StrictKexError::RekeyNotStarted));
+    state.begin_rekey().expect("initial KEX is complete");
+    assert_eq!(state.on_send(StrictKexPacket::Other(2)), Ok(0));
+    assert_eq!(
+        state.on_send(StrictKexPacket::KexEcdhInit),
+        Err(StrictKexError::FirstPacketMustBeKexInit {
+            direction: TransportDirection::Send,
+            packet: StrictKexPacket::KexEcdhInit,
+        })
+    );
+    assert_eq!(state.on_send(StrictKexPacket::KexInit), Ok(1));
+    assert_eq!(
+        state.on_send(StrictKexPacket::KexDhInit),
+        Err(StrictKexError::KexMessageNotAllowed {
+            family: KeyExchangeFamily::Ecdh,
+            packet: StrictKexPacket::KexDhInit,
+        })
+    );
+    assert_eq!(
+        state.on_send(StrictKexPacket::KexInit),
+        Err(StrictKexError::KexMessageRepeated {
+            direction: TransportDirection::Send,
+            packet: StrictKexPacket::KexInit,
+        })
+    );
+    assert_eq!(state.on_send(StrictKexPacket::NewKeys), Ok(2));
+    assert_eq!(
+        state.on_send(StrictKexPacket::KexEcdhInit),
+        Err(StrictKexError::PacketAfterNewKeys {
+            direction: TransportDirection::Send,
+            packet: StrictKexPacket::KexEcdhInit,
+        })
+    );
+    assert_eq!(
+        state.on_send(StrictKexPacket::NewKeys),
+        Err(StrictKexError::KexMessageRepeated {
+            direction: TransportDirection::Send,
+            packet: StrictKexPacket::NewKeys,
+        })
+    );
+    assert_eq!(state.send_sequence(), 0);
 }
 
 #[test]

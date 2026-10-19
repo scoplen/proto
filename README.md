@@ -127,6 +127,12 @@ allows one second for graceful protocol shutdown, then closes the transport if o
 Automatic rekey waits until authentication completes, including a pending keyboard-interactive
 prompt, then handles an expired elapsed limit without waiting for channel traffic. Full
 OpenSSH cipher-dependent default compatibility remains open.
+The public `StrictKeyExchange` helper enforces strict first-packet and non-KEX admission only
+through each direction's initial `NEWKEYS`. During later rekeys, ordinary transport packets may
+interleave with KEX controls, including after one direction completes; the first KEX control in
+each direction still has to be `KEXINIT`. Strict negotiation resets each direction's sequence
+immediately after every `NEWKEYS`, while non-strict exchanges keep advancing. The helper's public
+state-machine tests do not establish behavior of the separate encrypted `russh` engine.
 Rekey durations must fit an event-loop deadline. `ClientConfig::with_inactivity_timeout` also
 returns a typed result, rejects zero or unrepresentable enabled durations, and accepts `None` to
 disable the timeout. Received traffic resets the configured inactivity timer.

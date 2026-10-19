@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Corrected D-98 strict-KEX helper admission: each direction resumes ordinary transport traffic
+  after its initial NEWKEYS, later rekeys allow interleaved ordinary packets, and sequence resets
+  remain per-direction after every strict NEWKEYS. KEX-control boundaries, family, and repetition
+  checks remain enforced; non-strict sequence numbers continue without reset. Public regressions
+  and a rekey fuzz seed cover the corrected helper boundary, not the encrypted engine.
 - Added D-97 raw-TLS gateway possession proofs in `scoplen-crypto`, with dedicated ES256 type,
   exact-ticket hash and device-key binding, combined trusted-ticket verification, strict lifetime,
   signed vector, failure-path tests, and fuzz seeds. The `dpop_proof` CBOR carriage is unchanged;
