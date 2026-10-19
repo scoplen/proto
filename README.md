@@ -371,8 +371,9 @@ the generated path list and TypeScript declarations. Run it without `--check` to
 the Rust CI matrix runs the drift check on every supported desktop runner.
 
 For a paired same-host comparison with OpenSSH under the two required S4 ciphers, run
-`pwsh ./scripts/ssh-throughput.ps1`. The setup, measurement method, local results, and limits are
-in [docs/ssh-throughput.md](docs/ssh-throughput.md).
+`pwsh ./scripts/ssh-throughput.ps1`. Each cipher fails the command when its measured median
+throughput is below 80% of OpenSSH's on this host. The setup, measurement method, local results,
+and release-evidence limits are in [docs/ssh-throughput.md](docs/ssh-throughput.md).
 
 For diagnostic one-byte SSH echo latency comparisons against direct `russh` and a disposable
 OpenSSH server/client pair, run `pwsh ./scripts/ssh-keystroke-latency.ps1`. The local engine
