@@ -433,7 +433,7 @@ fn take_response_string(
         .ok_or(CertificateResponseCodecError::InvalidField(name))
 }
 
-fn valid_strong_etag(value: &str) -> bool {
+pub(crate) fn valid_strong_etag(value: &str) -> bool {
     let bytes = value.as_bytes();
     (2..=256).contains(&bytes.len())
         && bytes.first() == Some(&b'"')
@@ -443,7 +443,7 @@ fn valid_strong_etag(value: &str) -> bool {
             .all(|byte| *byte == b'!' || (b'#'..=b'~').contains(byte))
 }
 
-fn valid_utc_timestamp(value: &str) -> bool {
+pub(crate) fn valid_utc_timestamp(value: &str) -> bool {
     let bytes = value.as_bytes();
     if bytes.len() < 20
         || bytes[4] != b'-'

@@ -25,6 +25,7 @@ export interface components {
     CertificateHostRequest: CertificateHostRequest;
     CertificateHostGroupRequest: CertificateHostGroupRequest;
     CertificateIssuanceResponse: CertificateIssuanceResponse;
+    AccountProfile: AccountProfile;
     Account: Resource;
     Device: Resource;
     Organization: Resource;
@@ -68,6 +69,21 @@ export interface Resource {
   data: Record<string, unknown>;
 }
 export interface ResourcePage { items: Resource[]; next_cursor: string | null; }
+// BEGIN GENERATED AccountProfile
+export interface AccountProfile {
+  id: string;
+  etag: string;
+  created_at: string;
+  updated_at: string;
+  data: AccountProfileData;
+  [extension: string]: unknown;
+}
+
+export interface AccountProfileData {
+  email: string | null;
+  [extension: string]: unknown;
+}
+// END GENERATED AccountProfile
 // BEGIN GENERATED ProblemDetails
 export interface ProblemDetails {
   type: string;

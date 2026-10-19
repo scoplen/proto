@@ -116,7 +116,10 @@ mod tests {
         QueryError, Resource,
     };
     use crate::{INTERNAL_PROTO_DESCRIPTOR, proto};
-    use cedar_policy::{PolicySet, Schema, ValidationMode, Validator};
+    use cedar_policy::{
+        Authorizer, Context, Decision, Entities, EntityUid, PolicySet, Request, Schema,
+        ValidationMode, Validator,
+    };
     use prost::Message;
     use prost_types::FileDescriptorSet;
     use serde_json::json;
@@ -278,5 +281,56 @@ mod tests {
             "built-in policy validation failed: {:?}",
             result.validation_errors().collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn optional_email_requires_a_guard_and_authorizes_both_account_states() {
+        let schema = Schema::from_str(CEDAR_SCHEMA).expect("Cedar schema");
+        let guarded = PolicySet::from_str(
+            r#"permit(principal, action == Action::"manage_inventory", resource)
+                when { principal has email && principal.email == "a@example.test" };"#,
+        )
+        .expect("guarded policy");
+        let unguarded = PolicySet::from_str(
+            r#"permit(principal, action == Action::"manage_inventory", resource)
+                when { principal.email == "a@example.test" };"#,
+        )
+        .expect("unguarded policy parses");
+        assert!(
+            Validator::new(schema.clone())
+                .validate(&guarded, ValidationMode::Strict)
+                .validation_errors()
+                .next()
+                .is_none()
+        );
+        assert!(
+            Validator::new(schema.clone())
+                .validate(&unguarded, ValidationMode::Strict)
+                .validation_errors()
+                .next()
+                .is_some()
+        );
+
+        let principal: EntityUid = r#"Account::"alice""#.parse().expect("principal");
+        let action: EntityUid = r#"Action::"manage_inventory""#.parse().expect("action");
+        let resource: EntityUid = r#"Organization::"org""#.parse().expect("resource");
+        let context =
+            Context::from_json_str(r#"{"now":1}"#, Some((&schema, &action))).expect("context");
+        let request =
+            Request::new(principal, action, resource, context, Some(&schema)).expect("request");
+        for (email, expected) in [(None, Decision::Deny), (Some("a@example.test"), Decision::Allow)]
+        {
+            let mut attributes = serde_json::json!({"groups": [], "status": "active"});
+            if let Some(email) = email {
+                attributes["email"] = serde_json::json!(email);
+            }
+            let entities = Entities::from_json_value(serde_json::json!([
+                {"uid": {"type": "Account", "id": "alice"}, "attrs": attributes, "parents": []},
+                {"uid": {"type": "Organization", "id": "org"}, "attrs": {"name": "org"}, "parents": []}
+            ]), Some(&schema)).expect("entities with optional email");
+            let response = Authorizer::new().is_authorized(&request, &guarded, &entities);
+            assert_eq!(response.decision(), expected);
+            assert_eq!(response.diagnostics().errors().count(), 0);
+        }
     }
 }

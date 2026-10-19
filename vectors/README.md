@@ -108,6 +108,15 @@ their signatures as fixture provenance, then exercise the shared parser and requ
 The response parser itself validates canonical syntax, role, bounds, and interval but does not
 establish CA trust, signature validity, authorization, current validity, or revocation.
 
+`account-profile.json` contains D-99 K-3/K-5 current-account Resource response vectors.
+`account.profile.response_json` expects exact compact JSON after decoding, including string
+and null email values and ignored extensions. `account.profile.response_invalid` expects the
+stable codec error name. `account.profile.response_budget` uses a JSON recipe: start from the
+named `base` vector, append the named string `extension` filled with ASCII `a` until the complete
+body reaches `total_bytes`, then require `accept:<bytes>` or `reject:<bytes>`. These recipes
+exercise the 4,096/4,097-byte boundary without large literal bodies. The codec establishes syntax
+and bounds, not authenticated account ownership or email verification.
+
 `sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a

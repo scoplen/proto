@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-99's bounded current-account Resource codec, exact OpenAPI/TypeScript profile,
+  portable email/null/failure/budget vectors, and recursive duplicate-name rejection. Cedar
+  `Account.email` is optional, with strict guarded-policy validation and authorization tests
+  for present and absent addresses. The production GET route and email verification remain
+  server work.
 - Corrected D-98 strict-KEX helper admission: each direction resumes ordinary transport traffic
   after its initial NEWKEYS, later rekeys allow interleaved ordinary packets, and sequence resets
   remain per-direction after every strict NEWKEYS. KEX-control boundaries, family, and repetition

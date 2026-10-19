@@ -392,8 +392,15 @@ OpenSSH user-certificate line, and a separate request-subject comparison. Parsin
 the certificate signature, CA trust, current validity, requested scope, policy, or revocation;
 the SSH consumer must check these before use. Issuance, authorization, and durable idempotency
 belong to the server.
-These API codecs validate syntax and size; their ticket field remains opaque. `scoplen-crypto`
-signs and statelessly verifies the D-96 dedicated Ed25519 gateway-ticket profile with a trusted
+The D-99 current-account `AccountProfile` codec accepts a complete 4 KiB Resource response with
+required `data.email` as a preserved bounded string or JSON null. It rejects missing email,
+duplicate names at every depth, invalid Resource metadata, and mismatched ETag or cache headers.
+The Cedar `Account.email` attribute is optional; policies reading it must use a `has` guard.
+These contracts do not authenticate the account or verify an address. The production GET route and
+email enrollment remain server work.
+
+The gateway-ticket issuance codecs validate syntax and size; their ticket field remains opaque.
+`scoplen-crypto` signs and statelessly verifies the D-96 dedicated Ed25519 gateway-ticket profile with a trusted
 issuer and ticket-only keyring, exact 60-second validity, UUIDv7 claims, and DPoP-key and SSH-key
 hashes. It checks fallible signer output and redacts ticket diagnostics. Consumers still own
 authenticated issuance, authorization, SSH-key use, and atomic single-use consumption. The D-97
@@ -503,7 +510,8 @@ remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.
 `vectors/sync-keys-failures.json`,
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
 `vectors/sync-vault-members.json`, `vectors/gateway.json`, `vectors/gateway-ticket-issuance.json`,
-`vectors/certificate-issuance-request.json`, and `vectors/certificate-issuance-response.json`.
+`vectors/certificate-issuance-request.json`, `vectors/certificate-issuance-response.json`, and
+`vectors/account-profile.json`.
 The shared loader is usable by both workstreams.
 
 ## Development
@@ -548,12 +556,14 @@ The `crypto_decoders` target additionally parses and statelessly verifies DPoP a
 seeds include the RFC proof, the published gateway ticket, malformed signatures and duplicate JSON,
 truncation, and a proof one byte over the 8 KiB bound.
 The `api_json` target exercises all seven authentication/refresh message types, both gateway-ticket
-issuance messages, and the certificate issuance request and response through public decoders. Accepted messages
-must preserve their values across canonical encoding, and a second encode must preserve those bytes. Gateway request checks also
+issuance messages, the certificate issuance request and response, and the current-account profile
+through public decoders. Accepted messages must preserve their values across canonical encoding,
+and a second encode must preserve those bytes. Gateway request checks also
 enforce rejection of an idempotency header. Seeds include the published JSON vectors, duplicate
 fields, forbidden browser refresh tokens, ambiguous edge hosts, nested response extensions,
 invalid certificate selectors and duplicate fields, signed certificate response Resource vectors,
-duplicate nested response fields, truncation, and complete bodies at and one byte above request and response limits. This checks
+current-account email/null profiles and failures, duplicate nested response fields, truncation,
+and complete bodies at and one byte above request and response limits. This checks
 message syntax; token authentication, ticket signatures, and authorization remain consumer work.
 Fuzz-discovered mutations remain ignored; review, minimize, and name useful regression inputs
 before tracking them as new seeds. The scheduled run's results and performance targets remain

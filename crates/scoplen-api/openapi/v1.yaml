@@ -187,9 +187,24 @@
     "/accounts/me": {
       "get": {
         "operationId": "getCurrentAccount",
+        "description": "Current authenticated account profile. Complete response body is at most 4096 bytes, including whitespace, escapes, and extensions. Duplicate JSON names are invalid at every depth.",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Resource"
+            "description": "Current account Resource; HTTP ETag exactly equals body etag.",
+            "headers": {
+              "ETag": {
+                "required": true,
+                "description": "Strong entity tag exactly equal to the body etag.",
+                "schema": { "type": "string", "minLength": 2, "maxLength": 256, "pattern": "^\"[!#-~]*\"$" }
+              },
+              "Cache-Control": { "required": true, "schema": { "const": "no-store" } },
+              "Pragma": { "required": true, "schema": { "const": "no-cache" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AccountProfile" }
+              }
+            }
           },
           "default": {
             "$ref": "#/components/responses/Problem"
@@ -3489,6 +3504,50 @@
           "refresh_expires_in": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      },
+      "AccountProfile": {
+        "type": "object",
+        "required": ["id", "etag", "created_at", "updated_at", "data"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "etag": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 256,
+            "pattern": "^\"[!#-~]*\"$",
+            "description": "Strong ASCII HTTP entity tag including double quotes; exactly matches the ETag response header."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "Valid UTC calendar date and time."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "Valid UTC calendar date and time."
+          },
+          "data": {
+            "type": "object",
+            "required": ["email"],
+            "additionalProperties": true,
+            "properties": {
+              "email": {
+                "type": ["string", "null"],
+                "minLength": 1,
+                "maxLength": 320,
+                "description": "Null when no email exists. A present value is at most 320 UTF-8 bytes, nonempty, with no Unicode control or whitespace characters; the exact string is preserved."
+              }
+            }
           }
         }
       },

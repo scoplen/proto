@@ -2,6 +2,8 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  AccountProfile,
+  AccountProfileData,
   AuthChallengeRequest,
   AuthChallengeResponse,
   AuthDeviceRequest,
