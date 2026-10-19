@@ -9,6 +9,7 @@
 
 use std::{
     borrow::Cow,
+    collections::HashMap,
     ffi::{OsStr, OsString},
     fmt,
     future::Future,
@@ -17,8 +18,8 @@ use std::{
     pin::Pin,
     str,
     sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, Weak,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
     time::Duration,
@@ -746,6 +747,56 @@ pub struct ClientConnection {
     channel_slots: Arc<Semaphore>,
     channel_limit: usize,
     forwarded_channels: mpsc::Receiver<ForwardedChannel>,
+    agent_forwarding: Arc<AtomicUsize>,
+    agent_sessions: Arc<Mutex<AgentSessionRegistry>>,
+}
+
+#[derive(Default)]
+struct AgentSessionRegistry {
+    leases: HashMap<u32, Weak<AgentForwardingLease>>,
+    pending_opens: usize,
+    unregistered_close: bool,
+}
+
+struct AgentSessionOpenGuard<'a> {
+    registry: &'a Mutex<AgentSessionRegistry>,
+    pending: bool,
+}
+
+impl<'a> AgentSessionOpenGuard<'a> {
+    fn new(registry: &'a Mutex<AgentSessionRegistry>) -> Self {
+        registry.lock().expect("agent session registry mutex poisoned").pending_opens += 1;
+        Self { registry, pending: true }
+    }
+
+    fn register(mut self, channel: u32, lease: &Arc<AgentForwardingLease>) {
+        let mut registry = self.registry.lock().expect("agent session registry mutex poisoned");
+        if registry.unregistered_close {
+            // russh can deliver Close before channel_open_session returns its channel ID.
+            // Without an ID to correlate that close, the pending opt-in fails closed.
+            lease.revoke();
+        } else {
+            registry.leases.retain(|_, lease| lease.strong_count() > 0);
+            registry.leases.insert(channel, Arc::downgrade(lease));
+        }
+        registry.pending_opens -= 1;
+        if registry.pending_opens == 0 {
+            registry.unregistered_close = false;
+        }
+        self.pending = false;
+    }
+}
+
+impl Drop for AgentSessionOpenGuard<'_> {
+    fn drop(&mut self) {
+        if self.pending {
+            let mut registry = self.registry.lock().expect("agent session registry mutex poisoned");
+            registry.pending_opens -= 1;
+            if registry.pending_opens == 0 {
+                registry.unregistered_close = false;
+            }
+        }
+    }
 }
 
 // Channel handles retain the engine's sender. Closing this owner must still wake blocked I/O
@@ -852,10 +903,18 @@ impl ClientConnection {
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         let channel_slots = Arc::new(Semaphore::new(config.channel_limit));
+        let agent_forwarding = Arc::new(AtomicUsize::new(0));
+        let agent_sessions = Arc::new(Mutex::new(AgentSessionRegistry::default()));
         let (forwarded_tx, forwarded_channels) = mpsc::channel(config.channel_limit);
         let (stopped_tx, stopped) = watch::channel(false);
-        let handler =
-            ClientHandler::new(&config, Arc::clone(&channel_slots), forwarded_tx, stopped_tx);
+        let handler = ClientHandler::new(
+            &config,
+            Arc::clone(&channel_slots),
+            Arc::clone(&agent_forwarding),
+            Arc::clone(&agent_sessions),
+            forwarded_tx,
+            stopped_tx,
+        );
         let (owner, lifetime) = oneshot::channel();
         let stream = ConnectionTransport { inner: stream, lifetime, closed: false };
         let handle =
@@ -869,6 +928,8 @@ impl ClientConnection {
             channel_slots,
             channel_limit: config.channel_limit,
             forwarded_channels,
+            agent_forwarding,
+            agent_sessions,
         })
     }
 
@@ -1348,11 +1409,11 @@ impl ClientConnection {
     /// Open an RFC 4254 `session` channel.
     pub async fn open_session(&self) -> Result<ClientChannel, ClientError> {
         let permit = self.channel_permit()?;
-        self.handle
-            .channel_open_session()
-            .await
-            .map(|channel| ClientChannel::new(channel, permit))
-            .map_err(ClientError::from)
+        let opening = AgentSessionOpenGuard::new(&self.agent_sessions);
+        let channel = self.handle.channel_open_session().await.map_err(ClientError::from)?;
+        let lease = Arc::new(AgentForwardingLease::new(Arc::clone(&self.agent_forwarding)));
+        opening.register(channel.id().number(), &lease);
+        Ok(ClientChannel::new(channel, permit, Some(lease)))
     }
 
     /// Open an RFC 4254 `direct-tcpip` channel through this connection.
@@ -1376,7 +1437,7 @@ impl ClientConnection {
                 originator_port,
             )
             .await
-            .map(|channel| ClientChannel::new(channel, permit))
+            .map(|channel| ClientChannel::new(channel, permit, None))
             .map_err(ClientError::from)
     }
 
@@ -1391,7 +1452,7 @@ impl ClientConnection {
         self.handle
             .channel_open_direct_streamlocal(socket_path.to_owned())
             .await
-            .map(|channel| ClientChannel::new(channel, permit))
+            .map(|channel| ClientChannel::new(channel, permit, None))
             .map_err(ClientError::from)
     }
 
@@ -1517,6 +1578,7 @@ pub enum ForwardedChannelKind {
 pub struct ForwardedChannel {
     channel: ClientChannel,
     kind: ForwardedChannelKind,
+    agent_forwarding: Arc<AtomicUsize>,
 }
 
 impl fmt::Debug for ForwardedChannel {
@@ -1525,13 +1587,17 @@ impl fmt::Debug for ForwardedChannel {
             .debug_struct("ForwardedChannel")
             .field("channel", &self.channel)
             .field("kind", &self.kind)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 impl ForwardedChannel {
-    fn new(channel: ClientChannel, kind: ForwardedChannelKind) -> Self {
-        Self { channel, kind }
+    fn new(
+        channel: ClientChannel,
+        kind: ForwardedChannelKind,
+        agent_forwarding: Arc<AtomicUsize>,
+    ) -> Self {
+        Self { channel, kind, agent_forwarding }
     }
 
     /// Return the engine-local channel number for diagnostics and recorder correlation.
@@ -1570,11 +1636,19 @@ impl ForwardedChannel {
         if !matches!(self.kind, ForwardedChannelKind::Agent) {
             return Err(ClientError::InvalidInput("channel is not an auth-agent channel"));
         }
+        if self.agent_forwarding.load(Ordering::SeqCst) == 0 {
+            return Err(ClientError::InvalidInput("agent forwarding is no longer authorized"));
+        }
         let response_channel = self.channel.id();
         let mut adapter = AgentForwardingAdapter::new(server, policy, response_channel);
         loop {
             match self.channel.next_event().await? {
                 Some(ChannelEvent::Data(data)) => {
+                    if self.agent_forwarding.load(Ordering::SeqCst) == 0 {
+                        return Err(ClientError::InvalidInput(
+                            "agent forwarding is no longer authorized",
+                        ));
+                    }
                     for response in adapter.push(&data)? {
                         self.channel.send_data(&response.data).await?;
                     }
@@ -1630,6 +1704,88 @@ pub enum ChannelEvent {
 pub struct ClientChannel {
     channel: russh::Channel<client::Msg>,
     permit: OwnedSemaphorePermit,
+    agent_forwarding: Option<Arc<AgentForwardingLease>>,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum AgentForwardingState {
+    Idle,
+    Requesting,
+    Active,
+    Closed,
+}
+
+struct AgentForwardingLease {
+    state: Mutex<AgentForwardingState>,
+    active_sessions: Arc<AtomicUsize>,
+}
+
+impl AgentForwardingLease {
+    fn new(active_sessions: Arc<AtomicUsize>) -> Self {
+        Self { state: Mutex::new(AgentForwardingState::Idle), active_sessions }
+    }
+
+    fn begin(&self) -> Result<(), ClientError> {
+        let mut state = self.state.lock().expect("agent forwarding state mutex poisoned");
+        if *state != AgentForwardingState::Idle {
+            return Err(ClientError::InvalidInput(
+                "agent forwarding already requested or channel closed",
+            ));
+        }
+        *state = AgentForwardingState::Requesting;
+        self.active_sessions.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn sent(&self) -> bool {
+        let mut state = self.state.lock().expect("agent forwarding state mutex poisoned");
+        if *state != AgentForwardingState::Requesting {
+            return false;
+        }
+        *state = AgentForwardingState::Active;
+        true
+    }
+
+    fn on_event(&self, event: &ChannelEvent) {
+        let mut state = self.state.lock().expect("agent forwarding state mutex poisoned");
+        if matches!(event, ChannelEvent::Close) {
+            self.revoke_locked(&mut state);
+        }
+    }
+
+    fn revoke(&self) {
+        let mut state = self.state.lock().expect("agent forwarding state mutex poisoned");
+        self.revoke_locked(&mut state);
+    }
+
+    fn revoke_locked(&self, state: &mut AgentForwardingState) {
+        if matches!(state, AgentForwardingState::Requesting | AgentForwardingState::Active) {
+            self.active_sessions.fetch_sub(1, Ordering::SeqCst);
+        }
+        *state = AgentForwardingState::Closed;
+    }
+
+    fn cancel_request(&self) {
+        let mut state = self.state.lock().expect("agent forwarding state mutex poisoned");
+        if *state == AgentForwardingState::Requesting {
+            *state = AgentForwardingState::Idle;
+            self.active_sessions.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+}
+
+impl Drop for AgentForwardingLease {
+    fn drop(&mut self) {
+        self.revoke();
+    }
+}
+
+struct AgentRequestGuard<'a>(&'a AgentForwardingLease);
+
+impl Drop for AgentRequestGuard<'_> {
+    fn drop(&mut self) {
+        self.0.cancel_request();
+    }
 }
 
 impl fmt::Debug for ClientChannel {
@@ -1639,8 +1795,12 @@ impl fmt::Debug for ClientChannel {
 }
 
 impl ClientChannel {
-    fn new(channel: russh::Channel<client::Msg>, permit: OwnedSemaphorePermit) -> Self {
-        Self { channel, permit }
+    fn new(
+        channel: russh::Channel<client::Msg>,
+        permit: OwnedSemaphorePermit,
+        agent_forwarding: Option<Arc<AgentForwardingLease>>,
+    ) -> Self {
+        Self { channel, permit, agent_forwarding }
     }
 
     /// Return the engine-local channel number for diagnostics and recorder correlation.
@@ -1713,10 +1873,24 @@ impl ClientChannel {
     ///
     /// A requested reply is surfaced as [`ChannelEvent::Success`] or
     /// [`ChannelEvent::Failure`] by [`Self::next_event`]. The caller must enable
-    /// a forwarded-agent service before using this request; forwarding remains
-    /// disabled by default.
+    /// a forwarded-agent service before using this request. Until a live session sends this
+    /// opt-in, server-opened agent channels are rejected. Once the request is sent, local or
+    /// peer channel close and drop revoke the opt-in; EOF alone is a half-close and retains it.
+    /// A server failure reply does not identify which outstanding channel request it answers.
     pub async fn request_agent_forward(&self, want_reply: bool) -> Result<(), ClientError> {
-        self.channel.agent_forward(want_reply).await.map_err(ClientError::from)
+        let lease = self
+            .agent_forwarding
+            .as_ref()
+            .ok_or(ClientError::InvalidInput("agent forwarding requires a session channel"))?;
+        lease.begin()?;
+        let guard = AgentRequestGuard(lease);
+        self.channel.agent_forward(want_reply).await.map_err(ClientError::from)?;
+        let sent = lease.sent();
+        drop(guard);
+        if !sent {
+            return Err(ClientError::ConnectionClosed);
+        }
+        Ok(())
     }
 
     /// Notify the remote PTY of a bounded terminal resize.
@@ -1755,6 +1929,9 @@ impl ClientChannel {
 
     /// Request channel close.
     pub async fn close(&self) -> Result<(), ClientError> {
+        if let Some(lease) = &self.agent_forwarding {
+            lease.revoke();
+        }
         self.channel.close().await.map_err(ClientError::from)
     }
 
@@ -1765,13 +1942,20 @@ impl ClientChannel {
     /// [`ClientConnection::connect_via_direct_tcpip`], and framed subsystems such as SFTP.
     #[must_use]
     pub fn into_stream(self) -> ClientChannelStream {
-        ClientChannelStream { inner: self.channel.into_stream(), _permit: self.permit }
+        ClientChannelStream {
+            inner: self.channel.into_stream(),
+            _permit: self.permit,
+            _agent_forwarding: self.agent_forwarding,
+        }
     }
 
     /// Wait for the next peer event. `Ok(None)` means the engine closed the event stream.
     pub async fn next_event(&mut self) -> Result<Option<ChannelEvent>, ClientError> {
         loop {
             let Some(message) = self.channel.wait().await else {
+                if let Some(lease) = &self.agent_forwarding {
+                    lease.revoke();
+                }
                 return Ok(None);
             };
             let event = match message {
@@ -1809,6 +1993,9 @@ impl ClientChannel {
                 | ChannelMsg::Open { .. } => continue,
                 _ => return Err(ClientError::UnexpectedChannelEvent),
             };
+            if let Some(lease) = &self.agent_forwarding {
+                lease.on_event(&event);
+            }
             return Ok(Some(event));
         }
     }
@@ -1818,6 +2005,7 @@ impl ClientChannel {
 pub struct ClientChannelStream {
     inner: russh::ChannelStream<client::Msg>,
     _permit: OwnedSemaphorePermit,
+    _agent_forwarding: Option<Arc<AgentForwardingLease>>,
 }
 
 impl fmt::Debug for ClientChannelStream {
@@ -2000,6 +2188,8 @@ struct ClientHandler {
     host_key_policy: Option<HostKeyPolicy>,
     verifier: Arc<dyn HostKeyVerifier + Send + Sync>,
     channel_slots: Arc<Semaphore>,
+    agent_forwarding: Arc<AtomicUsize>,
+    agent_sessions: Arc<Mutex<AgentSessionRegistry>>,
     forwarded_tx: mpsc::Sender<ForwardedChannel>,
     stopped: watch::Sender<bool>,
     #[cfg(test)]
@@ -2012,6 +2202,12 @@ struct ClientHandler {
 
 impl Drop for ClientHandler {
     fn drop(&mut self) {
+        let mut sessions =
+            self.agent_sessions.lock().expect("agent session registry mutex poisoned");
+        for lease in sessions.leases.values().filter_map(Weak::upgrade) {
+            lease.revoke();
+        }
+        sessions.leases.clear();
         self.stopped.send_replace(true);
         #[cfg(test)]
         self.event_loop_stopped.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -2022,6 +2218,8 @@ impl ClientHandler {
     fn new(
         config: &ClientConfig,
         channel_slots: Arc<Semaphore>,
+        agent_forwarding: Arc<AtomicUsize>,
+        agent_sessions: Arc<Mutex<AgentSessionRegistry>>,
         forwarded_tx: mpsc::Sender<ForwardedChannel>,
         stopped: watch::Sender<bool>,
     ) -> Self {
@@ -2030,6 +2228,8 @@ impl ClientHandler {
             host_key_policy: config.host_key_policy.clone(),
             verifier: Arc::clone(&config.verifier),
             channel_slots,
+            agent_forwarding,
+            agent_sessions,
             forwarded_tx,
             stopped,
             #[cfg(test)]
@@ -2053,7 +2253,11 @@ impl ClientHandler {
             reply.reject(russh::ChannelOpenFailure::ResourceShortage).await;
             return;
         };
-        let forwarded = ForwardedChannel::new(ClientChannel::new(channel, permit), kind);
+        let forwarded = ForwardedChannel::new(
+            ClientChannel::new(channel, permit, None),
+            kind,
+            Arc::clone(&self.agent_forwarding),
+        );
         if self.forwarded_tx.try_send(forwarded).is_err() {
             reply.reject(russh::ChannelOpenFailure::ResourceShortage).await;
             return;
@@ -2161,12 +2365,34 @@ impl ClientHandler {
         channel: russh::Channel<client::Msg>,
         reply: russh::client::ChannelOpenHandle,
     ) {
+        if self.agent_forwarding.load(Ordering::SeqCst) == 0 {
+            Self::reject_invalid_forwarded_channel(reply).await;
+            return;
+        }
         self.deliver_forwarded_channel(channel, ForwardedChannelKind::Agent, reply).await;
     }
 }
 
 impl Handler for ClientHandler {
     type Error = ClientError;
+
+    async fn channel_close(
+        &mut self,
+        channel: russh::ChannelId,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        let mut sessions =
+            self.agent_sessions.lock().expect("agent session registry mutex poisoned");
+        let lease = sessions.leases.remove(&channel.number()).and_then(|lease| lease.upgrade());
+        if lease.is_none() && sessions.pending_opens > 0 {
+            sessions.unregistered_close = true;
+        }
+        drop(sessions);
+        if let Some(lease) = lease {
+            lease.revoke();
+        }
+        Ok(())
+    }
 
     async fn kex_done(
         &mut self,
@@ -2821,6 +3047,8 @@ mod tests {
     struct AgentForwardServer {
         allow: bool,
         requests: mpsc::Sender<bool>,
+        sessions: Option<mpsc::Sender<russh::ChannelId>>,
+        close_on_open: bool,
     }
 
     impl russh::server::Handler for AgentForwardServer {
@@ -2836,11 +3064,21 @@ mod tests {
 
         async fn channel_open_session(
             &mut self,
-            _channel: russh::Channel<russh::server::Msg>,
+            channel: russh::Channel<russh::server::Msg>,
             reply: russh::server::ChannelOpenHandle,
-            _session: &mut russh::server::Session,
+            session: &mut russh::server::Session,
         ) -> Result<(), Self::Error> {
             reply.accept().await;
+            if let Some(sessions) = &self.sessions {
+                let _ = sessions.send(channel.id()).await;
+            }
+            if self.close_on_open {
+                let handle = session.handle();
+                let id = channel.id();
+                tokio::spawn(async move {
+                    let _ = handle.close(id).await;
+                });
+            }
             Ok(())
         }
 
@@ -2857,6 +3095,54 @@ mod tests {
             }
             Ok(self.allow)
         }
+
+        async fn env_request(
+            &mut self,
+            channel: russh::ChannelId,
+            _variable_name: &str,
+            _variable_value: &str,
+            session: &mut russh::server::Session,
+        ) -> Result<(), Self::Error> {
+            session.channel_failure(channel)?;
+            Ok(())
+        }
+    }
+
+    async fn start_agent_control_server(
+        allow: bool,
+        close_on_open: bool,
+    ) -> (
+        SocketAddr,
+        mpsc::Receiver<russh::server::Handle>,
+        mpsc::Receiver<russh::ChannelId>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        let (requests, _received) = mpsc::channel(8);
+        let (sessions, session_rx) = mpsc::channel(8);
+        let (control, control_rx) = mpsc::channel(1);
+        let mut config = russh::server::Config::default();
+        config.keys.push(
+            PrivateKey::random(
+                &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+                Algorithm::Ed25519,
+            )
+            .expect("server key"),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind server");
+        let address = listener.local_addr().expect("server address");
+        let task = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            let running = russh::server::run_stream(
+                Arc::new(config),
+                stream,
+                AgentForwardServer { allow, requests, sessions: Some(sessions), close_on_open },
+            )
+            .await
+            .expect("start server");
+            control.send(running.handle()).await.expect("send server handle");
+            let _ = running.await;
+        });
+        (address, control_rx, session_rx, task)
     }
 
     #[derive(Clone)]
@@ -3983,8 +4269,14 @@ mod tests {
         let config = ClientConfig::new("host.example", 22, verifier).expect("config");
         let (forwarded_tx, _forwarded_rx) = mpsc::channel(1);
         let (stopped, _receiver) = watch::channel(false);
-        let mut handler =
-            ClientHandler::new(&config, Arc::new(Semaphore::new(1)), forwarded_tx, stopped);
+        let mut handler = ClientHandler::new(
+            &config,
+            Arc::new(Semaphore::new(1)),
+            Arc::new(AtomicUsize::new(0)),
+            Arc::new(Mutex::new(AgentSessionRegistry::default())),
+            forwarded_tx,
+            stopped,
+        );
         assert!(
             handler
                 .check_server_key(&PublicKeyOrCertificate::PublicKey {
@@ -4845,7 +5137,7 @@ mod tests {
             let _ = russh::server::run_stream(
                 server_config,
                 stream,
-                AgentForwardServer { allow, requests },
+                AgentForwardServer { allow, requests, sessions: None, close_on_open: false },
             )
             .await;
         });
@@ -4876,6 +5168,201 @@ mod tests {
     async fn agent_forward_request_surfaces_server_success_and_failure() {
         assert_eq!(agent_forward_request_case(true).await, ChannelEvent::Success);
         assert_eq!(agent_forward_request_case(false).await, ChannelEvent::Failure);
+    }
+
+    #[test]
+    fn agent_forwarding_lease_cancellation_and_close_revoke_permission() {
+        let count = Arc::new(AtomicUsize::new(0));
+        let lease = AgentForwardingLease::new(Arc::clone(&count));
+        lease.begin().expect("begin request");
+        let canceled = AgentRequestGuard(&lease);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        drop(canceled);
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+
+        lease.begin().expect("retry request");
+        assert!(lease.sent());
+        lease.on_event(&ChannelEvent::Failure);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        lease.on_event(&ChannelEvent::Eof);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        lease.on_event(&ChannelEvent::Close);
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn unregistered_close_during_session_open_fails_closed_and_cleans_up() {
+        let registry = Mutex::new(AgentSessionRegistry::default());
+        let opening = AgentSessionOpenGuard::new(&registry);
+        let count = Arc::new(AtomicUsize::new(0));
+        let lease = Arc::new(AgentForwardingLease::new(count));
+        registry.lock().expect("registry").unregistered_close = true;
+        opening.register(7, &lease);
+        assert!(lease.begin().is_err());
+        assert!(registry.lock().expect("registry").leases.is_empty());
+
+        let canceled = AgentSessionOpenGuard::new(&registry);
+        drop(canceled);
+        let registry = registry.lock().expect("registry");
+        assert_eq!(registry.pending_opens, 0);
+        assert!(!registry.unregistered_close);
+    }
+
+    #[tokio::test]
+    async fn agent_channels_require_a_live_opted_in_session() {
+        let (address, mut control_rx, _session_rx, server) =
+            start_agent_control_server(true, false).await;
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect");
+        connection.authenticate_password("user", b"password").await.expect("authenticate");
+        let control = control_rx.recv().await.expect("server handle");
+
+        assert!(control.channel_open_agent().await.is_err(), "unsolicited agent open accepted");
+        let mut first = connection.open_session().await.expect("first session");
+        first.set_env(b"SCOPLEN_TEST", b"1", true).await.expect("request env");
+        first.request_agent_forward(true).await.expect("request forwarding");
+        assert_eq!(first.next_event().await.expect("env reply"), Some(ChannelEvent::Failure));
+        assert_eq!(first.next_event().await.expect("reply"), Some(ChannelEvent::Success));
+
+        let opened = control.channel_open_agent().await.expect("authorized agent open");
+        let forwarded = connection.next_forwarded_channel().await.expect("forwarded agent");
+        assert_eq!(forwarded.kind(), &ForwardedChannelKind::Agent);
+        drop(opened);
+        drop(forwarded);
+
+        let mut second = connection.open_session().await.expect("second session");
+        second.request_agent_forward(true).await.expect("second forwarding request");
+        assert_eq!(second.next_event().await.expect("reply"), Some(ChannelEvent::Success));
+        first.close().await.expect("close first session");
+        let opened = control.channel_open_agent().await.expect("second session keeps permission");
+        drop(opened);
+        drop(connection.next_forwarded_channel().await.expect("forwarded agent"));
+
+        second.send_eof().await.expect("send half-close");
+        let opened = control.channel_open_agent().await.expect("EOF retains permission");
+        drop(opened);
+        drop(connection.next_forwarded_channel().await.expect("forwarded agent"));
+
+        let opened = control.channel_open_agent().await.expect("queue agent before revocation");
+        let forwarded = connection.next_forwarded_channel().await.expect("queued agent");
+        second.close().await.expect("close final session");
+        assert!(control.channel_open_agent().await.is_err(), "agent open survived final close");
+        assert!(matches!(
+            forwarded
+                .serve_agent(
+                    AgentServer::new(EmptyAgentStore),
+                    AgentForwardingPolicy::enabled(AllowAgent)
+                )
+                .await,
+            Err(ClientError::InvalidInput("agent forwarding is no longer authorized"))
+        ));
+        drop(opened);
+        connection.open_session().await.expect("connection remains usable");
+        connection.disconnect().await.expect("disconnect");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn rejected_agent_request_does_not_revoke_explicit_local_opt_in() {
+        let (address, mut control_rx, _session_rx, server) =
+            start_agent_control_server(false, false).await;
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect");
+        connection.authenticate_password("user", b"password").await.expect("authenticate");
+        let control = control_rx.recv().await.expect("server handle");
+        let mut session = connection.open_session().await.expect("session");
+        session.request_agent_forward(true).await.expect("request forwarding");
+        assert_eq!(session.next_event().await.expect("reply"), Some(ChannelEvent::Failure));
+        let opened = control.channel_open_agent().await.expect("local opt-in remains active");
+        drop(opened);
+        drop(connection.next_forwarded_channel().await.expect("forwarded agent"));
+        session.close().await.expect("close session");
+        assert!(control.channel_open_agent().await.is_err(), "agent open survived session close");
+        connection.open_session().await.expect("connection remains usable");
+        connection.disconnect().await.expect("disconnect");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn peer_close_revokes_agent_opt_in_without_draining_channel_events() {
+        let (address, mut control_rx, mut session_rx, server) =
+            start_agent_control_server(true, false).await;
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect");
+        connection.authenticate_password("user", b"password").await.expect("authenticate");
+        let control = control_rx.recv().await.expect("server handle");
+
+        let session = connection.open_session().await.expect("session");
+        let server_channel = session_rx.recv().await.expect("server channel ID");
+        session.request_agent_forward(false).await.expect("opt in");
+        assert_eq!(connection.agent_forwarding.load(Ordering::SeqCst), 1);
+        control.close(server_channel).await.expect("peer close");
+        timeout(Duration::from_secs(5), async {
+            while connection.agent_forwarding.load(Ordering::SeqCst) != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("engine close callback revoked opt-in");
+        assert!(control.channel_open_agent().await.is_err());
+        drop(session);
+
+        let session = connection.open_session().await.expect("stream session");
+        let server_channel = session_rx.recv().await.expect("stream channel ID");
+        session.request_agent_forward(false).await.expect("stream opt in");
+        let stream = session.into_stream();
+        assert_eq!(connection.agent_forwarding.load(Ordering::SeqCst), 1);
+        control.close(server_channel).await.expect("peer close stream");
+        timeout(Duration::from_secs(5), async {
+            while connection.agent_forwarding.load(Ordering::SeqCst) != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("stream close callback revoked opt-in");
+        assert!(control.channel_open_agent().await.is_err());
+        drop(stream);
+        connection.open_session().await.expect("connection remains usable");
+        connection.disconnect().await.expect("disconnect");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn immediate_peer_close_cannot_create_a_late_agent_opt_in() {
+        let (address, mut control_rx, mut session_rx, server) =
+            start_agent_control_server(true, true).await;
+        let verifier = |_host: &str, _key: &HostKey| Ok(());
+        let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect");
+        connection.authenticate_password("user", b"password").await.expect("authenticate");
+        let control = control_rx.recv().await.expect("server handle");
+        let session = connection.open_session().await.expect("session confirmed before close");
+        session_rx.recv().await.expect("server saw session");
+        timeout(Duration::from_secs(5), async {
+            loop {
+                let state = *session
+                    .agent_forwarding
+                    .as_ref()
+                    .expect("session lease")
+                    .state
+                    .lock()
+                    .expect("agent forwarding state mutex poisoned");
+                if state == AgentForwardingState::Closed {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("immediate peer close revoked lease");
+        assert!(session.request_agent_forward(false).await.is_err());
+        assert_eq!(connection.agent_forwarding.load(Ordering::SeqCst), 0);
+        assert!(control.channel_open_agent().await.is_err());
+        connection.disconnect().await.expect("disconnect");
+        server.abort();
     }
 
     #[tokio::test]

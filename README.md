@@ -161,9 +161,14 @@ session. The failing call retains its original typed error; later operations ret
 `SessionUnusable` until the caller opens a new SFTP channel on the same authenticated SSH
 connection. Local validation and fully correlated file-status rejections leave the session usable.
 The concrete adapter also forwards bounded environment and signal requests and accepts
-server-opened `auth-agent@openssh.com` channels. `ForwardedChannel::serve_agent` reassembles
-russh channel fragments, applies the fail-closed forwarding policy, and returns bounded agent
-responses; an in-process russh round trip covers the concrete lifecycle. The agent-backed signer
+server-opened `auth-agent@openssh.com` channels only while a live session on the connection has
+explicitly requested agent forwarding. A locally failed or canceled send and session close or drop
+revoke that permission; channel EOF alone retains it. A server failure reply is surfaced to the
+caller but cannot be correlated with a specific outstanding channel request.
+`ForwardedChannel::serve_agent` reassembles russh channel fragments, rechecks the live opt-in,
+applies the fail-closed forwarding policy to
+identity queries and signatures, and returns bounded agent responses; in-process russh round trips
+cover unsolicited opens, revocation, and the concrete lifecycle. The agent-backed signer
 also completes the concrete public-key authentication flow
 against the in-process russh server. `pwsh ./scripts/ssh-agent-interop.ps1` starts a disposable
 OpenSSH server and a real `ssh-agent` in one Alpine container. The `openssh_agent_interop` example
