@@ -2419,6 +2419,7 @@ name = "scoplen-proto-fuzz"
 version = "0.1.0"
 dependencies = [
  "libfuzzer-sys",
+ "scoplen-api",
  "scoplen-crypto",
  "scoplen-model",
  "scoplen-ssh",

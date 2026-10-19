@@ -6,8 +6,8 @@ use scoplen_ssh::{
     ChannelClose, ChannelData, ChannelEof, ChannelExtendedData, ChannelFailure, ChannelOpen,
     ChannelOpenConfirmation, ChannelOpenFailure, ChannelRequest, ChannelSuccess,
     ChannelWindowAdjust, GlobalRequest, GlobalRequestFailure, GlobalRequestSuccess,
-    KeyboardInteractiveInfoRequest, KeyboardInteractiveResponse, KeyExchangeFamily,
-    SftpLimits, SftpPacket, SftpStatvfs, SocksHandshake, StrictKexPacket, StrictKeyExchange,
+    KeyExchangeFamily, KeyboardInteractiveInfoRequest, KeyboardInteractiveResponse, SftpLimits,
+    SftpPacket, SftpStatvfs, SocksHandshake, StrictKexPacket, StrictKeyExchange,
 };
 
 fuzz_target!(|bytes: &[u8]| {

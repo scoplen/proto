@@ -17,6 +17,7 @@ scoplen-test-vectors = { path = "../crates/scoplen-test-vectors" }
 scoplen-model = { path = "../crates/scoplen-model" }
 scoplen-crypto = { path = "../crates/scoplen-crypto" }
 scoplen-ssh = { path = "../crates/scoplen-ssh" }
+scoplen-api = { path = "../crates/scoplen-api" }
 
 [[bin]]
 name = "vector_loader"
@@ -56,6 +57,13 @@ bench = false
 [[bin]]
 name = "ssh_protocol"
 path = "fuzz_targets/ssh_protocol.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sync_notification"
+path = "fuzz_targets/sync_notification.rs"
 test = false
 doc = false
 bench = false

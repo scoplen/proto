@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added a notification protocol fuzz target with published valid vectors, malformed and size-bound
+  seeds, and canonical round-trip assertions for every accepted message. Linux change checks
+  replay the corpus, and the daily fuzz matrix includes the new target.
 - Added bounded K-4 notification WebSocket context, first-message authentication, and ready
   acknowledgement codecs with GET/CONNECT vectors, strict compact-JWS lexical checks, redacted
   credential debug output, and rejection of mixed message fields. The existing event reader now

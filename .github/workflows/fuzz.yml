@@ -23,6 +23,7 @@ jobs:
           - agent_decoder
           - sftp_decoder
           - ssh_protocol
+          - sync_notification
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install nightly Rust and cargo-fuzz
