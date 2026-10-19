@@ -390,7 +390,7 @@ fn split_compact(value: &str) -> Result<(&str, &str, &str), DpopError> {
     Ok((first, second, third))
 }
 
-fn decode_segment(value: &str) -> Result<Vec<u8>, DpopError> {
+pub(crate) fn decode_segment(value: &str) -> Result<Vec<u8>, DpopError> {
     let bytes = URL_SAFE_NO_PAD.decode(value).map_err(|_| DpopError::InvalidProof)?;
     if URL_SAFE_NO_PAD.encode(&bytes) != value {
         return Err(DpopError::InvalidProof);
@@ -398,7 +398,7 @@ fn decode_segment(value: &str) -> Result<Vec<u8>, DpopError> {
     Ok(bytes)
 }
 
-fn decode_fixed_32(value: &str) -> Result<[u8; 32], DpopError> {
+pub(crate) fn decode_fixed_32(value: &str) -> Result<[u8; 32], DpopError> {
     if value.len() != 43 {
         return Err(DpopError::InvalidProof);
     }
@@ -406,7 +406,7 @@ fn decode_fixed_32(value: &str) -> Result<[u8; 32], DpopError> {
     bytes.try_into().map_err(|_| DpopError::InvalidProof)
 }
 
-fn parse_unique_json(bytes: &[u8]) -> Result<Value, DpopError> {
+pub(crate) fn parse_unique_json(bytes: &[u8]) -> Result<Value, DpopError> {
     serde_json::from_slice::<UniqueValue>(bytes)
         .map(|value| value.0)
         .map_err(|_| DpopError::InvalidProof)

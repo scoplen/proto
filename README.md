@@ -373,8 +373,12 @@ OpenSSH user-certificate line, and a separate request-subject comparison. Parsin
 the certificate signature, CA trust, current validity, requested scope, policy, or revocation;
 the SSH consumer must check these before use. Issuance, authorization, and durable idempotency
 belong to the server.
-These codecs validate syntax and size; the ticket remains opaque and issuance, signature
-verification, authorization, and single-use consumption belong to consumers. K-6 also includes
+These API codecs validate syntax and size; their ticket field remains opaque. `scoplen-crypto`
+signs and statelessly verifies the D-96 dedicated Ed25519 gateway-ticket profile with a trusted
+issuer and ticket-only keyring, exact 60-second validity, UUIDv7 claims, and DPoP-key and SSH-key
+hashes. It checks fallible signer output and redacts ticket diagnostics. Consumers still own
+authenticated issuance, authorization, SSH-key use, raw-TLS proof binding, and atomic single-use
+consumption. K-6 also includes
 the bounded gateway client-hello frame (`ticket` and `dpop_proof`) with a published vector and
 failure-path coverage. OpenAPI
 resources now have an authored OpenAPI 3.1 document at `crates/scoplen-api/openapi/v1.yaml`,
@@ -518,7 +522,8 @@ bound. The Linux change check replays every target's corpus, and
 the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
 Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
-9449 context; tracked seeds include the RFC signed proof, malformed signature and duplicate JSON,
+9449 context and signed gateway tickets against a fixed synthetic trusted issuer and key. Tracked
+seeds include the RFC proof, the published gateway ticket, malformed signatures and duplicate JSON,
 truncation, and a proof one byte over the 8 KiB bound.
 The `api_json` target exercises all seven authentication/refresh message types, both gateway-ticket
 issuance messages, and the certificate issuance request and response through public decoders. Accepted messages
