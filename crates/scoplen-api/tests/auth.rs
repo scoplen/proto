@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 use scoplen_api::auth::{
     ACCESS_TOKEN_EXPIRES_IN, AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest,
-    AuthTokenResponse, MAX_CHALLENGE_REQUEST_BYTES, MAX_DEVICE_REQUEST_BYTES,
-    REFRESH_TOKEN_EXPIRES_IN,
+    AuthRefreshRequest, AuthTokenResponse, BrowserAuthRefreshRequest, BrowserAuthTokenResponse,
+    MAX_CHALLENGE_REQUEST_BYTES, MAX_DEVICE_REQUEST_BYTES, MAX_REFRESH_REQUEST_BYTES,
+    MAX_REFRESH_TOKEN_BYTES, REFRESH_TOKEN_EXPIRES_IN,
 };
 use scoplen_test_vectors::VectorDocument;
 use uuid::Uuid;
@@ -11,7 +12,7 @@ use uuid::Uuid;
 fn published_auth_vectors_round_trip_with_canonical_json() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-auth.json");
     let document = VectorDocument::from_path(path).expect("auth vectors");
-    assert_eq!(document.vectors.len(), 6);
+    assert_eq!(document.vectors.len(), 10);
     for vector in document.vectors {
         let actual = match vector.kind.as_str() {
             "auth.challenge.request" => AuthChallengeRequest::from_json(&vector.input)
@@ -31,6 +32,22 @@ fn published_auth_vectors_round_trip_with_canonical_json() {
                 .expect("token")
                 .to_json()
                 .expect("token JSON"),
+            "auth.refresh.native.request" => AuthRefreshRequest::from_json(&vector.input)
+                .expect("native refresh request")
+                .to_json()
+                .expect("native refresh JSON"),
+            "auth.refresh.browser.request" => BrowserAuthRefreshRequest::from_json(&vector.input)
+                .expect("browser refresh request")
+                .to_json()
+                .to_owned(),
+            "auth.refresh.native.response" => AuthTokenResponse::from_json(&vector.input)
+                .expect("native refresh response")
+                .to_json()
+                .expect("native refresh response JSON"),
+            "auth.refresh.browser.response" => BrowserAuthTokenResponse::from_json(&vector.input)
+                .expect("browser refresh response")
+                .to_json()
+                .expect("browser refresh response JSON"),
             other => panic!("unexpected auth vector kind {other}"),
         };
         assert_eq!(actual, vector.expected, "{}", vector.id);
@@ -151,4 +168,84 @@ fn auth_public_types_enforce_failure_paths() {
         "{\"access_token\":\"a\",\"token_type\":\"Bearer\",\"expires_in\":600,\"refresh_token\":\"r\",\"refresh_expires_in\":2592000}"
     )
     .is_err());
+}
+
+#[test]
+fn refresh_requests_reject_other_shapes_and_count_utf8_bytes() {
+    let native = AuthRefreshRequest::new("synthetic-refresh-secret").expect("native request");
+    assert_eq!(
+        native.to_json().expect("encode"),
+        "{\"refresh_token\":\"synthetic-refresh-secret\"}"
+    );
+    assert!(!format!("{native:?}").contains("synthetic-refresh-secret"));
+    for invalid in [
+        "{}",
+        "null",
+        "[\"synthetic-refresh-secret\"]",
+        "{\"refresh_token\":null}",
+        "{\"refresh_token\":false}",
+        "{\"refresh_token\":\"\"}",
+        "{\"refresh_token\":\"one\",\"refresh_token\":\"two\"}",
+        "{\"refresh_token\":\"one\",\"extra\":true}",
+    ] {
+        assert!(AuthRefreshRequest::from_json(invalid).is_err());
+        assert!(serde_json::from_str::<AuthRefreshRequest>(invalid).is_err());
+    }
+    let unicode_at_limit = "é".repeat(MAX_REFRESH_TOKEN_BYTES / 2);
+    assert_eq!(unicode_at_limit.len(), MAX_REFRESH_TOKEN_BYTES);
+    assert!(AuthRefreshRequest::new(&unicode_at_limit).is_ok());
+    let unicode_over_limit = format!("{unicode_at_limit}é");
+    assert!(AuthRefreshRequest::new(&unicode_over_limit).is_err());
+    let oversized_token = format!("{{\"refresh_token\":\"{unicode_over_limit}\"}}");
+    assert!(serde_json::from_str::<AuthRefreshRequest>(&oversized_token).is_err());
+    let secret = "synthetic-refresh-secret";
+    let valid = format!("{{\"refresh_token\":\"{secret}\"}}");
+    let exact = format!("{valid}{}", " ".repeat(MAX_REFRESH_REQUEST_BYTES - valid.len()));
+    assert_eq!(exact.len(), MAX_REFRESH_REQUEST_BYTES);
+    assert!(AuthRefreshRequest::from_json(&exact).is_ok());
+    let error = AuthRefreshRequest::from_json(&(exact + " ")).expect_err("body cap");
+    assert!(!format!("{error:?}").contains(secret));
+    let browser_exact = format!("{{}}{}", " ".repeat(MAX_REFRESH_REQUEST_BYTES - 2));
+    assert!(BrowserAuthRefreshRequest::from_json(&browser_exact).is_ok());
+    assert!(BrowserAuthRefreshRequest::from_json(&(browser_exact + " ")).is_err());
+    for invalid in ["null", "[]", "{\"refresh_token\":\"secret\"}", "{\"extra\":null}"] {
+        assert!(BrowserAuthRefreshRequest::from_json(invalid).is_err());
+        assert!(serde_json::from_str::<BrowserAuthRefreshRequest>(invalid).is_err());
+    }
+}
+
+#[test]
+fn browser_response_never_accepts_native_refresh_token_field() {
+    let browser = BrowserAuthTokenResponse::new("synthetic-access-secret").expect("browser token");
+    let json = browser.to_json().expect("browser JSON");
+    assert_eq!(
+        json,
+        "{\"access_token\":\"synthetic-access-secret\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}"
+    );
+    assert!(!format!("{browser:?}").contains("synthetic-access-secret"));
+    assert!(!json.contains("refresh_token"));
+    assert_eq!(
+        BrowserAuthTokenResponse::from_json(&json.replace('}', ",\"extension\":true}"))
+            .expect("unknown extension"),
+        browser
+    );
+    for native_only in ["\"secret\"", "null", "false", "0", "{}"] {
+        let invalid = json.replace('}', &format!(",\"refresh_token\":{native_only}}}"));
+        let error = BrowserAuthTokenResponse::from_json(&invalid).expect_err("known native field");
+        assert!(!format!("{error:?}").contains("synthetic-access-secret"));
+        assert!(serde_json::from_str::<BrowserAuthTokenResponse>(&invalid).is_err());
+    }
+    for invalid in [
+        json.replace("\"DPoP\"", "\"Bearer\""),
+        json.replace("\"expires_in\":600", "\"expires_in\":0"),
+        json.replace("\"refresh_expires_in\":2592000", "\"refresh_expires_in\":0"),
+        json.replace("\"access_token\":\"synthetic-access-secret\",", ""),
+        json.replace("\"access_token\":\"synthetic-access-secret\"", "\"access_token\":\"\""),
+    ] {
+        assert!(BrowserAuthTokenResponse::from_json(&invalid).is_err());
+    }
+    let varying = BrowserAuthTokenResponse::from_json(
+        "{\"access_token\":\"a\",\"token_type\":\"DPoP\",\"expires_in\":1,\"refresh_expires_in\":18446744073709551615}"
+    ).expect("positive lifetimes");
+    assert_eq!(varying.refresh_expires_in, u64::MAX);
 }

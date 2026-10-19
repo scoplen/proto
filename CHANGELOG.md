@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added the D-78 K-3 JSON refresh request and browser-safe response codecs, strict body and token
+  bounds, redacted errors and Debug output, and three refresh problem codes. OpenAPI and generated
+  TypeScript now distinguish native body tokens from browser HttpOnly-cookie requests and reject a
+  browser response containing `refresh_token`. Published auth/problem vectors cover the wire;
+  DPoP verification and atomic token rotation remain server responsibilities.
 - Added a notification protocol fuzz target with published valid vectors, malformed and size-bound
   seeds, and canonical round-trip assertions for every accepted message. Linux change checks
   replay the corpus, and the daily fuzz matrix includes the new target.

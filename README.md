@@ -268,7 +268,8 @@ listener cancellation releasing its local port. It passed from Windows against a
 OpenSSH container; other host platforms, destinations, and server implementations remain
 unverified for this route. The disposable OpenSSH CI script above also runs this example.
 The `scoplen-api` crate exposes the K-3 error-code registry, RFC 9457 problem details, and device
-challenge, signed-device request, and token response JSON codecs, plus K-4 session, change-feed,
+challenge, signed-device request, native/browser refresh request, and token response JSON codecs,
+plus K-4 session, change-feed,
 write-batch, bounded conflict problem, acknowledgement, snapshot, version-history, content-free
 notification, notification WebSocket opening context, first-message authentication and ready
 acknowledgement, account key-bundle, shared-vault creation, key retrieval, epoch-publication,
@@ -282,12 +283,17 @@ JSON/CBOR error type. The OpenAPI schema and generated TypeScript declaration re
 `title`, `status`, `detail`, `instance`, `code`, `changed`, and `retryable`; decoders accept unknown
 response fields and syntactically valid future error codes.
 The K-3 authentication boundary now validates strict, bounded challenge and signed-device JSON
-requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. Its
-OpenAPI paths and generated TypeScript declarations describe both unauthenticated endpoints.
+requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. The
+native refresh body requires one opaque token (at most 2,048 UTF-8 bytes); the browser body is
+exactly `{}` with its HttpOnly refresh cookie supplied by the browser. Both JSON bodies are capped
+at 4,096 encoded bytes. The browser response omits and rejects any `refresh_token` field while
+retaining unrelated response extensions. OpenAPI and generated TypeScript types describe all three
+authentication paths, including the DPoP-only refresh operation and distinct browser response.
 Callers pass the returned bytes to the fallible K-2 `DeviceSigner::sign` boundary and propagate
 signer failures, including hardware-device failures.
 Challenge storage, credential verification, and token issuance are server responsibilities; this
-library does not implement a production authentication service.
+library does not implement a production authentication service. DPoP proof verification, Origin
+and cookie handling, atomic refresh rotation, and reuse detection remain server responsibilities.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR

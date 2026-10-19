@@ -48,6 +48,9 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.authentication_required",
     "auth.client_unsupported",
     "auth.device_revoked",
+    "auth.invalid_dpop_proof",
+    "auth.invalid_request",
+    "auth.use_dpop_nonce",
     "policy.denied",
     "sync.client_unsupported",
     "sync.conflict",
@@ -384,6 +387,9 @@ mod tests {
         assert!(
             ErrorCode::new("auth.authentication_required").expect("registered code").is_known()
         );
+        for code in ["auth.invalid_dpop_proof", "auth.invalid_request", "auth.use_dpop_nonce"] {
+            assert!(ErrorCode::new(code).expect("registered refresh code").is_known());
+        }
         assert!(ErrorCode::new("sync.cursor_ahead").expect("registered code").is_known());
         assert!(ErrorCode::new("sync.invalid_request").expect("registered code").is_known());
         assert!(ErrorCode::new("sync.object_not_found").expect("registered code").is_known());

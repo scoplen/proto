@@ -37,6 +37,30 @@
       "kind": "auth.token.response",
       "input": "{\"refresh_expires_in\":2592001,\"refresh_token\":\"refresh-token-test\",\"expires_in\":601,\"token_type\":\"DPoP\",\"access_token\":\"access-token-test\"}",
       "expected": "{\"access_token\":\"access-token-test\",\"token_type\":\"DPoP\",\"expires_in\":601,\"refresh_token\":\"refresh-token-test\",\"refresh_expires_in\":2592001}"
+    },
+    {
+      "id": "api-auth-refresh-native-request-v1",
+      "kind": "auth.refresh.native.request",
+      "input": "{\"refresh_token\":\"native-refresh-token-test\"}",
+      "expected": "{\"refresh_token\":\"native-refresh-token-test\"}"
+    },
+    {
+      "id": "api-auth-refresh-browser-request-v1",
+      "kind": "auth.refresh.browser.request",
+      "input": "{  }",
+      "expected": "{}"
+    },
+    {
+      "id": "api-auth-refresh-native-response-v1",
+      "kind": "auth.refresh.native.response",
+      "input": "{\"refresh_expires_in\":2592000,\"expires_in\":600,\"refresh_token\":\"rotated-native-refresh-token-test\",\"token_type\":\"DPoP\",\"access_token\":\"native-access-token-test\"}",
+      "expected": "{\"access_token\":\"native-access-token-test\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_token\":\"rotated-native-refresh-token-test\",\"refresh_expires_in\":2592000}"
+    },
+    {
+      "id": "api-auth-refresh-browser-response-v1",
+      "kind": "auth.refresh.browser.response",
+      "input": "{\"refresh_expires_in\":2592001,\"token_type\":\"DPoP\",\"access_token\":\"browser-access-token-test\",\"expires_in\":601}",
+      "expected": "{\"access_token\":\"browser-access-token-test\",\"token_type\":\"DPoP\",\"expires_in\":601,\"refresh_expires_in\":2592001}"
     }
   ]
 }

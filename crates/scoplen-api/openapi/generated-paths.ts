@@ -6,6 +6,7 @@ export const controlPlanePaths = [
   "/admin/settings",
   "/auth/challenge",
   "/auth/device",
+  "/auth/refresh",
   "/orgs/{org}",
   "/orgs/{org}/access-profiles",
   "/orgs/{org}/access-profiles/{id}",
