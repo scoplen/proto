@@ -531,6 +531,9 @@ pub enum ClientError {
         /// Remaining methods recognized by the SSH engine, in server order. Unknown methods are omitted.
         remaining_methods: Vec<String>,
     },
+    /// Authentication has already completed on this connection.
+    #[error("SSH connection is already authenticated")]
+    AlreadyAuthenticated,
     /// The public-key signer or its session-bound request was invalid.
     #[error("SSH public-key authentication could not be completed: {0}")]
     PublicKey(#[from] PublicKeyAuthError),
@@ -983,6 +986,7 @@ impl ClientConnection {
     where
         S: Signer + Sync,
     {
+        self.reject_if_authenticated()?;
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
         let identity =
@@ -1022,6 +1026,7 @@ impl ClientConnection {
     where
         S: Signer + Sync,
     {
+        self.reject_if_authenticated()?;
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
         if !user_certificate
@@ -1071,6 +1076,7 @@ impl ClientConnection {
         username: &str,
         password: &[u8],
     ) -> Result<(), ClientError> {
+        self.reject_if_authenticated()?;
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
         let secret = SecretVec::new(password.to_vec());
@@ -1102,6 +1108,7 @@ impl ClientConnection {
         &mut self,
         username: &str,
     ) -> Result<NoneAuthOutcome, ClientError> {
+        self.reject_if_authenticated()?;
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
         match self.handle.authenticate_none(username.to_owned()).await.map_err(ClientError::from)? {
@@ -1134,6 +1141,7 @@ impl ClientConnection {
     where
         F: FnMut(&KeyboardInteractiveInfoRequest) -> Result<Vec<String>, ClientError> + Send,
     {
+        self.reject_if_authenticated()?;
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
         if let Some(submethods) = submethods {
@@ -1321,6 +1329,14 @@ impl ClientConnection {
         Arc::clone(&self.channel_slots)
             .try_acquire_owned()
             .map_err(|_| ClientError::ChannelLimitReached { max: self.channel_limit })
+    }
+
+    fn reject_if_authenticated(&self) -> Result<(), ClientError> {
+        if self.authenticated.load(Ordering::Acquire) {
+            Err(ClientError::AlreadyAuthenticated)
+        } else {
+            Ok(())
+        }
     }
 
     fn require_authenticated(&self) -> Result<(), ClientError> {
