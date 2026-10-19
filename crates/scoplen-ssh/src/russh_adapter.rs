@@ -1792,7 +1792,10 @@ fn rsa_hash_algorithm(algorithm: SignatureAlgorithm) -> Option<HashAlg> {
     match algorithm {
         SignatureAlgorithm::RsaSha2_256 => Some(HashAlg::Sha256),
         SignatureAlgorithm::RsaSha2_512 => Some(HashAlg::Sha512),
-        SignatureAlgorithm::Ed25519 | SignatureAlgorithm::EcdsaSha2Nistp256 => None,
+        SignatureAlgorithm::Ed25519
+        | SignatureAlgorithm::EcdsaSha2Nistp256
+        | SignatureAlgorithm::SkEd25519
+        | SignatureAlgorithm::SkEcdsaSha2Nistp256 => None,
     }
 }
 

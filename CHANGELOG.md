@@ -12,6 +12,13 @@ All notable changes to the `proto` repository will be recorded here.
   credential debug output, and rejection of mixed message fields. The existing event reader now
   enforces the same 16 KiB bound and rejects zero advancement sequence numbers. JWT/DPoP
   verification and connection lifecycle remain consumer responsibilities.
+- Connected selected FIDO2 providers to raw `sk-ssh-ed25519@openssh.com` and
+  `sk-ecdsa-sha2-nistp256@openssh.com` public-key authentication. The signer rechecks its pinned
+  identity and application, algorithm, and required UP/UV flags before dispatch. Corrected the
+  OpenSSH signature wrapper so flags and counter follow the raw signature string; agent-backed
+  security-key signatures preserve those fields. A disposable OpenSSH fixture verifies both raw
+  algorithms and rejects wrong-key, wrong-application, and wrong-payload signatures. Physical
+  token adapters and security-key user certificates remain open.
 - Verified the default ML-KEM/ChaCha20 negotiation against a disposable OpenSSH listener that
   offers only those algorithms. Pinned-key authentication, exact command output, and exit status
   pass alongside the existing modern, legacy, strict-KEX, and rekey checks; the full algorithm

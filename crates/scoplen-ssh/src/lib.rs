@@ -87,7 +87,7 @@ pub use russh_adapter::{
 };
 pub use security_key::{
     SecurityKeyAlgorithm, SecurityKeyAuthRequest, SecurityKeyError, SecurityKeyProvider,
-    SecurityKeyPublicKey, SecurityKeySignOptions, SecurityKeySignature,
+    SecurityKeyPublicKey, SecurityKeySignOptions, SecurityKeySignature, SecurityKeySshSigner,
 };
 pub use sftp::{
     MAX_SFTP_EXTENSION_DATA, MAX_SFTP_EXTENSIONS, MAX_SFTP_HANDLE, MAX_SFTP_NAME_ENTRIES,

@@ -17,6 +17,7 @@ use thiserror::Error;
 use crate::agent::{
     AGENT_SIGN_FLAG_RSA_SHA2_256, AGENT_SIGN_FLAG_RSA_SHA2_512, AgentChannel, AgentClient,
 };
+use crate::security_key::{SecurityKeyAlgorithm, SecurityKeySignature};
 
 const USERAUTH_REQUEST: u8 = 50;
 const USERAUTH_METHOD: &[u8] = b"publickey";
@@ -62,6 +63,10 @@ pub enum SignatureAlgorithm {
     Ed25519,
     /// ECDSA over NIST P-256 (`ecdsa-sha2-nistp256`).
     EcdsaSha2Nistp256,
+    /// FIDO2 Ed25519 (`sk-ssh-ed25519@openssh.com`).
+    SkEd25519,
+    /// FIDO2 ECDSA over NIST P-256 (`sk-ecdsa-sha2-nistp256@openssh.com`).
+    SkEcdsaSha2Nistp256,
     /// RSA with SHA-256 (`rsa-sha2-256`).
     RsaSha2_256,
     /// RSA with SHA-512 (`rsa-sha2-512`).
@@ -75,6 +80,8 @@ impl SignatureAlgorithm {
         match self {
             Self::Ed25519 => "ssh-ed25519",
             Self::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256",
+            Self::SkEd25519 => "sk-ssh-ed25519@openssh.com",
+            Self::SkEcdsaSha2Nistp256 => "sk-ecdsa-sha2-nistp256@openssh.com",
             Self::RsaSha2_256 => "rsa-sha2-256",
             Self::RsaSha2_512 => "rsa-sha2-512",
         }
@@ -86,6 +93,8 @@ impl SignatureAlgorithm {
         match self {
             Self::Ed25519 => "ssh-ed25519",
             Self::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256",
+            Self::SkEd25519 => "sk-ssh-ed25519@openssh.com",
+            Self::SkEcdsaSha2Nistp256 => "sk-ecdsa-sha2-nistp256@openssh.com",
             Self::RsaSha2_256 | Self::RsaSha2_512 => "ssh-rsa",
         }
     }
@@ -96,6 +105,8 @@ impl SignatureAlgorithm {
         match self {
             Self::Ed25519 => "ssh-ed25519-cert-v01@openssh.com",
             Self::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256-cert-v01@openssh.com",
+            Self::SkEd25519 => "sk-ssh-ed25519-cert-v01@openssh.com",
+            Self::SkEcdsaSha2Nistp256 => "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
             Self::RsaSha2_256 => "rsa-sha2-256-cert-v01@openssh.com",
             Self::RsaSha2_512 => "rsa-sha2-512-cert-v01@openssh.com",
         }
@@ -108,6 +119,8 @@ impl SignatureAlgorithm {
                 | "ssh-ed25519-cert-v01@openssh.com"
                 | "ecdsa-sha2-nistp256"
                 | "ecdsa-sha2-nistp256-cert-v01@openssh.com"
+                | "sk-ssh-ed25519@openssh.com"
+                | "sk-ecdsa-sha2-nistp256@openssh.com"
                 | "rsa-sha2-256"
                 | "rsa-sha2-256-cert-v01@openssh.com"
                 | "rsa-sha2-512"
@@ -121,6 +134,7 @@ impl SignatureAlgorithm {
             Self::Ed25519 | Self::EcdsaSha2Nistp256 => {
                 identity == self.name() || identity == self.certificate_name()
             }
+            Self::SkEd25519 | Self::SkEcdsaSha2Nistp256 => identity == self.name(),
             Self::RsaSha2_256 => matches!(
                 identity,
                 "rsa-sha2-256"
@@ -138,6 +152,14 @@ impl SignatureAlgorithm {
 
     fn is_rsa_sha2(self) -> bool {
         matches!(self, Self::RsaSha2_256 | Self::RsaSha2_512)
+    }
+
+    fn security_key(self) -> Option<SecurityKeyAlgorithm> {
+        match self {
+            Self::SkEd25519 => Some(SecurityKeyAlgorithm::Ed25519),
+            Self::SkEcdsaSha2Nistp256 => Some(SecurityKeyAlgorithm::EcdsaSha2Nistp256),
+            _ => None,
+        }
     }
 }
 
@@ -179,7 +201,9 @@ pub trait Signer {
     fn public_key_blob(&self) -> Result<Vec<u8>, SignerError>;
 
     /// Sign the exact RFC 4252 session-bound payload and return the algorithm-specific signature
-    /// blob. The outer `string(algorithm) || string(signature)` wrapper is added by this crate.
+    /// body. For `sk-` algorithms the body is `string(signature) || flags || counter`; other
+    /// algorithms return the bytes enclosed by a signature string. The algorithm wrapper is
+    /// added by this crate.
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignerError>;
 }
 
@@ -220,7 +244,10 @@ impl<C: AgentChannel + Send + 'static> Signer for AgentSshSigner<C> {
         let flags = match self.algorithm {
             SignatureAlgorithm::RsaSha2_256 => AGENT_SIGN_FLAG_RSA_SHA2_256,
             SignatureAlgorithm::RsaSha2_512 => AGENT_SIGN_FLAG_RSA_SHA2_512,
-            SignatureAlgorithm::Ed25519 | SignatureAlgorithm::EcdsaSha2Nistp256 => 0,
+            SignatureAlgorithm::Ed25519
+            | SignatureAlgorithm::EcdsaSha2Nistp256
+            | SignatureAlgorithm::SkEd25519
+            | SignatureAlgorithm::SkEcdsaSha2Nistp256 => 0,
         };
         let signature = self
             .client
@@ -234,6 +261,11 @@ impl<C: AgentChannel + Send + 'static> Signer for AgentSshSigner<C> {
             return Err(SignerError::InvalidInput(
                 "agent returned a mismatched signature algorithm",
             ));
+        }
+        if let Some(algorithm) = self.algorithm.security_key() {
+            SecurityKeySignature::from_ssh_blob(algorithm, rest)
+                .map_err(|_| SignerError::InvalidInput("agent returned an invalid signature"))?;
+            return Ok(rest.to_vec());
         }
         let (signature, trailing) = read_string(rest)
             .ok_or(SignerError::InvalidInput("agent returned malformed signature"))?;
@@ -796,7 +828,13 @@ impl PublicKeyAuthRequest {
         let mut signature =
             Vec::with_capacity(4 + signer.algorithm().name().len() + 4 + signature_blob.len());
         write_string(&mut signature, signer.algorithm().name().as_bytes())?;
-        write_string(&mut signature, &signature_blob)?;
+        if let Some(algorithm) = signer.algorithm().security_key() {
+            SecurityKeySignature::from_ssh_blob(algorithm, &signature_blob)
+                .map_err(|_| SignerError::InvalidInput("malformed security-key signature body"))?;
+            signature.extend_from_slice(&signature_blob);
+        } else {
+            write_string(&mut signature, &signature_blob)?;
+        }
         Ok(Self { signature: Some(signature), ..unsigned })
     }
 
@@ -957,7 +995,10 @@ impl Signer for RsaSshSigner {
         let hash = match self.algorithm {
             SignatureAlgorithm::RsaSha2_256 => HashAlg::Sha256,
             SignatureAlgorithm::RsaSha2_512 => HashAlg::Sha512,
-            SignatureAlgorithm::Ed25519 | SignatureAlgorithm::EcdsaSha2Nistp256 => {
+            SignatureAlgorithm::Ed25519
+            | SignatureAlgorithm::EcdsaSha2Nistp256
+            | SignatureAlgorithm::SkEd25519
+            | SignatureAlgorithm::SkEcdsaSha2Nistp256 => {
                 return Err(SignerError::InvalidInput("RSA signer requires rsa-sha2 algorithm"));
             }
         };
@@ -1612,6 +1653,82 @@ mod tests {
         assert_eq!(
             state.lock().expect("fake agent lock").flags,
             Some(AGENT_SIGN_FLAG_RSA_SHA2_256)
+        );
+    }
+
+    #[test]
+    fn agent_security_key_signature_preserves_flags_and_counter() {
+        let identity = crate::security_key::SecurityKeyPublicKey::new(
+            crate::security_key::SecurityKeyAlgorithm::Ed25519,
+            [9; 32],
+            "ssh:scoplen-test",
+        )
+        .expect("security-key identity");
+        let key_blob = identity.to_blob().expect("key blob");
+        let body = SecurityKeySignature::new(
+            crate::security_key::SecurityKeyAlgorithm::Ed25519,
+            [7; 64],
+            0x05,
+            0x0102_0304,
+        )
+        .expect("security-key signature")
+        .to_ssh_blob()
+        .expect("signature body");
+        let mut signature = ssh_string(b"sk-ssh-ed25519@openssh.com");
+        signature.extend_from_slice(&body);
+        let state = Arc::new(std::sync::Mutex::new(FakeAgent {
+            signature,
+            flags: None,
+            key_blob: Vec::new(),
+            data: Vec::new(),
+        }));
+        let signer = AgentSshSigner::new(
+            AgentClient::new(SharedFakeAgent(Arc::clone(&state))),
+            SignatureAlgorithm::SkEd25519,
+            key_blob,
+        )
+        .expect("agent signer");
+        assert_eq!(signer.sign(b"session-bound payload").expect("signature"), body);
+        assert_eq!(state.lock().expect("fake agent lock").flags, Some(0));
+
+        state.lock().expect("fake agent lock").signature.pop();
+        assert_eq!(
+            signer.sign(b"session-bound payload"),
+            Err(SignerError::InvalidInput("agent returned an invalid signature"))
+        );
+    }
+
+    #[test]
+    fn public_key_request_rejects_malformed_security_key_signature_body() {
+        struct InvalidSigner(Vec<u8>);
+
+        impl Signer for InvalidSigner {
+            fn algorithm(&self) -> SignatureAlgorithm {
+                SignatureAlgorithm::SkEd25519
+            }
+
+            fn public_key_blob(&self) -> Result<Vec<u8>, SignerError> {
+                Ok(self.0.clone())
+            }
+
+            fn sign(&self, _message: &[u8]) -> Result<Vec<u8>, SignerError> {
+                Ok(vec![0])
+            }
+        }
+
+        let identity = crate::security_key::SecurityKeyPublicKey::new(
+            crate::security_key::SecurityKeyAlgorithm::Ed25519,
+            [9; 32],
+            "ssh:scoplen-test",
+        )
+        .expect("security-key identity");
+        let signer = InvalidSigner(identity.to_blob().expect("key blob"));
+        let request_identity = PublicKeyIdentity::from_signer(&signer).expect("request identity");
+        let context =
+            PublicKeyAuthContext::new([3; 32], "alice", "ssh-connection").expect("context");
+        assert_eq!(
+            PublicKeyAuthRequest::signed(context, request_identity, &signer),
+            Err(SignerError::InvalidInput("malformed security-key signature body"))
         );
     }
 

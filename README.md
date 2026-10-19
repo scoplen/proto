@@ -42,9 +42,9 @@ now composes bounded edge TCP dialing, TLS, the K-6 prelude, and the SSH handsha
 `AsyncGatewayTransport` and `connect_via_gateway_stream` remain available when a caller owns the TLS
 stream. The direct route applies a bounded timeout to the gateway handshake and maps a stalled edge
 to a typed failure.
-Software Ed25519, P-256, and
-RSA/SHA-2 signers, FIDO2 security-key hooks, RFC 4252 `none`, password and keyboard-interactive
-codecs, certificate validation, and host-verification callbacks are available. The concrete client
+Software Ed25519, P-256, and RSA/SHA-2 signers, raw FIDO2 security-key signer integration,
+RFC 4252 `none`, password and keyboard-interactive codecs, certificate validation, and
+host-verification callbacks are available. The concrete client
 exposes a `none` probe that reports the server's remaining methods, and handles bounded
 keyboard-interactive challenge rounds with prompt and response validation before sending answers
 to the SSH engine. It also authenticates with validated OpenSSH user certificates through the
@@ -180,15 +180,19 @@ hop, session commands on each connection, wrong-pin and closed-target rejection,
 connection reuse after the failures. The disposable OpenSSH script below runs this example.
 `pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH server and runs
 the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump examples. It also tests raw keys
-and user certificates with Ed25519, P-256, RSA-SHA2-256, and RSA-SHA2-512. Rejection checks cover
+and user certificates with Ed25519, P-256, RSA-SHA2-256, and RSA-SHA2-512. A software-generated
+authenticator fixture tests raw `sk-ssh-ed25519@openssh.com` and
+`sk-ecdsa-sha2-nistp256@openssh.com` authentication, including rejection of signatures from the
+wrong key, application, or session payload. Rejection checks cover
 wrong passwords, unauthorized keys, wrong certificate principals, wrong local CA pins, and
 locally valid certificates from a server-untrusted CA. A separate trusted CA signs three Ed25519
 certificates over one key: a KRL rejects one by serial and one by key ID, while an unrevoked
 certificate and the same raw public key still authenticate and run the exact command with exit
 status zero. OpenSSH enforces the KRL; the client does not load or parse it. The Linux CI workflow
 runs the same script on each change; disposable keys and the container are removed afterward.
-This fixture does not complete the required version, platform, agent, security-key, and broader
-certificate-revocation matrix.
+This fixture does not establish physical-token, libfido2, Windows WebAuthn, security-key user
+certificate, version, platform, agent, or broader certificate-revocation coverage. Security-key
+user certificates remain unsupported by the raw-key signer and are rejected before signing.
 For host-certificate mode, the concrete adapter checks the certificate signature, host principal,
 validity, and critical options before the callback checks the CA pin. A disposable
 `linuxserver/openssh-server` container with an Ed25519 `HostCertificate` accepted that path and

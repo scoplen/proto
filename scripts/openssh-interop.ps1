@@ -41,6 +41,21 @@ function Invoke-AuthExample {
     }
 }
 
+function Invoke-SecurityKeyExample {
+    param([string]$caseName, [string]$algorithm, [string]$fault = 'valid', [string]$expectedError = '')
+
+    $output = & cargo run --quiet --locked -p scoplen-ssh --example security_key_interop -- auth $algorithm $fault 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    if ($expectedError) {
+        if ($exitCode -eq 0 -or $output -notmatch [regex]::Escape($expectedError)) {
+            throw "$caseName did not fail as expected (exit $exitCode): $output"
+        }
+    }
+    elseif ($exitCode -ne 0 -or $output -notmatch '(?m)^security-key interop ok\s*$') {
+        throw "$caseName failed (exit $exitCode): $output"
+    }
+}
+
 try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
     $setup = @'
@@ -140,6 +155,21 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
         docker cp "${container}:/tmp/$name" (Join-Path $tempRoot $name) | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "Could not copy disposable OpenSSH fixture $name" }
     }
+    foreach ($case in @(
+        @{ Algorithm = 'ed25519'; File = 'sk_ed.pub'; Prefix = 'sk-ssh-ed25519@openssh.com ' },
+        @{ Algorithm = 'p256'; File = 'sk_p256.pub'; Prefix = 'sk-ecdsa-sha2-nistp256@openssh.com ' }
+    )) {
+        $publicLine = & cargo run --quiet --locked -p scoplen-ssh --example security_key_interop -- public $case.Algorithm
+        if ($LASTEXITCODE -ne 0 -or -not $publicLine.StartsWith($case.Prefix, [System.StringComparison]::Ordinal)) {
+            throw "Could not generate disposable $($case.Algorithm) security-key public identity"
+        }
+        $keyPath = Join-Path $tempRoot $case.File
+        Set-Content -LiteralPath $keyPath -Value $publicLine -Encoding ascii
+        docker cp $keyPath "${container}:/tmp/$($case.File)" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Could not copy disposable $($case.Algorithm) security-key identity" }
+    }
+    docker exec $container sh -c 'cat /tmp/sk_ed.pub /tmp/sk_p256.pub >> /home/scoplen/.ssh/authorized_keys && chown scoplen:scoplen /home/scoplen/.ssh/authorized_keys && chmod 600 /home/scoplen/.ssh/authorized_keys' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not authorize disposable security-key identities' }
     $env:SCOPLEN_OPENSSH_HOST = '127.0.0.1'
     $env:SCOPLEN_OPENSSH_PORT = $port.ToString()
     $env:SCOPLEN_OPENSSH_USER = 'scoplen'
@@ -216,7 +246,13 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
     Clear-AuthMode
     $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'user_ed'
     Invoke-AuthExample 'raw public key remains valid with KRL enabled'
-    Write-Output 'OpenSSH password, routes, software keys, user certificates, KRL revocation, and rejection paths passed'
+    foreach ($algorithm in @('ed25519', 'p256')) {
+        Invoke-SecurityKeyExample "$algorithm security key" $algorithm
+        foreach ($fault in @('wrong-key', 'wrong-application', 'wrong-payload')) {
+            Invoke-SecurityKeyExample "$algorithm security key $fault" $algorithm $fault 'AuthenticationRejected'
+        }
+    }
+    Write-Output 'OpenSSH password, routes, software keys, security keys, user certificates, KRL revocation, and rejection paths passed'
 }
 catch {
     if ($started) {
