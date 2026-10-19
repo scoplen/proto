@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added once-per-connection, two-second-bounded RSA SHA-2 discovery from `server-sig-algs`.
+  The concrete client reports SHA-512, SHA-256, advertised SHA-1-only, or undetermined without
+  selecting SHA-1 or probing authentication. Success and terminal timeout, engine, or cancellation
+  errors are cached. In-process tests cover mapping and auth continuation; a disposable OpenSSH
+  fixture checks constrained advertisements and real SHA-2 public-key authentication.
 - Bounded direct SSH setup with async DNS and family-interleaved Happy Eyeballs dialing under one
   ten-second resolve-and-TCP deadline, followed by a separate ten-second SSH handshake deadline.
   `connect_with_timeout` selects both budgets; typed direct transport and handshake timeout errors

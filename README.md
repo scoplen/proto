@@ -58,6 +58,11 @@ shared signer boundary, checking the requested principal and subject key before 
 certificates retain their legacy blob type while selecting the requested SHA-2 certificate
 algorithm; signing binds the complete certificate and selected hash. Authentication rejection
 reports `partial_success` and `remaining_methods` in server order, omitting unknown engine methods.
+`ClientConnection::server_rsa_sha2_selection` reads the server's `server-sig-algs` once per
+connection and reports SHA-512, SHA-256, an advertised SHA-1-only RSA choice, or an undetermined
+choice. It never selects SHA-1 or sends an authentication probe. The complete query has a
+two-second deadline; success, timeout, engine failure, and cancellation are terminal cached
+outcomes. Callers may explicitly try an existing SHA-2 signer when the result is undetermined.
 Callers can complete another factor on the same connection. Until full authentication succeeds,
 channel opens and remote-forwarding operations return `NotAuthenticated` locally. Real SSH tests
 cover OTP followed by password, wrong factors, premature channel/forwarding operations, and both
@@ -152,6 +157,12 @@ trust pin, authentication, exact command output, and exit status zero. Password,
 both RSA-SHA2 variants, Ed25519, and P-256 passed against disposable Linux OpenSSH containers;
 wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
+`pwsh ./scripts/ssh-rsa-selection-interop.ps1` starts three disposable OpenSSH listeners with
+`PubkeyAcceptedAlgorithms` constrained to RSA-SHA2-256, both RSA SHA-2 variants, and legacy
+`ssh-rsa`. The `rsa_selection_interop` example verifies the advertised choice on each listener,
+then completes RSA public-key authentication and an exact command on the two SHA-2 listeners.
+The SHA-1-only case is discovery-only; it does not opt into SHA-1 authentication. The script
+removes the disposable container and key file on exit.
 `pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners constrained to
 Curve25519/AES-CTR, ML-KEM/ChaCha20, and one legacy-only set. The `algorithm_interop` example
 verifies a pinned host key, authenticated command, exact output, and exit status for both modern

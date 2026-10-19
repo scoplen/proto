@@ -59,6 +59,7 @@ const MAX_PUBLICKEY_AUTH_PAYLOAD: usize = 256 * 1024;
 const MAX_KEYBOARD_SUBMETHODS: usize = 4096;
 const DEFAULT_CLIENT_CHANNEL_LIMIT: usize = 64;
 const DEFAULT_DIRECT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const RSA_SHA2_SELECTION_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_REKEY_WRITE_LIMIT: usize = 1 << 30;
 const DEFAULT_REKEY_READ_LIMIT: usize = 1 << 30;
 const DEFAULT_REKEY_TIME_LIMIT: Duration = Duration::from_secs(3600);
@@ -536,6 +537,15 @@ pub enum ClientError {
     /// Authentication has already completed on this connection.
     #[error("SSH connection is already authenticated")]
     AlreadyAuthenticated,
+    /// The server signature-algorithm query did not complete within its fixed deadline.
+    #[error("SSH server RSA signature selection timed out")]
+    RsaSelectionTimeout,
+    /// The SSH engine could not complete the server signature-algorithm query.
+    #[error("SSH server RSA signature selection failed")]
+    RsaSelectionEngine,
+    /// A prior server signature-algorithm query was cancelled.
+    #[error("SSH server RSA signature selection was interrupted")]
+    RsaSelectionInterrupted,
     /// The public-key signer or its session-bound request was invalid.
     #[error("SSH public-key authentication could not be completed: {0}")]
     PublicKey(#[from] PublicKeyAuthError),
@@ -624,6 +634,63 @@ pub enum NoneAuthOutcome {
     Rejected { methods: Vec<String>, partial_success: bool },
 }
 
+/// The strongest compatible RSA authentication signature advertised by this server.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ServerRsaSha2Selection {
+    /// The server advertises `rsa-sha2-512`.
+    Sha512,
+    /// The server advertises `rsa-sha2-256`, but not `rsa-sha2-512`.
+    Sha256,
+    /// The only recognized advertised RSA signature is legacy `ssh-rsa`.
+    Sha1OnlyAdvertised,
+    /// No RSA choice can be established from the available extension information.
+    Undetermined,
+}
+
+#[derive(Clone, Copy)]
+enum RsaSelectionFailure {
+    Timeout,
+    Engine,
+    Interrupted,
+}
+
+impl From<RsaSelectionFailure> for ClientError {
+    fn from(failure: RsaSelectionFailure) -> Self {
+        match failure {
+            RsaSelectionFailure::Timeout => Self::RsaSelectionTimeout,
+            RsaSelectionFailure::Engine => Self::RsaSelectionEngine,
+            RsaSelectionFailure::Interrupted => Self::RsaSelectionInterrupted,
+        }
+    }
+}
+
+type RsaSelectionCache = Option<Result<ServerRsaSha2Selection, RsaSelectionFailure>>;
+
+async fn select_server_rsa_sha2<F>(
+    cache: &mut RsaSelectionCache,
+    query: F,
+) -> Result<ServerRsaSha2Selection, ClientError>
+where
+    F: Future<Output = Result<Option<Option<HashAlg>>, russh::Error>>,
+{
+    if let Some(result) = cache {
+        return result.map_err(ClientError::from);
+    }
+    *cache = Some(Err(RsaSelectionFailure::Interrupted));
+    let result = match async_timeout(RSA_SHA2_SELECTION_TIMEOUT, query).await {
+        Err(_) => Err(RsaSelectionFailure::Timeout),
+        Ok(Err(_)) => Err(RsaSelectionFailure::Engine),
+        Ok(Ok(advertised)) => Ok(match advertised {
+            Some(Some(HashAlg::Sha512)) => ServerRsaSha2Selection::Sha512,
+            Some(Some(HashAlg::Sha256)) => ServerRsaSha2Selection::Sha256,
+            Some(None) => ServerRsaSha2Selection::Sha1OnlyAdvertised,
+            None | Some(Some(_)) => ServerRsaSha2Selection::Undetermined,
+        }),
+    };
+    *cache = Some(result);
+    result.map_err(ClientError::from)
+}
+
 /// Errors raised while adapting the engine-independent signer to `russh`.
 #[derive(Debug, Error)]
 pub enum PublicKeyAuthError {
@@ -671,6 +738,7 @@ impl From<russh::Error> for ClientError {
 pub struct ClientConnection {
     handle: client::Handle<ClientHandler>,
     authenticated: AtomicBool,
+    rsa_selection: RsaSelectionCache,
     transport_lifetime: Mutex<Option<oneshot::Sender<()>>>,
     stopped: watch::Receiver<bool>,
     channel_slots: Arc<Semaphore>,
@@ -793,12 +861,24 @@ impl ClientConnection {
         Ok(Self {
             handle,
             authenticated: AtomicBool::new(false),
+            rsa_selection: None,
             transport_lifetime: Mutex::new(Some(owner)),
             stopped,
             channel_slots,
             channel_limit: config.channel_limit,
             forwarded_channels,
         })
+    }
+
+    /// Discover the strongest advertised RSA SHA-2 signature before or between auth factors.
+    ///
+    /// The query is limited to two seconds and runs only once per connection. Its result or
+    /// terminal failure is cached. Cancellation permanently interrupts discovery on this
+    /// connection, while other authentication methods and channels remain available.
+    pub async fn server_rsa_sha2_selection(
+        &mut self,
+    ) -> Result<ServerRsaSha2Selection, ClientError> {
+        select_server_rsa_sha2(&mut self.rsa_selection, self.handle.best_supported_rsa_hash()).await
     }
 
     /// Write the K-6 gateway client hello over an already negotiated TLS/ALPN stream, then start
@@ -2314,6 +2394,57 @@ mod tests {
         P256SshSigner, ProxyError, ProxyOperation, ProxyProtocol, ProxyTransportError,
         RsaSshSigner,
     };
+
+    #[tokio::test]
+    async fn rsa_selection_success_and_terminal_failures_are_cached() {
+        let mut success_cache = None;
+        assert!(matches!(
+            select_server_rsa_sha2(&mut success_cache, async { Ok(Some(Some(HashAlg::Sha512))) })
+                .await,
+            Ok(ServerRsaSha2Selection::Sha512)
+        ));
+        assert!(matches!(
+            select_server_rsa_sha2(&mut success_cache, async { panic!("query repeated") }).await,
+            Ok(ServerRsaSha2Selection::Sha512)
+        ));
+
+        let mut timeout_cache = None;
+        assert!(matches!(
+            select_server_rsa_sha2(&mut timeout_cache, std::future::pending()).await,
+            Err(ClientError::RsaSelectionTimeout)
+        ));
+        assert!(matches!(
+            select_server_rsa_sha2(&mut timeout_cache, async { panic!("query repeated") }).await,
+            Err(ClientError::RsaSelectionTimeout)
+        ));
+
+        let mut engine_cache = None;
+        assert!(matches!(
+            select_server_rsa_sha2(&mut engine_cache, async { Err(russh::Error::SendError) }).await,
+            Err(ClientError::RsaSelectionEngine)
+        ));
+        assert!(matches!(
+            select_server_rsa_sha2(&mut engine_cache, async { panic!("query repeated") }).await,
+            Err(ClientError::RsaSelectionEngine)
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancelled_rsa_selection_keeps_interrupted_sentinel() {
+        let mut cache = None;
+        {
+            let selection = select_server_rsa_sha2(&mut cache, std::future::pending());
+            tokio::pin!(selection);
+            tokio::select! {
+                _ = &mut selection => panic!("pending query completed"),
+                () = tokio::time::sleep(Duration::from_millis(10)) => {}
+            }
+        }
+        assert!(matches!(
+            select_server_rsa_sha2(&mut cache, async { panic!("query repeated") }).await,
+            Err(ClientError::RsaSelectionInterrupted)
+        ));
+    }
 
     #[derive(Clone)]
     struct KeyboardServer {
