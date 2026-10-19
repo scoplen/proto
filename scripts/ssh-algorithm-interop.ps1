@@ -21,6 +21,26 @@ function Assert-RekeyLog {
     if ($LASTEXITCODE -ne 0) { throw "Could not read OpenSSH $mode rekey log" }
     $accepted = [regex]::Match($log, '(?m)^.*Accepted password for scoplen.*\n')
     if (-not $accepted.Success) { throw "OpenSSH $mode log has no authenticated session" }
+    $strict = [regex]::Match($log, 'will use strict KEX ordering')
+    if (-not $strict.Success -or $strict.Index -ge $accepted.Index) {
+        throw "OpenSSH $mode did not negotiate strict KEX before authentication"
+    }
+    foreach ($direction in @('send', 'receive')) {
+        $newKeysInDirection = @([regex]::Matches($log, "\b$direction packet: type 21\b"))
+        $resetDirection = if ($direction -eq 'send') { 'send' } else { 'read' }
+        $resets = @([regex]::Matches($log, "resetting $resetDirection seqnr (\d+)\b"))
+        if ($newKeysInDirection.Count -ne $resets.Count) {
+            throw "OpenSSH $mode $direction NEWKEYS count does not match sequence resets"
+        }
+        for ($index = 0; $index -lt $resets.Count; $index++) {
+            if ($resets[$index].Index -le $newKeysInDirection[$index].Index -or
+                ($index + 1 -lt $newKeysInDirection.Count -and
+                    $resets[$index].Index -ge $newKeysInDirection[$index + 1].Index) -or
+                [uint64]$resets[$index].Groups[1].Value -eq 0) {
+                throw "OpenSSH $mode $direction NEWKEYS was not followed by a nonzero sequence reset"
+            }
+        }
+    }
     $postAuth = $log.Substring($accepted.Index + $accepted.Length)
     $kex = @([regex]::Matches($postAuth, '\b(send|receive) packet: type 20\b'))
     $newKeys = @([regex]::Matches($postAuth, '\b(send|receive) packet: type 21\b'))
@@ -32,16 +52,16 @@ function Assert-RekeyLog {
         if ($kex.Count -ne 0 -or $newKeys.Count -ne 0) {
             throw "OpenSSH $mode unexpectedly rekeyed after authentication"
         }
-        Write-Output "OpenSSH ${mode}: no post-auth KEXINIT or NEWKEYS"
+        Write-Output "OpenSSH ${mode}: strict initial KEX reset both sequence numbers; no post-auth rekey"
         return
     }
-    if ($kex.Count -lt 2 -or $kex[0].Groups[1].Value -ne $firstDirection -or
-        $sentKex -eq 0 -or $receivedKex -eq 0 -or
+    if ($kex.Count -lt 4 -or $kex[0].Groups[1].Value -ne $firstDirection -or
+        $sentKex -lt 2 -or $receivedKex -lt 2 -or
         $sentKex -ne $receivedKex -or $sentKex -ne $sentNewKeys -or
         $sentKex -ne $receivedNewKeys) {
         throw "OpenSSH $mode did not complete the expected $firstDirection-first rekey"
     }
-    Write-Output "OpenSSH ${mode}: first post-auth KEXINIT=$firstDirection, KEXINIT send=$sentKex receive=$receivedKex, NEWKEYS send=$sentNewKeys receive=$receivedNewKeys"
+    Write-Output "OpenSSH ${mode}: strict KEX; first post-auth KEXINIT=$firstDirection, rekeys=$sentKex, send/read sequence reset after every NEWKEYS"
 }
 
 try {
