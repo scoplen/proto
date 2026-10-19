@@ -347,6 +347,14 @@ The control-plane and shared `ProblemDetails` Rust paths use the same validated 
 JSON/CBOR error type. The OpenAPI schema and generated TypeScript declaration require `type`,
 `title`, `status`, `detail`, `instance`, `code`, `changed`, and `retryable`; decoders accept unknown
 response fields and syntactically valid future error codes.
+
+The six successful K-4 key-management mutation responses expose request/path-aware validators:
+vault creation, epoch publication and retirement, member addition and removal, and account-key
+PUT. Callers validate the echoed id, epoch, account, or revision against the original request or
+typed path value before applying local metadata. These checks do not establish authorization,
+cryptographic validity, or durable server mutation; response CBOR and additive extensions are
+unchanged.
+
 The K-3 authentication boundary now validates strict, bounded challenge and signed-device JSON
 requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. The
 native refresh body requires one opaque token (at most 2,048 UTF-8 bytes); the browser body is

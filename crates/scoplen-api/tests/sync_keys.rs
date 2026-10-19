@@ -85,12 +85,30 @@ fn key_bundle_codecs_enforce_contract_and_extensions() {
         panic!("response map");
     };
     fields.push((Value::Text("future".into()), Value::UInt(1)));
+    let extended = cbor::encode(&Value::Map(fields)).expect("extension");
     assert_eq!(
-        SyncAccountKeyBundlePutResponse::from_cbor(
-            &cbor::encode(&Value::Map(fields)).expect("extension")
-        )
-        .expect("response extension"),
+        SyncAccountKeyBundlePutResponse::from_cbor(&extended).expect("response extension"),
         response
+    );
+    SyncAccountKeyBundlePutResponse::from_cbor(&extended)
+        .expect("response extension")
+        .validate_for_update(&source)
+        .expect("extended response matches update");
+}
+
+#[test]
+fn key_bundle_put_response_binds_to_valid_update() {
+    let response = SyncAccountKeyBundlePutResponse { revision: 8 };
+    response.validate_for_update(&update()).expect("matching revision");
+    let mut different = update();
+    different.revision = 9;
+    assert!(response.validate_for_update(&different).is_err(), "different valid revision");
+    let mut invalid = update();
+    invalid.signature.clear();
+    assert!(response.validate_for_update(&invalid).is_err(), "invalid update");
+    assert!(
+        SyncAccountKeyBundlePutResponse { revision: 0 }.validate_for_update(&update()).is_err(),
+        "invalid response"
     );
 }
 
@@ -181,10 +199,13 @@ fn published_key_bundle_vectors_match_public_codecs() {
             "sync.keys.put.response" => {
                 let source = SyncAccountKeyBundlePutResponse { revision: 8 };
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
-                assert_eq!(
-                    SyncAccountKeyBundlePutResponse::from_cbor(&expected).expect("decode"),
-                    source
-                );
+                let decoded =
+                    SyncAccountKeyBundlePutResponse::from_cbor(&expected).expect("decode");
+                assert_eq!(decoded, source);
+                decoded.validate_for_update(&update()).expect("published response binding");
+                let mut different = update();
+                different.revision = 9;
+                assert!(decoded.validate_for_update(&different).is_err());
             }
             other => panic!("unexpected vector kind {other}"),
         }

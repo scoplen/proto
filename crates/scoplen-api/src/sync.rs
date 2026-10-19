@@ -348,6 +348,23 @@ impl SyncCreateVaultResponse {
         Ok(())
     }
 
+    /// Validate the created vault against its request before applying local metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either message is invalid or the vault ids differ.
+    pub fn validate_for_request(
+        &self,
+        request: &SyncCreateVaultRequest,
+    ) -> Result<(), SyncCodecError> {
+        request.validate()?;
+        self.validate()?;
+        if self.vault.id != request.vault_id {
+            return Err(invalid("created vault id does not match request"));
+        }
+        Ok(())
+    }
+
     /// Encode the response as `{vault}` with deterministic nested descriptor fields.
     ///
     /// # Errors
@@ -626,6 +643,23 @@ impl SyncPublishVaultEpochResponse {
         positive(self.epoch, "epoch")
     }
 
+    /// Validate the committed epoch against its publication request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either message is invalid or the epochs differ.
+    pub fn validate_for_request(
+        &self,
+        request: &SyncPublishVaultEpochRequest,
+    ) -> Result<(), SyncCodecError> {
+        request.validate()?;
+        self.validate()?;
+        if self.epoch != request.epoch {
+            return Err(invalid("published epoch does not match request"));
+        }
+        Ok(())
+    }
+
     /// Encode the deterministic `{epoch}` response map.
     ///
     /// # Errors
@@ -667,6 +701,20 @@ impl SyncRetireVaultEpochResponse {
     /// Returns an error when the epoch is zero.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
         positive(self.epoch, "epoch")
+    }
+
+    /// Validate the retired epoch against the typed path epoch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the response or path epoch is invalid, or the epochs differ.
+    pub fn validate_for_epoch(&self, epoch: u64) -> Result<(), SyncCodecError> {
+        positive(epoch, "path epoch")?;
+        self.validate()?;
+        if self.epoch != epoch {
+            return Err(invalid("retired epoch does not match path"));
+        }
+        Ok(())
     }
 
     /// Encode the deterministic `{epoch}` response map.
@@ -793,6 +841,23 @@ impl SyncAddVaultMemberResponse {
         valid_uuid(self.account_id, "account_id")
     }
 
+    /// Validate the added account against its request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either message is invalid or the account ids differ.
+    pub fn validate_for_request(
+        &self,
+        request: &SyncAddVaultMemberRequest,
+    ) -> Result<(), SyncCodecError> {
+        request.validate()?;
+        self.validate()?;
+        if self.account_id != request.account_id {
+            return Err(invalid("added account_id does not match request"));
+        }
+        Ok(())
+    }
+
     /// Encode the deterministic `{account_id}` response map.
     ///
     /// # Errors
@@ -839,6 +904,20 @@ impl SyncRemoveVaultMemberResponse {
         valid_uuid(self.account_id, "account_id")?;
         if !self.rotation_pending {
             return Err(invalid("rotation_pending must be true"));
+        }
+        Ok(())
+    }
+
+    /// Validate the removed account against the typed path account.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the response or path account is invalid, or the ids differ.
+    pub fn validate_for_account(&self, account_id: Uuid) -> Result<(), SyncCodecError> {
+        valid_uuid(account_id, "path account_id")?;
+        self.validate()?;
+        if self.account_id != account_id {
+            return Err(invalid("removed account_id does not match path"));
         }
         Ok(())
     }
@@ -2418,6 +2497,23 @@ impl SyncAccountKeyBundlePutResponse {
     /// Returns an error for a zero revision.
     pub fn validate(self) -> Result<(), SyncCodecError> {
         positive(self.revision, "key bundle revision")
+    }
+
+    /// Validate the stored revision against the submitted key-bundle update.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either message is invalid or the revisions differ.
+    pub fn validate_for_update(
+        self,
+        update: &SyncAccountKeyBundleUpdate,
+    ) -> Result<(), SyncCodecError> {
+        update.validate()?;
+        self.validate()?;
+        if self.revision != update.revision {
+            return Err(invalid("key bundle revision does not match update"));
+        }
+        Ok(())
     }
 
     /// Encode the successful response as `{revision}`.

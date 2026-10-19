@@ -38,6 +38,10 @@ fn shared_vault_member_codecs_round_trip_and_accept_response_extensions() {
         SyncAddVaultMemberResponse::from_cbor(&extended).expect("decode extension"),
         response
     );
+    SyncAddVaultMemberResponse::from_cbor(&extended)
+        .expect("decode extension")
+        .validate_for_request(&request())
+        .expect("extended addition response matches request");
 
     let removal = SyncRemoveVaultMemberResponse { account_id: account(3), rotation_pending: true };
     let encoded = removal.to_cbor().expect("encode removal response");
@@ -49,6 +53,39 @@ fn shared_vault_member_codecs_round_trip_and_accept_response_extensions() {
     assert_eq!(
         SyncRemoveVaultMemberResponse::from_cbor(&extended).expect("decode removal extension"),
         removal
+    );
+    SyncRemoveVaultMemberResponse::from_cbor(&extended)
+        .expect("decode removal extension")
+        .validate_for_account(account(3))
+        .expect("extended removal response matches path");
+}
+
+#[test]
+fn shared_vault_member_responses_bind_to_request_and_path() {
+    let added = SyncAddVaultMemberResponse { account_id: account(3) };
+    added.validate_for_request(&request()).expect("matching added account");
+    let mut different = request();
+    different.account_id = account(4);
+    assert!(added.validate_for_request(&different).is_err(), "different valid account");
+    let mut invalid = request();
+    invalid.wrapped_keys.clear();
+    assert!(added.validate_for_request(&invalid).is_err(), "invalid request");
+    assert!(
+        SyncAddVaultMemberResponse { account_id: Uuid::nil() }
+            .validate_for_request(&request())
+            .is_err(),
+        "invalid addition response"
+    );
+
+    let removed = SyncRemoveVaultMemberResponse { account_id: account(3), rotation_pending: true };
+    removed.validate_for_account(account(3)).expect("matching path account");
+    assert!(removed.validate_for_account(account(4)).is_err(), "different valid path account");
+    assert!(removed.validate_for_account(Uuid::nil()).is_err(), "invalid path account");
+    assert!(
+        SyncRemoveVaultMemberResponse { account_id: account(3), rotation_pending: false }
+            .validate_for_account(account(3))
+            .is_err(),
+        "invalid removal response"
     );
 }
 
@@ -187,10 +224,12 @@ fn published_shared_vault_member_vectors_match_public_codecs() {
             "sync.vaults.members.add.response" => {
                 let source = SyncAddVaultMemberResponse { account_id: account(3) };
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
-                assert_eq!(
-                    SyncAddVaultMemberResponse::from_cbor(&expected).expect("decode"),
-                    source
-                );
+                let decoded = SyncAddVaultMemberResponse::from_cbor(&expected).expect("decode");
+                assert_eq!(decoded, source);
+                decoded.validate_for_request(&request()).expect("published response binding");
+                let mut different = request();
+                different.account_id = account(4);
+                assert!(decoded.validate_for_request(&different).is_err());
             }
             "sync.vaults.members.remove.response" => {
                 let source = SyncRemoveVaultMemberResponse {
@@ -198,10 +237,10 @@ fn published_shared_vault_member_vectors_match_public_codecs() {
                     rotation_pending: true,
                 };
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
-                assert_eq!(
-                    SyncRemoveVaultMemberResponse::from_cbor(&expected).expect("decode"),
-                    source
-                );
+                let decoded = SyncRemoveVaultMemberResponse::from_cbor(&expected).expect("decode");
+                assert_eq!(decoded, source);
+                decoded.validate_for_account(account(3)).expect("published response binding");
+                assert!(decoded.validate_for_account(account(4)).is_err());
             }
             other => panic!("unexpected vector kind {other}"),
         }
