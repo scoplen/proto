@@ -433,6 +433,14 @@ The Cedar `Account.email` attribute is optional; policies reading it must use a 
 These contracts do not authenticate the account or verify an address. The production GET route and
 email enrollment remain server work.
 
+`scoplen-crypto` also signs and statelessly verifies D-100 enrolled-device access tokens as bounded
+Ed25519 compact JWS values. The `spl-device-access+jwt` profile uses its own trusted issuer and
+configured keyring, an exact 600-second lifetime, complete ordered organization and SSO snapshots,
+bounded scopes, and a thumbprint computed from the verified device signing public key at issuance.
+Public signed and rejection vectors are in `vectors/device-access-token.json`. Consumers still own
+current-state checks, DPoP proof and replay verification, and route authorization; the K-3 JSON
+response continues to treat the token as opaque.
+
 The gateway-ticket issuance codecs validate syntax and size; their ticket field remains opaque.
 `scoplen-crypto` signs and statelessly verifies the D-96 dedicated Ed25519 gateway-ticket profile with a trusted
 issuer and ticket-only keyring, exact 60-second validity, UUIDv7 claims, and DPoP-key and SSH-key
