@@ -2,16 +2,21 @@
 //! Disposable OpenSSH interoperability fixture using software-generated FIDO2 signatures.
 //! It does not exercise a physical token or platform provider.
 
-use std::{env, time::Duration};
+use std::{
+    env,
+    path::Path,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
 use scoplen_ssh::{
-    ChannelEvent, ClientConfig, ClientConnection, HostKey, HostKeyVerificationError,
-    SecurityKeyAlgorithm, SecurityKeyError, SecurityKeyProvider, SecurityKeyPublicKey,
-    SecurityKeySignOptions, SecurityKeySignature, SecurityKeySshSigner,
+    CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, HostKey,
+    HostKeyVerificationError, SecurityKeyAlgorithm, SecurityKeyError, SecurityKeyProvider,
+    SecurityKeyPublicKey, SecurityKeySignOptions, SecurityKeySignature, SecurityKeySshSigner,
+    UserCertificate,
 };
 use ssh_key::{
-    PublicKey,
+    Certificate, PublicKey,
     sha2::{Digest, Sha256},
 };
 use tokio::time::timeout;
@@ -148,9 +153,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let provider = SoftwareProvider::new(&algorithm, fault)?;
     let identity = provider.public_key()?;
     if mode == "public" {
-        if !matches!(fault, Fault::None) {
-            return Err("public mode does not accept a signature fault".into());
-        }
+        let identity = match fault {
+            Fault::None => identity,
+            Fault::WrongKey => {
+                let key = match algorithm.as_str() {
+                    "ed25519" => Ed25519SigningKey::from_bytes(&[8; 32])?.public_key().to_vec(),
+                    "p256" => P256SigningKey::from_bytes(&[2; 32])?.public_key_sec1().clone(),
+                    _ => unreachable!("validated algorithm"),
+                };
+                SecurityKeyPublicKey::new(identity.algorithm(), key, APPLICATION)?
+            }
+            Fault::WrongApplication => SecurityKeyPublicKey::new(
+                identity.algorithm(),
+                identity.key(),
+                "ssh:other-application",
+            )?,
+            Fault::WrongPayload => return Err("public mode does not accept wrong-payload".into()),
+        };
         println!("{}", PublicKey::from_bytes(&identity.to_blob()?)?.to_openssh()?);
         return Ok(());
     }
@@ -169,7 +188,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => Err(HostKeyVerificationError::Rejected("unexpected server key".into())),
     })?;
     let mut connection = timeout(DEADLINE, ClientConnection::connect(config)).await??;
-    timeout(DEADLINE, connection.authenticate_publickey(&user, &signer)).await??;
+    if let Ok(path) = env::var("SCOPLEN_OPENSSH_USER_CERT") {
+        let ca_path = env::var("SCOPLEN_OPENSSH_USER_CA_KEY")
+            .map_err(|_| "security-key certificate requires a pinned CA public key")?;
+        let encoded = Certificate::read_file(Path::new(&path))?.to_bytes()?;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let certificate = UserCertificate::parse_and_validate(
+            &encoded,
+            &CertificateValidationPolicy::user(&user, now),
+        )?;
+        let pinned_ca = PublicKey::read_openssh_file(ca_path)?.to_bytes()?;
+        if certificate.certificate().ca_public_key_blob() != pinned_ca {
+            return Err("UntrustedUserCa".into());
+        }
+        timeout(DEADLINE, connection.authenticate_certificate(&user, &certificate, &signer))
+            .await??;
+    } else {
+        timeout(DEADLINE, connection.authenticate_publickey(&user, &signer)).await??;
+    }
     let mut channel = timeout(DEADLINE, connection.open_session()).await??;
     timeout(DEADLINE, channel.exec(true, b"printf scoplen-security-key-ok")).await??;
     let mut output = Vec::new();

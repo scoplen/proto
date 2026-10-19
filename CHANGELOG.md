@@ -4,13 +4,20 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Enabled both OpenSSH FIDO2 security-key user-certificate algorithms through the shared signer
+  and concrete client. Authentication binds the complete certificate, raw subject key and
+  application, username, service, and session; malformed or mismatched subjects fail before
+  signing. In-process SSH and disposable OpenSSH checks cover both algorithms, wrong signature
+  inputs, subject/application/principal/validity failures, local CA pins, server-untrusted CAs,
+  and KRL serial and key-ID revocation with unrevoked and raw-key controls. CA trust remains a
+  caller decision, KRL enforcement remains server-side, and physical-token integration is open.
 - Connected selected FIDO2 providers to raw `sk-ssh-ed25519@openssh.com` and
   `sk-ecdsa-sha2-nistp256@openssh.com` public-key authentication. The signer rechecks its pinned
   identity and application, algorithm, and required UP/UV flags before dispatch. Corrected the
   OpenSSH signature wrapper so flags and counter follow the raw signature string; agent-backed
   security-key signatures preserve those fields. A disposable OpenSSH fixture verifies both raw
   algorithms and rejects wrong-key, wrong-application, and wrong-payload signatures. Physical
-  token adapters and security-key user certificates remain open.
+  token adapters remain open.
 - Verified the default ML-KEM/ChaCha20 negotiation against a disposable OpenSSH listener that
   offers only those algorithms. Pinned-key authentication, exact command output, and exit status
   pass alongside the existing modern, legacy, strict-KEX, and rekey checks; the full algorithm
