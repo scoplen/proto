@@ -1049,6 +1049,11 @@ impl ClientConnection {
         credentials: Option<&ProxyCredentials>,
         timeout: Duration,
     ) -> Result<Self, ClientError> {
+        if let Some(credentials) = credentials {
+            credentials
+                .validate_http_basic()
+                .map_err(|error| ClientError::Proxy(ProxyTransportError::Proxy(error)))?;
+        }
         let proxy_host = proxy_host.to_owned();
         let target_host = config.host.clone();
         let target_port = config.port;
@@ -4707,6 +4712,135 @@ mod tests {
     async fn proxy_routes_complete_real_russh_handshake_and_data_round_trip() {
         proxy_route_round_trip(RouteProxyKind::Socks5).await;
         proxy_route_round_trip(RouteProxyKind::HttpConnect).await;
+    }
+
+    #[tokio::test]
+    async fn authenticated_http_connect_route_reaches_ssh_and_maps_proxy_rejection() {
+        let (target, server_task) = start_echo_server().await;
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind proxy");
+        let proxy_port = listener.local_addr().expect("proxy addr").port();
+        let proxy_task = tokio::spawn(async move {
+            let (mut client, _) = listener.accept().await.expect("accept proxy client");
+            let mut request = Vec::new();
+            let mut byte = [0];
+            while !request.ends_with(b"\r\n\r\n") {
+                client.read_exact(&mut byte).await.expect("request byte");
+                request.push(byte[0]);
+                assert!(request.len() <= 4096);
+            }
+            let request = String::from_utf8(request).expect("ASCII request");
+            assert!(
+                request
+                    .starts_with(&format!("CONNECT target.example:{} HTTP/1.1\r\n", target.port()))
+            );
+            assert!(
+                request.contains("Proxy-Authorization: Basic cm91dGUtdXNlcjpwYXNzOndvcmQ=\r\n")
+            );
+            client
+                .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                .await
+                .expect("proxy accept");
+            let mut target_stream = TcpStream::connect(target).await.expect("SSH target");
+            let _ = copy_bidirectional(&mut client, &mut target_stream).await;
+        });
+        let credentials = ProxyCredentials::new("route-user", "pass:word").expect("credentials");
+        let config = ClientConfig::new(
+            "target.example",
+            target.port(),
+            |_host: &str, _key: &HostKey| Ok(()),
+        )
+        .expect("config");
+        let mut connection = ClientConnection::connect_via_http_connect(
+            config,
+            "127.0.0.1",
+            proxy_port,
+            Some(&credentials),
+            Duration::from_secs(2),
+        )
+        .await
+        .expect("authenticated route");
+        connection.authenticate_password("user", b"password").await.expect("SSH authentication");
+        let mut channel = connection.open_session().await.expect("session");
+        channel.send_data(b"authenticated route").await.expect("send data");
+        assert!(matches!(
+            timeout(Duration::from_secs(5), channel.next_event()).await.expect("response").expect("event"),
+            Some(ChannelEvent::Data(data)) if data == b"authenticated route"
+        ));
+        channel.close().await.expect("close session");
+        drop(channel);
+        connection.disconnect().await.expect("disconnect");
+        proxy_task.await.expect("proxy task");
+        server_task.await.expect("SSH server");
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind rejecting proxy");
+        let proxy_port = listener.local_addr().expect("proxy addr").port();
+        let proxy_task = tokio::spawn(async move {
+            let (mut client, _) = listener.accept().await.expect("accept proxy client");
+            let mut request = Vec::new();
+            let mut byte = [0];
+            while !request.ends_with(b"\r\n\r\n") {
+                client.read_exact(&mut byte).await.expect("request byte");
+                request.push(byte[0]);
+                assert!(request.len() <= 4096);
+            }
+            assert!(
+                String::from_utf8(request)
+                    .expect("request")
+                    .contains("Proxy-Authorization: Basic cm91dGUtdXNlcjpwYXNzOndvcmQ=\r\n")
+            );
+            client
+                .write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n")
+                .await
+                .expect("reject");
+        });
+        let config = ClientConfig::new("target.example", 22, |_host: &str, _key: &HostKey| Ok(()))
+            .expect("config");
+        let error = ClientConnection::connect_via_http_connect(
+            config,
+            "127.0.0.1",
+            proxy_port,
+            Some(&credentials),
+            Duration::from_secs(2),
+        )
+        .await
+        .expect_err("authentication rejection");
+        assert!(matches!(
+            error,
+            ClientError::Proxy(ProxyTransportError::Proxy(ProxyError::Rejected {
+                protocol: ProxyProtocol::HttpConnect,
+                code: 407
+            }))
+        ));
+        proxy_task.await.expect("rejecting proxy task");
+    }
+
+    #[tokio::test]
+    async fn invalid_http_basic_credentials_open_no_proxy_socket() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind proxy");
+        let proxy_port = listener.local_addr().expect("proxy addr").port();
+        for (username, password, field) in [
+            (b"user:name".to_vec(), b"pass".to_vec(), "username"),
+            (vec![0x80], b"pass".to_vec(), "username"),
+            (b"user".to_vec(), vec![0x80], "password"),
+        ] {
+            let credentials = ProxyCredentials::new(username, password).expect("SOCKS bytes");
+            let config =
+                ClientConfig::new("target.example", 22, |_host: &str, _key: &HostKey| Ok(()))
+                    .expect("config");
+            let error = ClientConnection::connect_via_http_connect(
+                config,
+                "127.0.0.1",
+                proxy_port,
+                Some(&credentials),
+                Duration::from_secs(1),
+            )
+            .await
+            .expect_err("invalid HTTP Basic credentials");
+            assert!(matches!(error, ClientError::Proxy(ProxyTransportError::Proxy(
+                ProxyError::InvalidCredential { field: actual }
+            )) if actual == field));
+            assert!(timeout(Duration::from_millis(100), listener.accept()).await.is_err());
+        }
     }
 
     #[tokio::test]

@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-102 Route proxy-username field validation and canonical clear/merge vectors. HTTP CONNECT
+  now rejects non-ASCII Basic credentials and usernames containing `:` before opening a proxy
+  socket, while SOCKS5 retains its byte-string credential interface. Public proxy transport and
+  SSH-route tests cover authenticated success, rejection, and invalid-credential preflight. Basic
+  encoding also handles a two-byte final Base64 group without aborting the connection task.
 - Added bounded async-reader SFTP uploads with explicit byte count and remote resume offset.
   Slice and stream uploads share contiguous progress and pipeline accounting, including
   out-of-order acknowledgements. Source failures isolate the SFTP channel; the OpenSSH

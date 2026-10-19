@@ -652,7 +652,7 @@ fn field_kind(object_type: ObjectType, field: u64) -> Option<FieldKind> {
             _ => return None,
         },
         ObjectType::ROUTE => match field {
-            1 | 4 | 6 => Scalar(TextValue),
+            1 | 4 | 6 | 8 => Scalar(TextValue),
             2 => Scalar(UInt),
             3 => Scalar(ArrayOfUuid),
             5 | 7 => Scalar(ValueKind::Uuid),
@@ -934,7 +934,7 @@ fn validate_route_fields(object: &Object) -> Result<(), ModelError> {
             if !field_present(3) {
                 return Err(invalid_field(object, "jump routes require hops"));
             }
-            if [4, 5, 6, 7].into_iter().any(field_present) {
+            if [4, 5, 6, 7, 8].into_iter().any(field_present) {
                 return Err(invalid_field(
                     object,
                     "jump routes cannot contain proxy, command, or gateway fields",
@@ -951,12 +951,28 @@ fn validate_route_fields(object: &Object) -> Result<(), ModelError> {
                     "proxy routes cannot contain jump, command, or gateway fields",
                 ));
             }
+            if field_present(5) != field_present(8) {
+                return Err(invalid_field(object, "proxy username and credential must be paired"));
+            }
+            if let Some(username) = object
+                .optional_text(8)
+                .map_err(|_| invalid_field(object, "proxy username must be text"))?
+            {
+                let bytes = username.as_bytes();
+                if bytes.is_empty()
+                    || bytes.len() > 255
+                    || bytes.iter().any(|byte| !(0x20..=0x7e).contains(byte))
+                    || (kind == 3 && bytes.contains(&b':'))
+                {
+                    return Err(invalid_field(object, "proxy username is invalid"));
+                }
+            }
         }
         4 => {
             if !field_present(6) {
                 return Err(invalid_field(object, "command routes require a command"));
             }
-            if [3, 4, 5, 7].into_iter().any(field_present) {
+            if [3, 4, 5, 7, 8].into_iter().any(field_present) {
                 return Err(invalid_field(
                     object,
                     "command routes cannot contain jump, proxy, or gateway fields",
@@ -967,7 +983,7 @@ fn validate_route_fields(object: &Object) -> Result<(), ModelError> {
             if !field_present(7) {
                 return Err(invalid_field(object, "managed routes require a gateway network"));
             }
-            if [3, 4, 5, 6].into_iter().any(field_present) {
+            if [3, 4, 5, 6, 8].into_iter().any(field_present) {
                 return Err(invalid_field(
                     object,
                     "managed routes cannot contain jump, proxy, or command fields",
@@ -1207,6 +1223,89 @@ mod tests {
         );
         put_field(&mut route, 4, cbor::Value::Null, 2);
         route.validate().expect("a cleared proxy does not conflict with a jump route");
+    }
+
+    #[test]
+    fn proxy_routes_require_a_valid_paired_username_and_credential() {
+        for kind in [2, 3] {
+            let mut route = Object::new(id(1), ObjectType::ROUTE, 1).expect("route");
+            put_field(&mut route, 1, cbor::Value::Text("proxy".into()), 1);
+            put_field(&mut route, 2, cbor::Value::UInt(kind), 1);
+            put_field(&mut route, 4, cbor::Value::Text("proxy.example:8080".into()), 1);
+            put_field(&mut route, 8, cbor::Value::Text("user".into()), 1);
+            assert!(route.validate().is_err(), "username alone is invalid");
+            put_field(&mut route, 5, cbor::Value::Bytes(id(3).as_bytes().to_vec()), 1);
+            route.validate().expect("paired proxy authentication");
+            put_field(&mut route, 99, cbor::Value::Bool(true), 1);
+            assert_eq!(Object::decode(&route.encode().expect("encode")), Ok(route.clone()));
+
+            for username in ["", "\n", "\u{7f}", "é"] {
+                put_field(&mut route, 8, cbor::Value::Text(username.into()), 2);
+                assert!(route.validate().is_err(), "invalid username {username:?}");
+            }
+            put_field(&mut route, 8, cbor::Value::Text("x".repeat(256)), 2);
+            assert!(route.validate().is_err(), "oversized username");
+            put_field(&mut route, 8, cbor::Value::Text("x".repeat(255)), 2);
+            route.validate().expect("maximum username length");
+            put_field(&mut route, 8, cbor::Value::Text(" ~".into()), 2);
+            route.validate().expect("printable ASCII endpoints");
+            put_field(&mut route, 8, cbor::Value::Text("user:realm".into()), 2);
+            assert_eq!(route.validate().is_ok(), kind == 2, "HTTP excludes colon");
+
+            put_field(&mut route, 8, cbor::Value::Null, 3);
+            assert!(route.validate().is_err(), "credential alone is invalid");
+            put_field(&mut route, 5, cbor::Value::Null, 3);
+            route.validate().expect("both authentication fields cleared");
+            assert_eq!(route.optional_text(8), Ok(None));
+            assert!(route.field(8).is_some(), "clear keeps its clock");
+        }
+    }
+
+    #[test]
+    fn proxy_authentication_fields_have_scalar_shapes_and_only_proxy_route_kinds() {
+        let mut route = Object::new(id(1), ObjectType::ROUTE, 1).expect("route");
+        put_field(&mut route, 1, cbor::Value::Text("proxy".into()), 1);
+        put_field(&mut route, 2, cbor::Value::UInt(2), 1);
+        put_field(&mut route, 4, cbor::Value::Text("proxy.example:8080".into()), 1);
+        put_field(&mut route, 5, cbor::Value::Bytes(id(3).as_bytes().to_vec()), 1);
+        put_field(&mut route, 8, cbor::Value::Bytes(b"user".to_vec()), 1);
+        assert!(route.validate().is_err(), "username must be text");
+        put_field(&mut route, 8, cbor::Value::Text("user".into()), 1);
+        route
+            .insert(
+                FieldPath::map_entry(8, MapKey::Text("other".into())).expect("path"),
+                FieldEntry::new(
+                    cbor::Value::Text("user".into()),
+                    Hlc::at(1).expect("clock"),
+                    id(2),
+                )
+                .expect("entry"),
+            )
+            .expect("insert");
+        assert!(route.validate().is_err(), "username cannot be a map entry");
+        route.fields.remove(&FieldPath::map_entry(8, MapKey::Text("other".into())).expect("path"));
+
+        put_field(&mut route, 2, cbor::Value::UInt(1), 2);
+        put_field(&mut route, 3, cbor::Value::Array(vec![]), 2);
+        put_field(&mut route, 4, cbor::Value::Null, 2);
+        put_field(&mut route, 5, cbor::Value::Null, 2);
+        assert!(route.validate().is_err(), "jump route cannot carry username");
+        put_field(&mut route, 8, cbor::Value::Null, 2);
+        route.validate().expect("cleared proxy authentication on jump route");
+
+        for (kind, field, value) in [
+            (4, 6, cbor::Value::Text("proxy-command".into())),
+            (5, 7, cbor::Value::Bytes(id(3).as_bytes().to_vec())),
+        ] {
+            let mut route = Object::new(id(1), ObjectType::ROUTE, 1).expect("route");
+            put_field(&mut route, 1, cbor::Value::Text("other route".into()), 1);
+            put_field(&mut route, 2, cbor::Value::UInt(kind), 1);
+            put_field(&mut route, field, value, 1);
+            put_field(&mut route, 8, cbor::Value::Text("user".into()), 1);
+            assert!(route.validate().is_err(), "non-proxy route cannot carry username");
+            put_field(&mut route, 8, cbor::Value::Null, 2);
+            route.validate().expect("cleared username is absent");
+        }
     }
 
     fn put_map_entry(object: &mut Object, field: u64, key: MapKey, value: cbor::Value, clock: u64) {
