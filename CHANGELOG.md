@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added continuous parser fuzz coverage for K-4 sync requests, responses, queries, and selected
+  resource limits beyond notifications. Two public-codec targets replay vector-derived positive,
+  malformed, truncated, and input-boundary seeds in Linux change checks and scheduled fuzzing.
 - Broadened external OpenSSH SFTP transfers to all byte values and verified that a rejected
   four-request write pipeline invalidates only its SFTP session. A fresh channel reads the
   unchanged file and an independent SSH session still opens on the same connection.

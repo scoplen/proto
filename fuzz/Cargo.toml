@@ -69,6 +69,20 @@ doc = false
 bench = false
 
 [[bin]]
+name = "sync_control"
+path = "fuzz_targets/sync_control.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sync_data"
+path = "fuzz_targets/sync_data.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "api_json"
 path = "fuzz_targets/api_json.rs"
 test = false
