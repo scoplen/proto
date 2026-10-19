@@ -11,7 +11,8 @@
 use thiserror::Error;
 
 use crate::authentication::{
-    PublicKeyAuthContext, publickey_signature_payload, read_string, write_string,
+    PublicKeyAuthContext, SignatureAlgorithm, Signer, SignerError, publickey_signature_payload,
+    read_string, write_string,
 };
 
 const MAX_APPLICATION: usize = 1024;
@@ -336,6 +337,78 @@ pub trait SecurityKeyProvider {
     ) -> Result<SecurityKeySignature, SecurityKeyError>;
 }
 
+/// A selected FIDO2 credential exposed through the concrete public-key authentication path.
+///
+/// The provider retains the private credential. The complete public identity, including its
+/// application, is pinned here and checked again before every signing operation.
+pub struct SecurityKeySshSigner<'a, P: SecurityKeyProvider + ?Sized> {
+    provider: &'a P,
+    identity: SecurityKeyPublicKey,
+    options: SecurityKeySignOptions,
+}
+
+impl<'a, P: SecurityKeyProvider + ?Sized> SecurityKeySshSigner<'a, P> {
+    /// Select one provider identity and its user-presence and verification requirements.
+    pub fn new(
+        provider: &'a P,
+        identity: SecurityKeyPublicKey,
+        options: SecurityKeySignOptions,
+    ) -> Result<Self, SecurityKeyError> {
+        check_provider_identity(provider, &identity)?;
+        Ok(Self { provider, identity, options })
+    }
+
+    /// Return the pinned public identity.
+    #[must_use]
+    pub const fn identity(&self) -> &SecurityKeyPublicKey {
+        &self.identity
+    }
+}
+
+impl<P: SecurityKeyProvider + ?Sized> Signer for SecurityKeySshSigner<'_, P> {
+    fn algorithm(&self) -> SignatureAlgorithm {
+        match self.identity.algorithm() {
+            SecurityKeyAlgorithm::Ed25519 => SignatureAlgorithm::SkEd25519,
+            SecurityKeyAlgorithm::EcdsaSha2Nistp256 => SignatureAlgorithm::SkEcdsaSha2Nistp256,
+        }
+    }
+
+    fn public_key_blob(&self) -> Result<Vec<u8>, SignerError> {
+        self.identity.to_blob().map_err(|error| security_key_signer_error(&error))
+    }
+
+    fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignerError> {
+        check_provider_identity(self.provider, &self.identity)
+            .map_err(|error| security_key_signer_error(&error))?;
+        let signature = self
+            .provider
+            .sign(self.identity.application(), message, self.options)
+            .map_err(|error| security_key_signer_error(&error))?;
+        if signature.algorithm() != self.identity.algorithm() {
+            return Err(security_key_signer_error(&SecurityKeyError::AlgorithmMismatch));
+        }
+        signature.enforce(self.options).map_err(|error| security_key_signer_error(&error))?;
+        signature.to_ssh_blob().map_err(|error| security_key_signer_error(&error))
+    }
+}
+
+fn check_provider_identity<P: SecurityKeyProvider + ?Sized>(
+    provider: &P,
+    identity: &SecurityKeyPublicKey,
+) -> Result<(), SecurityKeyError> {
+    if provider.algorithm() != identity.algorithm() {
+        return Err(SecurityKeyError::AlgorithmMismatch);
+    }
+    if provider.public_key()? != *identity {
+        return Err(SecurityKeyError::IdentityMismatch);
+    }
+    Ok(())
+}
+
+fn security_key_signer_error(error: &SecurityKeyError) -> SignerError {
+    SignerError::Signing(error.to_string())
+}
+
 /// An RFC 4252 `publickey` request backed by an SSH security key.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SecurityKeyAuthRequest {
@@ -360,12 +433,7 @@ impl SecurityKeyAuthRequest {
         provider: &P,
         options: SecurityKeySignOptions,
     ) -> Result<Self, SecurityKeyError> {
-        if provider.algorithm() != identity.algorithm() {
-            return Err(SecurityKeyError::AlgorithmMismatch);
-        }
-        if provider.public_key()? != identity {
-            return Err(SecurityKeyError::IdentityMismatch);
-        }
+        check_provider_identity(provider, &identity)?;
         let key_blob = identity.to_blob()?;
         let payload = publickey_signature_payload(&context, identity.algorithm().name(), &key_blob);
         let signature = provider.sign(identity.application(), &payload, options)?;
@@ -375,7 +443,7 @@ impl SecurityKeyAuthRequest {
         signature.enforce(options)?;
         let mut outer = Vec::new();
         append_string(&mut outer, identity.algorithm().name().as_bytes())?;
-        append_string(&mut outer, &signature.to_ssh_blob()?)?;
+        outer.extend_from_slice(&signature.to_ssh_blob()?);
         Ok(Self { context, identity, signature: Some(outer) })
     }
 
@@ -424,7 +492,9 @@ impl SecurityKeyAuthRequest {
 
 const USER_PRESENCE: u8 = 0x01;
 const USER_VERIFICATION: u8 = 0x04;
-const KNOWN_FLAGS: u8 = 0xDD;
+// Assertion flags that need no additional authenticator data. AT and ED require fields that
+// this OpenSSH `sk-` signature profile cannot carry.
+const KNOWN_FLAGS: u8 = 0x1D;
 
 fn validate_public_key(
     algorithm: SecurityKeyAlgorithm,
@@ -532,6 +602,20 @@ fn display_bytes(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use scoplen_crypto::{Ed25519SigningKey, P256SigningKey, ed25519_verify, p256_verify};
+    use ssh_key::{
+        Signature as SshSignature,
+        sha2::{Digest, Sha256},
+    };
+    use std::cell::Cell;
+
+    fn fido_signed_data(application: &str, flags: u8, counter: u32, message: &[u8]) -> Vec<u8> {
+        let mut signed = Vec::with_capacity(69);
+        signed.extend_from_slice(&Sha256::digest(application.as_bytes()));
+        signed.push(flags);
+        signed.extend_from_slice(&counter.to_be_bytes());
+        signed.extend_from_slice(&Sha256::digest(message));
+        signed
+    }
 
     fn mpint(value: &[u8]) -> Vec<u8> {
         let first_nonzero = value.iter().position(|byte| *byte != 0).unwrap_or(value.len());
@@ -591,7 +675,7 @@ mod tests {
             }
             SecurityKeySignature::new(
                 self.algorithm(),
-                self.key.sign(message).to_vec(),
+                self.key.sign(&fido_signed_data(application, self.flags, 7, message)).to_vec(),
                 self.flags,
                 7,
             )
@@ -642,16 +726,67 @@ mod tests {
         .expect("signed request");
         let outer = request.signature().expect("signature");
         let (algorithm, rest) = read_string(outer).expect("algorithm");
-        let (body, trailing) = read_string(rest).expect("body");
-        assert_eq!(trailing.len(), 0);
         assert_eq!(algorithm, identity.algorithm().name().as_bytes());
-        let decoded = SecurityKeySignature::from_ssh_blob(identity.algorithm(), body)
+        let decoded = SecurityKeySignature::from_ssh_blob(identity.algorithm(), rest)
             .expect("signature body");
         assert_eq!(decoded.flags(), USER_PRESENCE | USER_VERIFICATION);
         assert_eq!(decoded.counter(), 7);
-        ed25519_verify(identity.key(), &request.signature_payload(), decoded.signature())
-            .expect("signature verifies");
+        let external = SshSignature::try_from(outer).expect("independent SSH decoder");
+        assert_eq!(Vec::try_from(external).expect("independent SSH encoder"), outer);
+        ed25519_verify(
+            identity.key(),
+            &fido_signed_data(
+                identity.application(),
+                decoded.flags(),
+                decoded.counter(),
+                &request.signature_payload(),
+            ),
+            decoded.signature(),
+        )
+        .expect("FIDO signature verifies");
         assert!(request.encode().expect("wire").starts_with(&[50]));
+    }
+
+    #[test]
+    fn provider_signer_uses_the_public_authentication_request_without_an_extra_string() {
+        let provider = EdProvider {
+            key: Ed25519SigningKey::from_bytes(&[9; 32]).expect("key"),
+            application: "ssh:scoplen".into(),
+            flags: USER_PRESENCE | USER_VERIFICATION,
+        };
+        let identity = provider.public_key().expect("identity");
+        let signer = SecurityKeySshSigner::new(
+            &provider,
+            identity.clone(),
+            SecurityKeySignOptions::user_presence_and_verification(),
+        )
+        .expect("provider signer");
+        let context =
+            PublicKeyAuthContext::new([3; 32], "alice", "ssh-connection").expect("context");
+        let request = crate::authentication::PublicKeyAuthRequest::signed(
+            context,
+            crate::authentication::PublicKeyIdentity::from_signer(&signer).expect("identity"),
+            &signer,
+        )
+        .expect("signed request");
+        let encoded = request.signature().expect("signature");
+        let external = SshSignature::try_from(encoded).expect("independent SSH decoder");
+        assert_eq!(Vec::try_from(external).expect("independent SSH encoder"), encoded);
+        let (algorithm, body) = read_string(encoded).expect("algorithm");
+        assert_eq!(algorithm, identity.algorithm().name().as_bytes());
+        let signature = SecurityKeySignature::from_ssh_blob(identity.algorithm(), body)
+            .expect("security-key body");
+        ed25519_verify(
+            identity.key(),
+            &fido_signed_data(
+                identity.application(),
+                signature.flags(),
+                signature.counter(),
+                &request.signature_payload(),
+            ),
+            signature.signature(),
+        )
+        .expect("session-bound FIDO signature");
     }
 
     #[test]
@@ -670,6 +805,14 @@ mod tests {
             SecurityKeySignature::new(SecurityKeyAlgorithm::Ed25519, [7; 64], 0x02, 1),
             Err(SecurityKeyError::InvalidFlags(0x02))
         );
+        for flags in [0x40, 0x80, 0xc0] {
+            assert_eq!(
+                SecurityKeySignature::new(SecurityKeyAlgorithm::Ed25519, [7; 64], flags, 1),
+                Err(SecurityKeyError::InvalidFlags(flags))
+            );
+        }
+        SecurityKeySignature::new(SecurityKeyAlgorithm::Ed25519, [7; 64], 0x1d, 1)
+            .expect("presence, verification, and backup flags");
     }
 
     #[test]
@@ -708,6 +851,83 @@ mod tests {
                 SecurityKeySignOptions::default(),
             ),
             Err(SecurityKeyError::AlgorithmMismatch)
+        );
+    }
+
+    #[test]
+    fn provider_signer_rechecks_algorithm_and_required_flags_before_dispatch() {
+        struct ChangingAlgorithmProvider {
+            inner: EdProvider,
+            algorithm_calls: Cell<usize>,
+        }
+
+        impl SecurityKeyProvider for ChangingAlgorithmProvider {
+            fn algorithm(&self) -> SecurityKeyAlgorithm {
+                let calls = self.algorithm_calls.get();
+                self.algorithm_calls.set(calls + 1);
+                if calls == 0 {
+                    SecurityKeyAlgorithm::Ed25519
+                } else {
+                    SecurityKeyAlgorithm::EcdsaSha2Nistp256
+                }
+            }
+
+            fn public_key(&self) -> Result<SecurityKeyPublicKey, SecurityKeyError> {
+                self.inner.public_key()
+            }
+
+            fn discover(
+                &self,
+                application: &str,
+            ) -> Result<Vec<SecurityKeyPublicKey>, SecurityKeyError> {
+                self.inner.discover(application)
+            }
+
+            fn sign(
+                &self,
+                _application: &str,
+                _message: &[u8],
+                _options: SecurityKeySignOptions,
+            ) -> Result<SecurityKeySignature, SecurityKeyError> {
+                panic!("changed algorithm must be rejected before signing")
+            }
+        }
+
+        let inner = EdProvider {
+            key: Ed25519SigningKey::from_bytes(&[9; 32]).expect("key"),
+            application: "ssh:scoplen".into(),
+            flags: USER_PRESENCE,
+        };
+        let identity = inner.public_key().expect("identity");
+        let provider = ChangingAlgorithmProvider { inner, algorithm_calls: Cell::new(0) };
+        let signer =
+            SecurityKeySshSigner::new(&provider, identity, SecurityKeySignOptions::user_presence())
+                .expect("provider signer");
+        assert_eq!(
+            signer.sign(b"session-bound payload"),
+            Err(SignerError::Signing(SecurityKeyError::AlgorithmMismatch.to_string()))
+        );
+
+        let provider = EdProvider {
+            key: Ed25519SigningKey::from_bytes(&[9; 32]).expect("key"),
+            application: "ssh:scoplen".into(),
+            flags: USER_VERIFICATION,
+        };
+        let signer = SecurityKeySshSigner::new(
+            &provider,
+            provider.public_key().expect("identity"),
+            SecurityKeySignOptions::user_presence_and_verification(),
+        )
+        .expect("provider signer");
+        assert_eq!(
+            signer.sign(b"session-bound payload"),
+            Err(SignerError::Signing(
+                SecurityKeyError::RequirementsNotMet {
+                    required: USER_PRESENCE | USER_VERIFICATION,
+                    received: USER_VERIFICATION,
+                }
+                .to_string()
+            ))
         );
     }
 
