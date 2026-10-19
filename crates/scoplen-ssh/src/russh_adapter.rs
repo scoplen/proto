@@ -58,6 +58,7 @@ const MAX_CERTIFICATE_PRINCIPAL: usize = 4096;
 const MAX_PUBLICKEY_AUTH_PAYLOAD: usize = 256 * 1024;
 const MAX_KEYBOARD_SUBMETHODS: usize = 4096;
 const DEFAULT_CLIENT_CHANNEL_LIMIT: usize = 64;
+const DEFAULT_DIRECT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_REKEY_WRITE_LIMIT: usize = 1 << 30;
 const DEFAULT_REKEY_READ_LIMIT: usize = 1 << 30;
 const DEFAULT_REKEY_TIME_LIMIT: Duration = Duration::from_secs(3600);
@@ -544,6 +545,12 @@ pub enum ClientError {
     /// A TCP or stream I/O operation failed.
     #[error("SSH transport I/O failed: {0}")]
     Transport(#[source] std::io::Error),
+    /// Direct name resolution, TCP connection, or socket configuration failed.
+    #[error("SSH direct TCP connection failed: {0}")]
+    DirectTcp(#[source] TransportError),
+    /// The direct TCP connection succeeded, but SSH key exchange did not finish in time.
+    #[error("SSH direct handshake timed out after {timeout:?}")]
+    DirectSshHandshakeTimeout { timeout: Duration },
     /// A SOCKS5 or HTTP CONNECT route failed before the SSH stream was opened.
     #[error("SSH proxy route failed: {0}")]
     Proxy(#[from] ProxyTransportError),
@@ -723,11 +730,11 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for ConnectionTransport<S> {
 
 // russh moves the socket into its key-exchange task before connect_stream returns. Shutting down
 // this duplicate wakes that task if the handshake future times out or its caller is canceled.
-struct ProxyHandshakeSocketGuard {
+struct HandshakeSocketGuard {
     socket: Option<StdTcpStream>,
 }
 
-impl Drop for ProxyHandshakeSocketGuard {
+impl Drop for HandshakeSocketGuard {
     fn drop(&mut self) {
         if let Some(socket) = &self.socket {
             let _ = socket.shutdown(Shutdown::Both);
@@ -743,11 +750,30 @@ impl fmt::Debug for ClientConnection {
 
 impl ClientConnection {
     /// Connect to the configured TCP endpoint and complete SSH key exchange.
+    /// Resolve and dial within ten seconds, then allow ten seconds for the SSH handshake.
     pub async fn connect(config: ClientConfig) -> Result<Self, ClientError> {
-        let address = (config.host.clone(), config.port);
-        let stream = tokio::net::TcpStream::connect(address).await.map_err(russh::Error::from)?;
-        let _ = stream.set_nodelay(true);
-        Self::connect_stream(config, stream).await
+        Self::connect_with_timeout(config, DEFAULT_DIRECT_CONNECT_TIMEOUT).await
+    }
+
+    /// Connect directly with separate resolve-and-TCP and SSH handshake budgets.
+    ///
+    /// Each stage receives the same positive, representable `timeout`. Pending address attempts
+    /// are canceled on timeout or caller cancellation. A stalled SSH handshake closes its socket.
+    pub async fn connect_with_timeout(
+        config: ClientConfig,
+        timeout: Duration,
+    ) -> Result<Self, ClientError> {
+        let stream = TcpTransport::connect_async(&config.host, config.port, timeout)
+            .await
+            .map_err(ClientError::DirectTcp)?
+            .into_stream();
+        Self::connect_via_tcp_socket(
+            config,
+            stream,
+            timeout,
+            ClientError::DirectSshHandshakeTimeout { timeout },
+        )
+        .await
     }
 
     /// Connect over a caller-provided byte stream and complete SSH key exchange.
@@ -859,7 +885,13 @@ impl ClientConnection {
         .await
         .map_err(|_| ClientError::Transport(io::Error::other("SSH proxy route task stopped")))?
         .map_err(ClientError::Proxy)?;
-        Self::connect_via_proxy_socket(config, stream, timeout).await
+        Self::connect_via_tcp_socket(
+            config,
+            stream,
+            timeout,
+            ClientError::ProxySshHandshakeTimeout { timeout },
+        )
+        .await
     }
 
     /// Connect through an HTTP CONNECT proxy and complete the SSH handshake over the stream.
@@ -892,7 +924,13 @@ impl ClientConnection {
         .await
         .map_err(|_| ClientError::Transport(io::Error::other("SSH proxy route task stopped")))?
         .map_err(ClientError::Proxy)?;
-        Self::connect_via_proxy_socket(config, stream, timeout).await
+        Self::connect_via_tcp_socket(
+            config,
+            stream,
+            timeout,
+            ClientError::ProxySshHandshakeTimeout { timeout },
+        )
+        .await
     }
 
     /// Spawn a bounded desktop `ProxyCommand` and complete the SSH handshake over its standard
@@ -928,13 +966,14 @@ impl ClientConnection {
         }
     }
 
-    async fn connect_via_proxy_socket(
+    async fn connect_via_tcp_socket(
         config: ClientConfig,
         stream: StdTcpStream,
         timeout: Duration,
+        timeout_error: ClientError,
     ) -> Result<Self, ClientError> {
         stream.set_nonblocking(true).map_err(ClientError::Transport)?;
-        let mut shutdown_guard = ProxyHandshakeSocketGuard {
+        let mut shutdown_guard = HandshakeSocketGuard {
             socket: Some(stream.try_clone().map_err(ClientError::Transport)?),
         };
         let stream = tokio::net::TcpStream::from_std(stream).map_err(ClientError::Transport)?;
@@ -944,7 +983,7 @@ impl ClientConnection {
                 Ok(connection)
             }
             Ok(Err(error)) => Err(error),
-            Err(_) => Err(ClientError::ProxySshHandshakeTimeout { timeout }),
+            Err(_) => Err(timeout_error),
         }
     }
 

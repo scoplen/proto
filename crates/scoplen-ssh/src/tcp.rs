@@ -168,11 +168,11 @@ pub struct TcpTransport {
 }
 
 impl TcpTransport {
-    /// Connect to a host and TCP port with one bounded total timeout.
+    /// Connect to a host and TCP port with one timeout for all connection attempts.
     ///
-    /// Name resolution is bounded to [`MAX_TCP_ADDRESSES`] results. Candidates retain resolver
-    /// order and use staggered Happy Eyeballs attempts under one total timeout, so a slow or
-    /// unreachable candidate cannot multiply the caller's timeout budget.
+    /// The synchronous system resolver is not cancellable and can outlast `timeout`. Resolution
+    /// is bounded to [`MAX_TCP_ADDRESSES`] raw results. Candidates are interleaved by address
+    /// family and use staggered Happy Eyeballs attempts under one post-resolution timeout.
     ///
     /// # Errors
     ///
@@ -182,21 +182,35 @@ impl TcpTransport {
         validate_host(host)?;
         validate_timeout(timeout)?;
 
-        let mut addresses = Vec::new();
-        let mut resolved_count = 0;
         let resolved = (host, port)
             .to_socket_addrs()
             .map_err(|error| TransportError::Resolution { kind: error.kind() })?;
-        for address in resolved {
-            resolved_count += 1;
-            if resolved_count > MAX_TCP_ADDRESSES {
-                return Err(TransportError::AddressLimitExceeded { max: MAX_TCP_ADDRESSES });
-            }
-            if !addresses.contains(&address) {
-                addresses.push(address);
-            }
-        }
+        let addresses = collect_addresses(resolved)?;
         Self::connect_addresses(&addresses, timeout)
+    }
+
+    /// Resolve and dial under one async deadline without blocking the caller's executor.
+    /// Dropping the operation aborts pending connection attempts; a platform resolver worker may
+    /// finish later, but its result cannot start another attempt.
+    pub(crate) async fn connect_async(
+        host: &str,
+        port: u16,
+        timeout: Duration,
+    ) -> Result<Self, TransportError> {
+        validate_host(host)?;
+        validate_timeout(timeout)?;
+        let deadline = tokio::time::Instant::now()
+            .checked_add(timeout)
+            .ok_or(TransportError::InvalidTimeout)?;
+        let resolved = tokio::time::timeout_at(deadline, tokio::net::lookup_host((host, port)))
+            .await
+            .map_err(|_| TransportError::Resolution { kind: io::ErrorKind::TimedOut })?
+            .map_err(|error| TransportError::Resolution { kind: error.kind() })?;
+        let addresses = collect_addresses(resolved)?;
+        if addresses.is_empty() {
+            return Err(TransportError::NoAddresses);
+        }
+        connect_happy_eyeballs(&addresses, deadline, timeout, DEFAULT_TCP_FALLBACK_DELAY).await
     }
 
     /// Connect to one resolved address with a bounded timeout.
@@ -244,8 +258,8 @@ impl TcpTransport {
     /// Connect to resolved addresses with an explicit Happy Eyeballs fallback delay.
     ///
     /// A zero delay starts all candidates immediately, still subject to
-    /// [`MAX_TCP_ADDRESSES`]. This is useful for deterministic tests and for callers that have
-    /// already applied their own address-family policy.
+    /// [`MAX_TCP_ADDRESSES`]. Both overloads interleave address families while preserving each
+    /// family's candidate order.
     ///
     /// # Errors
     ///
@@ -274,7 +288,12 @@ impl TcpTransport {
                     address: candidates[0],
                     kind: io::ErrorKind::Other,
                 })?;
-            runtime.block_on(connect_happy_eyeballs(&candidates, timeout, fallback_delay))
+            runtime.block_on(async {
+                let deadline = tokio::time::Instant::now()
+                    .checked_add(timeout)
+                    .ok_or(TransportError::InvalidTimeout)?;
+                connect_happy_eyeballs(&candidates, deadline, timeout, fallback_delay).await
+            })
         });
         runtime_thread.join().unwrap_or_else(|_| {
             Err(TransportError::Connect { address: addresses[0], kind: io::ErrorKind::Other })
@@ -369,20 +388,26 @@ impl Write for TcpTransport {
 
 async fn connect_happy_eyeballs(
     addresses: &[SocketAddr],
+    deadline: tokio::time::Instant,
     timeout: Duration,
     fallback_delay: Duration,
 ) -> Result<TcpTransport, TransportError> {
-    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
-    let mut attempts = Vec::with_capacity(addresses.len());
-    for (index, &address) in addresses.iter().enumerate() {
-        let sender = sender.clone();
+    let candidates = interleave_addresses(addresses);
+    if tokio::time::Instant::now() >= deadline {
+        return Err(TransportError::ConnectTimeout { address: candidates[0], timeout });
+    }
+    let mut attempts = tokio::task::JoinSet::new();
+    for (index, &address) in candidates.iter().enumerate() {
         let delay = u32::try_from(index)
             .ok()
             .and_then(|index| fallback_delay.checked_mul(index))
             .unwrap_or(timeout);
-        attempts.push(tokio::spawn(async move {
+        attempts.spawn(async move {
             if !delay.is_zero() {
                 tokio::time::sleep(delay).await;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return (index, Err(TransportError::ConnectTimeout { address, timeout }));
             }
             let result = tokio::net::TcpStream::connect(address)
                 .await
@@ -405,15 +430,21 @@ async fn connect_happy_eyeballs(
                     Ok(stream)
                 })
                 .and_then(TcpTransport::from_stream);
-            let _ = sender.send((index, result));
-        }));
+            (index, result)
+        });
     }
-    drop(sender);
 
-    let result = tokio::time::timeout(timeout, async {
-        let mut errors = Vec::with_capacity(addresses.len());
-        errors.resize_with(addresses.len(), || None);
-        while let Some((index, result)) = receiver.recv().await {
+    let result = tokio::time::timeout_at(deadline, async {
+        let mut errors = Vec::with_capacity(candidates.len());
+        errors.resize_with(candidates.len(), || None);
+        while let Some(joined) = attempts.join_next().await {
+            let (index, result) = joined.map_err(|_| TransportError::Connect {
+                address: candidates[0],
+                kind: io::ErrorKind::Other,
+            })?;
+            if tokio::time::Instant::now() >= deadline {
+                return Err(TransportError::ConnectTimeout { address: candidates[0], timeout });
+            }
             match result {
                 Ok(transport) => return Ok(transport),
                 Err(error) => errors[index] = Some(error),
@@ -428,15 +459,51 @@ async fn connect_happy_eyeballs(
     })
     .await;
 
-    for attempt in attempts {
-        attempt.abort();
-        let _ = attempt.await;
-    }
+    attempts.abort_all();
+    while attempts.join_next().await.is_some() {}
 
     match result {
         Ok(result) => result,
-        Err(_) => Err(TransportError::ConnectTimeout { address: addresses[0], timeout }),
+        Err(_) => Err(TransportError::ConnectTimeout { address: candidates[0], timeout }),
     }
+}
+
+fn collect_addresses(
+    resolved: impl IntoIterator<Item = SocketAddr>,
+) -> Result<Vec<SocketAddr>, TransportError> {
+    let mut addresses = Vec::new();
+    for (index, address) in resolved.into_iter().enumerate() {
+        if index >= MAX_TCP_ADDRESSES {
+            return Err(TransportError::AddressLimitExceeded { max: MAX_TCP_ADDRESSES });
+        }
+        if !addresses.contains(&address) {
+            addresses.push(address);
+        }
+    }
+    Ok(addresses)
+}
+
+fn interleave_addresses(addresses: &[SocketAddr]) -> Vec<SocketAddr> {
+    let first_is_ipv4 = addresses[0].is_ipv4();
+    let mut first_family = Vec::new();
+    let mut second_family = Vec::new();
+    for &address in addresses {
+        if address.is_ipv4() == first_is_ipv4 {
+            first_family.push(address);
+        } else {
+            second_family.push(address);
+        }
+    }
+    let mut ordered = Vec::with_capacity(addresses.len());
+    for index in 0..first_family.len().max(second_family.len()) {
+        if let Some(&address) = first_family.get(index) {
+            ordered.push(address);
+        }
+        if let Some(&address) = second_family.get(index) {
+            ordered.push(address);
+        }
+    }
+    ordered
 }
 
 fn validate_host(host: &str) -> Result<(), TransportError> {
@@ -453,7 +520,7 @@ fn validate_host(host: &str) -> Result<(), TransportError> {
 }
 
 fn validate_timeout(timeout: Duration) -> Result<(), TransportError> {
-    if timeout.is_zero() {
+    if timeout.is_zero() || tokio::time::Instant::now().checked_add(timeout).is_none() {
         return Err(TransportError::InvalidTimeout);
     }
     Ok(())
@@ -549,6 +616,96 @@ mod tests {
         .expect_err("closed listener and delayed candidate must time out");
         assert!(matches!(error, TransportError::ConnectTimeout { .. }));
         assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn candidates_interleave_families_without_reordering_either_family() {
+        let addresses = [
+            SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 1)),
+            SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 2], 2)),
+            SocketAddr::from(([127, 0, 0, 1], 3)),
+            SocketAddr::from(([127, 0, 0, 2], 4)),
+            SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 3], 5)),
+        ];
+        assert_eq!(
+            interleave_addresses(&addresses),
+            [addresses[0], addresses[2], addresses[1], addresses[3], addresses[4]]
+        );
+        let reversed = [addresses[2], addresses[3], addresses[0], addresses[1]];
+        assert_eq!(
+            interleave_addresses(&reversed),
+            [addresses[2], addresses[0], addresses[3], addresses[1]]
+        );
+    }
+
+    #[test]
+    fn raw_address_limit_is_checked_before_deduplication() {
+        let address = SocketAddr::from(([127, 0, 0, 1], 22));
+        assert_eq!(
+            collect_addresses(vec![address; MAX_TCP_ADDRESSES]).expect("at limit"),
+            [address]
+        );
+        assert!(matches!(
+            collect_addresses(vec![address; MAX_TCP_ADDRESSES + 1]),
+            Err(TransportError::AddressLimitExceeded { max: MAX_TCP_ADDRESSES })
+        ));
+    }
+
+    #[tokio::test]
+    async fn canceling_pending_fallback_does_not_open_a_late_socket() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("listener address");
+        let unavailable = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], address.port()));
+        let dial = tokio::spawn(async move {
+            connect_happy_eyeballs(
+                &[unavailable, address],
+                tokio::time::Instant::now() + Duration::from_secs(2),
+                Duration::from_secs(2),
+                Duration::from_millis(300),
+            )
+            .await
+        });
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        dial.abort();
+        assert!(dial.await.expect_err("dial was canceled").is_cancelled());
+        assert!(tokio::time::timeout(Duration::from_millis(450), listener.accept()).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn expired_shared_deadline_never_starts_a_tcp_attempt() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("listener");
+        let address = listener.local_addr().expect("listener address");
+        let error = connect_happy_eyeballs(
+            &[address],
+            tokio::time::Instant::now() - Duration::from_millis(1),
+            Duration::from_millis(100),
+            DEFAULT_TCP_FALLBACK_DELAY,
+        )
+        .await
+        .expect_err("shared deadline expired during resolution");
+        assert!(
+            matches!(error, TransportError::ConnectTimeout { address: timed_out, .. } if timed_out == address)
+        );
+        assert!(tokio::time::timeout(Duration::from_millis(100), listener.accept()).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn async_dial_refusal_retains_the_candidate_address() {
+        let address = SocketAddr::from(([127, 0, 0, 1], 0));
+        let error = connect_happy_eyeballs(
+            &[address],
+            tokio::time::Instant::now() + Duration::from_secs(1),
+            Duration::from_secs(1),
+            DEFAULT_TCP_FALLBACK_DELAY,
+        )
+        .await
+        .expect_err("port zero cannot have a listening peer");
+        assert!(matches!(
+            error,
+            TransportError::Connect { address: failed, .. }
+                | TransportError::ConnectTimeout { address: failed, .. }
+                if failed == address
+        ));
     }
 
     #[test]
