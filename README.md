@@ -55,7 +55,9 @@ reports `partial_success` and `remaining_methods` in server order, omitting unkn
 Callers can complete another factor on the same connection. Until full authentication succeeds,
 channel opens and remote-forwarding operations return `NotAuthenticated` locally. Real SSH tests
 cover OTP followed by password, wrong factors, premature channel/forwarding operations, and both
-RSA certificate hashes. Concrete password-change support remains incomplete. Agent support
+RSA certificate hashes. Once authenticated, all five authentication and probe entrypoints return
+`AlreadyAuthenticated` locally, preventing a second authentication call from waiting indefinitely;
+channels remain usable on the same connection. Concrete password-change support remains incomplete. Agent support
 includes bounded Unix-socket and Windows named-pipe streams, Pageant named-pipe compatibility,
 identity and signing requests, an `AgentSshSigner` that binds agent signatures to the concrete
 public-key authentication session, add/remove/lock/smart-card management, opaque extensions, and

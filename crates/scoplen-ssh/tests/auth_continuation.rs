@@ -11,7 +11,11 @@ use std::{
 };
 
 use russh::keys::PrivateKey;
-use scoplen_ssh::{ChannelEvent, ClientConfig, ClientConnection, ClientError, HostKey};
+use scoplen_crypto::Ed25519SigningKey;
+use scoplen_ssh::{
+    CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, ClientError,
+    Ed25519SshSigner, HostKey, Signer, UserCertificate,
+};
 use ssh_key::Algorithm;
 use tokio::{net::TcpListener, task::JoinHandle, time::timeout};
 
@@ -268,6 +272,89 @@ async fn rejected_first_and_second_factors_do_not_open_a_session() {
         Err(ClientError::NotAuthenticated)
     ));
     assert_eq!(opened_sessions.load(Ordering::SeqCst), 0);
+    connection.disconnect().await.expect("disconnect");
+    timeout(DEADLINE, server).await.expect("server shutdown deadline").expect("server task");
+}
+
+#[tokio::test]
+async fn completed_authentication_rejects_all_further_authentication_without_blocking_channels() {
+    let (mut connection, opened_sessions, server) = connect().await;
+    let error = one_time_code(&mut connection, "123456").await;
+    assert!(matches!(error, ClientError::AuthenticationRejected { partial_success: true, .. }));
+    timeout(DEADLINE, connection.authenticate_password("user", b"test-password"))
+        .await
+        .expect("second factor deadline")
+        .expect("complete authentication");
+
+    let signer =
+        Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("signer key"));
+    let subject = ssh_key::PublicKey::from_bytes(&signer.public_key_blob().expect("subject blob"))
+        .expect("subject key");
+    let mut builder = ssh_key::certificate::Builder::new(vec![8; 16], subject, 1, 1000)
+        .expect("certificate builder");
+    builder.cert_type(ssh_key::certificate::CertType::User).expect("user certificate");
+    builder.valid_principal("user").expect("certificate principal");
+    let ca = PrivateKey::random(
+        &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+        Algorithm::Ed25519,
+    )
+    .expect("certificate CA");
+    let certificate = UserCertificate::parse_and_validate(
+        &builder.sign(&ca).expect("signed certificate").to_bytes().expect("certificate bytes"),
+        &CertificateValidationPolicy::user("user", 100),
+    )
+    .expect("validated certificate");
+
+    assert!(matches!(
+        timeout(DEADLINE, connection.authenticate_password("", &[0xff]))
+            .await
+            .expect("repeated password deadline"),
+        Err(ClientError::AlreadyAuthenticated)
+    ));
+    assert!(matches!(
+        timeout(DEADLINE, connection.authenticate_publickey("", &signer))
+            .await
+            .expect("repeated public-key deadline"),
+        Err(ClientError::AlreadyAuthenticated)
+    ));
+    assert!(matches!(
+        timeout(DEADLINE, connection.authenticate_certificate("", &certificate, &signer))
+            .await
+            .expect("repeated certificate deadline"),
+        Err(ClientError::AlreadyAuthenticated)
+    ));
+    assert!(matches!(
+        timeout(DEADLINE, connection.probe_authentication(""))
+            .await
+            .expect("repeated none probe deadline"),
+        Err(ClientError::AlreadyAuthenticated)
+    ));
+    assert!(matches!(
+        timeout(
+            DEADLINE,
+            connection.authenticate_keyboard_interactive("", None, |_| {
+                panic!("completed authentication must not call the responder")
+            })
+        )
+        .await
+        .expect("repeated keyboard-interactive deadline"),
+        Err(ClientError::AlreadyAuthenticated)
+    ));
+
+    let mut channel = timeout(DEADLINE, connection.open_session())
+        .await
+        .expect("post-guard session deadline")
+        .expect("connection remains authenticated");
+    assert_eq!(opened_sessions.load(Ordering::SeqCst), 1);
+    channel.send_data(b"authentication guard kept the session open").await.expect("send echo");
+    assert_eq!(
+        timeout(DEADLINE, channel.next_event())
+            .await
+            .expect("post-guard echo deadline")
+            .expect("read echoed data")
+            .expect("session remains open"),
+        ChannelEvent::Data(b"authentication guard kept the session open".to_vec())
+    );
     connection.disconnect().await.expect("disconnect");
     timeout(DEADLINE, server).await.expect("server shutdown deadline").expect("server task");
 }
