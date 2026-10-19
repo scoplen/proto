@@ -150,7 +150,19 @@ russh channel fragments, applies the fail-closed forwarding policy, and returns 
 responses; an in-process russh round trip covers the concrete lifecycle. External OpenSSH and
 Pageant interoperability, live gateway interoperability, and broader channel scheduling remain
 unverified. The agent-backed signer also completes the concrete public-key authentication flow
-against the in-process russh server; platform agent interoperability remains unverified.
+against the in-process russh server. `pwsh ./scripts/ssh-agent-interop.ps1` starts a disposable
+OpenSSH server and a real `ssh-agent` in one Alpine container. The `openssh_agent_interop` example
+selects an exact raw identity, signs through the agent protocol, and completes pinned-host-key
+raw-key and pinned-user-CA certificate authentication with exact command output and exit status
+zero. The fixture rejects a missing agent identity, wrong certificate subject or principal, wrong
+local CA pin, and a certificate from a CA the server does not trust, then repeats both valid paths
+after each rejection. Only public keys and certificates leave the container; the private key stays
+inside the disposable container and signatures come from its agent. `socat` bridges the container's
+Unix agent socket to a loopback-published TCP port for the cross-platform test runner. This
+verifies real OpenSSH agent messages and signing,
+not the native Unix-socket, Windows named-pipe, or Pageant connectors. External forwarded-agent
+and Pageant interoperability, live gateway interoperability, and broader channel scheduling remain
+unverified.
 The `openssh_interop` example provides a disposable external-server smoke test when
 one host trust pin and one authentication source are supplied. Set either
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's OpenSSH public-key line or

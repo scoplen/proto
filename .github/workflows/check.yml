@@ -79,6 +79,9 @@ jobs:
       - name: P-384 and P-521 host keys and host certificates
         shell: pwsh
         run: ./scripts/ssh-host-certificate-interop.ps1
+      - name: Real OpenSSH agent raw-key and user-certificate authentication
+        shell: pwsh
+        run: ./scripts/ssh-agent-interop.ps1
 
   openssh-algorithms:
     name: OpenSSH algorithm policy

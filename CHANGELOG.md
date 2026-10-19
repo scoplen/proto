@@ -10,6 +10,10 @@ All notable changes to the `proto` repository will be recorded here.
 - Added an API JSON fuzz target covering authentication, native/browser refresh, and gateway-ticket
   issuance decoders, canonical round trips, and prohibited idempotency headers. Public-vector and
   malformed/size-bound seeds feed both Linux change checks and the daily fuzz matrix.
+- Added a disposable real OpenSSH agent interoperability fixture for raw Ed25519 keys and user
+  certificates. It verifies pinned host and user CA keys, exact command output, exit zero, five
+  rejection paths, and valid reconnection controls. A loopback TCP bridge exercises the agent wire
+  protocol without claiming native Unix-socket, Windows pipe, or Pageant connector coverage.
 - Added bounded gateway-ticket issuance request/response JSON codecs, canonical SSH public-key
   and edge-address validation, redacted credentials, and the `gateway.invalid_request` problem
   code. OpenAPI, generated TypeScript, vectors, and both dependency graphs are synchronized;
