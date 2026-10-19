@@ -172,11 +172,13 @@ then completes RSA public-key authentication and an exact command on the two SHA
 The SHA-1-only case is discovery-only; it does not opt into SHA-1 authentication. The script
 removes the disposable container and key file on exit.
 `pwsh ./scripts/ssh-host-certificate-interop.ps1` starts disposable OpenSSH listeners for P-384
-and P-521 raw host keys and host certificates. For each curve it verifies exact authenticated
-command output and exit status zero for a pinned raw key and a trusted valid certificate. It
-rejects wrong CA, wrong principal, and expired certificates with typed errors, then completes a
-new valid connection after each rejection. The script removes its container on exit; this is one
-external OpenSSH fixture, not the complete host-key interoperability matrix.
+and P-521 raw host keys and host certificates, including listeners that offer both identities on
+the same connection. For each curve it verifies exact authenticated command output and exit status
+zero for a pinned raw key, a trusted valid certificate, and the default client's certificate
+selection when both are offered. It rejects wrong CA, wrong principal, and expired certificates
+with typed errors in both certificate-only and mixed cases, without falling back to the raw key,
+then completes a new valid connection after each rejection. The script removes its container on
+exit; this is one external OpenSSH fixture, not the complete host-key interoperability matrix.
 `pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners constrained to
 Curve25519/AES-CTR, ML-KEM/ChaCha20, and one legacy-only set. The `algorithm_interop` example
 verifies a pinned host key, authenticated command, exact output, and exit status for both modern
