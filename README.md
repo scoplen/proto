@@ -329,6 +329,14 @@ Ed25519 and RSA-SHA2-256/512 public-key authentication and a session command; an
 RSA key was rejected. The container uses `openssh-server`, an unlocked `scoplen` test account,
 authorized test public keys, and generated host keys. This adds one older OpenSSH release to the
 interop evidence; the remaining version and platform matrix is open.
+`pwsh ./scripts/openssh-8-interop.ps1` runs the same public client example against the pinned
+OpenSSH 8.8p1 package in a disposable Alpine 3.15 container. It checks the installed package and
+SSH banner, then verifies password, Ed25519, and RSA-SHA2-256/512 authentication, exact command
+output and exit status, and rejection of a wrong password, unauthorized Ed25519 and RSA keys, and
+an unrelated host key. Docker publishes only a random loopback port; the container and temporary
+test identities are removed afterward. This Windows-hosted Linux-server run adds the 8.x major
+release but does not cover its SFTP, certificates, forwarding, other algorithms, OpenSSH for
+Windows, or the current OpenSSH release.
 For a user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
 file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
 certificate signature, principal, validity, critical options, and CA pin before sending it.

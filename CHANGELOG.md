@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added a pinned OpenSSH 8.8p1 Linux-server fixture using the public SSH client example. The
+  Windows-hosted Docker run verifies installed version and banner, password, Ed25519 and both
+  RSA-SHA2 hashes, exact command output and exit status, plus credential and host-pin rejection.
+  The remaining release, platform, certificate, SFTP, and forwarding matrix stays open.
 - Broadened external OpenSSH SFTP transfers to all byte values and verified that a rejected
   four-request write pipeline invalidates only its SFTP session. A fresh channel reads the
   unchanged file and an independent SSH session still opens on the same connection.
