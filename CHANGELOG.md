@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Bounded the complete K-4 session request to 4,096 CBOR bytes and added caller-selected session
+  response body budgets with a 4 MiB default. Encoders preflight exact size; decoders check the
+  complete input before CBOR parsing. Seven portable budget recipes and public boundary tests
+  retain the existing session bytes and future-vault-kind behavior.
 - Framed SSH agent streams now fail closed after uncertain write, flush, read, or response-frame
   failures. Later requests return typed `ChannelUnusable` without I/O, preventing a late response
   from being assigned to a new request; complete agent refusals and pre-I/O validation errors remain

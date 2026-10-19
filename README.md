@@ -387,6 +387,15 @@ the cursor sent. A higher stored maximum is valid when another acknowledgement h
 advanced it. Call this before applying acknowledgement metadata locally; the check does not
 establish the current vault sequence or server persistence. Existing CBOR bytes remain valid.
 
+The K-4 session request codec caps its complete CBOR body at 4,096 bytes. Session responses use a
+4 MiB default complete-body budget; `SyncSessionResponse` also provides
+`validate_with_body_limit`, `to_cbor_with_body_limit`, and `from_cbor_with_body_limit` for a positive
+caller-selected budget. Encoders preflight exact bytes before copying version strings or vaults;
+decoders reject over-budget input, including ignored extensions, before CBOR parsing. Choose the
+response budget from local policy, not the advertised vault quota. A rejected response must not
+replace the consumer's current vault list, and HTTP consumers must also bound decompressed bytes
+while collecting the response.
+
 Change-feed, snapshot, and version-history responses accept an explicit `SyncReadLimits` profile
 through their `*_with_limits` methods, including query/path-aware validators. The independent
 default read budgets are 260 KiB per opaque payload and 266,295,039 bytes for the complete CBOR
@@ -453,7 +462,7 @@ The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
 in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
-`vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
+`vectors/sync-session.json`, `vectors/sync-session-limits.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
 `vectors/sync-read-limits.json`,
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
 `vectors/sync-keys-failures.json`,
