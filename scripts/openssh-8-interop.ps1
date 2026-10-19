@@ -11,7 +11,8 @@ $testVariables = @(
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_HOST_KEY', 'SCOPLEN_OPENSSH_HOST_CA_KEY',
     'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH', 'SCOPLEN_OPENSSH_ED25519_KEY',
     'SCOPLEN_OPENSSH_P256_KEY', 'SCOPLEN_OPENSSH_ECDSA_KEY', 'SCOPLEN_OPENSSH_USER_CERT',
-    'SCOPLEN_OPENSSH_USER_CA_KEY', 'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_FORWARD',
+    'SCOPLEN_OPENSSH_USER_CA_KEY', 'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_SFTP_PROFILE',
+    'SCOPLEN_OPENSSH_FORWARD',
     'SCOPLEN_OPENSSH_JUMP_TARGET_PORT'
 )
 foreach ($name in $testVariables) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
@@ -26,8 +27,9 @@ function Invoke-Interop {
             throw "OpenSSH 8.8p1 $caseName did not reject as expected (exit $exitCode)"
         }
     }
-    elseif ($exitCode -ne 0 -or $output -notmatch '(?m)^openssh interop ok\s*$') {
-        throw "OpenSSH 8.8p1 $caseName failed (exit $exitCode)"
+    elseif ($exitCode -ne 0 -or $output -notmatch '(?m)^openssh interop ok\s*$' -or
+        ($env:SCOPLEN_OPENSSH_SFTP -eq '1' -and $output -notmatch '(?m)^openssh sftp interop ok\s*$')) {
+        throw "OpenSSH 8.8p1 $caseName failed (exit $exitCode): $output"
     }
     Write-Output "OpenSSH 8.8p1 ${caseName}: passed"
 }
@@ -57,6 +59,7 @@ HostKey /tmp/host_key
 PasswordAuthentication yes
 PubkeyAuthentication yes
 LogLevel VERBOSE
+Subsystem sftp internal-sftp
 SSHD
 /usr/sbin/sshd -t -f /tmp/sshd_config
 exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
@@ -118,7 +121,10 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
     $env:SCOPLEN_OPENSSH_USER = 'scoplen'
     $env:SCOPLEN_OPENSSH_HOST_KEY = $hostKey
     $env:SCOPLEN_OPENSSH_PASSWORD = 'scoplen-test-password'
-    Invoke-Interop 'password and command'
+    $env:SCOPLEN_OPENSSH_SFTP = '1'
+    $env:SCOPLEN_OPENSSH_SFTP_PROFILE = '8.8p1'
+    Invoke-Interop 'password, command, and SFTP'
+    Remove-Item Env:SCOPLEN_OPENSSH_SFTP, Env:SCOPLEN_OPENSSH_SFTP_PROFILE
 
     $env:SCOPLEN_OPENSSH_PASSWORD = 'wrong-password'
     Invoke-Interop 'wrong password' 'AuthenticationRejected'
