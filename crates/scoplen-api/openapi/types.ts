@@ -13,6 +13,9 @@ export interface components {
     AuthRefreshRequest: AuthRefreshRequest;
     BrowserAuthRefreshRequest: BrowserAuthRefreshRequest;
     BrowserAuthTokenResponse: BrowserAuthTokenResponse;
+    GatewayTicketRequest: GatewayTicketRequest;
+    GatewayEdgeAddress: GatewayEdgeAddress;
+    GatewayTicketResponse: GatewayTicketResponse;
     ListQuery: ListQuery;
     WriteRequest: WriteRequest;
     DecisionRequest: DecisionRequest;
@@ -45,7 +48,6 @@ export interface components {
     Certificate: Resource;
     Gateway: Resource;
     JoinToken: Resource;
-    GatewayTicket: Resource;
     Credential: Resource;
     HostAgent: Resource;
     Session: Resource;
@@ -118,6 +120,26 @@ export interface BrowserAuthTokenResponse {
   [extension: string]: unknown;
 }
 // END GENERATED Authentication
+// BEGIN GENERATED GatewayTicket
+export interface GatewayTicketRequest {
+  host: string;
+  remote_user: string;
+  ssh_public_key: string;
+}
+
+export interface GatewayEdgeAddress {
+  host: string;
+  port: number;
+  [extension: string]: unknown;
+}
+
+export interface GatewayTicketResponse {
+  ticket: string;
+  edge_addresses: GatewayEdgeAddress[];
+  gateway_host_ca_public_key: string;
+  [extension: string]: unknown;
+}
+// END GENERATED GatewayTicket
 export interface ListQuery { limit?: number; cursor?: string; filter?: string; sort?: string; }
 export interface WriteRequest { data: Record<string, unknown>; }
 export interface DecisionRequest { decision: "approve" | "deny"; reason?: string; }

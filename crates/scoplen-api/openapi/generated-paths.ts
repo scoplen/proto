@@ -28,7 +28,6 @@ export const controlPlanePaths = [
   "/orgs/{org}/gateway-networks",
   "/orgs/{org}/gateway-networks/{id}",
   "/orgs/{org}/gateway-tickets",
-  "/orgs/{org}/gateway-tickets/{id}",
   "/orgs/{org}/grants",
   "/orgs/{org}/grants/{id}",
   "/orgs/{org}/groups",

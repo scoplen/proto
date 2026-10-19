@@ -43,6 +43,18 @@
       "kind": "api.problem.json",
       "input": "{\"type\":\"about:blank\",\"title\":\"Refresh credential rejected\",\"status\":401,\"detail\":\"The refresh credential cannot be used and its family was revoked. Sign in again.\",\"instance\":\"refresh-4\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}",
       "expected": "{\"type\":\"about:blank\",\"title\":\"Refresh credential rejected\",\"status\":401,\"detail\":\"The refresh credential cannot be used and its family was revoked. Sign in again.\",\"instance\":\"refresh-4\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-gateway-invalid-request-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Invalid gateway ticket request\",\"status\":400,\"detail\":\"Correct the ticket request and retry.\",\"instance\":\"gateway-1\",\"code\":\"gateway.invalid_request\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Invalid gateway ticket request\",\"status\":400,\"detail\":\"Correct the ticket request and retry.\",\"instance\":\"gateway-1\",\"code\":\"gateway.invalid_request\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-gateway-request-too-large-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Gateway ticket request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"gateway-2\",\"code\":\"gateway.invalid_request\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Gateway ticket request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"gateway-2\",\"code\":\"gateway.invalid_request\",\"changed\":false,\"retryable\":false}"
     }
   ]
 }

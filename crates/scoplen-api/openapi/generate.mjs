@@ -151,8 +151,82 @@ const authStartIndex = generatedTypes.indexOf(authStart);
 const authEndIndex = generatedTypes.indexOf(authEnd, authStartIndex + authStart.length);
 if (authStartIndex < 0 || authEndIndex < 0) throw new Error("types.ts is missing its generated authentication section");
 const allGeneratedTypes = `${generatedTypes.slice(0, authStartIndex + authStart.length)}${authLines.join("\n")}${generatedTypes.slice(authEndIndex)}`;
+const gatewayShapes = {
+  GatewayTicketRequest: { fields: ["host", "remote_user", "ssh_public_key"], extensions: false },
+  GatewayEdgeAddress: { fields: ["host", "port"], extensions: true },
+  GatewayTicketResponse: { fields: ["ticket", "edge_addresses", "gateway_host_ca_public_key"], extensions: true },
+};
+const gatewayTypes = {
+  host: "string",
+  remote_user: "string",
+  ssh_public_key: "string",
+  port: "number",
+  ticket: "string",
+  edge_addresses: "GatewayEdgeAddress[]",
+  gateway_host_ca_public_key: "string",
+};
+const gatewayLines = [];
+for (const [name, { fields, extensions }] of Object.entries(gatewayShapes)) {
+  const schema = document.components?.schemas?.[name];
+  if (schema?.type !== "object" || schema.additionalProperties !== extensions ||
+      JSON.stringify(schema.required) !== JSON.stringify(fields) ||
+      JSON.stringify(Object.keys(schema.properties ?? {})) !== JSON.stringify(fields)) {
+    throw new Error(`${name} differs from the gateway-ticket contract`);
+  }
+  gatewayLines.push(`export interface ${name} {`);
+  for (const field of fields) {
+    const property = schema.properties[field];
+    const expected = gatewayTypes[field];
+    if ((expected === "GatewayEdgeAddress[]" &&
+         (property.type !== "array" || property.items?.$ref !== "#/components/schemas/GatewayEdgeAddress")) ||
+        (expected !== "GatewayEdgeAddress[]" && property.type !== (expected === "number" ? "integer" : "string"))) {
+      throw new Error(`${name}.${field} differs from the gateway-ticket contract`);
+    }
+    gatewayLines.push(`  ${field}: ${expected};`);
+  }
+  if (extensions) gatewayLines.push("  [extension: string]: unknown;");
+  gatewayLines.push("}", "");
+}
+const gatewayRequest = document.components.schemas.GatewayTicketRequest.properties;
+const gatewayResponse = document.components.schemas.GatewayTicketResponse.properties;
+const gatewayEdge = document.components.schemas.GatewayEdgeAddress.properties;
+if (gatewayRequest.host.pattern !== authPatterns.device_id ||
+    gatewayRequest.remote_user.minLength !== 1 ||
+    !gatewayRequest.remote_user.description?.includes("255 UTF-8 bytes") ||
+    gatewayRequest.ssh_public_key.maxLength !== 8192 ||
+    gatewayResponse.ticket.maxLength !== 4096 ||
+    gatewayResponse.edge_addresses.minItems !== 1 ||
+    gatewayResponse.edge_addresses.maxItems !== 16 ||
+    gatewayResponse.gateway_host_ca_public_key.maxLength !== 8192 ||
+    gatewayEdge.host.maxLength !== 253 ||
+    gatewayEdge.port.minimum !== 1 || gatewayEdge.port.maximum !== 65535) {
+  throw new Error("gateway-ticket field bounds differ from D-84");
+}
+const gatewayPath = document.paths?.["/orgs/{org}/gateway-tickets"];
+const gatewayPost = gatewayPath?.post;
+if (!gatewayPath || JSON.stringify(Object.keys(gatewayPath)) !== JSON.stringify(["post"]) ||
+    document.paths["/orgs/{org}/gateway-tickets/{id}"] ||
+    gatewayPost.operationId !== "issueGatewayTicket" ||
+    JSON.stringify(gatewayPost.parameters) !== JSON.stringify([{ $ref: "#/components/parameters/org" }]) ||
+    !gatewayPost.description?.includes("Idempotency-Key is forbidden") ||
+    gatewayPost.requestBody?.required !== true ||
+    !gatewayPost.requestBody.description?.includes("16384 bytes") ||
+    gatewayPost.requestBody.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/GatewayTicketRequest" ||
+    gatewayPost.responses?.["200"]?.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/GatewayTicketResponse" ||
+    !gatewayPost.responses["200"].description?.includes("32768 bytes") ||
+    gatewayPost.responses["200"].headers?.["Cache-Control"]?.schema?.const !== "no-store" ||
+    gatewayPost.responses["200"].headers?.Pragma?.schema?.const !== "no-cache" ||
+    !["400", "413", "default"].every((status) => gatewayPost.responses?.[status]?.$ref === "#/components/responses/Problem")) {
+  throw new Error("gateway-ticket endpoint differs from D-84");
+}
+const gatewayStart = "// BEGIN GENERATED GatewayTicket\n";
+const gatewayEnd = "// END GENERATED GatewayTicket";
+const gatewayStartIndex = allGeneratedTypes.indexOf(gatewayStart);
+const gatewayEndIndex = allGeneratedTypes.indexOf(gatewayEnd, gatewayStartIndex + gatewayStart.length);
+if (gatewayStartIndex < 0 || gatewayEndIndex < 0) throw new Error("types.ts is missing its generated gateway-ticket section");
+const finalGeneratedTypes = `${allGeneratedTypes.slice(0, gatewayStartIndex + gatewayStart.length)}${gatewayLines.join("\n")}${allGeneratedTypes.slice(gatewayEndIndex)}`;
 const generatedPaths = `// SPDX-License-Identifier: Apache-2.0\n// Generated by openapi/generate.mjs.\nexport const controlPlanePaths = ${JSON.stringify(paths, null, 2)} as const;\n`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, allGeneratedTypes]];
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, finalGeneratedTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

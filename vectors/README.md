@@ -56,6 +56,12 @@ last accepted second, and independently computed `ath`. The public `scoplen-cryp
 the original JWS signing bytes against the RFC's access token and these expected values. The vector is public RFC test material,
 not a production credential; replay prevention remains a consumer obligation.
 
+`gateway-ticket-issuance.json` contains K-5/K-6 JSON request and successful response vectors
+for the transient ticket issuance action. They use synthetic public key and ticket strings,
+validate bounded canonical syntax, and preserve edge preference order. The response ticket is
+opaque; these vectors do not prove a signature, authorization, expiry, or single-use consumption.
+`api-problem.json` also contains 400 and 413 `gateway.invalid_request` JSON problem vectors.
+
 `sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a
