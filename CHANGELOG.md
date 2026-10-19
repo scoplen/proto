@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added an automated external OpenSSH forwarding fixture for direct Unix sockets, remote TCP,
+  and remote Unix sockets. Public client checks cover exact binary data, half-close, forwarded
+  metadata, cancellation and listener reuse, denied and missing targets, and parent session
+  reuse after failure; the fixture runs in the OpenSSH CI job.
 - Added D-99's bounded current-account Resource codec, exact OpenAPI/TypeScript profile,
   portable email/null/failure/budget vectors, and recursive duplicate-name rejection. Cedar
   `Account.email` is optional, with strict guarded-policy validation and authorization tests

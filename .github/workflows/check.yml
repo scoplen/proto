@@ -82,6 +82,9 @@ jobs:
       - name: Real OpenSSH agent raw-key and user-certificate authentication
         shell: pwsh
         run: ./scripts/ssh-agent-interop.ps1
+      - name: Remote TCP and Unix socket forwarding, cancellation, and denial
+        shell: pwsh
+        run: ./scripts/ssh-remote-forwarding-interop.ps1
 
   openssh-agent-unix:
     name: Native Unix OpenSSH agent interoperability
