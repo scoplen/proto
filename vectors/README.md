@@ -34,6 +34,8 @@ and `limit`; expected values are the canonical query string. Response inputs are
 `changes`, `next_cursor`, and `more`; payloads are lowercase hexadecimal and a missing signer is
 represented by JSON `null`. Response expected values are deterministic CBOR. Each response change
 entry uses integer map keys 1 through 5, as defined by `07-sync-protocol.md` §4.
+The shared query codec also serves snapshot reads. Its maximum canonical query is 37 bytes;
+`sync.changes.query.reject` uses a raw query string and expects `reject` above that bound.
 
 `sync-messages.json` contains the remaining K-4 wire vectors. Write requests are JSON arrays with
 `object_id`, nullable `base_seq`, lowercase hexadecimal `payload`, and `tombstone`; their
@@ -44,11 +46,12 @@ integer-keyed maps 1 and 2. Acknowledgement requests and responses use a JSON ob
 and `more`, with the same integer-keyed entries and page rules as the change feed. Version
 responses use `versions`, contain one object id in ascending sequence order, and include at most
 the current entry plus 20 retained entries. All expected values are deterministic CBOR in lowercase
-hexadecimal. Conflict responses use `sync.writes.conflict` with a complete RFC 9457 `problem`
-and a `conflicts` array in request order. Each conflict names an `object_id` and carries a current
-change entry or JSON `null` for an absent object. Default codecs bound the array to 1–500 unique
-ids and each current payload to 260 KiB; explicit exchange limits may raise or lower these
-defaults. The encoded conflict problem body remains capped at 128 MiB.
+hexadecimal. `sync.ack.request.reject` uses raw CBOR hex and expects `reject` for a complete request
+beyond the 17-byte exact-map maximum. Conflict responses use `sync.writes.conflict` with a complete
+RFC 9457 `problem` and a `conflicts` array in request order. Each conflict names an `object_id`
+and carries a current change entry or JSON `null` for an absent object. Default codecs bound the
+array to 1–500 unique ids and each current payload to 260 KiB; explicit exchange limits may raise
+or lower these defaults. The encoded conflict problem body remains capped at 128 MiB.
 
 `sync-write-limits.json` applies explicit profiles to exact write-request, assignment, and
 conflict CBOR. Each JSON `input` contains positive `max_envelope_bytes`, `max_batch_objects`,

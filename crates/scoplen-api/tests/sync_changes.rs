@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use scoplen_api::sync::{SyncChange, SyncChangesQuery, SyncChangesResponse};
+use scoplen_api::sync::{
+    MAX_SYNC_PAGE_QUERY_BYTES, SyncChange, SyncChangesQuery, SyncChangesResponse, SyncCodecError,
+};
 use scoplen_model::cbor::{self, Value};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
@@ -68,11 +70,36 @@ fn query_requires_canonical_decimal_and_both_parameters() {
 }
 
 #[test]
+fn page_query_rejects_oversized_raw_input_before_parsing() {
+    let max = "after=18446744073709551615&limit=1000";
+    assert_eq!(max.len(), MAX_SYNC_PAGE_QUERY_BYTES);
+    assert_eq!(
+        SyncChangesQuery::from_query(max).expect("maximum query"),
+        SyncChangesQuery { after: u64::MAX, limit: 1_000 }
+    );
+    assert_eq!(
+        SyncChangesQuery::from_query("limit=1000&after=18446744073709551615")
+            .expect("reverse order"),
+        SyncChangesQuery { after: u64::MAX, limit: 1_000 }
+    );
+    let over = "after=18446744073709551615&limit=10000";
+    assert_eq!(over.len(), MAX_SYNC_PAGE_QUERY_BYTES + 1);
+    assert_eq!(
+        SyncChangesQuery::from_query(over),
+        Err(SyncCodecError::Invalid("change-page query exceeds 37 bytes".into()))
+    );
+    assert_eq!(
+        SyncChangesQuery::from_query(&"x".repeat(128 * 1024)),
+        Err(SyncCodecError::Invalid("change-page query exceeds 37 bytes".into()))
+    );
+}
+
+#[test]
 fn published_change_feed_vectors_match_public_codec() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/sync-changes.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vectors");
-    assert_eq!(document.vectors.len(), 4);
+    assert_eq!(document.vectors.len(), 6);
     for vector in &document.vectors {
         match vector.kind.as_str() {
             "sync.changes.query" => {
@@ -83,6 +110,15 @@ fn published_change_feed_vectors_match_public_codec() {
                 };
                 assert_eq!(query.to_query().expect("format"), vector.expected, "{}", vector.id);
                 assert_eq!(SyncChangesQuery::from_query(&vector.expected).expect("parse"), query);
+            }
+            "sync.changes.query.reject" => {
+                assert_eq!(vector.expected, "reject");
+                assert_eq!(
+                    SyncChangesQuery::from_query(&vector.input),
+                    Err(SyncCodecError::Invalid("change-page query exceeds 37 bytes".into())),
+                    "{}",
+                    vector.id
+                );
             }
             "sync.changes.response" => {
                 let source = response_from_json(&vector.input);

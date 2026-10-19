@@ -25,6 +25,10 @@ pub const MAX_SYNC_CONFLICT_PAYLOAD_BYTES: usize = 260 * 1024;
 pub const MAX_SYNC_READ_ENVELOPE_BYTES: usize = 260 * 1024;
 /// Default maximum complete encoded change, snapshot, or version-history response.
 pub const MAX_SYNC_READ_BODY_BYTES: usize = 266_295_039;
+/// Maximum raw `after`/`limit` query size for changes and snapshot reads.
+pub const MAX_SYNC_PAGE_QUERY_BYTES: usize = 37;
+/// Maximum complete deterministic CBOR acknowledgement request.
+pub const MAX_SYNC_ACK_REQUEST_BYTES: usize = 17;
 /// Maximum complete encoded session request.
 pub const MAX_SYNC_SESSION_REQUEST_BYTES: usize = 4 * 1024;
 /// Default maximum complete encoded session response.
@@ -1627,8 +1631,12 @@ impl SyncChangesQuery {
     ///
     /// # Errors
     ///
-    /// Returns an error for missing, duplicate, unknown, malformed, or out-of-range parameters.
+    /// Returns an error for an oversized query or missing, duplicate, unknown, malformed, or
+    /// out-of-range parameters.
     pub fn from_query(input: &str) -> Result<Self, SyncCodecError> {
+        if input.len() > MAX_SYNC_PAGE_QUERY_BYTES {
+            return Err(invalid("change-page query exceeds 37 bytes"));
+        }
         let (mut after, mut limit) = (None, None);
         for parameter in input.split('&') {
             let (key, value) =
@@ -2488,8 +2496,12 @@ impl SyncAckRequest {
     ///
     /// # Errors
     ///
-    /// Returns an error for malformed CBOR, a missing cursor, or an unknown field.
+    /// Returns an error for an oversized or malformed CBOR body, a missing cursor, or an unknown
+    /// field.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        if input.len() > MAX_SYNC_ACK_REQUEST_BYTES {
+            return Err(invalid("acknowledgement request exceeds 17 bytes"));
+        }
         let mut fields = decode_map(input)?;
         let request = Self { cursor: take_uint(&mut fields, "cursor")? };
         if !fields.is_empty() {

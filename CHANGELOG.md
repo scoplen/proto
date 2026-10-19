@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Bound raw K-4 change-feed and snapshot queries to 37 bytes and acknowledgement requests to
+  17 complete CBOR bytes before parsing. Exact-boundary and rejection vectors and public tests
+  preserve all valid query and CBOR bytes.
 - Added an automated external OpenSSH forwarding fixture for direct Unix sockets, remote TCP,
   and remote Unix sockets. Public client checks cover exact binary data, half-close, forwarded
   metadata, cancellation and listener reuse, denied and missing targets, and parent session
