@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added the bounded D-90 K-5 certificate issuance Resource response codec and exact 201 OpenAPI
+  and generated TypeScript shape. Seven signed user-certificate vectors, host-role and malformed
+  response rejection, 64 KiB binary and 131072-byte JSON boundaries, HTTP metadata checks, and
+  API JSON fuzz seeds cover the wire. Request-subject comparison is separate from SSH trust,
+  signature, authorization, current-validity, and revocation checks.
 - Added explicit deployment-selected limits for complete K-4 write exchanges: requests,
   assignments, conflicts, and request-aware checks accept raised or lowered budgets. Encoders
   preflight exact request sizes and decoders check body bounds before CBOR parsing. Default

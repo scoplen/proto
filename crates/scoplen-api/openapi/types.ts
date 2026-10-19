@@ -24,7 +24,7 @@ export interface components {
     CertificateRequest: CertificateRequest;
     CertificateHostRequest: CertificateHostRequest;
     CertificateHostGroupRequest: CertificateHostGroupRequest;
-    CertificateResponse: CertificateResponse;
+    CertificateIssuanceResponse: CertificateIssuanceResponse;
     Account: Resource;
     Device: Resource;
     Organization: Resource;
@@ -166,7 +166,21 @@ export interface CertificateHostGroupRequest {
 
 export type CertificateRequest = CertificateHostRequest | CertificateHostGroupRequest;
 // END GENERATED CertificateRequest
-export interface CertificateResponse { certificate: string; valid_after: string; valid_before: string; }
+// BEGIN GENERATED CertificateIssuanceResponse
+export interface CertificateIssuanceResponse {
+  id: string;
+  etag: string;
+  created_at: string;
+  updated_at: string;
+  data: CertificateIssuanceData;
+  [extension: string]: unknown;
+}
+
+export interface CertificateIssuanceData {
+  certificate: string;
+  [extension: string]: unknown;
+}
+// END GENERATED CertificateIssuanceResponse
 
 export interface paths {
   [path: string]: {
