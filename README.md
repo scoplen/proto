@@ -27,6 +27,12 @@ CONNECT Basic proxy authentication are bounded and keep passwords out of transpo
 transports do not perform SSH negotiation or authentication. `ProxyCommandTransport` provides
 bounded direct child-process stdin/stdout composition without shell interpolation and reaps the
 child on shutdown or drop.
+`ClientConnection::connect` uses async resolution and family-interleaved Happy Eyeballs dialing
+with a ten-second DNS-plus-TCP deadline, followed by a separate ten-second SSH handshake deadline.
+`connect_with_timeout` sets the same positive duration for each stage. Direct setup enforces the
+255-byte host and sixteen-raw-address bounds, returns typed transport or SSH handshake timeout
+errors, and closes pending dials or the engine-owned socket on cancellation. The synchronous
+system DNS resolver remains outside the cancellation guarantee.
 `ClientConnection::connect_via_socks5` and `connect_via_http_connect` compose the existing bounded
 proxy handshakes with the concrete async SSH client, preserving proxy rejection and timeout errors.
 `ClientConnection::connect_via_proxy_command` composes a directly spawned, bounded desktop

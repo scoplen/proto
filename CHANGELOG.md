@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Bounded direct SSH setup with async DNS and family-interleaved Happy Eyeballs dialing under one
+  ten-second resolve-and-TCP deadline, followed by a separate ten-second SSH handshake deadline.
+  `connect_with_timeout` selects both budgets; typed direct transport and handshake timeout errors
+  distinguish failures. Cancellation stops pending dials and closes a stalled handshake socket.
 - Extended the SSH protocol fuzz target to public security-key and SSH certificate boundaries,
   including canonical round-trip assertions, certificate signature/role/principal/validity
   validation, and tracked valid and malformed identity seeds.
