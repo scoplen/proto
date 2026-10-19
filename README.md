@@ -424,6 +424,7 @@ in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, 
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
 `vectors/sync-session.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
+`vectors/sync-keys-failures.json`,
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
 `vectors/sync-vault-members.json`, `vectors/gateway.json`, and
 `vectors/gateway-ticket-issuance.json`. The shared loader is usable by both
