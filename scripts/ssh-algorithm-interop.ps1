@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
+param([ValidateSet('aes256-cbc', '3des-cbc')][string]$LegacyCipher = 'aes256-cbc')
+
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $container = 'scoplen-algorithm-interop-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
@@ -7,6 +9,7 @@ $started = $false
 $testVariables = @(
     'SCOPLEN_ALGORITHM_MODERN_PORT', 'SCOPLEN_ALGORITHM_LEGACY_PORT',
     'SCOPLEN_ALGORITHM_HOST_KEY', 'SCOPLEN_ALGORITHM_USER', 'SCOPLEN_ALGORITHM_PASSWORD'
+    'SCOPLEN_ALGORITHM_LEGACY_CIPHER'
 )
 
 try {
@@ -46,6 +49,7 @@ exec /usr/sbin/sshd -D -e -f /tmp/legacy.conf
 '@
     # A CRLF checkout leaves carriage returns in PowerShell here-strings; Alpine sh rejects them.
     $setup = $setup.Replace("`r", '')
+    $setup = $setup.Replace('Ciphers aes256-cbc', "Ciphers $LegacyCipher")
     docker run -d --name $container -p '127.0.0.1::2222' -p '127.0.0.1::2223' alpine:3.21 sh -c $setup | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Failed to start disposable OpenSSH algorithm container' }
     $started = $true
@@ -81,6 +85,7 @@ exec /usr/sbin/sshd -D -e -f /tmp/legacy.conf
 
     $env:SCOPLEN_ALGORITHM_MODERN_PORT = $ports[2222].ToString()
     $env:SCOPLEN_ALGORITHM_LEGACY_PORT = $ports[2223].ToString()
+    $env:SCOPLEN_ALGORITHM_LEGACY_CIPHER = $LegacyCipher
     $env:SCOPLEN_ALGORITHM_HOST_KEY = $hostKey
     $env:SCOPLEN_ALGORITHM_USER = 'scoplen'
     $env:SCOPLEN_ALGORITHM_PASSWORD = 'scoplen-test-password'

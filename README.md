@@ -143,9 +143,13 @@ open.
 `pwsh ./scripts/ssh-algorithm-interop.ps1` starts disposable OpenSSH listeners with one modern
 algorithm set and one legacy-only set. The `algorithm_interop` example verifies an authenticated
 command on the modern set, handshake rejection by the default policy on the legacy set, a working
-command after per-Host legacy opt-in, and rejection by another default Host. The same script runs
-`strict_kex_interop`: a pinned-key, password-authenticated OpenSSH command succeeds, then a local
-relay inserts a valid `SSH_MSG_IGNORE` before and after the server's first KEXINIT in separate
+command after per-Host legacy opt-in, and rejection by another default Host. Pass
+`-LegacyCipher 3des-cbc` to constrain the legacy listener to 3DES instead of AES-CBC.
+The concrete engine includes 3DES support, but offers it only when that Host explicitly enables
+`3des-cbc` through `HostAlgorithmPolicy::with_legacy`. CI checks both constrained ciphers.
+The same script runs `strict_kex_interop`: a pinned-key, password-authenticated OpenSSH command
+succeeds, then a local relay inserts a valid `SSH_MSG_IGNORE` before and after the server's first
+KEXINIT in separate
 connections. The strict client rejects both before host-key verification, while a server that does
 not advertise strict KEX accepts the same packets. This covers one initial exchange and the
 selected modern algorithms; rekey and the wider server, platform, and algorithm matrix remain open.
