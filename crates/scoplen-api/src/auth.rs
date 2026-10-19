@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //! K-3 device authentication JSON messages.
 
+use std::fmt;
+
 use scoplen_model::validate_uuid_v7;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct};
 use thiserror::Error;
@@ -10,6 +12,10 @@ use uuid::Uuid;
 pub const ACCESS_TOKEN_EXPIRES_IN: u64 = 600;
 /// The lifetime of a refresh token in seconds.
 pub const REFRESH_TOKEN_EXPIRES_IN: u64 = 2_592_000;
+/// Maximum encoded body for an unauthenticated device challenge request.
+pub const MAX_CHALLENGE_REQUEST_BYTES: usize = 256;
+/// Maximum encoded body for a signed device authentication request.
+pub const MAX_DEVICE_REQUEST_BYTES: usize = 4_096;
 
 /// Errors returned while decoding or validating K-3 authentication JSON.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -22,12 +28,94 @@ pub enum AuthCodecError {
     Invalid(String),
 }
 
+/// The device-bound request sent to `POST /api/v1/auth/challenge`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuthChallengeRequest {
+    /// Device identifier for a one-use challenge.
+    pub device_id: Uuid,
+}
+
+impl AuthChallengeRequest {
+    /// Construct a request with a canonical `UUIDv7` device identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the device identifier is not `UUIDv7`.
+    pub fn new(device_id: Uuid) -> Result<Self, AuthCodecError> {
+        let request = Self { device_id };
+        request.validate()?;
+        Ok(request)
+    }
+
+    /// Validate the device identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the device identifier is not `UUIDv7`.
+    pub fn validate(&self) -> Result<(), AuthCodecError> {
+        validate_uuid_v7(self.device_id)
+            .map_err(|_| AuthCodecError::Invalid("device_id must be UUIDv7".into()))
+    }
+
+    /// Decode a strict, bounded JSON request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed, noncanonical, or oversized requests.
+    pub fn from_json(input: &str) -> Result<Self, AuthCodecError> {
+        enforce_body_limit(input, MAX_CHALLENGE_REQUEST_BYTES)?;
+        serde_json::from_str(input).map_err(|error| AuthCodecError::Json(error.to_string()))
+    }
+
+    /// Encode a request with deterministic field order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the device identifier is invalid or encoding fails.
+    pub fn to_json(&self) -> Result<String, AuthCodecError> {
+        self.validate()?;
+        let json =
+            serde_json::to_string(self).map_err(|error| AuthCodecError::Json(error.to_string()))?;
+        enforce_body_limit(&json, MAX_CHALLENGE_REQUEST_BYTES)?;
+        Ok(json)
+    }
+}
+
+impl Serialize for AuthChallengeRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.validate().map_err(serde::ser::Error::custom)?;
+        let mut state = serializer.serialize_struct("AuthChallengeRequest", 1)?;
+        state.serialize_field("device_id", &self.device_id.to_string())?;
+        state.end()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawAuthChallengeRequest {
+    device_id: String,
+}
+
+impl<'de> Deserialize<'de> for AuthChallengeRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = RawAuthChallengeRequest::deserialize(deserializer)?;
+        Self::new(parse_device_id(&raw.device_id).map_err(serde::de::Error::custom)?)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 /// The response from `POST /api/v1/auth/challenge`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuthChallengeResponse {
     /// The 32-byte challenge nonce as 64 lowercase hexadecimal characters.
     pub nonce: String,
-    /// The server time as an RFC 3339 UTC timestamp ending in `Z`.
+    /// The server time in the K-3 RFC 3339 UTC profile, without leap-second labels.
     pub server_time: String,
 }
 
@@ -51,7 +139,7 @@ impl AuthChallengeResponse {
     /// # Errors
     ///
     /// Returns an error when the nonce is not 32 bytes of lowercase hexadecimal or the timestamp
-    /// is not an RFC 3339 UTC value with a `Z` suffix.
+    /// is not in the normalized RFC 3339 UTC profile.
     pub fn validate(&self) -> Result<(), AuthCodecError> {
         validate_lower_hex(&self.nonce, 32, "nonce")?;
         validate_rfc3339_utc(&self.server_time)
@@ -159,6 +247,7 @@ impl AuthDeviceRequest {
     /// Returns an error when the JSON is malformed, contains an unknown field, or a required
     /// field is invalid.
     pub fn from_json(input: &str) -> Result<Self, AuthCodecError> {
+        enforce_body_limit(input, MAX_DEVICE_REQUEST_BYTES)?;
         serde_json::from_str(input).map_err(|error| AuthCodecError::Json(error.to_string()))
     }
 
@@ -169,7 +258,10 @@ impl AuthDeviceRequest {
     /// Returns an error when a field is invalid or JSON serialization fails.
     pub fn to_json(&self) -> Result<String, AuthCodecError> {
         self.validate()?;
-        serde_json::to_string(self).map_err(|error| AuthCodecError::Json(error.to_string()))
+        let json =
+            serde_json::to_string(self).map_err(|error| AuthCodecError::Json(error.to_string()))?;
+        enforce_body_limit(&json, MAX_DEVICE_REQUEST_BYTES)?;
+        Ok(json)
     }
 }
 
@@ -201,19 +293,13 @@ impl<'de> Deserialize<'de> for AuthDeviceRequest {
         D: Deserializer<'de>,
     {
         let raw = RawAuthDeviceRequest::deserialize(deserializer)?;
-        let device_id = Uuid::parse_str(&raw.device_id)
-            .map_err(|_| serde::de::Error::custom("device_id must be a UUIDv7"))?;
-        if raw.device_id != device_id.to_string() {
-            return Err(serde::de::Error::custom(
-                "device_id must use lowercase canonical UUID form",
-            ));
-        }
+        let device_id = parse_device_id(&raw.device_id).map_err(serde::de::Error::custom)?;
         Self::new(device_id, raw.nonce, raw.signature).map_err(serde::de::Error::custom)
     }
 }
 
 /// The successful response from `POST /api/v1/auth/device`.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct AuthTokenResponse {
     /// Opaque DPoP-bound access token.
     pub access_token: String,
@@ -225,6 +311,19 @@ pub struct AuthTokenResponse {
     pub refresh_token: String,
     /// Refresh-token lifetime in seconds.
     pub refresh_expires_in: u64,
+}
+
+impl fmt::Debug for AuthTokenResponse {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AuthTokenResponse")
+            .field("access_token", &"[REDACTED]")
+            .field("token_type", &self.token_type)
+            .field("expires_in", &self.expires_in)
+            .field("refresh_token", &"[REDACTED]")
+            .field("refresh_expires_in", &self.refresh_expires_in)
+            .finish()
+    }
 }
 
 impl AuthTokenResponse {
@@ -348,6 +447,28 @@ fn validate_lower_hex(value: &str, bytes: usize, field: &str) -> Result<(), Auth
     Ok(())
 }
 
+fn parse_device_id(value: &str) -> Result<Uuid, AuthCodecError> {
+    let device_id = Uuid::parse_str(value)
+        .map_err(|_| AuthCodecError::Invalid("device_id must be UUIDv7".into()))?;
+    if value != device_id.to_string() {
+        return Err(AuthCodecError::Invalid(
+            "device_id must use lowercase canonical UUID form".into(),
+        ));
+    }
+    validate_uuid_v7(device_id)
+        .map_err(|_| AuthCodecError::Invalid("device_id must be UUIDv7".into()))?;
+    Ok(device_id)
+}
+
+fn enforce_body_limit(input: &str, max_bytes: usize) -> Result<(), AuthCodecError> {
+    if input.len() > max_bytes {
+        return Err(AuthCodecError::Invalid(format!(
+            "authentication request exceeds {max_bytes} bytes"
+        )));
+    }
+    Ok(())
+}
+
 fn validate_rfc3339_utc(value: &str) -> Result<(), AuthCodecError> {
     let bytes = value.as_bytes();
     if bytes.len() < 20
@@ -372,7 +493,7 @@ fn validate_rfc3339_utc(value: &str) -> Result<(), AuthCodecError> {
         || !(1..=days_in_month(year, month)).contains(&day)
         || hour > 23
         || minute > 59
-        || second > 60
+        || second > 59
     {
         return Err(AuthCodecError::Invalid("server_time has an invalid date or time".into()));
     }
@@ -435,6 +556,7 @@ mod tests {
         assert!(AuthChallengeResponse::new(NONCE.to_uppercase(), "2026-10-07T12:34:56Z").is_err());
         assert!(AuthChallengeResponse::new(NONCE, "2026-10-07T12:34:56+00:00").is_err());
         assert!(AuthChallengeResponse::new(NONCE, "2026-02-29T12:34:56Z").is_err());
+        assert!(AuthChallengeResponse::new(NONCE, "2026-10-07T12:34:60Z").is_err());
         assert!(AuthChallengeResponse::new(NONCE, "2024-02-29T12:34:56Z").is_ok());
         assert!(AuthChallengeResponse::from_json(&format!("{{\"nonce\":\"{NONCE}\"}}")).is_err());
     }

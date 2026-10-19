@@ -3,6 +3,18 @@
   "version": 1,
   "vectors": [
     {
+      "id": "api-auth-challenge-request-v1",
+      "kind": "auth.challenge.request",
+      "input": "{\"device_id\":\"00000000-0000-7000-8000-000000000001\"}",
+      "expected": "{\"device_id\":\"00000000-0000-7000-8000-000000000001\"}"
+    },
+    {
+      "id": "api-auth-device-signature-input-v1",
+      "kind": "auth.device.signature-input",
+      "input": "https://example.com:8443|000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f|00000000-0000-7000-8000-000000000001",
+      "expected": "73706c2d617574682d763168747470733a2f2f6578616d706c652e636f6d3a38343433000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f00000000000070008000000000000001"
+    },
+    {
       "id": "api-auth-challenge-response-v1",
       "kind": "auth.challenge.response",
       "input": "{\"server_time\":\"2026-10-07T12:34:56.123Z\",\"nonce\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\"}",

@@ -11,6 +11,11 @@ All notable changes to the `proto` repository will be recorded here.
 - Reject repeated password, public-key, certificate, keyboard-interactive, and none-probe calls
   after full authentication with the typed local `AlreadyAuthenticated` error. A bounded real
   SSH regression verifies all five calls and continued channel use on the same connection.
+- Added the bounded K-3 challenge request codec, exact device-authentication signature input,
+  canonical HTTPS origin validation, published vectors, unauthenticated OpenAPI paths, and
+  generated TypeScript auth declarations. Request codecs reject malformed and oversized bodies;
+  the pre-Stable UTC challenge-time validation rejects leap-second labels. Challenge storage and
+  token issuance remain server-owned. `AuthTokenResponse` debug output redacts both opaque tokens.
 - Expanded the disposable OpenSSH check to cover raw Ed25519, P-256, RSA-SHA2-256/512 keys and
   all four user-certificate variants, with wrong-password, unauthorized-key, wrong-principal,
   local CA-pin, and server-untrusted CA failures. The shared example bounds SSH steps and

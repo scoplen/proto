@@ -2391,6 +2391,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hkdf 0.12.4",
  "hpke",
+ "http",
  "p256 0.13.2",
  "pakery-cpace",
  "pakery-crypto",

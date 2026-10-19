@@ -273,6 +273,17 @@ The control-plane and shared `ProblemDetails` Rust paths use the same validated 
 JSON/CBOR error type. The OpenAPI schema and generated TypeScript declaration require `type`,
 `title`, `status`, `detail`, `instance`, `code`, `changed`, and `retryable`; decoders accept unknown
 response fields and syntactically valid future error codes.
+The K-3 authentication boundary now validates strict, bounded challenge and signed-device JSON
+requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. Its
+OpenAPI paths and generated TypeScript declarations describe both unauthenticated endpoints.
+Callers pass the returned bytes to the fallible K-2 `DeviceSigner::sign` boundary and propagate
+signer failures, including hardware-device failures.
+Challenge storage, credential verification, and token issuance are server responsibilities; this
+library does not implement a production authentication service.
+`AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
+lifetimes for diagnostics.
+Challenge timestamps use the K-3 pre-Stable UTC profile: uppercase `T` and `Z`, optional fractional
+seconds, and seconds from `00` through `59` without leap-second labels.
 The internal `spl.gateway.v1.Control` and `spl.agent.v1.Agent` protobuf source contracts are
 also checked in under `crates/scoplen-api/proto`. The built-in Cedar schema and role policies are
 parsed and strictly validated in the API crate's tests. The API crate now generates bounded Rust
@@ -311,8 +322,8 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 node crates/scoplen-api/openapi/generate.mjs --check
 ```
 
-The OpenAPI generator checks the authored error schema and detects drift in the generated path
-list and TypeScript problem declaration. Run it without `--check` to regenerate those sections;
+The OpenAPI generator checks the authored error and authentication schemas and detects drift in
+the generated path list and TypeScript declarations. Run it without `--check` to regenerate those sections;
 the Rust CI matrix runs the drift check on every supported desktop runner.
 
 For a paired same-host comparison with OpenSSH under the two required S4 ciphers, run

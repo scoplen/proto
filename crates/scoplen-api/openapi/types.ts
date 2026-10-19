@@ -6,6 +6,10 @@ export interface components {
     Resource: Resource;
     ResourcePage: ResourcePage;
     ProblemDetails: ProblemDetails;
+    AuthChallengeRequest: AuthChallengeRequest;
+    AuthChallengeResponse: AuthChallengeResponse;
+    AuthDeviceRequest: AuthDeviceRequest;
+    AuthTokenResponse: AuthTokenResponse;
     ListQuery: ListQuery;
     WriteRequest: WriteRequest;
     DecisionRequest: DecisionRequest;
@@ -70,6 +74,32 @@ export interface ProblemDetails {
   [extension: string]: unknown;
 }
 // END GENERATED ProblemDetails
+// BEGIN GENERATED Authentication
+export interface AuthChallengeRequest {
+  device_id: string;
+}
+
+export interface AuthChallengeResponse {
+  nonce: string;
+  server_time: string;
+  [extension: string]: unknown;
+}
+
+export interface AuthDeviceRequest {
+  device_id: string;
+  nonce: string;
+  signature: string;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  token_type: "DPoP";
+  expires_in: number;
+  refresh_token: string;
+  refresh_expires_in: number;
+  [extension: string]: unknown;
+}
+// END GENERATED Authentication
 export interface ListQuery { limit?: number; cursor?: string; filter?: string; sort?: string; }
 export interface WriteRequest { data: Record<string, unknown>; }
 export interface DecisionRequest { decision: "approve" | "deny"; reason?: string; }
