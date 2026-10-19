@@ -369,6 +369,11 @@ typed path value before applying local metadata. These checks do not establish a
 cryptographic validity, or durable server mutation; response CBOR and additive extensions are
 unchanged.
 
+`SyncAckResponse::validate_for_request` checks that a decoded acknowledgement returns at least
+the cursor sent. A higher stored maximum is valid when another acknowledgement has already
+advanced it. Call this before applying acknowledgement metadata locally; the check does not
+establish the current vault sequence or server persistence. Existing CBOR bytes remain valid.
+
 The K-3 authentication boundary now validates strict, bounded challenge and signed-device JSON
 requests, canonical HTTPS origins, and the exact domain-separated P-256 signature input. The
 native refresh body requires one opaque token (at most 2,048 UTF-8 bytes); the browser body is

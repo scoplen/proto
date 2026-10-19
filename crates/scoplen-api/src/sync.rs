@@ -2015,6 +2015,21 @@ pub struct SyncAckResponse {
 }
 
 impl SyncAckResponse {
+    /// Validate the stored maximum against the original acknowledgement request.
+    ///
+    /// A greater cursor is valid after another acknowledgement has advanced the device.
+    /// This does not establish the vault sequence or durable storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the response cursor is below the requested cursor.
+    pub fn validate_for_request(self, request: &SyncAckRequest) -> Result<(), SyncCodecError> {
+        if self.cursor < request.cursor {
+            return Err(invalid("acknowledgement cursor is below request"));
+        }
+        Ok(())
+    }
+
     /// Encode the acknowledgement response as `{cursor}`.
     ///
     /// # Errors

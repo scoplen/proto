@@ -371,6 +371,46 @@ fn acknowledgements_use_canonical_text_maps_and_response_extensions() {
 }
 
 #[test]
+fn acknowledgement_response_binds_published_request_without_rejecting_a_stored_maximum() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/sync-messages.json");
+    let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vectors");
+    let request_vector =
+        document.vectors.iter().find(|vector| vector.kind == "sync.ack.request").expect("request");
+    let response_vector = document
+        .vectors
+        .iter()
+        .find(|vector| vector.kind == "sync.ack.response")
+        .expect("response");
+    let request =
+        SyncAckRequest::from_cbor(&decode_hex(&request_vector.expected)).expect("request");
+    let response =
+        SyncAckResponse::from_cbor(&decode_hex(&response_vector.expected)).expect("response");
+    response.validate_for_request(&request).expect("published acknowledgement");
+
+    let Value::Map(mut fields) =
+        cbor::decode(&response.to_cbor().expect("encode")).expect("decode")
+    else {
+        panic!("ack map");
+    };
+    fields.push((Value::Text("future".into()), Value::UInt(1)));
+    let extended = cbor::encode(&Value::Map(fields)).expect("extension");
+    let response = SyncAckResponse::from_cbor(&extended).expect("extended response");
+    response.validate_for_request(&request).expect("extensions preserve binding");
+    response
+        .validate_for_request(&SyncAckRequest { cursor: request.cursor - 1 })
+        .expect("a stale request returns the stored maximum");
+    assert!(response.validate_for_request(&SyncAckRequest { cursor: request.cursor + 1 }).is_err());
+
+    let zero = SyncAckRequest { cursor: 0 };
+    SyncAckResponse { cursor: 0 }.validate_for_request(&zero).expect("zero acknowledgement");
+    let maximum = SyncAckRequest { cursor: u64::MAX };
+    SyncAckResponse { cursor: u64::MAX }.validate_for_request(&maximum).expect("maximum equality");
+    SyncAckResponse { cursor: u64::MAX }.validate_for_request(&zero).expect("maximum after zero");
+    assert!(SyncAckResponse { cursor: u64::MAX - 1 }.validate_for_request(&maximum).is_err());
+}
+
+#[test]
 fn snapshots_follow_change_page_rules_with_objects_key() {
     let page = snapshot();
     let query = SyncChangesQuery { after: 0, limit: 2 };

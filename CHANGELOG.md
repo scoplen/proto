@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added request-aware K-4 acknowledgement validation that rejects a cursor below the request
+  while preserving higher stored maxima, zero/maximum cursor bounds, and response extensions.
+  Published acknowledgement vectors and CBOR bytes remain unchanged.
 - Added D-87 request/path-aware validation for six successful K-4 key-management mutation
   responses. Public tests bind decoded published vectors, reject mismatched and invalid inputs,
   and retain additive response extensions without changing CBOR bytes or error types.
