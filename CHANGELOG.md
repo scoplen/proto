@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Verified the default ML-KEM/ChaCha20 negotiation against a disposable OpenSSH listener that
+  offers only those algorithms. Pinned-key authentication, exact command output, and exit status
+  pass alongside the existing modern, legacy, strict-KEX, and rekey checks; the full algorithm
+  interoperability matrix remains incomplete.
 - Expanded the disposable OpenSSH fixture with a real KRL: the server rejects Ed25519 user
   certificates revoked by serial and key ID, while a certificate from the same trusted CA and
   the same raw public key still complete authenticated commands. The test disables OpenSSH's
