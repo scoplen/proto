@@ -1,0 +1,60 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "sync-read-limits-changes-exact-v1",
+      "kind": "sync.read.limits.changes",
+      "input": "{\"max_envelope_bytes\":2,\"max_body_bytes\":103,\"cbor_hex\":\"a3646d6f7265f5676368616e67657382a501500000000000007000800000000000000102020342dead04f4055000000000000070008000000000000003a501500000000000007000800000000000000202050342beef04f505f66b6e6578745f637572736f7205\"}",
+      "expected": "accept"
+    },
+    {
+      "id": "sync-read-limits-changes-short-body-v1",
+      "kind": "sync.read.limits.changes",
+      "input": "{\"max_envelope_bytes\":2,\"max_body_bytes\":102,\"cbor_hex\":\"a3646d6f7265f5676368616e67657382a501500000000000007000800000000000000102020342dead04f4055000000000000070008000000000000003a501500000000000007000800000000000000202050342beef04f505f66b6e6578745f637572736f7205\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "sync-read-limits-changes-short-envelope-v1",
+      "kind": "sync.read.limits.changes",
+      "input": "{\"max_envelope_bytes\":1,\"max_body_bytes\":103,\"cbor_hex\":\"a3646d6f7265f5676368616e67657382a501500000000000007000800000000000000102020342dead04f4055000000000000070008000000000000003a501500000000000007000800000000000000202050342beef04f505f66b6e6578745f637572736f7205\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "sync-read-limits-snapshot-exact-v1",
+      "kind": "sync.read.limits.snapshot",
+      "input": "{\"max_envelope_bytes\":2,\"max_body_bytes\":119,\"cbor_hex\":\"a3646d6f7265f5676f626a6563747382a50150000000000000700080000000000000010202034201be04f405500000000000007000800000000000000ba50150000000000000700080000000000000020205034202be04f505500000000000007000800000000000000c6b6e6578745f637572736f7205\"}",
+      "expected": "accept"
+    },
+    {
+      "id": "sync-read-limits-snapshot-short-body-v1",
+      "kind": "sync.read.limits.snapshot",
+      "input": "{\"max_envelope_bytes\":2,\"max_body_bytes\":118,\"cbor_hex\":\"a3646d6f7265f5676f626a6563747382a50150000000000000700080000000000000010202034201be04f405500000000000007000800000000000000ba50150000000000000700080000000000000020205034202be04f505500000000000007000800000000000000c6b6e6578745f637572736f7205\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "sync-read-limits-snapshot-short-envelope-v1",
+      "kind": "sync.read.limits.snapshot",
+      "input": "{\"max_envelope_bytes\":1,\"max_body_bytes\":119,\"cbor_hex\":\"a3646d6f7265f5676f626a6563747382a50150000000000000700080000000000000010202034201be04f405500000000000007000800000000000000ba50150000000000000700080000000000000020205034202be04f505500000000000007000800000000000000c6b6e6578745f637572736f7205\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "sync-read-limits-versions-exact-v1",
+      "kind": "sync.read.limits.versions",
+      "input": "{\"max_envelope_bytes\":2,\"max_body_bytes\":101,\"cbor_hex\":\"a16876657273696f6e7382a50150000000000000700080000000000000010202034201be04f405500000000000007000800000000000000ba50150000000000000700080000000000000010205034201be04f405500000000000007000800000000000000b\"}",
+      "expected": "accept"
+    },
+    {
+      "id": "sync-read-limits-versions-short-body-v1",
+      "kind": "sync.read.limits.versions",
+      "input": "{\"max_envelope_bytes\":2,\"max_body_bytes\":100,\"cbor_hex\":\"a16876657273696f6e7382a50150000000000000700080000000000000010202034201be04f405500000000000007000800000000000000ba50150000000000000700080000000000000010205034201be04f405500000000000007000800000000000000b\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "sync-read-limits-versions-short-envelope-v1",
+      "kind": "sync.read.limits.versions",
+      "input": "{\"max_envelope_bytes\":1,\"max_body_bytes\":101,\"cbor_hex\":\"a16876657273696f6e7382a50150000000000000700080000000000000010202034201be04f405500000000000007000800000000000000ba50150000000000000700080000000000000010205034201be04f405500000000000007000800000000000000b\"}",
+      "expected": "reject"
+    }
+  ]
+}

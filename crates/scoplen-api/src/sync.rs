@@ -21,6 +21,10 @@ pub const MAX_SYNC_BATCH_OBJECTS: usize = 500;
 pub const MAX_SYNC_BATCH_BYTES: usize = 4 * 1024 * 1024;
 /// Default maximum opaque payload in a write or current conflict change.
 pub const MAX_SYNC_CONFLICT_PAYLOAD_BYTES: usize = 260 * 1024;
+/// Default maximum payload in one change, snapshot, or version-history entry.
+pub const MAX_SYNC_READ_ENVELOPE_BYTES: usize = 260 * 1024;
+/// Default maximum complete encoded change, snapshot, or version-history response.
+pub const MAX_SYNC_READ_BODY_BYTES: usize = 266_295_039;
 /// Maximum encoded size of a conflict problem, including its required extension.
 pub const MAX_SYNC_CONFLICT_BODY_BYTES: usize = 128 * 1024 * 1024;
 /// Maximum number of retained historical versions in addition to the current version.
@@ -252,6 +256,48 @@ impl SyncWriteLimits {
             .checked_mul(29)
             .and_then(|size| size.checked_add(9))
             .ok_or_else(|| invalid("assignment body bound overflows this platform"))
+    }
+}
+
+/// Caller-selected local acceptance budgets for K-4 change, snapshot, and history reads.
+///
+/// The session's advertised write limit is not authority to allocate a read response. Stored
+/// history may also predate the deployment's current write limit.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyncReadLimits {
+    /// Maximum payload in one response entry, including an organization object.
+    pub max_envelope_bytes: usize,
+    /// Maximum complete encoded response body, including unknown fields on decode.
+    pub max_body_bytes: usize,
+}
+
+impl Default for SyncReadLimits {
+    fn default() -> Self {
+        Self {
+            max_envelope_bytes: MAX_SYNC_READ_ENVELOPE_BYTES,
+            max_body_bytes: MAX_SYNC_READ_BODY_BYTES,
+        }
+    }
+}
+
+impl SyncReadLimits {
+    /// Check positive budgets and that the largest page bound fits this platform.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero budgets or an unrepresentable derived page size.
+    pub fn validate(self) -> Result<(), SyncCodecError> {
+        if self.max_envelope_bytes == 0 || self.max_body_bytes == 0 {
+            return Err(invalid("read limits must be positive"));
+        }
+        let payload_header = length_argument_bytes(self.max_envelope_bytes)?;
+        self.max_envelope_bytes
+            .checked_add(50)
+            .and_then(|size| size.checked_add(payload_header))
+            .and_then(|size| size.checked_mul(1_000))
+            .and_then(|size| size.checked_add(39))
+            .ok_or_else(|| invalid("read page size bound overflows this platform"))?;
+        Ok(())
     }
 }
 
@@ -1544,6 +1590,66 @@ impl SyncChange {
     }
 }
 
+fn read_change_bytes(change: &SyncChange, limits: SyncReadLimits) -> Result<usize, SyncCodecError> {
+    if change.payload.len() > limits.max_envelope_bytes {
+        return Err(invalid("read payload exceeds the envelope limit"));
+    }
+    // Map header, five integer keys, object UUID, and boolean occupy 24 bytes.
+    let overhead = 24
+        + argument_bytes(change.seq)
+        + length_argument_bytes(change.payload.len())?
+        + if change.signer_device_id.is_some() { 17 } else { 1 };
+    change
+        .payload
+        .len()
+        .checked_add(overhead)
+        .ok_or_else(|| invalid("read entry encoded size overflows this platform"))
+}
+
+fn read_entries_body_bytes(
+    entries: &[SyncChange],
+    wrapper_bytes: usize,
+    limits: SyncReadLimits,
+) -> Result<(), SyncCodecError> {
+    let mut size = wrapper_bytes;
+    for entry in entries {
+        size = size
+            .checked_add(read_change_bytes(entry, limits)?)
+            .ok_or_else(|| invalid("read response encoded size overflows this platform"))?;
+        if size > limits.max_body_bytes {
+            return Err(invalid("read response exceeds the encoded-body limit"));
+        }
+    }
+    if size > limits.max_body_bytes {
+        return Err(invalid("read response exceeds the encoded-body limit"));
+    }
+    Ok(())
+}
+
+fn read_page_body_bytes(
+    entries: &[SyncChange],
+    next_cursor: u64,
+    limits: SyncReadLimits,
+) -> Result<(), SyncCodecError> {
+    // Three-entry map, seven-byte array key, next_cursor key, more key and boolean: 27 bytes.
+    let wrapper = 27usize
+        .checked_add(length_argument_bytes(entries.len())?)
+        .and_then(|size| size.checked_add(argument_bytes(next_cursor)))
+        .ok_or_else(|| invalid("read page encoded size overflows this platform"))?;
+    read_entries_body_bytes(entries, wrapper, limits)
+}
+
+fn read_versions_body_bytes(
+    entries: &[SyncChange],
+    limits: SyncReadLimits,
+) -> Result<(), SyncCodecError> {
+    // One-entry map and eight-byte versions key: 10 bytes before the array header.
+    let wrapper = 10usize
+        .checked_add(length_argument_bytes(entries.len())?)
+        .ok_or_else(|| invalid("version history encoded size overflows this platform"))?;
+    read_entries_body_bytes(entries, wrapper, limits)
+}
+
 /// Response body for `GET /sync/v1/vaults/{vault}/changes`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyncChangesResponse {
@@ -1557,8 +1663,19 @@ impl SyncChangesResponse {
     ///
     /// # Errors
     ///
-    /// Returns an error for invalid entries, ordering, duplicate objects, or cursor shape.
+    /// Returns an error for invalid entries, ordering, duplicate objects, cursor shape, or default
+    /// read-budget excess.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.validate_with_limits(SyncReadLimits::default())
+    }
+
+    /// Validate the page and selected payload and complete-body budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, page structure, or exceeded budgets.
+    pub fn validate_with_limits(&self, limits: SyncReadLimits) -> Result<(), SyncCodecError> {
+        limits.validate()?;
         if self.changes.len() > 1_000 {
             return Err(invalid("changes exceeds 1000 entries"));
         }
@@ -1580,7 +1697,7 @@ impl SyncChangesResponse {
         if self.more && (self.changes.is_empty() || self.next_cursor != previous_seq) {
             return Err(invalid("non-final page cursor must equal its last change sequence"));
         }
-        Ok(())
+        read_page_body_bytes(&self.changes, self.next_cursor, limits)
     }
 
     /// Validate a page against the request that produced it.
@@ -1592,8 +1709,21 @@ impl SyncChangesResponse {
     ///
     /// Returns an error if the page exceeds `limit`, includes old entries, or regresses the cursor.
     pub fn validate_for_query(&self, query: &SyncChangesQuery) -> Result<(), SyncCodecError> {
+        self.validate_for_query_with_limits(query, SyncReadLimits::default())
+    }
+
+    /// Validate the page against its query and selected read budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, page structure, or query correlation.
+    pub fn validate_for_query_with_limits(
+        &self,
+        query: &SyncChangesQuery,
+        limits: SyncReadLimits,
+    ) -> Result<(), SyncCodecError> {
         query.validate()?;
-        self.validate()?;
+        self.validate_with_limits(limits)?;
         if self.changes.len() > usize::from(query.limit) {
             return Err(invalid("changes exceeds requested limit"));
         }
@@ -1611,7 +1741,16 @@ impl SyncChangesResponse {
     ///
     /// Returns an error for an invalid page or non-encodable CBOR.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
-        self.validate()?;
+        self.to_cbor_with_limits(SyncReadLimits::default())
+    }
+
+    /// Check exact encoded size before copying payloads into deterministic CBOR values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, page structure, or exceeded budgets.
+    pub fn to_cbor_with_limits(&self, limits: SyncReadLimits) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate_with_limits(limits)?;
         encode_map(vec![
             (
                 "changes",
@@ -1628,6 +1767,22 @@ impl SyncChangesResponse {
     ///
     /// Returns an error for malformed CBOR or invalid required fields.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        Self::from_cbor_with_limits(input, SyncReadLimits::default())
+    }
+
+    /// Check the complete input budget before decoding CBOR, including ignored extensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, oversized input, malformed CBOR, or invalid fields.
+    pub fn from_cbor_with_limits(
+        input: &[u8],
+        limits: SyncReadLimits,
+    ) -> Result<Self, SyncCodecError> {
+        limits.validate()?;
+        if input.len() > limits.max_body_bytes {
+            return Err(invalid("read response exceeds the encoded-body limit"));
+        }
         let mut fields = decode_map(input)?;
         let changes = match fields.remove("changes") {
             Some(Value::Array(values)) => {
@@ -1640,7 +1795,7 @@ impl SyncChangesResponse {
             next_cursor: take_uint(&mut fields, "next_cursor")?,
             more: take_bool(&mut fields, "more")?,
         };
-        response.validate()?;
+        response.validate_with_limits(limits)?;
         Ok(response)
     }
 }
@@ -2288,7 +2443,18 @@ impl SyncSnapshotResponse {
     ///
     /// Returns an error for invalid entries, ordering, duplicates, or cursor rules.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
-        validate_page(&self.objects, self.next_cursor, self.more, "snapshot objects")
+        self.validate_with_limits(SyncReadLimits::default())
+    }
+
+    /// Validate snapshot structure and selected payload and complete-body budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, page structure, or exceeded budgets.
+    pub fn validate_with_limits(&self, limits: SyncReadLimits) -> Result<(), SyncCodecError> {
+        limits.validate()?;
+        validate_page(&self.objects, self.next_cursor, self.more, "snapshot objects")?;
+        read_page_body_bytes(&self.objects, self.next_cursor, limits)
     }
 
     /// Validate a snapshot page against its canonical query parameters.
@@ -2297,8 +2463,21 @@ impl SyncSnapshotResponse {
     ///
     /// Returns an error when the query or page violates the pagination contract.
     pub fn validate_for_query(&self, query: &SyncChangesQuery) -> Result<(), SyncCodecError> {
+        self.validate_for_query_with_limits(query, SyncReadLimits::default())
+    }
+
+    /// Validate snapshot query correlation with selected read budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, page structure, or query correlation.
+    pub fn validate_for_query_with_limits(
+        &self,
+        query: &SyncChangesQuery,
+        limits: SyncReadLimits,
+    ) -> Result<(), SyncCodecError> {
         query.validate()?;
-        self.validate()?;
+        self.validate_with_limits(limits)?;
         if self.objects.len() > usize::from(query.limit) {
             return Err(invalid("snapshot exceeds requested limit"));
         }
@@ -2316,7 +2495,16 @@ impl SyncSnapshotResponse {
     ///
     /// Returns an error when validation fails or deterministic CBOR encoding fails.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
-        self.validate()?;
+        self.to_cbor_with_limits(SyncReadLimits::default())
+    }
+
+    /// Check exact encoded size before copying payloads into deterministic CBOR values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, page structure, or exceeded budgets.
+    pub fn to_cbor_with_limits(&self, limits: SyncReadLimits) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate_with_limits(limits)?;
         encode_map(vec![
             (
                 "objects",
@@ -2333,6 +2521,22 @@ impl SyncSnapshotResponse {
     ///
     /// Returns an error for malformed CBOR, missing fields, invalid entries, or cursor rules.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        Self::from_cbor_with_limits(input, SyncReadLimits::default())
+    }
+
+    /// Check the complete input budget before decoding CBOR, including ignored extensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, oversized input, malformed CBOR, or invalid fields.
+    pub fn from_cbor_with_limits(
+        input: &[u8],
+        limits: SyncReadLimits,
+    ) -> Result<Self, SyncCodecError> {
+        limits.validate()?;
+        if input.len() > limits.max_body_bytes {
+            return Err(invalid("read response exceeds the encoded-body limit"));
+        }
         let mut fields = decode_map(input)?;
         let objects = match fields.remove("objects") {
             Some(Value::Array(values)) => {
@@ -2345,7 +2549,7 @@ impl SyncSnapshotResponse {
             next_cursor: take_uint(&mut fields, "next_cursor")?,
             more: take_bool(&mut fields, "more")?,
         };
-        response.validate()?;
+        response.validate_with_limits(limits)?;
         Ok(response)
     }
 }
@@ -2363,6 +2567,16 @@ impl SyncVersionsResponse {
     ///
     /// Returns an error for an empty, oversized, mixed-object, or non-ascending history.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        self.validate_with_limits(SyncReadLimits::default())
+    }
+
+    /// Validate history structure and selected payload and complete-body budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, history structure, or exceeded budgets.
+    pub fn validate_with_limits(&self, limits: SyncReadLimits) -> Result<(), SyncCodecError> {
+        limits.validate()?;
         if self.versions.is_empty() {
             return Err(invalid("versions must not be empty"));
         }
@@ -2381,7 +2595,7 @@ impl SyncVersionsResponse {
             }
             previous_seq = version.seq;
         }
-        Ok(())
+        read_versions_body_bytes(&self.versions, limits)
     }
 
     /// Validate that every history entry belongs to the path object.
@@ -2390,8 +2604,21 @@ impl SyncVersionsResponse {
     ///
     /// Returns an error when the path id is invalid or an entry has a different object id.
     pub fn validate_for_object(&self, object_id: Uuid) -> Result<(), SyncCodecError> {
+        self.validate_for_object_with_limits(object_id, SyncReadLimits::default())
+    }
+
+    /// Validate history path correlation with selected read budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, history structure, or object mismatch.
+    pub fn validate_for_object_with_limits(
+        &self,
+        object_id: Uuid,
+        limits: SyncReadLimits,
+    ) -> Result<(), SyncCodecError> {
         valid_uuid(object_id, "version object id")?;
-        self.validate()?;
+        self.validate_with_limits(limits)?;
         if self.versions.iter().any(|version| version.object_id != object_id) {
             return Err(invalid("version object id does not match path"));
         }
@@ -2404,7 +2631,16 @@ impl SyncVersionsResponse {
     ///
     /// Returns an error when validation fails or deterministic CBOR encoding fails.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
-        self.validate()?;
+        self.to_cbor_with_limits(SyncReadLimits::default())
+    }
+
+    /// Check exact encoded size before copying payloads into deterministic CBOR values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, history structure, or exceeded budgets.
+    pub fn to_cbor_with_limits(&self, limits: SyncReadLimits) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate_with_limits(limits)?;
         encode_map(vec![(
             "versions",
             Value::Array(self.versions.iter().cloned().map(SyncChange::into_value).collect()),
@@ -2417,6 +2653,22 @@ impl SyncVersionsResponse {
     ///
     /// Returns an error for malformed CBOR, missing fields, invalid entries, or history limits.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        Self::from_cbor_with_limits(input, SyncReadLimits::default())
+    }
+
+    /// Check the complete input budget before decoding CBOR, including ignored extensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, oversized input, malformed CBOR, or invalid fields.
+    pub fn from_cbor_with_limits(
+        input: &[u8],
+        limits: SyncReadLimits,
+    ) -> Result<Self, SyncCodecError> {
+        limits.validate()?;
+        if input.len() > limits.max_body_bytes {
+            return Err(invalid("read response exceeds the encoded-body limit"));
+        }
         let mut fields = decode_map(input)?;
         let versions = match fields.remove("versions") {
             Some(Value::Array(values)) => {
@@ -2425,7 +2677,7 @@ impl SyncVersionsResponse {
             _ => return Err(invalid("versions must be an array")),
         };
         let response = Self { versions };
-        response.validate()?;
+        response.validate_with_limits(limits)?;
         Ok(response)
     }
 
@@ -2435,8 +2687,21 @@ impl SyncVersionsResponse {
     ///
     /// Returns an error when decoding fails or an entry does not match the path id.
     pub fn from_cbor_for_object(input: &[u8], object_id: Uuid) -> Result<Self, SyncCodecError> {
-        let response = Self::from_cbor(input)?;
-        response.validate_for_object(object_id)?;
+        Self::from_cbor_for_object_with_limits(input, object_id, SyncReadLimits::default())
+    }
+
+    /// Decode and validate history against its path object and selected budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid limits, malformed/oversized input, or object mismatch.
+    pub fn from_cbor_for_object_with_limits(
+        input: &[u8],
+        object_id: Uuid,
+        limits: SyncReadLimits,
+    ) -> Result<Self, SyncCodecError> {
+        let response = Self::from_cbor_with_limits(input, limits)?;
+        response.validate_for_object_with_limits(object_id, limits)?;
         Ok(response)
     }
 }

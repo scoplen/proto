@@ -11,6 +11,10 @@ All notable changes to the `proto` repository will be recorded here.
   pre-Stable source-breaking change for exhaustive matches.
 - Preserve LF endings for shell scripts so the native Unix agent fixture also runs from a
   Windows checkout mounted into its Linux container.
+- Added independent, caller-selected read budgets for complete K-4 change-feed, snapshot, and
+  version-history responses. Encoders preflight exact CBOR sizes, decoders reject oversized input
+  before parsing, and default methods enforce 260 KiB payloads and a 266,295,039-byte body cap.
+  Nine portable profile vectors and public boundary tests cover all three response types.
 - Added explicit deployment-selected limits for complete K-4 write exchanges: requests,
   assignments, conflicts, and request-aware checks accept raised or lowered budgets. Encoders
   preflight exact request sizes and decoders check body bounds before CBOR parsing. Default
