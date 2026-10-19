@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Expanded the pinned OpenSSH 8.8p1 fixture through the existing public SSH examples: Ed25519
+  user certificates with principal, CA, and KRL rejection controls; mixed raw and certified host
+  identity with CA, principal, and expiry rejection; direct TCP forwarding; and nested jumps with
+  wrong-host-pin rejection and parent connection reuse.
 - Extended the pinned OpenSSH 8.8p1 fixture with the existing SFTP v3 workflow, including exact
   streaming-upload length and resume offset, directory and metadata operations, advertised
   extensions, and explicit `copy-data` unsupported response. CI runs this shared example against
