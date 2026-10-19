@@ -176,3 +176,39 @@ fn host_certificate_wins_when_peer_offers_certificate_and_raw_key() {
         Some("ssh-ed25519")
     );
 }
+
+#[test]
+fn per_host_default_preference_reorders_without_enabling_legacy() {
+    let preferred = HostAlgorithmPolicy::with_legacy(&[(Category::Compression, "zlib")])
+        .unwrap()
+        .prefer_default(Category::Compression, "zlib@openssh.com")
+        .unwrap();
+    let other = HostAlgorithmPolicy::default();
+    assert_eq!(preferred.offers(Category::Compression), &["zlib@openssh.com", "none", "zlib"]);
+    assert_eq!(other.offers(Category::Compression), &["none", "zlib@openssh.com"]);
+    assert_eq!(preferred.offers(Category::Cipher), other.offers(Category::Cipher));
+    assert_eq!(
+        preferred.clone().prefer_default(Category::Compression, "zlib@openssh.com").unwrap(),
+        preferred
+    );
+    assert_eq!(
+        preferred.select_client_preference(Category::Compression, &["none", "zlib@openssh.com"]),
+        Some("zlib@openssh.com")
+    );
+    assert_eq!(
+        preferred.clone().prefer_default(Category::Compression, "zlib"),
+        Err(AlgorithmPolicyError::NotDefault {
+            category: Category::Compression,
+            algorithm: "zlib".to_owned(),
+        })
+    );
+    for name in ["aes256-ctr", "ZLIB@OPENSSH.COM", "unknown"] {
+        assert_eq!(
+            preferred.clone().prefer_default(Category::Compression, name),
+            Err(AlgorithmPolicyError::NotDefault {
+                category: Category::Compression,
+                algorithm: name.to_owned(),
+            })
+        );
+    }
+}

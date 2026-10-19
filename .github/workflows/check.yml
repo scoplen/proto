@@ -89,3 +89,13 @@ jobs:
       - name: Explicit per-Host 3DES and default rejection
         shell: pwsh
         run: ./scripts/ssh-algorithm-interop.ps1 -LegacyCipher 3des-cbc
+
+  openssh-modern-matrix:
+    name: OpenSSH modern algorithm matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Constrained KEX, cipher, ETM MAC, and delayed compression
+        shell: pwsh
+        run: ./scripts/ssh-modern-algorithm-interop.ps1

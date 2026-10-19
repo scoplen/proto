@@ -175,7 +175,17 @@ legacy opt-in, and rejection by another default Host. Pass
 The concrete engine includes 3DES support, but offers it only when that Host explicitly enables
 `3des-cbc` through `HostAlgorithmPolicy::with_legacy`. CI checks both constrained ciphers. The
 remaining algorithm and platform interoperability matrix is incomplete.
-The same script runs `strict_kex_interop`: a pinned-key, password-authenticated OpenSSH command
+`HostAlgorithmPolicy::prefer_default` can promote one default algorithm for one Host without
+removing other defaults or enabling legacy names. `pwsh ./scripts/ssh-modern-algorithm-interop.ps1`
+uses 15 disposable, server-constrained OpenSSH listeners to exercise every modern KEX and cipher
+implemented by the current concrete engine, both SHA-2 ETM MACs under AES-CTR, and `none` and
+delayed `zlib@openssh.com` compression. Each case checks the host-key pin, password authentication,
+64 KiB of exact binary command output, exit status zero, and the negotiated algorithms in OpenSSH
+DEBUG3 logs in both directions. A wrong host-key pin fails, and a separate default Host continues
+to negotiate `none` against a server that also offers delayed compression. `sntrup761x25519-sha512`
+and `umac-128-etm@openssh.com` remain unsupported by the current concrete engine; this fixture
+does not establish the full server or platform interoperability matrix.
+`ssh-algorithm-interop.ps1` also runs `strict_kex_interop`: a pinned-key, password-authenticated OpenSSH command
 succeeds, then a local relay inserts a valid `SSH_MSG_IGNORE` before and after the server's first
 KEXINIT in separate connections. The strict client rejects both before host-key verification, while a server that does
 not advertise strict KEX accepts the same packets. This covers one initial exchange and the

@@ -78,9 +78,11 @@ const LEGACY: [&[&str]; 5] = [
     &["zlib"],
 ];
 
-/// An invalid per-Host legacy algorithm selection.
+/// An invalid per-Host algorithm selection.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum AlgorithmPolicyError {
+    #[error("{algorithm} is not a default algorithm in {category:?}")]
+    NotDefault { category: AlgorithmCategory, algorithm: String },
     #[error("{algorithm} is not a legacy algorithm in {category:?}")]
     NotLegacy { category: AlgorithmCategory, algorithm: String },
     #[error("{algorithm} is listed more than once in {category:?}")]
@@ -100,6 +102,27 @@ impl Default for HostAlgorithmPolicy {
 }
 
 impl HostAlgorithmPolicy {
+    /// Put a default algorithm first for this Host without removing the other default offers.
+    /// Legacy algorithms remain disabled unless separately enabled with [`Self::with_legacy`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AlgorithmPolicyError::NotDefault`] when the name is not a default algorithm in
+    /// the selected category.
+    pub fn prefer_default(
+        mut self,
+        category: AlgorithmCategory,
+        name: &str,
+    ) -> Result<Self, AlgorithmPolicyError> {
+        let index = category.index();
+        let Some(&known) = DEFAULTS[index].iter().find(|&&candidate| candidate == name) else {
+            return Err(AlgorithmPolicyError::NotDefault { category, algorithm: name.to_owned() });
+        };
+        self.offers[index].retain(|&candidate| candidate != known);
+        self.offers[index].insert(0, known);
+        Ok(self)
+    }
+
     /// Build one Host's offers. Enabling legacy algorithms only appends them after modern defaults.
     /// Unsupported names, algorithms from another category, and duplicate entries fail closed.
     ///

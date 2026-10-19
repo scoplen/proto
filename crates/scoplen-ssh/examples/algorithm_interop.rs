@@ -19,9 +19,13 @@ use tokio::{net::TcpStream, time::timeout};
 
 const DEADLINE: Duration = Duration::from_secs(10);
 const COMMAND_OUTPUT: &[u8] = b"scoplen-algorithm-ok";
+const MATRIX_OUTPUT_LEN: usize = 64 * 1024;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if let Ok(cases) = env::var("SCOPLEN_ALGORITHM_MATRIX") {
+        return verify_modern_matrix(&cases).await;
+    }
     let modern_port = env::var("SCOPLEN_ALGORITHM_MODERN_PORT")?.parse()?;
     let mlkem_port = env::var("SCOPLEN_ALGORITHM_MLKEM_PORT")?.parse()?;
     let legacy_port = env::var("SCOPLEN_ALGORITHM_LEGACY_PORT")?.parse()?;
@@ -67,6 +71,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "OpenSSH constrained Curve25519/AES-CTR, ML-KEM/ChaCha20, legacy opt-in, and Host isolation passed"
     );
+    Ok(())
+}
+
+async fn verify_modern_matrix(cases: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let expected_key =
+        PublicKey::from_openssh(&env::var("SCOPLEN_ALGORITHM_HOST_KEY")?)?.to_bytes()?;
+    let username = env::var("SCOPLEN_ALGORITHM_USER")?;
+    let password = env::var("SCOPLEN_ALGORITHM_PASSWORD")?;
+    let expected_output = vec![0; MATRIX_OUTPUT_LEN];
+    let mut count = 0;
+    for case in cases.split(';') {
+        let fields: Vec<_> = case.split('|').collect();
+        let [name, port, expected_compression, preference] = fields.as_slice() else {
+            return Err(format!("invalid modern algorithm case: {case}").into());
+        };
+        let port = port.parse::<u16>()?;
+        if !matches!(*expected_compression, "none" | "zlib@openssh.com") {
+            return Err(format!("invalid compression expectation for {name}").into());
+        }
+        if !matches!(*preference, "default" | "zlib") {
+            return Err(format!("invalid policy selection for {name}").into());
+        }
+        let host = format!("{name}.example.test");
+        if count == 0 {
+            let wrong_key = vec![0; expected_key.len()];
+            let (wrong_config, wrong_checks) = pinned_config(&host, port, &wrong_key)?;
+            match connect(wrong_config, port).await {
+                Err(error)
+                    if matches!(
+                        error.downcast_ref::<ClientError>(),
+                        Some(ClientError::HostKey(_))
+                    ) => {}
+                Err(error) => {
+                    return Err(format!("{name}: expected wrong-pin rejection, got {error}").into());
+                }
+                Ok(connection) => {
+                    connection.disconnect().await?;
+                    return Err(format!("{name}: accepted a wrong host key").into());
+                }
+            }
+            require_checks(&wrong_checks, 0, "wrong host-key pin")?;
+        }
+        let (mut config, checks) = pinned_config(&host, port, &expected_key)?;
+        if *preference == "zlib" {
+            config = config.with_algorithm_policy(
+                HostAlgorithmPolicy::default()
+                    .prefer_default(AlgorithmCategory::Compression, "zlib@openssh.com")?,
+            );
+        }
+        let connection = connect(config, port).await?;
+        verify_command_output(
+            connection,
+            &username,
+            &password,
+            b"head -c 65536 /dev/zero",
+            &expected_output,
+        )
+        .await?;
+        require_checks(&checks, 1, name)?;
+        println!(
+            "modern algorithm case {name}: command, exact data, exit status, and host pin passed ({expected_compression})"
+        );
+        count += 1;
+    }
+    if count == 0 {
+        return Err("modern algorithm matrix is empty".into());
+    }
     Ok(())
 }
 
@@ -136,13 +207,30 @@ fn require_checks(
 }
 
 async fn verify_command(
-    mut connection: ClientConnection,
+    connection: ClientConnection,
     username: &str,
     password: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    verify_command_output(
+        connection,
+        username,
+        password,
+        b"printf scoplen-algorithm-ok",
+        COMMAND_OUTPUT,
+    )
+    .await
+}
+
+async fn verify_command_output(
+    mut connection: ClientConnection,
+    username: &str,
+    password: &str,
+    command: &[u8],
+    expected_output: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
     timeout(DEADLINE, connection.authenticate_password(username, password.as_bytes())).await??;
     let mut channel = timeout(DEADLINE, connection.open_session()).await??;
-    timeout(DEADLINE, channel.exec(true, b"printf scoplen-algorithm-ok")).await??;
+    timeout(DEADLINE, channel.exec(true, command)).await??;
     let (output, exit_status) = timeout(DEADLINE, async {
         let mut output = Vec::new();
         let mut exit_status = None;
@@ -158,9 +246,13 @@ async fn verify_command(
         Ok::<_, Box<dyn std::error::Error>>((output, exit_status))
     })
     .await??;
-    if output != COMMAND_OUTPUT || exit_status != Some(0) {
+    if output != expected_output || exit_status != Some(0) {
+        let first_difference =
+            output.iter().zip(expected_output).position(|(actual, expected)| actual != expected);
         return Err(format!(
-            "unexpected command result: status {exit_status:?}, output {output:?}"
+            "unexpected command result: status {exit_status:?}, output length {}, expected length {}, first differing byte {first_difference:?}",
+            output.len(),
+            expected_output.len(),
         )
         .into());
     }
