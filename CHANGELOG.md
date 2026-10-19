@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Reject unsolicited forwarded-agent channels until a live session opts in, revoke permission on
+  locally failed or canceled sends and session close, and reject all forwarded agent requests without
+  touching the key store when the forwarding policy is disabled.
 - Broadened external OpenSSH SFTP transfers to all byte values and verified that a rejected
   four-request write pipeline invalidates only its SFTP session. A fresh channel reads the
   unchanged file and an independent SSH session still opens on the same connection.

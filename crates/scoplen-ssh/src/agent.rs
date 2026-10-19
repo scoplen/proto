@@ -1240,6 +1240,9 @@ impl<S: AgentKeyStore> AgentServer<S> {
         request: AgentMessage,
         policy: &AgentForwardingPolicy<A>,
     ) -> AgentMessage {
+        if !policy.is_enabled() {
+            return AgentMessage::Failure;
+        }
         match request {
             AgentMessage::RequestIdentities => self.dispatch(AgentMessage::RequestIdentities),
             AgentMessage::SignRequest { key_blob, data, flags } => {
@@ -2919,6 +2922,33 @@ mod tests {
         assert_eq!(
             AgentMessage::decode_frame(&stream.written).expect("response"),
             AgentMessage::SignResponse { signature: b"signed payload".to_vec() }
+        );
+    }
+
+    #[test]
+    fn disabled_forwarding_rejects_identity_queries_without_accessing_store() {
+        struct UnreachableStore;
+
+        impl AgentKeyStore for UnreachableStore {
+            fn identities(&self) -> Result<Vec<AgentIdentity>, AgentError> {
+                panic!("disabled forwarding reached the key store");
+            }
+
+            fn sign(
+                &self,
+                _key_blob: &[u8],
+                _data: &[u8],
+                _flags: u32,
+            ) -> Result<Vec<u8>, AgentError> {
+                panic!("disabled forwarding reached the key store");
+            }
+        }
+
+        let server = AgentServer::new(UnreachableStore);
+        let policy = AgentForwardingPolicy::disabled(Authorizer { allowed: true });
+        assert_eq!(
+            server.dispatch_forwarded(AgentMessage::RequestIdentities, &policy),
+            AgentMessage::Failure
         );
     }
 

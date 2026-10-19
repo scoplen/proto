@@ -68,11 +68,14 @@ the stream to the SSH engine, including partial-write and typed failure handling
 negotiation and interoperability with other SSH engines remain open. `AsyncGatewayTransport` and
 `ClientConnection::connect_via_gateway_stream` compose the same one-shot frame over an already
 negotiated async TLS/ALPN stream before the SSH version exchange. The concrete adapter accepts
-server-opened `auth-agent@openssh.com` channels through `ForwardedChannelKind::Agent`; callers can
-serve them with `ForwardedChannel::serve_agent`, which reassembles channel fragments, applies the
-fail-closed signature authorizer, and bounds every response. An in-process russh round trip covers
-the open, data, response, and close lifecycle; external OpenSSH/Pageant interoperability and
-broader channel scheduling remain unverified.
+server-opened `auth-agent@openssh.com` channels through `ForwardedChannelKind::Agent` only while
+a live session on that connection has explicitly requested forwarding. Peer and local close revoke
+the opt-in even when the caller does not consume the peer event; EOF retains it. Callers can serve
+the channel with `ForwardedChannel::serve_agent`, which rechecks authorization, reassembles channel
+fragments, refuses every request under a disabled policy, and bounds every response. In-process
+russh tests cover unsolicited opens and revocation; a disposable OpenSSH fixture covers forwarded
+signing, disabled and denied policies, and management-request refusal. Pageant interoperability
+and broader channel scheduling remain unverified.
 Native Pageant interoperability remains unverified because hosted CI has no Pageant installation.
 The agent server can consume
 multiple bounded frames from a blocking stream through clean peer close while applying the same
