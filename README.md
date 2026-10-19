@@ -159,10 +159,14 @@ local CA pin, and a certificate from a CA the server does not trust, then repeat
 after each rejection. Only public keys and certificates leave the container; the private key stays
 inside the disposable container and signatures come from its agent. `socat` bridges the container's
 Unix agent socket to a loopback-published TCP port for the cross-platform test runner. This
-verifies real OpenSSH agent messages and signing,
-not the native Unix-socket, Windows named-pipe, or Pageant connectors. External forwarded-agent
-and Pageant interoperability, live gateway interoperability, and broader channel scheduling remain
-unverified.
+verifies real OpenSSH agent messages and signing. `pwsh ./scripts/ssh-agent-unix-interop.ps1`
+builds the same example with the pinned Rust toolchain in a disposable Linux container, runs it
+through the public `connect_unix_agent` connector against the agent socket, and repeats the raw,
+certificate, rejection, and healthy-reconnection cases. The container publishes no ports and
+mounts the source read-only; its keys, socket, and build outputs are discarded. The fixture's
+per-case process timeout bounds a stalled test; it does not add a cancellation deadline to the
+production synchronous agent API. Windows named-pipe and Pageant connectors, external agent
+forwarding, live gateway interoperability, and broader channel scheduling remain unverified.
 The `openssh_interop` example provides a disposable external-server smoke test when
 one host trust pin and one authentication source are supplied. Set either
 `SCOPLEN_OPENSSH_HOST_KEY` to the server's OpenSSH public-key line or
