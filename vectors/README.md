@@ -38,6 +38,12 @@ device revocation uses the boolean marker `{device_revoked: true}` until the spe
 an event payload. UUIDs are encoded as 16-byte UUIDv7 strings, and all expected values are
 deterministic CBOR in lowercase hexadecimal.
 
+`sync-notification-auth.json` contains the K-4 WebSocket opening context for both `GET` and
+`CONNECT`, the client's first authentication message, and the successful server acknowledgement.
+Inputs are JSON objects; expected values are deterministic CBOR in lowercase hexadecimal. The
+compact-JWS strings are synthetic public test data. The shared codec validates their lexical wire
+shape and limits, not signatures, claims, device state, key binding, or proof replay.
+
 `sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a

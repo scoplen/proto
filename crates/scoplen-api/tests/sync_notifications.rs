@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use scoplen_api::sync::SyncNotification;
+use scoplen_api::sync::{MAX_SYNC_NOTIFICATION_BODY_BYTES, SyncNotification};
 use scoplen_model::cbor::{self, Value};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
@@ -50,6 +50,12 @@ fn notifications_require_one_unambiguous_event_and_validate_fields() {
 
     let zero_seq = SyncNotification::VaultAdvanced { vault: vault(), seq: 0 };
     assert!(zero_seq.to_cbor().is_err());
+    let zero_seq_wire = cbor::encode(&Value::Map(vec![
+        (Value::Text("seq".into()), Value::UInt(0)),
+        (Value::Text("vault".into()), Value::Bytes(vault().into_bytes().to_vec())),
+    ]))
+    .expect("zero sequence wire");
+    assert!(SyncNotification::from_cbor(&zero_seq_wire).is_err());
 
     let ambiguous = cbor::encode(&Value::Map(vec![
         (Value::Text("seq".into()), Value::UInt(1)),
@@ -63,6 +69,23 @@ fn notifications_require_one_unambiguous_event_and_validate_fields() {
         cbor::encode(&Value::Map(vec![(Value::Text("device_revoked".into()), Value::Bool(false))]))
             .expect("false marker");
     assert!(SyncNotification::from_cbor(&false_marker).is_err());
+
+    for key in ["htm", "access_token", "dpop_proof", "authenticated"] {
+        let Value::Map(mut fields) = cbor::decode(&encoded).expect("map") else {
+            panic!("notification map");
+        };
+        fields.push((Value::Text(key.into()), Value::Null));
+        let mixed = cbor::encode(&Value::Map(fields)).expect("mixed message");
+        assert!(SyncNotification::from_cbor(&mixed).is_err(), "accepted {key}");
+    }
+
+    assert!(SyncNotification::from_cbor(&vec![0; MAX_SYNC_NOTIFICATION_BODY_BYTES + 1]).is_err());
+    let oversized_extension = cbor::encode(&Value::Map(vec![
+        (Value::Text("device_revoked".into()), Value::Bool(true)),
+        (Value::Text("future".into()), Value::Text("x".repeat(MAX_SYNC_NOTIFICATION_BODY_BYTES))),
+    ]))
+    .expect("oversized event");
+    assert!(SyncNotification::from_cbor(&oversized_extension).is_err());
 
     assert!(SyncNotification::from_cbor(&[0xbf, 0xff]).is_err());
     assert!(SyncNotification::from_cbor(&[0xf6]).is_err());

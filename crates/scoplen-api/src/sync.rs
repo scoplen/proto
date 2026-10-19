@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //! K-4 sync wire messages and canonical change-feed query parameters.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 use scoplen_model::{
     cbor::{self, Value},
@@ -48,6 +51,14 @@ pub const MAX_SYNC_VAULT_EPOCH_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
 pub const MAX_SYNC_VAULT_MEMBER_EPOCHS: usize = MAX_SYNC_VAULT_KEY_EPOCHS;
 /// Maximum encoded size of a shared-vault member request or response.
 pub const MAX_SYNC_VAULT_MEMBER_BODY_BYTES: usize = MAX_SYNC_KEY_BODY_BYTES;
+/// Maximum size of a complete K-4 notification WebSocket application message.
+pub const MAX_SYNC_NOTIFICATION_BODY_BYTES: usize = 16 * 1024;
+/// Maximum length of a notification access-token compact JWS.
+pub const MAX_SYNC_NOTIFICATION_ACCESS_TOKEN_BYTES: usize = 4 * 1024;
+/// Maximum length of a notification `DPoP` proof compact JWS.
+pub const MAX_SYNC_NOTIFICATION_DPOP_PROOF_BYTES: usize = 8 * 1024;
+/// Time from the opening handshake to complete notification authentication.
+pub const SYNC_NOTIFICATION_AUTH_DEADLINE_SECS: u64 = 10;
 
 /// Errors at the K-4 sync wire boundary.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -874,6 +885,223 @@ pub struct SyncSessionResponse {
     pub vaults: Vec<SessionVault>,
 }
 
+/// The opening HTTP method reported by the K-4 notification WebSocket server.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SyncNotificationMethod {
+    Get,
+    Connect,
+}
+
+impl SyncNotificationMethod {
+    /// Return the exact `DPoP` `htm` value for this opening method.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Get => "GET",
+            Self::Connect => "CONNECT",
+        }
+    }
+}
+
+/// Server context sent before the client generates a notification `DPoP` proof.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyncNotificationContext {
+    pub htm: SyncNotificationMethod,
+}
+
+impl SyncNotificationContext {
+    /// Encode the context as deterministic CBOR.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the complete message exceeds the notification bound.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        let encoded = encode_map(vec![("htm", Value::Text(self.htm.as_str().into()))])?;
+        enforce_notification_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a context, ignoring unknown response extensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an oversized, invalid, or mixed protocol message.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_notification_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        reject_notification_fields(&fields, &NOTIFICATION_CONTEXT_FORBIDDEN)?;
+        let htm = match take_text(&mut fields, "htm")?.as_str() {
+            "GET" => SyncNotificationMethod::Get,
+            "CONNECT" => SyncNotificationMethod::Connect,
+            _ => return Err(invalid("notification htm must be GET or CONNECT")),
+        };
+        Ok(Self { htm })
+    }
+}
+
+/// Client's first notification WebSocket application message.
+///
+/// This codec checks only bounded compact-JWS syntax. Token signatures, claims, device state,
+/// `DPoP` key binding, and replay are verified by the consumer.
+#[derive(Clone, Eq, PartialEq)]
+pub struct SyncNotificationAuth {
+    pub access_token: String,
+    pub dpop_proof: String,
+}
+
+impl fmt::Debug for SyncNotificationAuth {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SyncNotificationAuth")
+            .field("access_token", &"[REDACTED]")
+            .field("dpop_proof", &"[REDACTED]")
+            .finish()
+    }
+}
+
+impl SyncNotificationAuth {
+    /// Validate compact-JWS lexical form and field bounds without authenticating credentials.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty, malformed, or oversized field.
+    pub fn validate(&self) -> Result<(), SyncCodecError> {
+        validate_notification_jws(
+            &self.access_token,
+            MAX_SYNC_NOTIFICATION_ACCESS_TOKEN_BYTES,
+            "access_token",
+        )?;
+        validate_notification_jws(
+            &self.dpop_proof,
+            MAX_SYNC_NOTIFICATION_DPOP_PROOF_BYTES,
+            "dpop_proof",
+        )
+    }
+
+    /// Encode the strict two-field authentication message as deterministic CBOR.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid credentials' lexical form or an oversized message.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
+        self.validate()?;
+        let encoded = encode_map(vec![
+            ("access_token", Value::Text(self.access_token.clone())),
+            ("dpop_proof", Value::Text(self.dpop_proof.clone())),
+        ])?;
+        enforce_notification_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode a strict two-field authentication message.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an oversized, malformed, non-canonical, or mixed message.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_notification_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        let auth = Self {
+            access_token: take_text(&mut fields, "access_token")?,
+            dpop_proof: take_text(&mut fields, "dpop_proof")?,
+        };
+        if !fields.is_empty() {
+            return Err(invalid("unknown notification authentication field"));
+        }
+        auth.validate()?;
+        Ok(auth)
+    }
+}
+
+/// Server acknowledgement sent after successful notification authentication.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyncNotificationReady;
+
+impl SyncNotificationReady {
+    /// Encode the acknowledgement as deterministic CBOR.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if deterministic CBOR encoding fails.
+    pub fn to_cbor(self) -> Result<Vec<u8>, SyncCodecError> {
+        let encoded = encode_map(vec![("authenticated", Value::Bool(true))])?;
+        enforce_notification_body_limit(&encoded)?;
+        Ok(encoded)
+    }
+
+    /// Decode an acknowledgement, ignoring unknown response extensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an oversized, invalid, or mixed protocol message.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_notification_body_limit(input)?;
+        let mut fields = decode_map(input)?;
+        reject_notification_fields(&fields, &NOTIFICATION_READY_FORBIDDEN)?;
+        if !take_bool(&mut fields, "authenticated")? {
+            return Err(invalid("authenticated must be true"));
+        }
+        Ok(Self)
+    }
+}
+
+const NOTIFICATION_CONTEXT_FORBIDDEN: [&str; 7] = [
+    "access_token",
+    "dpop_proof",
+    "authenticated",
+    "vault",
+    "seq",
+    "rotation_pending",
+    "device_revoked",
+];
+const NOTIFICATION_READY_FORBIDDEN: [&str; 7] =
+    ["htm", "access_token", "dpop_proof", "vault", "seq", "rotation_pending", "device_revoked"];
+const NOTIFICATION_EVENT_FORBIDDEN: [&str; 4] =
+    ["htm", "access_token", "dpop_proof", "authenticated"];
+
+fn reject_notification_fields(
+    fields: &BTreeMap<String, Value>,
+    forbidden: &[&str],
+) -> Result<(), SyncCodecError> {
+    if forbidden.iter().any(|key| fields.contains_key(*key)) {
+        return Err(invalid("notification message has fields from another message type"));
+    }
+    Ok(())
+}
+
+fn validate_notification_jws(
+    value: &str,
+    max_bytes: usize,
+    field: &str,
+) -> Result<(), SyncCodecError> {
+    if value.len() > max_bytes {
+        return Err(invalid(format!("{field} exceeds {max_bytes} bytes")));
+    }
+    let mut segments = value.split('.');
+    if (0..3).any(|_| {
+        !segments.next().is_some_and(|segment| {
+            !segment.is_empty()
+                && segment.len() % 4 != 1
+                && segment
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+        })
+    }) || segments.next().is_some()
+    {
+        return Err(invalid(format!("{field} must be compact JWS syntax")));
+    }
+    Ok(())
+}
+
+fn enforce_notification_body_limit(input: &[u8]) -> Result<(), SyncCodecError> {
+    if input.len() > MAX_SYNC_NOTIFICATION_BODY_BYTES {
+        return Err(invalid(format!(
+            "notification message exceeds {MAX_SYNC_NOTIFICATION_BODY_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
 /// A content-free event delivered on the K-4 notification WebSocket.
 ///
 /// Notifications only tell a client which follow-up action is needed. Object content is never
@@ -911,7 +1139,7 @@ impl SyncNotification {
     ///
     /// # Errors
     ///
-    /// Returns an error when event fields are invalid or deterministic CBOR encoding fails.
+    /// Returns an error when event fields are invalid, encoding fails, or the message is oversized.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
         self.validate()?;
         let value = match self {
@@ -925,7 +1153,9 @@ impl SyncNotification {
             ]),
             Self::DeviceRevoked => map(vec![("device_revoked", Value::Bool(true))]),
         };
-        cbor::encode(&value).map_err(Into::into)
+        let encoded = cbor::encode(&value)?;
+        enforce_notification_body_limit(&encoded)?;
+        Ok(encoded)
     }
 
     /// Decode a deterministic CBOR notification, ignoring additive response fields.
@@ -935,10 +1165,12 @@ impl SyncNotification {
     ///
     /// # Errors
     ///
-    /// Returns an error for malformed CBOR, an unknown or ambiguous event, wrong field types, an
-    /// invalid UUID, or a zero advancement sequence.
+    /// Returns an error for an oversized message, malformed CBOR, an unknown or ambiguous event,
+    /// wrong field types, an invalid UUID, or a zero advancement sequence.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
+        enforce_notification_body_limit(input)?;
         let mut fields = decode_map(input)?;
+        reject_notification_fields(&fields, &NOTIFICATION_EVENT_FORBIDDEN)?;
         let device_revoked = fields.remove("device_revoked");
         let rotation_pending = fields.remove("rotation_pending");
         let seq = fields.remove("seq");
@@ -962,10 +1194,11 @@ impl SyncNotification {
                 }
                 Ok(Self::RotationPending { vault: decode_uuid(vault, "notification vault")? })
             }
-            (None, None, Some(seq), Some(vault)) => Ok(Self::VaultAdvanced {
-                vault: decode_uuid(vault, "notification vault")?,
-                seq: decode_uint(&seq, "notification sequence")?,
-            }),
+            (None, None, Some(seq), Some(vault)) => {
+                let seq = decode_uint(&seq, "notification sequence")?;
+                positive(seq, "notification sequence")?;
+                Ok(Self::VaultAdvanced { vault: decode_uuid(vault, "notification vault")?, seq })
+            }
             (Some(_), _, _, _) => {
                 Err(invalid("device_revoked notification has extra known fields"))
             }

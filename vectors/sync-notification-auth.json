@@ -1,0 +1,30 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "sync-notification-context-get-v1",
+      "kind": "sync.notification.context",
+      "input": "{\"htm\":\"GET\"}",
+      "expected": "a16368746d63474554"
+    },
+    {
+      "id": "sync-notification-context-connect-v1",
+      "kind": "sync.notification.context",
+      "input": "{\"htm\":\"CONNECT\"}",
+      "expected": "a16368746d67434f4e4e454354"
+    },
+    {
+      "id": "sync-notification-auth-v1",
+      "kind": "sync.notification.auth",
+      "input": "{\"access_token\":\"YQ.Yg.Yw\",\"dpop_proof\":\"ZA.ZQ.Zg\"}",
+      "expected": "a26a64706f705f70726f6f66685a412e5a512e5a676c6163636573735f746f6b656e6859512e59672e5977"
+    },
+    {
+      "id": "sync-notification-ready-v1",
+      "kind": "sync.notification.ready",
+      "input": "{\"authenticated\":true}",
+      "expected": "a16d61757468656e74696361746564f5"
+    }
+  ]
+}

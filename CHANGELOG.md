@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added bounded K-4 notification WebSocket context, first-message authentication, and ready
+  acknowledgement codecs with GET/CONNECT vectors, strict compact-JWS lexical checks, redacted
+  credential debug output, and rejection of mixed message fields. The existing event reader now
+  enforces the same 16 KiB bound and rejects zero advancement sequence numbers. JWT/DPoP
+  verification and connection lifecycle remain consumer responsibilities.
 - Verified the default ML-KEM/ChaCha20 negotiation against a disposable OpenSSH listener that
   offers only those algorithms. Pinned-key authentication, exact command output, and exit status
   pass alongside the existing modern, legacy, strict-KEX, and rekey checks; the full algorithm
