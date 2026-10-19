@@ -120,7 +120,9 @@ impl SignatureAlgorithm {
                 | "ecdsa-sha2-nistp256"
                 | "ecdsa-sha2-nistp256-cert-v01@openssh.com"
                 | "sk-ssh-ed25519@openssh.com"
+                | "sk-ssh-ed25519-cert-v01@openssh.com"
                 | "sk-ecdsa-sha2-nistp256@openssh.com"
+                | "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
                 | "rsa-sha2-256"
                 | "rsa-sha2-256-cert-v01@openssh.com"
                 | "rsa-sha2-512"
@@ -131,10 +133,12 @@ impl SignatureAlgorithm {
 
     fn accepts_identity(self, identity: &str) -> bool {
         match self {
-            Self::Ed25519 | Self::EcdsaSha2Nistp256 => {
+            Self::Ed25519
+            | Self::EcdsaSha2Nistp256
+            | Self::SkEd25519
+            | Self::SkEcdsaSha2Nistp256 => {
                 identity == self.name() || identity == self.certificate_name()
             }
-            Self::SkEd25519 | Self::SkEcdsaSha2Nistp256 => identity == self.name(),
             Self::RsaSha2_256 => matches!(
                 identity,
                 "rsa-sha2-256"

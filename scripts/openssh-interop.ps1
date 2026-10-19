@@ -156,20 +156,61 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
         if ($LASTEXITCODE -ne 0) { throw "Could not copy disposable OpenSSH fixture $name" }
     }
     foreach ($case in @(
-        @{ Algorithm = 'ed25519'; File = 'sk_ed.pub'; Prefix = 'sk-ssh-ed25519@openssh.com ' },
-        @{ Algorithm = 'p256'; File = 'sk_p256.pub'; Prefix = 'sk-ecdsa-sha2-nistp256@openssh.com ' }
+        @{ Algorithm = 'ed25519'; Stem = 'sk_ed'; Prefix = 'sk-ssh-ed25519@openssh.com ' },
+        @{ Algorithm = 'p256'; Stem = 'sk_p256'; Prefix = 'sk-ecdsa-sha2-nistp256@openssh.com ' }
     )) {
-        $publicLine = & cargo run --quiet --locked -p scoplen-ssh --example security_key_interop -- public $case.Algorithm
-        if ($LASTEXITCODE -ne 0 -or -not $publicLine.StartsWith($case.Prefix, [System.StringComparison]::Ordinal)) {
-            throw "Could not generate disposable $($case.Algorithm) security-key public identity"
+        foreach ($variant in @(
+            @{ Argument = 'valid'; Suffix = '' },
+            @{ Argument = 'wrong-key'; Suffix = '_other-key' },
+            @{ Argument = 'wrong-application'; Suffix = '_other-application' }
+        )) {
+            $publicLine = & cargo run --quiet --locked -p scoplen-ssh --example security_key_interop -- public $case.Algorithm $variant.Argument
+            if ($LASTEXITCODE -ne 0 -or -not $publicLine.StartsWith($case.Prefix, [System.StringComparison]::Ordinal)) {
+                throw "Could not generate disposable $($case.Algorithm) $($variant.Argument) security-key identity"
+            }
+            $file = "$($case.Stem)$($variant.Suffix).pub"
+            $keyPath = Join-Path $tempRoot $file
+            Set-Content -LiteralPath $keyPath -Value $publicLine -Encoding ascii
+            docker cp $keyPath "${container}:/tmp/$file" | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Could not copy disposable $file security-key identity" }
         }
-        $keyPath = Join-Path $tempRoot $case.File
-        Set-Content -LiteralPath $keyPath -Value $publicLine -Encoding ascii
-        docker cp $keyPath "${container}:/tmp/$($case.File)" | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Could not copy disposable $($case.Algorithm) security-key identity" }
     }
     docker exec $container sh -c 'cat /tmp/sk_ed.pub /tmp/sk_p256.pub >> /home/scoplen/.ssh/authorized_keys && chown scoplen:scoplen /home/scoplen/.ssh/authorized_keys && chmod 600 /home/scoplen/.ssh/authorized_keys' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Could not authorize disposable security-key identities' }
+    $securityKeyCertificates = @'
+set -eu
+for stem in sk_ed sk_p256; do
+    ssh-keygen -q -s /tmp/ca_trusted -I "${stem}-valid" -z 4200 -n scoplen -V -1m:+10m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_valid-cert.pub"
+    ssh-keygen -q -s /tmp/ca_trusted -I "${stem}-wrong-subject" -z 4204 -n scoplen -V -1m:+10m "/tmp/${stem}_other-key.pub"
+    mv "/tmp/${stem}_other-key-cert.pub" "/tmp/${stem}_wrong-subject-cert.pub"
+    ssh-keygen -q -s /tmp/ca_trusted -I "${stem}-wrong-application" -z 4205 -n scoplen -V -1m:+10m "/tmp/${stem}_other-application.pub"
+    mv "/tmp/${stem}_other-application-cert.pub" "/tmp/${stem}_wrong-application-cert.pub"
+    ssh-keygen -q -s /tmp/ca_trusted -I "${stem}-wrong-principal" -z 4207 -n other -V -1m:+10m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_wrong-principal-cert.pub"
+    ssh-keygen -q -s /tmp/ca_trusted -I "${stem}-future" -z 4209 -n scoplen -V +5m:+10m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_future-cert.pub"
+    ssh-keygen -q -s /tmp/ca_trusted -I "${stem}-expired" -z 4208 -n scoplen -V -10m:-5m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_expired-cert.pub"
+    ssh-keygen -q -s /tmp/ca_other -I "${stem}-untrusted" -z 4206 -n scoplen -V -1m:+10m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_untrusted-cert.pub"
+    ssh-keygen -q -s /tmp/ca_krl -I krl-allowed -z 4103 -n scoplen -V -1m:+10m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_krl-allowed-cert.pub"
+    ssh-keygen -q -s /tmp/ca_krl -I krl-serial-revoked -z 4101 -n scoplen -V -1m:+10m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_krl-serial-cert.pub"
+    ssh-keygen -q -s /tmp/ca_krl -I krl-id-revoked -z 4102 -n scoplen -V -1m:+10m "/tmp/${stem}.pub"
+    mv "/tmp/${stem}-cert.pub" "/tmp/${stem}_krl-id-cert.pub"
+done
+'@
+    docker exec $container sh -c ($securityKeyCertificates.Replace("`r", '')) | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not sign disposable security-key user certificates' }
+    foreach ($stem in @('sk_ed', 'sk_p256')) {
+        foreach ($suffix in @('valid', 'wrong-subject', 'wrong-application', 'wrong-principal', 'future', 'expired', 'untrusted', 'krl-allowed', 'krl-serial', 'krl-id')) {
+            $file = "${stem}_${suffix}-cert.pub"
+            docker cp "${container}:/tmp/$file" (Join-Path $tempRoot $file) | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Could not copy disposable security-key certificate $file" }
+        }
+    }
     $env:SCOPLEN_OPENSSH_HOST = '127.0.0.1'
     $env:SCOPLEN_OPENSSH_PORT = $port.ToString()
     $env:SCOPLEN_OPENSSH_USER = 'scoplen'
@@ -252,7 +293,46 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
             Invoke-SecurityKeyExample "$algorithm security key $fault" $algorithm $fault 'AuthenticationRejected'
         }
     }
-    Write-Output 'OpenSSH password, routes, software keys, security keys, user certificates, KRL revocation, and rejection paths passed'
+    foreach ($case in @(
+        @{ Algorithm = 'ed25519'; Stem = 'sk_ed' },
+        @{ Algorithm = 'p256'; Stem = 'sk_p256' }
+    )) {
+        $stem = $case.Stem
+        $algorithm = $case.Algorithm
+        $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
+        $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "${stem}_valid-cert.pub"
+        Invoke-SecurityKeyExample "$algorithm security-key certificate" $algorithm
+        foreach ($fault in @('wrong-key', 'wrong-application', 'wrong-payload')) {
+            Invoke-SecurityKeyExample "$algorithm security-key certificate $fault" $algorithm $fault 'AuthenticationRejected'
+        }
+        foreach ($caseName in @('wrong-subject', 'wrong-application')) {
+            $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "${stem}_${caseName}-cert.pub"
+            Invoke-SecurityKeyExample "$algorithm certificate $caseName" $algorithm 'valid' 'KeyMismatch'
+        }
+        foreach ($rejection in @(
+            @{ Suffix = 'wrong-principal'; Error = 'PrincipalMismatch' },
+            @{ Suffix = 'future'; Error = 'NotYetValid' },
+            @{ Suffix = 'expired'; Error = 'Expired' }
+        )) {
+            $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "${stem}_$($rejection.Suffix)-cert.pub"
+            Invoke-SecurityKeyExample "$algorithm certificate $($rejection.Suffix)" $algorithm 'valid' $rejection.Error
+        }
+        $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "${stem}_valid-cert.pub"
+        $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_other.pub'
+        Invoke-SecurityKeyExample "$algorithm certificate wrong local CA pin" $algorithm 'valid' 'UntrustedUserCa'
+        $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "${stem}_untrusted-cert.pub"
+        Invoke-SecurityKeyExample "$algorithm certificate server-untrusted CA" $algorithm 'valid' 'AuthenticationRejected'
+        $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_krl.pub'
+        $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "${stem}_krl-allowed-cert.pub"
+        Invoke-SecurityKeyExample "$algorithm certificate unrevoked by KRL" $algorithm
+        foreach ($suffix in @('krl-serial', 'krl-id')) {
+            $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot "${stem}_${suffix}-cert.pub"
+            Invoke-SecurityKeyExample "$algorithm certificate $suffix" $algorithm 'valid' 'AuthenticationRejected'
+        }
+        Remove-Item Env:SCOPLEN_OPENSSH_USER_CERT, Env:SCOPLEN_OPENSSH_USER_CA_KEY
+        Invoke-SecurityKeyExample "$algorithm raw key remains valid with KRL enabled" $algorithm
+    }
+    Write-Output 'OpenSSH password, routes, software keys, security keys and certificates, user certificates, KRL revocation, and rejection paths passed'
 }
 catch {
     if ($started) {
