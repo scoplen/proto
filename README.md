@@ -9,7 +9,8 @@ under Apache-2.0.
 ## Status
 
 Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1), K-1 object
-model (S2), and K-2 cryptographic gate (S3) are complete. The model includes deterministic CBOR, schema-version
+model (S2) are complete. The K-2 baseline is implemented; D-108 hierarchy artifact formats
+remain in progress before the cryptographic gate (S3) is complete. The model includes deterministic CBOR, schema-version
 handling, per-object limits, merge properties, and executable known-answer vectors. Protocol,
 cryptographic, and wire behavior is added only from the canonical specifications in `scoplen-docs`;
 the S3 primitive boundary now includes zeroizing secret containers, operating-system randomness,
@@ -601,6 +602,12 @@ signature and token hash from an independent source.
 Challenge storage, credential verification, and token issuance are server responsibilities; this
 library does not implement a production authentication service. Origin and cookie handling,
 atomic refresh rotation, and reuse detection remain server responsibilities.
+
+`ObjectEnvelope::verify_signature` checks an opaque encrypted object's version, epoch,
+identifiers, ciphertext/tag size, and certified device signature against trusted vault/object
+ids without decrypting it. `decrypt` uses the same verification path. Servers must separately
+check current device and vault write authority in their mutation transaction; this check
+does not validate the plaintext or grant permission to write.
 `PersonalEnrollmentContext` constructs D-101's exact first-device signature input
 from the trusted HTTPS origin, decoded invitation-token digest, UUIDv7 account/vault
 ids, public account keys, and hashes of the exact uploaded artifacts. It signs through

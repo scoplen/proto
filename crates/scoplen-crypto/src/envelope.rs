@@ -90,6 +90,29 @@ impl ObjectEnvelope {
         Ok(envelope)
     }
 
+    /// Verify the opaque envelope for a certified device key without decrypting its contents.
+    ///
+    /// This authenticates the supplied vault/object binding, not current write authorization
+    /// or the validity of the encrypted object. Consumers enforce those separately.
+    pub fn verify_signature(
+        &self,
+        vault_id: Uuid,
+        object_id: Uuid,
+        signer_public_key_sec1: &[u8],
+    ) -> Result<(), PrimitiveError> {
+        if self.version != OBJECT_ENVELOPE_VERSION
+            || self.key_epoch == 0
+            || self.ciphertext.len() < 16
+        {
+            return Err(PrimitiveError::InvalidEncoding);
+        }
+        validate_uuid(vault_id)?;
+        validate_uuid(object_id)?;
+        validate_uuid(self.signer_device_id)?;
+        let aad = aad(vault_id, object_id, self.key_epoch)?;
+        p256_verify(signer_public_key_sec1, &self.signature_input(&aad), &self.signature)
+    }
+
     /// Verify, decrypt, and decode the object for a known signer public key.
     pub fn decrypt(
         &self,
@@ -98,14 +121,8 @@ impl ObjectEnvelope {
         vault_key: &SymmetricKey,
         signer_public_key_sec1: &[u8],
     ) -> Result<Object, PrimitiveError> {
-        if self.version != OBJECT_ENVELOPE_VERSION || self.key_epoch == 0 {
-            return Err(PrimitiveError::InvalidEncoding);
-        }
-        validate_uuid(vault_id)?;
-        validate_uuid(object_id)?;
-        validate_uuid(self.signer_device_id)?;
+        self.verify_signature(vault_id, object_id, signer_public_key_sec1)?;
         let aad = aad(vault_id, object_id, self.key_epoch)?;
-        p256_verify(signer_public_key_sec1, &self.signature_input(&aad), &self.signature)?;
         let plaintext = xchacha20poly1305_open(vault_key, &self.nonce, &self.ciphertext, &aad)?;
         let object = Object::decode(&plaintext).map_err(|_| PrimitiveError::InvalidEncoding)?;
         if object.id != object_id {
