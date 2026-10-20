@@ -195,6 +195,7 @@
     "/auth/device": {
       "post": {
         "operationId": "authenticateDevice",
+        "x-scoplen-initial-device-scope": "account:read keys:read keys:write sync:read sync:write",
         "security": [],
         "requestBody": {
           "required": true,
@@ -209,7 +210,7 @@
         },
         "responses": {
           "200": {
-            "description": "DPoP-bound access and refresh tokens.",
+            "description": "DPoP-bound access and refresh tokens. The server issues exactly account:read keys:read keys:write sync:read sync:write after checking the current active account, enrolled device, and certificate. Request bodies cannot propose scopes. The refresh family records this initial permission ceiling. Scopes do not grant operator, browser, or service-principal rights and do not replace current-state or resource authorization.",
             "content": {
               "application/json": {
                 "schema": {
@@ -289,7 +290,7 @@
         },
         "responses": {
           "200": {
-            "description": "A rotated DPoP-bound token pair. Browser responses omit refresh_token and rotate it only through Set-Cookie: __Secure-spl-refresh with Path=/api/v1/auth/refresh, HttpOnly, Secure, SameSite=Strict, no Domain, and Max-Age=refresh_expires_in. The refresh family expires absolutely 30 days after initial authentication/bootstrap; rotation does not extend it. Return 600 access seconds and the remaining family whole seconds rounded down; deny when fewer than one remains.",
+            "description": "A rotated DPoP-bound token pair. Browser responses omit refresh_token and rotate it only through Set-Cookie: __Secure-spl-refresh with Path=/api/v1/auth/refresh, HttpOnly, Secure, SameSite=Strict, no Domain, and Max-Age=refresh_expires_in. The refresh family expires absolutely 30 days after initial authentication/bootstrap; rotation does not extend it. Return 600 access seconds and the remaining family whole seconds rounded down; deny when fewer than one remains. For enrolled-device families, rotation may preserve or narrow the initially granted scope ceiling according to current server state, never widen it. If no scope remains, require reauthentication and issue no token. Resource and organization access is rechecked at use; browser profiles remain separate.",
             "headers": {
               "Cache-Control": {
                 "required": true,
@@ -382,7 +383,8 @@
     "/accounts/me": {
       "get": {
         "operationId": "getCurrentAccount",
-        "description": "Current authenticated account profile. Complete response body is at most 4096 bytes, including whitespace, escapes, and extensions. Duplicate JSON names are invalid at every depth.",
+        "x-scoplen-required-device-scope": "account:read",
+        "description": "Current authenticated account profile. Complete response body is at most 4096 bytes, including whitespace, escapes, and extensions. Duplicate JSON names are invalid at every depth. The enrolled-device profile requires exact account:read after signature, DPoP, replay, and current account/device checks and before protected resource access. A missing scope returns 403 policy.denied, changed=false and retryable=false, without disclosing resource existence. There are no wildcard, prefix, role-name, or implied read-from-write matches; unknown scopes grant no registered rights and unmapped protected routes fail closed. The scope does not replace account ownership or operation policy.",
         "responses": {
           "200": {
             "description": "Current account Resource; HTTP ETag exactly equals body etag.",

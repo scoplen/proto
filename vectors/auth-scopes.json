@@ -1,0 +1,300 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "auth-scope-missing-problem-v1",
+      "kind": "auth.scope.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Permission denied\",\"status\":403,\"detail\":\"The device permission does not allow this operation.\",\"instance\":\"scope-1\",\"code\":\"policy.denied\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Permission denied\",\"status\":403,\"detail\":\"The device permission does not allow this operation.\",\"instance\":\"scope-1\",\"code\":\"policy.denied\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "auth-scope-initial-v1",
+      "kind": "auth.scope.initial",
+      "input": "first-party-device",
+      "expected": "account:read keys:read keys:write sync:read sync:write"
+    },
+    {
+      "id": "auth-scope-token-account-read-v1",
+      "kind": "auth.scope.token",
+      "input": "account:read",
+      "expected": "account:read"
+    },
+    {
+      "id": "auth-scope-token-keys-read-v1",
+      "kind": "auth.scope.token",
+      "input": "keys:read",
+      "expected": "keys:read"
+    },
+    {
+      "id": "auth-scope-token-keys-write-v1",
+      "kind": "auth.scope.token",
+      "input": "keys:write",
+      "expected": "keys:write"
+    },
+    {
+      "id": "auth-scope-token-sync-read-v1",
+      "kind": "auth.scope.token",
+      "input": "sync:read",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-token-sync-write-v1",
+      "kind": "auth.scope.token",
+      "input": "sync:write",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-unknown-future-v1",
+      "kind": "auth.scope.token",
+      "input": "future:read",
+      "expected": "unknown"
+    },
+    {
+      "id": "auth-scope-unknown-wildcard-v1",
+      "kind": "auth.scope.token",
+      "input": "*",
+      "expected": "unknown"
+    },
+    {
+      "id": "auth-scope-unknown-prefix-v1",
+      "kind": "auth.scope.token",
+      "input": "sync:*",
+      "expected": "unknown"
+    },
+    {
+      "id": "auth-scope-unknown-role-v1",
+      "kind": "auth.scope.token",
+      "input": "owner",
+      "expected": "unknown"
+    },
+    {
+      "id": "auth-scope-unknown-case-v1",
+      "kind": "auth.scope.token",
+      "input": "SYNC:READ",
+      "expected": "unknown"
+    },
+    {
+      "id": "auth-scope-unknown-suffix-v1",
+      "kind": "auth.scope.token",
+      "input": "keys:read:extra",
+      "expected": "unknown"
+    },
+    {
+      "id": "auth-scope-operation-1-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/accounts/me\"}",
+      "expected": "account:read"
+    },
+    {
+      "id": "auth-scope-operation-2-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/keys\"}",
+      "expected": "keys:read"
+    },
+    {
+      "id": "auth-scope-operation-3-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/sync/v1/keys\"}",
+      "expected": "keys:write"
+    },
+    {
+      "id": "auth-scope-operation-4-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/session\"}",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-operation-5-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/keys\"}",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-operation-6-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/changes\"}",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-operation-7-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/snapshot\"}",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-operation-8-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/objects/{object}/versions\"}",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-operation-9-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/notify\"}",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-operation-10-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/vaults\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-operation-11-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/vaults/{vault}/objects\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-operation-12-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/vaults/{vault}/ack\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-operation-13-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/vaults/{vault}/epochs\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-operation-14-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/vaults/{vault}/members\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-operation-15-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/vaults/{vault}/epochs/{epoch}/retire\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-operation-16-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/sync/v1/vaults/{vault}/members/{account}\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-unmapped-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"get\",\"route_template\":\"/api/v1/accounts/me\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-unmapped-head-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"HEAD\",\"route_template\":\"/api/v1/accounts/me\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-unmapped-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/accounts/me/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-unmapped-template-alias-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault_id}/keys\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-unmapped-concrete-path-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/00000000-0000-7000-8000-000000000001/keys\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-unmapped-operator-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/admin/accounts\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-unmapped-authentication-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/auth/device\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-unmapped-public-jwks-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/.well-known/jwks.json\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-contains-all-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write sync:read sync:write\",\"required\":\"account:read\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-contains-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"sync:read\",\"required\":\"sync:read\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-contains-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"sync:write\",\"required\":\"sync:write\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-contains-mixed-future-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"future:read keys:read\",\"required\":\"keys:read\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-contains-write-not-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"sync:write\",\"required\":\"sync:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-contains-keys-write-not-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"keys:write\",\"required\":\"keys:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-contains-read-not-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"keys:read\",\"required\":\"keys:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-contains-future-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"future:read\",\"required\":\"sync:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-contains-wildcard-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"sync:*\",\"required\":\"sync:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-contains-prefix-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"sync:reader\",\"required\":\"sync:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-contains-case-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"SYNC:READ\",\"required\":\"sync:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-contains-role-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"admin owner\",\"required\":\"account:read\"}",
+      "expected": "missing"
+    }
+  ]
+}

@@ -14,6 +14,8 @@ use uuid::Uuid;
 
 mod jwks;
 pub use jwks::{AuthJwk, AuthJwks, AuthJwksCodecError, MAX_AUTH_JWKS_BYTES};
+mod scope;
+pub use scope::{DeviceAccessOperation, DeviceAccessScope, INITIAL_DEVICE_ACCESS_SCOPE};
 
 /// The lifetime of an access token in seconds.
 pub const ACCESS_TOKEN_EXPIRES_IN: u64 = 600;

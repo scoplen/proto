@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-107's exact initial enrolled-device scope ceiling and typed 16-operation route
+  registry, with public scope/mapping vectors and signed-token compatibility checks. OpenAPI
+  records issuance, non-expanding refresh, and current-account scope requirements. Unknown
+  valid JWT scopes remain accepted; current-state and complete route authorization remain
+  consumer responsibilities.
 - Added D-106's independent authentication admission headers and bounded public-only Ed25519
   JWKS codec, with canonical key ordering, recursive duplicate-name rejection, and public-key
   field checks. OpenAPI and generated TypeScript include root JWKS discovery, authentication
