@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added an isolated Windows CI fixture for the native OpenSSH agent named-pipe connector. It
+  verifies raw-key authentication to a disposable SSH server, exact command output and exit,
+  identity, host-key, and pipe rejections, and precise cleanup of its generated test key.
 - Expanded the pinned OpenSSH 8.8p1 fixture through the existing public SSH examples: Ed25519
   user certificates with principal, CA, and KRL rejection controls; mixed raw and certified host
   identity with CA, principal, and expiry rejection; direct TCP forwarding; and nested jumps with
