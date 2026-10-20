@@ -159,9 +159,18 @@ The existing `sync-vaults.json`, `sync-vault-epochs.json`, `sync-vault-members.j
 public codecs. Binding changes validation behavior only; their deterministic CBOR bytes remain
 unchanged.
 
-`crypto.json` contains K-2 known answers. All private keys and plaintexts in this document are
-synthetic, public test material and must never be used for real data. Every binary field is
-lowercase hexadecimal; fields in `input` are separated by `|`. Decimal integer fields and the
+`account-hierarchy.json` contains the D-108 K-2 account hierarchy artifacts. Each `input` uses
+`|`-separated fields, with UUIDv7 text, decimal epoch, and lowercase hex for keys and artifacts.
+The four `.device-ark-open`, `.account-signing-open`, `.account-kem-open`, and
+`.personal-vault-open` kinds expect the 32-byte plaintext key as lowercase hex or `reject` for a
+changed authenticated context. The device input is account id, device id, recipient private key,
+and the exact 114-byte artifact. Account-key inputs are account id, ARK, expected public key,
+and the exact 73-byte artifact. Personal input is account id, vault id, positive epoch, ARK,
+and the exact 73-byte artifact. All private keys and plaintexts are synthetic public test data.
+
+`crypto.json` contains the other K-2 known answers. All private keys and plaintexts in this
+document are synthetic, public test material and must never be used for real data. Every binary
+field is lowercase hexadecimal; fields in `input` are separated by `|`. Decimal integer fields and the
 recovery display and safety-number outputs are written as text.
 
 | Kind | Input fields, in order | Expected |

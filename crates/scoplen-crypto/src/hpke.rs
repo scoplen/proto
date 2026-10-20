@@ -53,6 +53,12 @@ impl DeviceKemKeyPair {
         &self.public
     }
 
+    /// Export this software key for encrypted device-local persistence.
+    #[must_use]
+    pub fn private_key_bytes(&self) -> SecretBytes<32> {
+        self.private.clone()
+    }
+
     fn private_key(&self) -> <DeviceKem as KemTrait>::PrivateKey {
         <DeviceKem as KemTrait>::PrivateKey::from_bytes(self.private.as_ref())
             .expect("device HPKE key validated at construction")
@@ -95,6 +101,12 @@ impl AccountKemKeyPair {
     #[must_use]
     pub fn public_key(&self) -> &[u8] {
         &self.public
+    }
+
+    /// Export this software key for encryption under the account root key.
+    #[must_use]
+    pub fn private_key_bytes(&self) -> SecretBytes<32> {
+        self.private.clone()
     }
 
     fn private_key(&self) -> <AccountKem as KemTrait>::PrivateKey {

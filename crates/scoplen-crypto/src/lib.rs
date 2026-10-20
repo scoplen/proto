@@ -14,6 +14,7 @@ mod envelope;
 mod escrow;
 mod gateway_proof;
 mod gateway_ticket;
+mod hierarchy;
 mod hpke;
 mod keys;
 mod pairing;
@@ -50,6 +51,9 @@ pub use gateway_proof::{GatewayProof, GatewayProofError, VerifiedGatewayProof};
 pub use gateway_ticket::{
     GatewayTicket, GatewayTicketClaims, GatewayTicketError, GatewayTicketSigner,
     TrustedGatewayTicketKeys, VerifiedGatewayTicket, gateway_ssh_key_sha256,
+};
+pub use hierarchy::{
+    AccountKemKeyWrap, AccountSigningKeyWrap, DeviceArkWrap, PersonalVaultKeyWrap,
 };
 pub use hpke::{
     AccountKemKeyPair, DeviceKemKeyPair, HpkeCiphertext, hpke_open_account, hpke_open_device,

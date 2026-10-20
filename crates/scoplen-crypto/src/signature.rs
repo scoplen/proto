@@ -47,6 +47,12 @@ impl P256SigningKey {
         signing_key.verifying_key().to_encoded_point(false).as_bytes().to_vec()
     }
 
+    /// Export this software key for encrypted device-local persistence.
+    #[must_use]
+    pub fn private_key_bytes(&self) -> SecretBytes<32> {
+        self.secret.clone()
+    }
+
     /// Sign a message with ECDSA P-256 and SHA-256, returning fixed-width `r || s` bytes.
     #[must_use]
     pub fn sign(&self, message: &[u8]) -> [u8; 64] {
@@ -112,6 +118,12 @@ impl Ed25519SigningKey {
     #[must_use]
     pub fn public_key(&self) -> [u8; 32] {
         self.to_signing_key().verifying_key().to_bytes()
+    }
+
+    /// Export this software key for encryption under the account root key.
+    #[must_use]
+    pub fn private_key_bytes(&self) -> SecretBytes<32> {
+        self.secret.clone()
     }
 
     /// Sign a message with Ed25519.
