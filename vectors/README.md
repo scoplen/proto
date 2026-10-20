@@ -85,6 +85,10 @@ and response JSON vectors. The browser response has no `refresh_token`; its rota
 travels in an HttpOnly cookie managed by the server. `api-problem.json` includes refresh failure
 examples as canonical JSON with the registered codes and `changed`/`retryable` fields; its older
 CBOR vectors remain valid. All token strings are synthetic public test data.
+The D-104 `auth.rate_limited` JSON problem keeps those eight fields and does not identify a
+private admission bucket. `api.personal.rate_headers` vectors use a decimal 1..300-second input
+and a JSON map of exact `Retry-After`, `RateLimit-Policy`, and `RateLimit` values; `.reject`
+vectors require rejection of out-of-range delays. No header is part of the problem body.
 
 `api-dpop.json` publishes the compact ES256 protected-resource proof from RFC 9449 Figure 13,
 with its public JWK thumbprint from Figure 11, proof id and timestamp, inclusive

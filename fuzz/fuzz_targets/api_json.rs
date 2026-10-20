@@ -2,6 +2,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
+use scoplen_api::ProblemDetails;
 use scoplen_api::account_profile::AccountProfile;
 use scoplen_api::auth::{
     AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthRefreshRequest,
@@ -28,12 +29,25 @@ macro_rules! round_trip {
 }
 
 fuzz_target!(|bytes: &[u8]| {
+    if let Ok(problem) = serde_json::from_slice::<ProblemDetails>(bytes) {
+        let encoded = serde_json::to_vec(&problem).expect("validated problem encodes");
+        assert_eq!(
+            serde_json::from_slice::<ProblemDetails>(&encoded).expect("canonical problem decodes"),
+            problem,
+        );
+    }
     round_trip!(AccountProfile, bytes);
     round_trip!(CertificateIssuanceRequest, bytes);
     round_trip!(CertificateIssuanceResponse, bytes);
     round_trip!(GatewayTicketRequest, bytes);
     round_trip!(GatewayTicketResponse, bytes);
     round_trip!(PersonalInvitationResponse, bytes);
+    if let Ok(request) = PersonalEnrollmentRequest::from_json_structural(bytes) {
+        assert_eq!(
+            PersonalEnrollmentRequest::from_json(bytes),
+            request.validate().map(|()| request.clone()),
+        );
+    }
     round_trip!(PersonalEnrollmentRequest, bytes);
     round_trip!(PersonalEnrollmentResponse, bytes);
     if let Ok(request) = PersonalInvitationRequest::from_json(bytes) {

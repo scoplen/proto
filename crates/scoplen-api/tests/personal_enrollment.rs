@@ -307,6 +307,12 @@ fn published_personal_wire_vectors_match_public_codecs() {
                     other => panic!("unexpected expected failure {other}"),
                 };
                 assert_eq!(error, expected, "{}", vector.id);
+                if vector.expected == "identity_mismatch" {
+                    let structural =
+                        PersonalEnrollmentRequest::from_json_structural(vector.input.as_bytes())
+                            .expect("identity mismatch follows structural decoding");
+                    assert_eq!(structural.validate(), Err(expected), "{}", vector.id);
+                }
             }
             "api.personal_enrollment.response.json" => {
                 let value = PersonalEnrollmentResponse::from_json(vector.input.as_bytes())
@@ -345,4 +351,99 @@ fn reference_enrollment_failure_mapping_keeps_identity_denial_opaque() {
     )
     .expect_err("foreign origin");
     assert_eq!(reference_enrollment_problem(&error), (403, "policy.denied"));
+}
+
+#[test]
+fn structural_http_decode_exposes_digest_input_before_identity_validation() {
+    let request = enrollment();
+    let encoded = request.to_json().expect("encode");
+    let mut body: Value = serde_json::from_slice(&encoded).expect("json");
+    body["account_id"] = json!(id(4).to_string());
+    let mismatched = serde_json::to_vec(&body).expect("json");
+    let structural = PersonalEnrollmentRequest::from_http_json_structural(
+        &mismatched,
+        false,
+        false,
+        false,
+        Some("https://example.com"),
+        "https://example.com",
+    )
+    .expect("well-formed request reaches digest admission");
+    assert_eq!(structural.invitation_token, request.invitation_token);
+    assert_eq!(structural.validate(), Err(PersonalEnrollmentCodecError::IdentityMismatch));
+    assert_eq!(
+        PersonalEnrollmentRequest::from_http_json(
+            &mismatched,
+            false,
+            false,
+            false,
+            Some("https://example.com"),
+            "https://example.com",
+        ),
+        Err(PersonalEnrollmentCodecError::IdentityMismatch),
+    );
+
+    body["wrapped_personal_vault_key"] = json!("");
+    let malformed = serde_json::to_vec(&body).expect("json");
+    assert_eq!(
+        PersonalEnrollmentRequest::from_http_json_structural(
+            &malformed,
+            false,
+            false,
+            false,
+            None,
+            "https://example.com",
+        ),
+        Err(PersonalEnrollmentCodecError::InvalidField("wrapped_personal_vault_key")),
+    );
+    assert_eq!(
+        PersonalEnrollmentRequest::from_http_json_structural(
+            &mismatched,
+            true,
+            false,
+            false,
+            None,
+            "https://example.com",
+        ),
+        Err(PersonalEnrollmentCodecError::ForbiddenHeader("Authorization")),
+    );
+    assert_eq!(
+        PersonalEnrollmentRequest::from_http_json_structural(
+            &mismatched,
+            false,
+            false,
+            false,
+            Some("https://foreign.example"),
+            "https://example.com",
+        ),
+        Err(PersonalEnrollmentCodecError::OriginMismatch),
+    );
+}
+
+#[test]
+fn reference_personal_storage_failure_takes_precedence_over_every_rejection() {
+    fn selected_failure(
+        candidate: (u16, &'static str),
+        admission_available: bool,
+        failure_audit_committed: bool,
+    ) -> (u16, &'static str) {
+        if !admission_available || !failure_audit_committed {
+            (503, "auth.storage_unavailable")
+        } else {
+            candidate
+        }
+    }
+
+    for candidate in [
+        (400, "auth.invalid_request"),
+        (401, "auth.enrollment_denied"),
+        (403, "policy.denied"),
+        (413, "auth.invalid_request"),
+        (415, "auth.invalid_request"),
+        (429, "auth.rate_limited"),
+    ] {
+        assert_eq!(selected_failure(candidate, true, true), candidate);
+        assert_eq!(selected_failure(candidate, false, true), (503, "auth.storage_unavailable"),);
+        assert_eq!(selected_failure(candidate, true, false), (503, "auth.storage_unavailable"),);
+    }
 }

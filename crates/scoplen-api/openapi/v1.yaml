@@ -19,7 +19,7 @@
     "/admin/personal-invitations": {
       "post": {
         "operationId": "issuePersonalInvitation",
-        "description": "Authenticated deployment operator only; organization roles do not grant authority. Idempotency-Key is forbidden. Each authorized POST creates a fresh 24-hour invitation. The response contains a one-use bearer URL and must not be logged or replayed.",
+        "description": "Authenticated deployment operator only; organization roles do not grant authority. Idempotency-Key is forbidden. Each authorized POST creates a fresh 24-hour invitation. The response contains a one-use bearer URL and must not be logged or replayed. Durable source admission precedes body parsing; authenticated operator admission applies only after authentication. If durable admission or mandatory failure auditing cannot commit, 503 auth.storage_unavailable takes precedence over an otherwise applicable 400, 401, 403, 413, 415, or 429 without identity mutation.",
         "requestBody": {
           "required": true,
           "description": "Exactly {} as application/json; complete UTF-8 body at most 256 bytes, including whitespace.",
@@ -48,6 +48,7 @@
           "403": { "$ref": "#/components/responses/Problem" },
           "413": { "$ref": "#/components/responses/Problem" },
           "415": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/PersonalRateLimited" },
           "503": { "$ref": "#/components/responses/Problem" },
           "default": { "$ref": "#/components/responses/Problem" }
         }
@@ -57,7 +58,7 @@
       "post": {
         "operationId": "enrollPersonalDevice",
         "security": [],
-        "description": "First-device Personal enrollment requires a one-use invitation and possession proof. Authorization, DPoP, and Idempotency-Key headers are forbidden. Origin, when present, must equal the trusted canonical HTTPS deployment origin. The server verifies both artifact signatures, invitation state, unique ids, and atomic account creation; structural decoding alone does not verify signatures. Malformed CBOR or fields return 400 auth.invalid_request; mismatched account/certificate/wrap identity or rejected proofs return 401 auth.enrollment_denied without an invitation-validity signal. Credentialed cross-origin requests are forbidden.",
+        "description": "First-device Personal enrollment requires a one-use invitation and possession proof. Authorization, DPoP, and Idempotency-Key headers are forbidden. Origin, when present, must equal the trusted canonical HTTPS deployment origin. The server verifies both artifact signatures, invitation state, unique ids, and atomic account creation; structural decoding alone does not verify signatures. Malformed CBOR or fields return 400 auth.invalid_request; mismatched account/certificate/wrap identity or rejected proofs return 401 auth.enrollment_denied without an invitation-validity signal. Credentialed cross-origin requests are forbidden. Durable source admission precedes body parsing; decoded invitation-digest admission follows structural and origin/header validation without testing token existence. If durable admission or mandatory failure auditing cannot commit, 503 auth.storage_unavailable takes precedence over an otherwise applicable 400, 401, 403, 413, 415, or 429 without invitation or identity mutation.",
         "requestBody": {
           "required": true,
           "description": "Complete application/json UTF-8 body at most 1048576 bytes, including whitespace and escapes.",
@@ -85,6 +86,7 @@
           "403": { "$ref": "#/components/responses/Problem" },
           "413": { "$ref": "#/components/responses/Problem" },
           "415": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/PersonalRateLimited" },
           "503": { "$ref": "#/components/responses/Problem" },
           "default": { "$ref": "#/components/responses/Problem" }
         }
@@ -3433,6 +3435,22 @@
             }
           }
         }
+      },
+      "PersonalRateLimited": {
+        "description": "Personal admission rejected without invitation or identity mutation. Retry-After is the latest applicable admission delay, rounded up to a decimal 1..300 seconds; retrying then does not guarantee admission. RateLimit and RateLimit-Policy use draft-ietf-httpapi-ratelimit-headers-11 structured-field syntax and reveal only the nominal source policy, never a private bucket or key.",
+        "headers": {
+          "Retry-After": { "required": true, "schema": { "type": "string", "pattern": "^(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$" } },
+          "RateLimit-Policy": { "required": true, "schema": { "const": "\"personal\";q=30;w=60" } },
+          "RateLimit": { "required": true, "schema": { "type": "string", "pattern": "^\"personal\";r=0;t=(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$" }, "description": "The t delay equals Retry-After." },
+          "Cache-Control": { "required": true, "schema": { "const": "no-store" } },
+          "Pragma": { "required": true, "schema": { "const": "no-cache" } },
+          "Referrer-Policy": { "required": true, "schema": { "const": "no-referrer" } }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": { "$ref": "#/components/schemas/PersonalRateLimitedProblem" }
+          }
+        }
       }
     },
     "schemas": {
@@ -4006,6 +4024,20 @@
           }
         },
         "additionalProperties": true
+      },
+      "PersonalRateLimitedProblem": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ProblemDetails" },
+          {
+            "type": "object",
+            "properties": {
+              "status": { "const": 429 },
+              "code": { "const": "auth.rate_limited" },
+              "changed": { "const": false },
+              "retryable": { "const": true }
+            }
+          }
+        ]
       },
       "DecisionRequest": {
         "type": "object",

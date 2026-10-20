@@ -24,6 +24,52 @@ pub const MAX_PERSONAL_ENROLLMENT_RESPONSE_BYTES: usize = 256;
 /// Maximum decoded K-2 certificate and Personal vault wrap size.
 pub const MAX_PERSONAL_ENROLLMENT_ARTIFACT_BYTES: usize = 65_536;
 
+/// Nominal source quota advertised on Personal admission rejections.
+pub const PERSONAL_RATE_LIMIT_POLICY: &str = "\"personal\";q=30;w=60";
+
+/// The public Personal admission headers contain no private bucket identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PersonalRateLimitHeaders {
+    retry_after_seconds: u16,
+}
+
+/// An invalid public Personal retry delay.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[error("Personal retry delay must be between 1 and 300 seconds")]
+pub struct PersonalRateLimitHeaderError;
+
+impl PersonalRateLimitHeaders {
+    /// Construct the D-104 header profile from the latest applicable admission delay.
+    ///
+    /// # Errors
+    ///
+    /// Rejects a delay outside 1..=300 seconds.
+    pub fn new(retry_after_seconds: u16) -> Result<Self, PersonalRateLimitHeaderError> {
+        if !(1..=300).contains(&retry_after_seconds) {
+            return Err(PersonalRateLimitHeaderError);
+        }
+        Ok(Self { retry_after_seconds })
+    }
+
+    /// Decimal `Retry-After` value and `RateLimit` reset delay, in seconds.
+    #[must_use]
+    pub fn retry_after_seconds(self) -> u16 {
+        self.retry_after_seconds
+    }
+
+    /// Exact structured `RateLimit` value with zero advertised remaining capacity.
+    #[must_use]
+    pub fn rate_limit(self) -> String {
+        format!("\"personal\";r=0;t={}", self.retry_after_seconds)
+    }
+
+    /// Exact structured `RateLimit-Policy` value.
+    #[must_use]
+    pub fn rate_limit_policy(self) -> &'static str {
+        PERSONAL_RATE_LIMIT_POLICY
+    }
+}
+
 /// A Personal invitation or enrollment message violates its wire contract.
 ///
 /// Errors never include submitted credentials, keys, certificates, or raw bodies.
@@ -185,8 +231,10 @@ impl PersonalInvitationResponse {
 
 /// One invitation-bound, possession-proven first-device enrollment request.
 ///
-/// Decoding enforces syntax and artifact identity only. A consumer must verify both signatures,
-/// invitation state and origin, uniqueness, and the atomic identity transaction.
+/// Ordinary decoding enforces syntax and artifact identity. Structural decoding is available so
+/// a consumer can admit the decoded invitation digest before rejecting an identity mismatch.
+/// A consumer must still verify both signatures, invitation state and origin, uniqueness, and the
+/// atomic identity transaction.
 #[derive(Clone, Eq, PartialEq)]
 pub struct PersonalEnrollmentRequest {
     /// Decoded one-use bearer token. Never log this value.
@@ -222,6 +270,20 @@ impl PersonalEnrollmentRequest {
     ///
     /// Rejects malformed or mismatched artifacts. This does not verify signatures.
     pub fn validate(&self) -> Result<(), PersonalEnrollmentCodecError> {
+        self.validate_structural()?;
+        self.validate_identity()
+    }
+
+    fn validate_identity(&self) -> Result<(), PersonalEnrollmentCodecError> {
+        if self.device_certificate.account_id != self.account_id
+            || self.device_certificate.device_id != self.key_bundle_update.device_wraps[0].device_id
+        {
+            return Err(PersonalEnrollmentCodecError::IdentityMismatch);
+        }
+        Ok(())
+    }
+
+    fn validate_structural(&self) -> Result<(), PersonalEnrollmentCodecError> {
         validate_uuid_v7(self.account_id)
             .map_err(|_| PersonalEnrollmentCodecError::InvalidField("account_id"))?;
         validate_uuid_v7(self.personal_vault_id)
@@ -245,11 +307,6 @@ impl PersonalEnrollmentRequest {
         {
             return Err(PersonalEnrollmentCodecError::InvalidField("device_certificate"));
         }
-        if self.device_certificate.account_id != self.account_id
-            || self.device_certificate.device_id != self.key_bundle_update.device_wraps[0].device_id
-        {
-            return Err(PersonalEnrollmentCodecError::IdentityMismatch);
-        }
         if self.wrapped_personal_vault_key.is_empty()
             || self.wrapped_personal_vault_key.len() > MAX_PERSONAL_ENROLLMENT_ARTIFACT_BYTES
         {
@@ -264,6 +321,20 @@ impl PersonalEnrollmentRequest {
     ///
     /// Rejects duplicate or unknown names, invalid fields, or oversized input.
     pub fn from_json(input: &[u8]) -> Result<Self, PersonalEnrollmentCodecError> {
+        let request = Self::from_json_structural(input)?;
+        request.validate_identity()?;
+        Ok(request)
+    }
+
+    /// Decode strict JSON, binary artifacts, and independent field bounds before digest admission.
+    ///
+    /// The returned request is not yet eligible for identity creation. After admission, the
+    /// consumer must call [`Self::validate`] and verify signatures, invitation state, and ids.
+    ///
+    /// # Errors
+    ///
+    /// Rejects duplicate or unknown names, malformed artifacts, invalid fields, or oversized input.
+    pub fn from_json_structural(input: &[u8]) -> Result<Self, PersonalEnrollmentCodecError> {
         let mut fields = decode_object(
             input,
             MAX_PERSONAL_ENROLLMENT_REQUEST_BYTES,
@@ -322,7 +393,7 @@ impl PersonalEnrollmentRequest {
             wrapped_personal_vault_key,
             device_signature,
         };
-        request.validate()?;
+        request.validate_structural()?;
         Ok(request)
     }
 
@@ -342,6 +413,36 @@ impl PersonalEnrollmentRequest {
         origin: Option<&str>,
         deployment_origin: &str,
     ) -> Result<Self, PersonalEnrollmentCodecError> {
+        let request = Self::from_http_json_structural(
+            input,
+            authorization_present,
+            dpop_present,
+            idempotency_key_present,
+            origin,
+            deployment_origin,
+        )?;
+        request.validate_identity()?;
+        Ok(request)
+    }
+
+    /// Decode a strict request after prohibited-header and Origin checks, before digest admission.
+    ///
+    /// The consumer enforces source admission before calling this method. On success it can hash
+    /// the decoded invitation token for durable digest admission without testing its existence.
+    /// The consumer must call [`Self::validate`] after admission; this method does not
+    /// approve artifact identity or verify any signature.
+    ///
+    /// # Errors
+    ///
+    /// Rejects prohibited headers, foreign Origin, malformed input, or independent field bounds.
+    pub fn from_http_json_structural(
+        input: &[u8],
+        authorization_present: bool,
+        dpop_present: bool,
+        idempotency_key_present: bool,
+        origin: Option<&str>,
+        deployment_origin: &str,
+    ) -> Result<Self, PersonalEnrollmentCodecError> {
         if authorization_present {
             return Err(PersonalEnrollmentCodecError::ForbiddenHeader("Authorization"));
         }
@@ -354,7 +455,7 @@ impl PersonalEnrollmentRequest {
         if origin.is_some_and(|value| value != deployment_origin) {
             return Err(PersonalEnrollmentCodecError::OriginMismatch);
         }
-        Self::from_json(input)
+        Self::from_json_structural(input)
     }
 
     /// Encode the nine request fields in the contract's fixed order.
