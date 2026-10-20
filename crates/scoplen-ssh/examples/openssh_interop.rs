@@ -1054,14 +1054,27 @@ async fn upload_sftp_stream(
     Ok(())
 }
 
-async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
-    let openssh_8 = match env::var("SCOPLEN_OPENSSH_SFTP_PROFILE") {
-        Ok(profile) if profile == "8.8p1" => true,
-        Err(env::VarError::NotPresent) => false,
-        _ => return Err("SCOPLEN_OPENSSH_SFTP_PROFILE must be 8.8p1 when set".into()),
+fn sftp_profile() -> Result<(bool, bool), Box<dyn std::error::Error>> {
+    let profile = match env::var("SCOPLEN_OPENSSH_SFTP_PROFILE") {
+        Ok(profile) if profile == "8.8p1" => (true, false),
+        Ok(profile) if profile == "dropbear-2024.86" => (false, true),
+        Err(env::VarError::NotPresent) => (false, false),
+        _ => {
+            return Err(
+                "SCOPLEN_OPENSSH_SFTP_PROFILE must be 8.8p1 or dropbear-2024.86 when set".into()
+            );
+        }
     };
+    Ok(profile)
+}
+
+async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
+    let (openssh_8, dropbear) = sftp_profile()?;
     let mut session = SftpSession::open(connection, 4).await?;
     verify_sftp_capabilities(&session, openssh_8)?;
+    if dropbear {
+        verify_unsupported_sftp_extension(&mut session).await?;
+    }
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let path = format!(".scoplen-interop-{}-{nonce}", std::process::id()).into_bytes();
     let linked_path = [path.as_slice(), b"-link"].concat();
@@ -1149,6 +1162,34 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     verify_expand_path(&mut session, &path, &missing_path, &data).await?;
     verify_standard_rename(&mut session, &path, &missing_path, &data).await?;
     verify_posix_rename(&mut session, &path, &missing_path, &data).await?;
-    println!("openssh sftp interop ok");
+    if dropbear {
+        println!("dropbear sftp interop ok");
+    } else {
+        println!("openssh sftp interop ok");
+    }
+    Ok(())
+}
+
+async fn verify_unsupported_sftp_extension(
+    session: &mut SftpSession,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let name = b"unsupported@scoplen.invalid";
+    if session.extensions().iter().any(|extension| extension.name == name) {
+        return Err("test extension unexpectedly advertised by SFTP server".into());
+    }
+    let SftpPacket::Extended { id, .. } = session.client_mut().request_limits()? else {
+        return Err("SFTP limits builder did not reserve an extended request id".into());
+    };
+    let request = SftpPacket::Extended { id, name: name.to_vec(), data: Vec::new() };
+    if !matches!(sftp_response(session, request).await?, SftpPacket::Status { code: 8, .. })
+        || session.pending_requests() != 0
+    {
+        return Err(
+            "unsupported SFTP extension did not return status 8 and release its slot".into()
+        );
+    }
+    if session.request_limits().await?.is_none() || session.pending_requests() != 0 {
+        return Err("unsupported SFTP extension made the session unusable".into());
+    }
     Ok(())
 }
