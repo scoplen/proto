@@ -35,10 +35,19 @@ if (problem.properties.status.minimum !== 100 || problem.properties.status.maxim
     problem.properties.code.pattern !== "^[a-z0-9_]+\\.[a-z0-9_]+$") {
   throw new Error("ProblemDetails status or code constraints differ from the shared error contract");
 }
+const changedDescription = "False guarantees no business-state mutation from the failed operation; true means a mutation occurred or cannot be ruled out, not that success was established. Admission counters and failure-audit records are not business-state mutations.";
+const retryableDescription = "Whether the same request may safely be retried; false forbids automatic replay.";
+if (problem.properties.changed.description !== changedDescription ||
+    problem.properties.retryable.description !== retryableDescription) {
+  throw new Error("ProblemDetails mutation and retry semantics differ from D-105");
+}
 const problemLines = ["export interface ProblemDetails {"];
 for (const field of requiredProblemFields) {
   if (problem.properties?.[field]?.type !== problemTypes[field]) {
     throw new Error(`ProblemDetails.${field} has the wrong type`);
+  }
+  if (field === "changed" || field === "retryable") {
+    problemLines.push(`  /** ${field === "changed" ? changedDescription : retryableDescription} */`);
   }
   problemLines.push(`  ${field}: ${problemTypes[field] === "integer" ? "number" : problemTypes[field]};`);
 }
@@ -444,11 +453,12 @@ for (const [path, operationId, request, response, maxRequest, maxResponse, refer
       success.headers?.Pragma?.schema?.const !== "no-cache" ||
       (referrer && success.headers?.["Referrer-Policy"]?.schema?.const !== "no-referrer") ||
       operation.responses?.["429"]?.$ref !== "#/components/responses/PersonalRateLimited" ||
+      operation.responses?.["503"]?.$ref !== "#/components/responses/PersonalStorageFailure" ||
       !operation.description?.includes("503 auth.storage_unavailable takes precedence") ||
       !operation.description?.includes("mandatory failure auditing") ||
-      !["400", "401", "403", "413", "415", "503", "default"].every((status) =>
+      !["400", "401", "403", "413", "415", "default"].every((status) =>
         operation.responses?.[status]?.$ref === "#/components/responses/Problem")) {
-    throw new Error(`${path} differs from D-101/D-104`);
+    throw new Error(`${path} differs from D-101/D-104/D-105`);
   }
 }
 const personalRateHeaders = document.components?.responses?.PersonalRateLimited?.headers;
@@ -493,6 +503,50 @@ personalLines.push(
   "  changed: false;",
   "  retryable: true;",
   "};", "",
+);
+const storageFailure = document.components?.responses?.PersonalStorageFailure;
+const storageFailureHeaders = {
+  "Cache-Control": { required: true, schema: { const: "no-store" } },
+  Pragma: { required: true, schema: { const: "no-cache" } },
+  "Referrer-Policy": { required: true, schema: { const: "no-referrer" } },
+};
+if (JSON.stringify(storageFailure?.headers) !== JSON.stringify(storageFailureHeaders) ||
+    !storageFailure.description?.includes("never automatically replay") ||
+    !storageFailure.description.includes("/auth/challenge and /auth/device") ||
+    !storageFailure.description.includes("operator explicitly decides") ||
+    JSON.stringify(storageFailure.content?.["application/problem+json"]?.schema?.oneOf) !==
+      JSON.stringify([
+        { $ref: "#/components/schemas/PersonalStorageUnavailableProblem" },
+        { $ref: "#/components/schemas/PersonalCommitOutcomeUnknownProblem" },
+      ])) {
+  throw new Error("Personal storage failure response differs from D-105");
+}
+for (const [name, code, changed, retryable] of [
+  ["PersonalStorageUnavailableProblem", "auth.storage_unavailable", false, true],
+  ["PersonalCommitOutcomeUnknownProblem", "auth.commit_outcome_unknown", true, false],
+]) {
+  const schema = document.components?.schemas?.[name];
+  if (JSON.stringify(schema?.allOf) !== JSON.stringify([
+    { $ref: "#/components/schemas/ProblemDetails" },
+    { type: "object", properties: {
+      status: { const: 503 }, code: { const: code },
+      changed: { const: changed }, retryable: { const: retryable },
+    } },
+  ])) {
+    throw new Error(`${name} differs from D-105`);
+  }
+  personalLines.push(
+    `export type ${name} = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {`,
+    "  status: 503;",
+    `  code: "${code}";`,
+    `  changed: ${changed};`,
+    `  retryable: ${retryable};`,
+    "};", "",
+  );
+}
+personalLines.push(
+  "export type PersonalStorageFailureProblem = PersonalStorageUnavailableProblem | PersonalCommitOutcomeUnknownProblem;",
+  "",
 );
 const personalStart = "// BEGIN GENERATED PersonalEnrollment\n";
 const personalEnd = "// END GENERATED PersonalEnrollment";

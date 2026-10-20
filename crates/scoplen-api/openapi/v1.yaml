@@ -49,7 +49,7 @@
           "413": { "$ref": "#/components/responses/Problem" },
           "415": { "$ref": "#/components/responses/Problem" },
           "429": { "$ref": "#/components/responses/PersonalRateLimited" },
-          "503": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/PersonalStorageFailure" },
           "default": { "$ref": "#/components/responses/Problem" }
         }
       }
@@ -87,7 +87,7 @@
           "413": { "$ref": "#/components/responses/Problem" },
           "415": { "$ref": "#/components/responses/Problem" },
           "429": { "$ref": "#/components/responses/PersonalRateLimited" },
-          "503": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/PersonalStorageFailure" },
           "default": { "$ref": "#/components/responses/Problem" }
         }
       }
@@ -3451,6 +3451,22 @@
             "schema": { "$ref": "#/components/schemas/PersonalRateLimitedProblem" }
           }
         }
+      },
+      "PersonalStorageFailure": {
+        "description": "A known precommit failure returns auth.storage_unavailable with changed=false and retryable=true. If COMMIT was attempted and its outcome cannot be confirmed, return auth.commit_outcome_unknown with changed=true and retryable=false; never automatically replay either Personal POST after an unknown outcome. For enrollment, retain local keys and ids and first try /auth/challenge and /auth/device. For invitation issuance, the one-time token may be unrecoverable; the operator explicitly decides whether to issue another invitation. An ordinary absent row or failed read does not prove rollback while a commit may be in flight.",
+        "headers": {
+          "Cache-Control": { "required": true, "schema": { "const": "no-store" } },
+          "Pragma": { "required": true, "schema": { "const": "no-cache" } },
+          "Referrer-Policy": { "required": true, "schema": { "const": "no-referrer" } }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": { "oneOf": [
+              { "$ref": "#/components/schemas/PersonalStorageUnavailableProblem" },
+              { "$ref": "#/components/schemas/PersonalCommitOutcomeUnknownProblem" }
+            ] }
+          }
+        }
       }
     },
     "schemas": {
@@ -4017,10 +4033,12 @@
             "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
           },
           "changed": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "False guarantees no business-state mutation from the failed operation; true means a mutation occurred or cannot be ruled out, not that success was established. Admission counters and failure-audit records are not business-state mutations."
           },
           "retryable": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether the same request may safely be retried; false forbids automatic replay."
           }
         },
         "additionalProperties": true
@@ -4037,6 +4055,28 @@
               "retryable": { "const": true }
             }
           }
+        ]
+      },
+      "PersonalStorageUnavailableProblem": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ProblemDetails" },
+          { "type": "object", "properties": {
+            "status": { "const": 503 },
+            "code": { "const": "auth.storage_unavailable" },
+            "changed": { "const": false },
+            "retryable": { "const": true }
+          } }
+        ]
+      },
+      "PersonalCommitOutcomeUnknownProblem": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ProblemDetails" },
+          { "type": "object", "properties": {
+            "status": { "const": 503 },
+            "code": { "const": "auth.commit_outcome_unknown" },
+            "changed": { "const": true },
+            "retryable": { "const": false }
+          } }
         ]
       },
       "DecisionRequest": {

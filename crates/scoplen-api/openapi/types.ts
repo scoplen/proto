@@ -31,6 +31,8 @@ export interface components {
     PersonalEnrollmentRequest: PersonalEnrollmentRequest;
     PersonalEnrollmentResponse: PersonalEnrollmentResponse;
     PersonalRateLimitedProblem: PersonalRateLimitedProblem;
+    PersonalStorageUnavailableProblem: PersonalStorageUnavailableProblem;
+    PersonalCommitOutcomeUnknownProblem: PersonalCommitOutcomeUnknownProblem;
     Account: Resource;
     Device: Resource;
     Organization: Resource;
@@ -133,6 +135,22 @@ export type PersonalRateLimitedProblem = Omit<ProblemDetails, "status" | "code" 
   changed: false;
   retryable: true;
 };
+
+export type PersonalStorageUnavailableProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {
+  status: 503;
+  code: "auth.storage_unavailable";
+  changed: false;
+  retryable: true;
+};
+
+export type PersonalCommitOutcomeUnknownProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {
+  status: 503;
+  code: "auth.commit_outcome_unknown";
+  changed: true;
+  retryable: false;
+};
+
+export type PersonalStorageFailureProblem = PersonalStorageUnavailableProblem | PersonalCommitOutcomeUnknownProblem;
 // END GENERATED PersonalEnrollment
 // BEGIN GENERATED ProblemDetails
 export interface ProblemDetails {
@@ -142,7 +160,9 @@ export interface ProblemDetails {
   detail: string;
   instance: string;
   code: string;
+  /** False guarantees no business-state mutation from the failed operation; true means a mutation occurred or cannot be ruled out, not that success was established. Admission counters and failure-audit records are not business-state mutations. */
   changed: boolean;
+  /** Whether the same request may safely be retried; false forbids automatic replay. */
   retryable: boolean;
   [extension: string]: unknown;
 }

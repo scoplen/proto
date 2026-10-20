@@ -52,6 +52,7 @@ pub const CONTRACTS: &[&str] = &["K-3", "K-4", "K-5", "K-6"];
 pub const ERROR_CODES: &[&str] = &[
     "auth.authentication_required",
     "auth.client_unsupported",
+    "auth.commit_outcome_unknown",
     "auth.device_revoked",
     "auth.enrollment_denied",
     "auth.invalid_dpop_proof",
@@ -171,9 +172,9 @@ pub struct ProblemDetails {
     pub instance: String,
     /// Stable machine-readable error code.
     pub code: ErrorCode,
-    /// Whether the request changed any server or local state.
+    /// False guarantees no business-state mutation; true means one occurred or cannot be ruled out.
     pub changed: bool,
-    /// Whether retrying the same request may succeed.
+    /// Whether the same request may safely be retried; false forbids automatic replay.
     pub retryable: bool,
 }
 

@@ -590,6 +590,13 @@ The shared `auth.rate_limited` problem uses the existing eight-field shape. A bo
 `PersonalRateLimitHeaders` value supplies the exact public `Retry-After`, `RateLimit`, and
 `RateLimit-Policy` profile without exposing private bucket identities. Durable admission,
 failure auditing, and their `503 auth.storage_unavailable` precedence remain server duties.
+For D-105, both Personal routes distinguish a known precommit storage failure from an attempted
+commit whose outcome cannot be confirmed. The shared `auth.commit_outcome_unknown` problem uses
+`503`, `changed: true`, and `retryable: false`; it never authorizes automatic replay of either
+POST. Enrollment keeps its local identity and first tries device authentication, while an
+operator explicitly decides whether to issue another invitation when the original token may be
+unrecoverable. The shared codec preserves the existing eight-field problem representation;
+classifying database commit outcomes remains a server responsibility.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR
@@ -686,7 +693,7 @@ and a second encode must preserve those bytes. Gateway request checks also
 enforce rejection of an idempotency header. Seeds include the published JSON vectors, duplicate
 fields, forbidden browser refresh tokens, ambiguous edge hosts, nested response extensions,
 invalid certificate selectors and duplicate fields, signed certificate response Resource vectors,
-current-account email/null profiles and failures, the Personal rate problem and structural
+current-account email/null profiles and failures, the Personal rate and commit-uncertainty problems and structural
 enrollment identity mismatch, duplicate nested response fields, truncation,
 and complete bodies at and one byte above request and response limits. This checks
 message syntax; token authentication, ticket signatures, and authorization remain consumer work.
