@@ -8,6 +8,8 @@
 
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::{
     ffi::OsStr,
     fmt,
@@ -35,12 +37,18 @@ pub const MAX_PROXY_COMMAND_ARGUMENTS: usize = 64;
 /// Maximum length of one `ProxyCommand` argument.
 pub const MAX_PROXY_COMMAND_ARGUMENT: usize = 4096;
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 /// Errors raised before a `ProxyCommand` transport can be created.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ProxyCommandError {
     /// The executable path or name was empty.
     #[error("ProxyCommand program is empty")]
     EmptyProgram,
+    /// Windows would run this program through an implicit command shell.
+    #[error("ProxyCommand program requires an implicit Windows shell")]
+    ImplicitShellProgram,
     /// The executable path or name exceeded the bound.
     #[error("ProxyCommand program exceeds the {max}-byte limit")]
     ProgramTooLong { max: usize },
@@ -76,7 +84,8 @@ impl ProxyCommandTransport {
     ///
     /// Arguments are passed directly to [`Command`]. No shell, interpolation, environment
     /// expansion, or implicit command-line parsing is performed. Standard error is discarded so
-    /// an unbounded child diagnostic cannot deadlock the byte transport.
+    /// an unbounded child diagnostic cannot deadlock the byte transport. On Windows, console
+    /// applications run without opening a console window.
     pub fn spawn<I, A>(program: impl AsRef<OsStr>, args: I) -> Result<Self, ProxyCommandError>
     where
         I: IntoIterator<Item = A>,
@@ -84,6 +93,10 @@ impl ProxyCommandTransport {
     {
         let program = program.as_ref();
         validate_program(program)?;
+        #[cfg(windows)]
+        if is_windows_batch_program(program) {
+            return Err(ProxyCommandError::ImplicitShellProgram);
+        }
 
         let mut arguments = Vec::new();
         for argument in args {
@@ -99,6 +112,8 @@ impl ProxyCommandTransport {
 
         let mut command = Command::new(program);
         command.args(&arguments).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
         let mut child =
             command.spawn().map_err(|error| ProxyCommandError::Spawn { kind: error.kind() })?;
         let Some(stdin) = child.stdin.take() else {
@@ -425,6 +440,16 @@ fn validate_program(program: &OsStr) -> Result<(), ProxyCommandError> {
     Ok(())
 }
 
+#[cfg(windows)]
+fn is_windows_batch_program(program: &OsStr) -> bool {
+    let program = program.to_string_lossy();
+    let file_name = program.rsplit(['\\', '/']).next().unwrap_or("");
+    let file_name = file_name.trim_end_matches(['.', ' ']);
+    file_name.rsplit_once('.').is_some_and(|(_, extension)| {
+        extension.eq_ignore_ascii_case("bat") || extension.eq_ignore_ascii_case("cmd")
+    })
+}
+
 fn validate_argument(argument: &OsStr) -> Result<(), ProxyCommandError> {
     if argument.to_string_lossy().len() > MAX_PROXY_COMMAND_ARGUMENT {
         return Err(ProxyCommandError::ArgumentTooLong { max: MAX_PROXY_COMMAND_ARGUMENT });
@@ -456,6 +481,36 @@ mod tests {
         {
             (OsString::from("/bin/sh"), vec![OsString::from("-c"), OsString::from("cat")])
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn batch_programs_are_rejected_before_execution() {
+        let directory = std::env::temp_dir().join(format!(
+            "scoplen-proxy-script-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).expect("create test directory");
+        let marker = directory.join("executed.marker");
+        for extension in ["cmd", "CMD", "bat", "BaT"] {
+            let script = directory.join(format!("proxy.{extension}"));
+            std::fs::write(&script, "@echo off\r\n>\"%~dp0executed.marker\" echo executed\r\n")
+                .expect("write batch script");
+            for suffix in ["", ".", " ", ". "] {
+                let mut program = script.as_os_str().to_os_string();
+                program.push(suffix);
+                assert!(matches!(
+                    ProxyCommandTransport::spawn(&program, std::iter::empty::<&str>()),
+                    Err(ProxyCommandError::ImplicitShellProgram)
+                ));
+                assert!(!marker.exists(), "batch script must not execute");
+            }
+        }
+        std::fs::remove_dir_all(directory).expect("remove test directory");
     }
 
     fn stalled_command() -> (OsString, Vec<OsString>) {

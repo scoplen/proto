@@ -26,7 +26,9 @@ CONNECT proxy composition with handshake-only socket timeouts. SOCKS5 username/p
 CONNECT Basic proxy authentication are bounded and keep passwords out of transport state. The
 transports do not perform SSH negotiation or authentication. `ProxyCommandTransport` provides
 bounded direct child-process stdin/stdout composition without shell interpolation and reaps the
-child on shutdown or drop.
+child on shutdown or drop. On Windows it suppresses the child's console window and rejects
+`.bat`/`.cmd` programs before spawn because Windows would invoke an implicit command shell;
+callers can still select `cmd.exe` explicitly.
 `ClientConnection::connect` uses async resolution and family-interleaved Happy Eyeballs dialing
 with a ten-second DNS-plus-TCP deadline, followed by a separate ten-second SSH handshake deadline.
 `connect_with_timeout` sets the same positive duration for each stage. Direct setup enforces the
