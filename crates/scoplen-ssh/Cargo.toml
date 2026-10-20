@@ -24,3 +24,4 @@ zeroize = "1.8"
 
 [dev-dependencies]
 scoplen-test-vectors = { path = "../scoplen-test-vectors", version = "0.1.0" }
+socket2 = "0.6.5"
