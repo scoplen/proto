@@ -87,6 +87,18 @@
       "expected": "{\"type\":\"about:blank\",\"title\":\"Personal request rate limited\",\"status\":429,\"detail\":\"The request was not completed; no data changed. Wait for the indicated delay before retrying.\",\"instance\":\"personal-rate-1\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}"
     },
     {
+      "id": "api-problem-personal-enrollment-commit-outcome-unknown-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Enrollment outcome unknown\",\"status\":503,\"detail\":\"Enrollment may have completed. Keep the generated identity and try device authentication before deciding whether to enroll again.\",\"instance\":\"enroll-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Enrollment outcome unknown\",\"status\":503,\"detail\":\"Enrollment may have completed. Keep the generated identity and try device authentication before deciding whether to enroll again.\",\"instance\":\"enroll-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-personal-invitation-commit-outcome-unknown-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Invitation outcome unknown\",\"status\":503,\"detail\":\"An invitation may have been issued, but its one-time token cannot be recovered. The operator must decide whether to issue another invitation.\",\"instance\":\"invite-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Invitation outcome unknown\",\"status\":503,\"detail\":\"An invitation may have been issued, but its one-time token cannot be recovered. The operator must decide whether to issue another invitation.\",\"instance\":\"invite-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
+    },
+    {
       "id": "api-personal-rate-headers-min",
       "kind": "api.personal.rate_headers",
       "input": "1",

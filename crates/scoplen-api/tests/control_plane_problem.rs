@@ -25,7 +25,7 @@ fn published_problem_json_vectors_use_registered_codes() {
         );
         count += 1;
     }
-    assert_eq!(count, 11);
+    assert_eq!(count, 13);
 }
 
 #[test]
@@ -46,6 +46,28 @@ fn personal_rate_and_storage_failure_vectors_keep_the_public_problem_shape() {
         assert_eq!(problem.retryable, retryable);
         assert!(!problem.detail.contains("token"));
         assert!(!problem.detail.contains("digest"));
+    }
+}
+
+#[test]
+fn personal_commit_uncertainty_vectors_preserve_recovery_without_automatic_replay() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-problem.json");
+    let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("problem vectors");
+    for (id, recovery) in [
+        ("api-problem-personal-enrollment-commit-outcome-unknown-json", "device authentication"),
+        ("api-problem-personal-invitation-commit-outcome-unknown-json", "operator must decide"),
+    ] {
+        let vector = document.vectors.iter().find(|vector| vector.id == id).expect(id);
+        let problem: SharedProblemDetails =
+            serde_json::from_str(&vector.input).expect("commit uncertainty problem");
+        assert_eq!(problem.status, 503);
+        assert_eq!(problem.code.as_str(), "auth.commit_outcome_unknown");
+        assert!(problem.changed, "the operation may have committed");
+        assert!(!problem.retryable, "the original POST must not be automatically replayed");
+        assert!(problem.detail.contains(recovery));
+        assert!(!problem.detail.contains("token="));
+        assert_eq!(serde_json::to_string(&problem).expect("canonical JSON"), vector.expected);
     }
 }
 
