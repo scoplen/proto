@@ -599,6 +599,20 @@ unrecoverable. The shared codec preserves the existing eight-field problem repre
 classifying database commit outcomes remains a server responsibility.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
+For D-106, `auth::AuthRateLimitHeaders` supplies the separate `"authentication"` response
+profile with a 1..300-second retry delay. `AuthJwk` and `AuthJwks` encode and decode public
+Ed25519 discovery documents, limited to 4,096 complete UTF-8 bytes and one or two distinct key
+identifiers. The reader checks canonical unpadded base64url, exact public fields, recursively
+duplicate JSON names, and private `d` presence of any type on a key entry. It accepts unordered
+keys and non-private extensions; the writer sorts by `kid` and writes `kty`, `crv`, `x`, `kid`,
+`alg`, and `use` in order. This document codec performs no network fetch and does not establish
+issuer or keyring trust. OpenAPI declares the root `/.well-known/jwks.json` operation separately
+from `/api/v1`, no-store authentication responses, bounded admission headers, consumed-nonce
+and refresh-reuse denials, and known rollback versus unknown-commit recovery. Refresh families
+expire absolutely 30 days after initial authentication or browser bootstrap; rotation reports
+the remaining positive whole seconds without extending expiry. The public reader continues
+accepting any positive lifetime. Durable admission, nonce consumption, key rotation, and
+refresh transactions remain server responsibilities.
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR
 codec enforces the 4 KiB token, 8 KiB proof, and 16 KiB complete-message bounds and compact-JWS
 lexical form; it does not verify a JWT, DPoP claims, device state, proof replay, or the WebSocket
@@ -624,7 +638,7 @@ identity, and audit storage remain owned by the server application.
 The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`, and
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
 in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
-remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
+remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admission.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
 `vectors/sync-session.json`, `vectors/sync-session-limits.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
 `vectors/sync-read-limits.json`,
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,
@@ -688,7 +702,10 @@ one byte over their 4 KiB bound.
 The `api_json` target exercises the shared problem body, all seven authentication/refresh message
 types, both gateway-ticket issuance messages, the certificate issuance request and response, and
 the current-account profile
-through public decoders. Accepted messages must preserve their values across canonical encoding,
+through public decoders, including the D-106 public JWKS document. Its seeds cover sorted and
+unordered keys, recursive duplicate members, duplicate identifiers, private `d`, malformed
+public fields, and exact and exceeded 4 KiB bodies. Authentication failure seeds preserve the
+shared problem body. Accepted messages must preserve their values across canonical encoding,
 and a second encode must preserve those bytes. Gateway request checks also
 enforce rejection of an idempotency header. Seeds include the published JSON vectors, duplicate
 fields, forbidden browser refresh tokens, ambiguous edge hosts, nested response extensions,

@@ -5,7 +5,7 @@ use libfuzzer_sys::fuzz_target;
 use scoplen_api::ProblemDetails;
 use scoplen_api::account_profile::AccountProfile;
 use scoplen_api::auth::{
-    AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthRefreshRequest,
+    AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthJwks, AuthRefreshRequest,
     AuthTokenResponse, BrowserAuthRefreshRequest, BrowserAuthTokenResponse,
 };
 use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceResponse};
@@ -37,6 +37,7 @@ fuzz_target!(|bytes: &[u8]| {
         );
     }
     round_trip!(AccountProfile, bytes);
+    round_trip!(AuthJwks, bytes);
     round_trip!(CertificateIssuanceRequest, bytes);
     round_trip!(CertificateIssuanceResponse, bytes);
     round_trip!(GatewayTicketRequest, bytes);

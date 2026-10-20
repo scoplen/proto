@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Authentication denied","status":429,"detail":"Authentication admission was denied without changing credentials. Wait for Retry-After before trying again; admission is not guaranteed.","instance":"req-auth-rate-limited","code":"auth.rate_limited","changed":false,"retryable":true}

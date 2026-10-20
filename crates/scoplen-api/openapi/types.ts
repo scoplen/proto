@@ -13,6 +13,12 @@ export interface components {
     AuthRefreshRequest: AuthRefreshRequest;
     BrowserAuthRefreshRequest: BrowserAuthRefreshRequest;
     BrowserAuthTokenResponse: BrowserAuthTokenResponse;
+    AuthJwk: AuthJwk;
+    AuthJwks: AuthJwks;
+    AuthRateLimitedProblem: AuthRateLimitedProblem;
+    AuthAuthenticationRequiredProblem: AuthAuthenticationRequiredProblem;
+    AuthStorageUnavailableProblem: AuthStorageUnavailableProblem;
+    AuthCommitOutcomeUnknownProblem: AuthCommitOutcomeUnknownProblem;
     GatewayTicketRequest: GatewayTicketRequest;
     GatewayEdgeAddress: GatewayEdgeAddress;
     GatewayTicketResponse: GatewayTicketResponse;
@@ -207,6 +213,64 @@ export interface BrowserAuthTokenResponse {
   refresh_token?: never;
   [extension: string]: unknown;
 }
+
+export type AuthRateLimitedProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {
+  status: 429;
+  code: "auth.rate_limited";
+  changed: false;
+  retryable: true;
+};
+
+export type AuthAuthenticationRequiredProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {
+  status: 401;
+  code: "auth.authentication_required";
+  changed: boolean;
+  retryable: false;
+};
+
+export type AuthStorageUnavailableProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {
+  status: 503;
+  code: "auth.storage_unavailable";
+  changed: false;
+  retryable: true;
+};
+
+export type AuthCommitOutcomeUnknownProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {
+  status: 503;
+  code: "auth.commit_outcome_unknown";
+  changed: true;
+  retryable: false;
+};
+
+export interface AuthJwk {
+  kty: "OKP";
+  crv: "Ed25519";
+  /** Canonical unpadded base64url, exactly 32 decoded bytes. */
+  x: string;
+  /** 1..128 ASCII letters, digits, dots, hyphens, or underscores. */
+  kid: string;
+  alg: "Ed25519";
+  use: "sig";
+  d?: never;
+  [extension: string]: unknown;
+}
+
+export interface AuthJwks {
+  /** One or two distinct kid values; the complete document is at most 4096 bytes. */
+  keys: [AuthJwk] | [AuthJwk, AuthJwk];
+  [extension: string]: unknown;
+}
+
+export interface AuthRateLimitHeaders {
+  /** Decimal 1..300 seconds; RateLimit.t equals this delay. */
+  "Retry-After": string;
+  "RateLimit-Policy": '"authentication";q=30;w=60';
+  RateLimit: string;
+  "Cache-Control": "no-store";
+  Pragma: "no-cache";
+}
+
+export type AuthStorageFailureProblem = AuthStorageUnavailableProblem | AuthCommitOutcomeUnknownProblem;
 // END GENERATED Authentication
 // BEGIN GENERATED GatewayTicket
 export interface GatewayTicketRequest {

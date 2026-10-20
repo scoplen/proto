@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Authentication unavailable","status":503,"detail":"Authentication commit could not be confirmed; a nonce and refresh family may have changed. Keep local identity and obtain a fresh challenge; do not replay this request.","instance":"req-auth-unknown-device-commit","code":"auth.commit_outcome_unknown","changed":true,"retryable":false}

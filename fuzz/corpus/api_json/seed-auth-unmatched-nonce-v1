@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Authentication denied","status":401,"detail":"Authentication failed without changing credentials. Obtain a fresh challenge before trying again.","instance":"req-auth-unmatched-nonce","code":"auth.authentication_required","changed":false,"retryable":false}

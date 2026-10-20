@@ -1,0 +1,1 @@
+{"keys":[{"kty":"OKP","crv":"Ed25519","x":"AA","kid":"access-1","alg":"Ed25519","use":"sig"}]}

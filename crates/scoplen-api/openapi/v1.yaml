@@ -16,6 +16,41 @@
     }
   ],
   "paths": {
+    "/.well-known/jwks.json": {
+      "get": {
+        "operationId": "getAuthJwks",
+        "servers": [
+          {
+            "url": "/"
+          }
+        ],
+        "security": [],
+        "description": "Public dedicated enrolled-device access-token key discovery from the trusted deployment origin, outside /api/v1. This does not establish verification trust or authorize token-directed key retrieval.",
+        "responses": {
+          "200": {
+            "description": "One active and optionally one unexpired overlap public Ed25519 key, ordered by kid; complete UTF-8 JSON at most 4096 bytes.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthJwks"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/AuthJwksUnavailable"
+          }
+        }
+      }
+    },
     "/admin/personal-invitations": {
       "post": {
         "operationId": "issuePersonalInvitation",
@@ -116,18 +151,45 @@
                   "$ref": "#/components/schemas/AuthChallengeResponse"
                 }
               }
+            },
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
             }
           },
           "400": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
           },
           "413": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthProblem"
+          },
+          "415": {
+            "$ref": "#/components/responses/AuthProblem"
+          },
+          "429": {
+            "$ref": "#/components/responses/AuthRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AuthStorageUnavailable"
           }
-        }
+        },
+        "description": "Device-bound 120-second one-use nonce. Authorization, DPoP, refresh credentials, and Idempotency-Key are forbidden. A supplied Origin must match the configured deployment origin. Unknown and enrolled devices receive the same shape; multiple challenges may coexist. A lost response or uncertain challenge write permits a fresh challenge. Durable source admission precedes body parsing; private device and verified-account quotas never use unverified account ids. Malformed requests use 400 auth.invalid_request, excess bodies 413 auth.invalid_request, wrong content type 415 auth.invalid_request, and foreign Origin 403 policy.denied, all changed=false and retryable=false. Mandatory admission or failure-audit storage failure takes precedence. Every success and failure uses Cache-Control: no-store and Pragma: no-cache. Problems include an instance request id and no credential values."
       }
     },
     "/auth/device": {
@@ -154,27 +216,54 @@
                   "$ref": "#/components/schemas/AuthTokenResponse"
                 }
               }
+            },
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
             }
           },
           "400": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
           },
           "401": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthAuthenticationRequired"
           },
           "413": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthProblem"
+          },
+          "415": {
+            "$ref": "#/components/responses/AuthProblem"
+          },
+          "429": {
+            "$ref": "#/components/responses/AuthRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AuthStorageFailure"
           }
-        }
+        },
+        "description": "Authorization, DPoP, refresh credentials, and Idempotency-Key are forbidden. A supplied Origin must match the configured deployment origin. The first structurally valid attempt with a live bound nonce consumes it, including an invalid signature; nonce consumption and denial audit commit together. Success commits the nonce, initial 30-day refresh family, and success audit after signing the complete response. No token is returned before confirmed commit. Durable source admission precedes body parsing; private device and verified-account quotas never use unverified account ids. Malformed requests use 400 auth.invalid_request, excess bodies 413 auth.invalid_request, wrong content type 415 auth.invalid_request, and foreign Origin 403 policy.denied, all changed=false and retryable=false. Mandatory admission or failure-audit storage failure takes precedence. Every success and failure uses Cache-Control: no-store and Pragma: no-cache. Problems include an instance request id and no credential values."
       }
     },
     "/auth/refresh": {
       "post": {
         "operationId": "refreshAuthentication",
-        "description": "Scoplen JSON refresh profile (not the OAuth form-encoded token endpoint). Exactly one DPoP proof is required without an access token. Native callers supply a body token; browser callers supply an empty body and one endpoint-scoped HttpOnly refresh cookie. Mixed or absent credentials, Authorization and Idempotency-Key headers are rejected. Browser Origin must match the configured console origin. All responses use Cache-Control: no-store and Pragma: no-cache. Proof, cookie, Origin, atomic rotation, and family-reuse checks are server responsibilities.",
+        "description": "Scoplen JSON refresh profile (not the OAuth form-encoded token endpoint). Exactly one DPoP proof is required without an access token. Native callers supply a body token; browser callers supply an empty body and one endpoint-scoped HttpOnly refresh cookie. Mixed or absent credentials, Authorization and Idempotency-Key headers are rejected. Browser Origin must match the configured console origin. All responses use Cache-Control: no-store and Pragma: no-cache. Proof, cookie, Origin, atomic rotation, and family-reuse checks are server responsibilities. Durable source admission precedes body parsing; private device and verified-account quotas never use unverified account ids. Malformed requests use 400 auth.invalid_request, excess bodies 413 auth.invalid_request, wrong content type 415 auth.invalid_request, and foreign Origin 403 policy.denied, all changed=false and retryable=false. Mandatory admission or failure-audit storage failure takes precedence. Every success and failure uses Cache-Control: no-store and Pragma: no-cache. Problems include an instance request id and no credential values.",
         "security": [
           {
             "dpopProof": []
@@ -200,8 +289,20 @@
         },
         "responses": {
           "200": {
-            "description": "A rotated DPoP-bound token pair. Browser responses omit refresh_token and rotate it only through Set-Cookie: __Secure-spl-refresh with Path=/api/v1/auth/refresh, HttpOnly, Secure, SameSite=Strict, no Domain, and Max-Age=refresh_expires_in.",
+            "description": "A rotated DPoP-bound token pair. Browser responses omit refresh_token and rotate it only through Set-Cookie: __Secure-spl-refresh with Path=/api/v1/auth/refresh, HttpOnly, Secure, SameSite=Strict, no Domain, and Max-Age=refresh_expires_in. The refresh family expires absolutely 30 days after initial authentication/bootstrap; rotation does not extend it. Return 600 access seconds and the remaining family whole seconds rounded down; deny when fewer than one remains.",
             "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
               "Set-Cookie": {
                 "description": "Required for browser mode and absent for native mode; contains the rotated refresh credential.",
                 "schema": {
@@ -225,8 +326,20 @@
             }
           },
           "400": {
-            "description": "RFC 9457 problem. A required or stale DPoP nonce uses auth.use_dpop_nonce and includes DPoP-Nonce; malformed requests or other proof failures use auth.invalid_request or auth.invalid_dpop_proof.",
+            "description": "RFC 9457 problem. A required or stale DPoP nonce uses auth.use_dpop_nonce and includes DPoP-Nonce; malformed requests or other proof failures use auth.invalid_request or auth.invalid_dpop_proof. auth.invalid_request and auth.invalid_dpop_proof have changed=false and retryable=false; auth.use_dpop_nonce has changed=false and retryable=true and requires a new proof and jti.",
             "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
               "DPoP-Nonce": {
                 "description": "Required only for auth.use_dpop_nonce; retry with a new proof and jti without consuming the refresh token.",
                 "schema": {
@@ -243,19 +356,25 @@
             }
           },
           "401": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthAuthenticationRequired"
           },
           "403": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
           },
           "413": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
           },
           "415": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/AuthProblem"
+          },
+          "429": {
+            "$ref": "#/components/responses/AuthRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AuthStorageFailure"
           }
         }
       }
@@ -3436,6 +3555,172 @@
           }
         }
       },
+      "AuthProblem": {
+        "description": "RFC 9457 authentication problem. Known request and origin denials have changed=false and retryable=false. Durable admission or mandatory failure audit failure takes precedence; all problems have an instance request id.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "AuthRateLimited": {
+        "description": "Authentication admission rejected without nonce consumption, refresh rotation, or family revocation. Retry-After is the greatest applicable wait rounded up to 1..300 seconds and does not guarantee admission. RateLimit and RateLimit-Policy use draft-ietf-httpapi-ratelimit-headers-11 and reveal only the nominal source quota, never the private bucket.",
+        "headers": {
+          "Retry-After": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            }
+          },
+          "RateLimit-Policy": {
+            "required": true,
+            "schema": {
+              "const": "\"authentication\";q=30;w=60"
+            }
+          },
+          "RateLimit": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"authentication\";r=0;t=(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            },
+            "description": "The t delay equals Retry-After."
+          },
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthRateLimitedProblem"
+            }
+          }
+        }
+      },
+      "AuthAuthenticationRequired": {
+        "description": "Uniform credential denial without disclosing which check failed. changed=true only when this request consumed a live bound device nonce or revoked a refresh family on verified matching reuse; otherwise changed=false. retryable=false. Native callers keep their local identity and obtain a fresh challenge; browser callers restart authentication. A wrong-key proof cannot revoke a family.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthAuthenticationRequiredProblem"
+            }
+          }
+        }
+      },
+      "AuthStorageUnavailable": {
+        "description": "Known precommit failure or uncertain transient challenge write: auth.storage_unavailable, changed=false, retryable=true. No business-state mutation committed; obtain a fresh challenge before another device attempt. Admission or mandatory audit failure takes precedence over denial.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthStorageUnavailableProblem"
+            }
+          }
+        }
+      },
+      "AuthStorageFailure": {
+        "description": "A known precommit rollback is auth.storage_unavailable with changed=false and retryable=true. Once COMMIT was sent without a confirmed result, return auth.commit_outcome_unknown with changed=true and retryable=false. Nonce or refresh family state may have changed; native clients retain local identity and obtain a fresh challenge, browser clients restart authentication. Never automatically replay the old device request or refresh credential. An absent row does not prove rollback while a commit may be in flight.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AuthStorageUnavailableProblem"
+                },
+                {
+                  "$ref": "#/components/schemas/AuthCommitOutcomeUnknownProblem"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AuthJwksUnavailable": {
+        "description": "Unavailable, corrupt, or undecryptable keyring: fail closed with auth.storage_unavailable, changed=false, retryable=true; never return a partial JWKS.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthStorageUnavailableProblem"
+            }
+          }
+        }
+      },
       "PersonalRateLimited": {
         "description": "Personal admission rejected without invitation or identity mutation. Retry-After is the latest applicable admission delay, rounded up to a decimal 1..300 seconds; retrying then does not guarantee admission. RateLimit and RateLimit-Policy use draft-ietf-httpapi-ratelimit-headers-11 structured-field syntax and reveal only the nominal source policy, never a private bucket or key.",
         "headers": {
@@ -3518,6 +3803,161 @@
           "device_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
           "personal_vault_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }
         }
+      },
+      "AuthJwk": {
+        "type": "object",
+        "required": [
+          "kty",
+          "crv",
+          "x",
+          "kid",
+          "alg",
+          "use"
+        ],
+        "additionalProperties": true,
+        "not": {
+          "required": [
+            "d"
+          ]
+        },
+        "properties": {
+          "kty": {
+            "const": "OKP"
+          },
+          "crv": {
+            "const": "Ed25519"
+          },
+          "x": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+            "description": "Canonical unpadded base64url decoding to exactly 32 bytes."
+          },
+          "kid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          },
+          "alg": {
+            "const": "Ed25519"
+          },
+          "use": {
+            "const": "sig"
+          }
+        }
+      },
+      "AuthJwks": {
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "additionalProperties": true,
+        "description": "Complete UTF-8 document at most 4096 bytes. Recursively reject duplicate JSON members, duplicate kid values, and each entry containing d of any JSON type. Readers accept member/key order and ignore non-private extensions. Writers emit keys sorted by kid, each with exactly kty, crv, x, kid, alg, use in that order. Discovery never establishes issuer/keyring trust or triggers token-selected fetching.",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/AuthJwk"
+            }
+          }
+        }
+      },
+      "AuthRateLimitedProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 429
+              },
+              "code": {
+                "const": "auth.rate_limited"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": true
+              }
+            }
+          }
+        ]
+      },
+      "AuthAuthenticationRequiredProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 401
+              },
+              "code": {
+                "const": "auth.authentication_required"
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "AuthStorageUnavailableProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 503
+              },
+              "code": {
+                "const": "auth.storage_unavailable"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": true
+              }
+            }
+          }
+        ]
+      },
+      "AuthCommitOutcomeUnknownProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 503
+              },
+              "code": {
+                "const": "auth.commit_outcome_unknown"
+              },
+              "changed": {
+                "const": true
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
       },
       "AuthChallengeRequest": {
         "type": "object",

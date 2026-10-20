@@ -325,7 +325,7 @@ const files = [];
 for (const source of sources) files.push(parseProto(await readFile(source, "utf8"), source));
 const generated = renderFile(files);
 if (process.argv.includes("--check")) {
-  const existing = await readFile(outputPath, "utf8").catch(() => "");
+  const existing = (await readFile(outputPath, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
   if (existing !== generated) {
     console.error(`generated file is stale: ${path.relative(process.cwd(), outputPath)}`);
     process.exitCode = 1;
