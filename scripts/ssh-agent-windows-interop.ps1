@@ -41,8 +41,8 @@ function Invoke-Case {
         $process.WaitForExit()
         throw "${name}: SSH example exceeded the 45-second fixture deadline"
     }
-    $output = ([string](Get-Content -LiteralPath $outputPath -Raw)).Trim()
-    $errorOutput = ([string](Get-Content -LiteralPath $errorPath -Raw)).Trim()
+    $output = [IO.File]::ReadAllText($outputPath).Trim()
+    $errorOutput = [IO.File]::ReadAllText($errorPath).Trim()
     if ($expectedError) {
         if ($process.ExitCode -eq 0 -or -not $errorOutput.Contains($expectedError)) {
             throw "${name}: expected '$expectedError', got exit $($process.ExitCode), stdout '$output', stderr '$errorOutput'"
