@@ -489,6 +489,21 @@ Public signed and rejection vectors are in `vectors/device-access-token.json`. C
 current-state checks, DPoP proof and replay verification, and route authorization; the K-3 JSON
 response continues to treat the token as opaque.
 
+`scoplen-api::auth` publishes D-107's `DeviceAccessScope`, `INITIAL_DEVICE_ACCESS_SCOPE`,
+and `DeviceAccessOperation`. Initial first-party device issuance uses exactly
+`account:read keys:read keys:write sync:read sync:write`; refresh may preserve or narrow its
+recorded ceiling, never widen it. The 16-operation registry requires router-owned canonical
+methods and route templates. Unknown protected routes fail closed for this device profile.
+Unknown syntactically valid JWT scopes still parse but grant no registered rights. Scope
+membership is exact, with no wildcard, prefix, role, or implied read-from-write matches.
+Consumers check signatures, DPoP, replay, and current account/device state before scope, then
+check membership, vault kind, signatures, SSO, and operation policy as applicable. Missing
+scope is `403 policy.denied`, `changed=false`, `retryable=false`, without resource disclosure.
+Notification authentication, subscriptions, and delivery all retain their scope check. The
+registry does not authorize browser, operator, or service-principal profiles; scope checks
+alone do not authorize any request. Public mappings and rejection cases are in
+`vectors/auth-scopes.json`.
+
 The gateway-ticket issuance codecs validate syntax and size; their ticket field remains opaque.
 `scoplen-crypto` signs and statelessly verifies the D-96 dedicated Ed25519 gateway-ticket profile with a trusted
 issuer and ticket-only keyring, exact 60-second validity, UUIDv7 claims, and DPoP-key and SSH-key
@@ -638,7 +653,8 @@ identity, and audit storage remain owned by the server application.
 The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`, and
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
 in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
-remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admission.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
+remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admission.json`,
+`vectors/auth-scopes.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
 `vectors/sync-session.json`, `vectors/sync-session-limits.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
 `vectors/sync-read-limits.json`,
 `vectors/sync-notifications.json`, `vectors/sync-notification-auth.json`, `vectors/sync-keys.json`,

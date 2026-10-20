@@ -127,6 +127,15 @@ if (document.paths["/auth/device"].post.responses?.["401"]?.$ref !== "#/componen
   throw new Error("/auth/device must describe authentication failure");
 }
 const refresh = document.paths?.["/auth/refresh"]?.post;
+const initialDeviceScope = "account:read keys:read keys:write sync:read sync:write";
+const deviceAuthentication = document.paths["/auth/device"].post;
+if (deviceAuthentication["x-scoplen-initial-device-scope"] !== initialDeviceScope ||
+    !deviceAuthentication.responses["200"].description.includes(`exactly ${initialDeviceScope}`) ||
+    !deviceAuthentication.responses["200"].description.includes("Request bodies cannot propose scopes") ||
+    !refresh.responses["200"].description.includes("never widen it") ||
+    !refresh.responses["200"].description.includes("require reauthentication and issue no token")) {
+  throw new Error("enrolled-device issuance and refresh scope ceiling differ from D-107");
+}
 const refreshRequest = refresh?.requestBody;
 const refs = (schema) => schema?.oneOf?.map((member) => member.$ref);
 if (JSON.stringify(refresh?.security) !== JSON.stringify([{ dpopProof: [] }]) ||
@@ -461,6 +470,9 @@ const accountProperties = accountSchema?.properties;
 const accountData = accountProperties?.data;
 const accountFields = ["id", "etag", "created_at", "updated_at", "data"];
 if (accountGet?.operationId !== "getCurrentAccount" || accountGet.requestBody ||
+    accountGet["x-scoplen-required-device-scope"] !== "account:read" ||
+    !accountGet.description?.includes("403 policy.denied, changed=false and retryable=false") ||
+    !accountGet.description?.includes("unmapped protected routes fail closed") ||
     !accountGet.description?.includes("4096 bytes") ||
     accountGet.responses?.["200"]?.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/AccountProfile" ||
     accountGet.responses["200"].headers?.ETag?.required !== true ||
