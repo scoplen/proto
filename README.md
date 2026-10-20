@@ -213,8 +213,17 @@ failure, and an identity query on the same channel plus subsequent valid connect
 source key remains usable. The source key and build artifacts stay inside the disposable
 container; its repository mount is read-only, and it publishes no ports. Each case has a process
 deadline; this does not establish a production cancellation bound for the synchronous agent API.
-Windows named-pipe and Pageant connectors, live
-gateway interoperability, and the wider OpenSSH matrix remain unverified.
+`pwsh ./scripts/ssh-agent-windows-interop.ps1` runs only on an isolated Windows GitHub Actions
+runner. It uses the real Windows OpenSSH agent service through `connect_windows_agent`, adds one
+newly generated Ed25519 test key, and removes that exact key afterward without enumerating or
+changing other identities. The `windows_agent_interop` example authenticates to a disposable
+in-process SSH server and requires exact command output and exit status zero. Missing identity,
+wrong host-key pin, missing agent pipe, and post-removal identity checks are rejection controls,
+with valid connections after each earlier failure. Some Windows OpenSSH agent installations reject
+bounded-lifetime key additions, so this fixture uses a disposable runner and exact-key
+cleanup rather than adding a key to a developer's persistent agent. The per-case process timeout
+bounds the fixture, not production synchronous agent I/O. This does not establish Windows OpenSSH
+server or native Pageant interoperability; those and the wider matrix remain unverified.
 
 `pwsh ./scripts/ssh-remote-forwarding-interop.ps1` runs the native public client against a
 disposable Alpine OpenSSH server. It checks direct Unix-socket forwarding, remote TCP port

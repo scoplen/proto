@@ -102,6 +102,21 @@ jobs:
         shell: pwsh
         run: ./scripts/ssh-agent-unix-interop.ps1
 
+  openssh-agent-windows:
+    name: Native Windows OpenSSH agent interoperability
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Start Windows OpenSSH agent
+        shell: pwsh
+        run: |
+          Set-Service -Name ssh-agent -StartupType Manual
+          Start-Service -Name ssh-agent
+      - name: Raw-key authentication over the native agent pipe and disposable SSH server
+        shell: pwsh
+        run: ./scripts/ssh-agent-windows-interop.ps1
+
   openssh-agent-forwarded:
     name: Forwarded OpenSSH agent interoperability
     runs-on: ubuntu-latest
