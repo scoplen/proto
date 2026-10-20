@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Authentication denied","status":401,"detail":"Authentication failed and this attempt consumed a challenge. Obtain a fresh challenge before trying again; do not replay this request.","instance":"req-auth-consumed-nonce","code":"auth.authentication_required","changed":true,"retryable":false}

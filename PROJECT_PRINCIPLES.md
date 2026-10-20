@@ -29,6 +29,9 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   with per-Host algorithm, incoming/outgoing byte and elapsed rekey configuration, and initial and
   repeated strict-KEX interoperability verification; complete algorithm/extension support, default compatibility, interoperability, and performance remain
   open. S6 has the error contract, K-3 device-auth JSON codecs, and K-4 sync codecs, while complete
-  API and production endpoint behavior remain open. The canonical roadmap records each outcome.
+  API and production endpoint behavior remain open. D-106 adds a bounded public-only JWKS
+  codec, separate authentication rate headers, and documented failure/recovery responses with
+  public vectors and parser seeds; it does not establish issuer or keyring trust. The canonical
+  roadmap records each outcome.
   S5 and S7 have no completed gate evidence.
 - Independent security review and interoperability evidence are required before a Stable release.

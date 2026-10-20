@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Authentication denied","status":401,"detail":"Authentication failed and credentials may have changed. Obtain a fresh challenge and authenticate again; do not replay this refresh token.","instance":"req-auth-refresh-reuse","code":"auth.authentication_required","changed":true,"retryable":false}

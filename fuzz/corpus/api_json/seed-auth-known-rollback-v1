@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Authentication unavailable","status":503,"detail":"Authentication storage is unavailable and credential changes rolled back. Obtain a fresh challenge before another device attempt; retrying later may help.","instance":"req-auth-known-rollback","code":"auth.storage_unavailable","changed":false,"retryable":true}

@@ -12,9 +12,13 @@ use serde::{
 use thiserror::Error;
 use uuid::Uuid;
 
+mod jwks;
+pub use jwks::{AuthJwk, AuthJwks, AuthJwksCodecError, MAX_AUTH_JWKS_BYTES};
+
 /// The lifetime of an access token in seconds.
 pub const ACCESS_TOKEN_EXPIRES_IN: u64 = 600;
-/// The lifetime of a refresh token in seconds.
+/// Absolute refresh-family lifetime from initial authentication or browser bootstrap.
+/// Rotation does not reset expiry and returns the remaining whole seconds instead.
 pub const REFRESH_TOKEN_EXPIRES_IN: u64 = 2_592_000;
 /// Maximum encoded body for an unauthenticated device challenge request.
 pub const MAX_CHALLENGE_REQUEST_BYTES: usize = 256;
@@ -24,6 +28,52 @@ pub const MAX_DEVICE_REQUEST_BYTES: usize = 4_096;
 pub const MAX_REFRESH_REQUEST_BYTES: usize = 4_096;
 /// Maximum UTF-8 byte length of a native refresh credential.
 pub const MAX_REFRESH_TOKEN_BYTES: usize = 2_048;
+
+/// Nominal source quota advertised on authentication admission rejections.
+pub const AUTH_RATE_LIMIT_POLICY: &str = "\"authentication\";q=30;w=60";
+
+/// Public authentication admission headers without private bucket identities.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AuthRateLimitHeaders {
+    retry_after_seconds: u16,
+}
+
+/// An invalid public authentication retry delay.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[error("authentication retry delay must be between 1 and 300 seconds")]
+pub struct AuthRateLimitHeaderError;
+
+impl AuthRateLimitHeaders {
+    /// Construct the D-106 header profile from the greatest applicable admission delay.
+    ///
+    /// # Errors
+    ///
+    /// Rejects a delay outside 1..=300 seconds.
+    pub fn new(retry_after_seconds: u16) -> Result<Self, AuthRateLimitHeaderError> {
+        if !(1..=300).contains(&retry_after_seconds) {
+            return Err(AuthRateLimitHeaderError);
+        }
+        Ok(Self { retry_after_seconds })
+    }
+
+    /// Decimal `Retry-After` value and `RateLimit` reset delay, in seconds.
+    #[must_use]
+    pub fn retry_after_seconds(self) -> u16 {
+        self.retry_after_seconds
+    }
+
+    /// Exact structured `RateLimit` value with zero advertised remaining capacity.
+    #[must_use]
+    pub fn rate_limit(self) -> String {
+        format!("\"authentication\";r=0;t={}", self.retry_after_seconds)
+    }
+
+    /// Exact structured `RateLimit-Policy` value.
+    #[must_use]
+    pub fn rate_limit_policy(self) -> &'static str {
+        AUTH_RATE_LIMIT_POLICY
+    }
+}
 
 /// Errors returned while decoding or validating K-3 authentication JSON.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -512,7 +562,9 @@ impl fmt::Debug for AuthTokenResponse {
 }
 
 impl AuthTokenResponse {
-    /// Construct a token response using the contract's default lifetimes.
+    /// Construct an initial token response using the contract's default lifetimes.
+    /// Refresh rotation must replace `refresh_expires_in` with the positive whole seconds
+    /// remaining in the original family; it must not reset the 30-day expiry.
     ///
     /// # Errors
     ///
@@ -649,7 +701,8 @@ impl fmt::Debug for BrowserAuthTokenResponse {
 }
 
 impl BrowserAuthTokenResponse {
-    /// Construct a browser response using the contract's default lifetimes.
+    /// Construct an initial browser response using the contract's default lifetimes.
+    /// Rotation must set `refresh_expires_in` to the remaining whole family seconds.
     ///
     /// # Errors
     ///

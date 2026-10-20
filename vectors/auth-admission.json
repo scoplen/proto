@@ -1,0 +1,228 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "auth-jwks-rfc8037-v1",
+      "kind": "auth.jwks",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}"
+    },
+    {
+      "id": "auth-jwks-unordered-extensions-v1",
+      "kind": "auth.jwks",
+      "input": "{\"future\":{\"nested\":[true,null]},\"keys\":[{\"use\":\"sig\",\"alg\":\"Ed25519\",\"kid\":\"overlap-2\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"extension\":{\"a\":1}},{\"use\":\"sig\",\"alg\":\"Ed25519\",\"kid\":\"access-1\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"crv\":\"Ed25519\",\"kty\":\"OKP\"}]}",
+      "expected": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"overlap-2\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}"
+    },
+    {
+      "id": "auth-jwks-reject-empty-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-three-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"overlap-2\",\"alg\":\"Ed25519\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"third\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-duplicate-kid-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-duplicate-member-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-duplicate-escaped-member-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"k\\u0069d\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-duplicate-root-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}],\"keys\":[]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-duplicate-nested-extension-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}],\"future\":{\"nested\":[{\"same\":1,\"same\":2}]}}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-private-null-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\",\"d\":null}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-private-text-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\",\"d\":\"synthetic-private-marker\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-padded-x-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo=\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-noncanonical-x-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyp\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-short-x-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"AA\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-wrong-kty-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"EC\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-wrong-curve-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"X25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-polymorphic-alg-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"EdDSA\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-wrong-use-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"alg\":\"Ed25519\",\"use\":\"enc\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-missing-alg-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"access-1\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-non-ascii-kid-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"é\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-long-kid-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYdk9Jwu2eNzMeK3GaE3ncyQ0bcYDBfZxe2CNyo\",\"kid\":\"kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\",\"alg\":\"Ed25519\",\"use\":\"sig\"}]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-null-entry-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":[null]}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-null-keys-v1",
+      "kind": "auth.jwks.reject",
+      "input": "{\"keys\":null}",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-jwks-reject-not-object-v1",
+      "kind": "auth.jwks.reject",
+      "input": "[]",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-rate-limit-1-v1",
+      "kind": "auth.rate-limit",
+      "input": "1",
+      "expected": "Retry-After: 1\nRateLimit-Policy: \"authentication\";q=30;w=60\nRateLimit: \"authentication\";r=0;t=1"
+    },
+    {
+      "id": "auth-rate-limit-300-v1",
+      "kind": "auth.rate-limit",
+      "input": "300",
+      "expected": "Retry-After: 300\nRateLimit-Policy: \"authentication\";q=30;w=60\nRateLimit: \"authentication\";r=0;t=300"
+    },
+    {
+      "id": "auth-rate-limit-reject-0-v1",
+      "kind": "auth.rate-limit.reject",
+      "input": "0",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-rate-limit-reject-301-v1",
+      "kind": "auth.rate-limit.reject",
+      "input": "301",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-rate-limit-reject-65535-v1",
+      "kind": "auth.rate-limit.reject",
+      "input": "65535",
+      "expected": "reject"
+    },
+    {
+      "id": "auth-consumed-nonce-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":401,\"detail\":\"Authentication failed and this attempt consumed a challenge. Obtain a fresh challenge before trying again; do not replay this request.\",\"instance\":\"req-auth-consumed-nonce\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":401,\"detail\":\"Authentication failed and this attempt consumed a challenge. Obtain a fresh challenge before trying again; do not replay this request.\",\"instance\":\"req-auth-consumed-nonce\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "auth-unmatched-nonce-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":401,\"detail\":\"Authentication failed without changing credentials. Obtain a fresh challenge before trying again.\",\"instance\":\"req-auth-unmatched-nonce\",\"code\":\"auth.authentication_required\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":401,\"detail\":\"Authentication failed without changing credentials. Obtain a fresh challenge before trying again.\",\"instance\":\"req-auth-unmatched-nonce\",\"code\":\"auth.authentication_required\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "auth-refresh-reuse-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":401,\"detail\":\"Authentication failed and credentials may have changed. Obtain a fresh challenge and authenticate again; do not replay this refresh token.\",\"instance\":\"req-auth-refresh-reuse\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":401,\"detail\":\"Authentication failed and credentials may have changed. Obtain a fresh challenge and authenticate again; do not replay this refresh token.\",\"instance\":\"req-auth-refresh-reuse\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "auth-rate-limited-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":429,\"detail\":\"Authentication admission was denied without changing credentials. Wait for Retry-After before trying again; admission is not guaranteed.\",\"instance\":\"req-auth-rate-limited\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication denied\",\"status\":429,\"detail\":\"Authentication admission was denied without changing credentials. Wait for Retry-After before trying again; admission is not guaranteed.\",\"instance\":\"req-auth-rate-limited\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "auth-known-rollback-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Authentication storage is unavailable and credential changes rolled back. Obtain a fresh challenge before another device attempt; retrying later may help.\",\"instance\":\"req-auth-known-rollback\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Authentication storage is unavailable and credential changes rolled back. Obtain a fresh challenge before another device attempt; retrying later may help.\",\"instance\":\"req-auth-known-rollback\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "auth-unknown-device-commit-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Authentication commit could not be confirmed; a nonce and refresh family may have changed. Keep local identity and obtain a fresh challenge; do not replay this request.\",\"instance\":\"req-auth-unknown-device-commit\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Authentication commit could not be confirmed; a nonce and refresh family may have changed. Keep local identity and obtain a fresh challenge; do not replay this request.\",\"instance\":\"req-auth-unknown-device-commit\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "auth-unknown-refresh-commit-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Refresh commit could not be confirmed and the family may have changed. Keep local identity and obtain a fresh challenge, or restart browser authentication; do not replay the old refresh token.\",\"instance\":\"req-auth-unknown-refresh-commit\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Refresh commit could not be confirmed and the family may have changed. Keep local identity and obtain a fresh challenge, or restart browser authentication; do not replay the old refresh token.\",\"instance\":\"req-auth-unknown-refresh-commit\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "auth-jwks-unavailable-v1",
+      "kind": "auth.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Public key discovery is unavailable. No partial key document was returned and credentials were not changed. Retry later; never trust a token-selected key source.\",\"instance\":\"req-auth-jwks-unavailable\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Authentication unavailable\",\"status\":503,\"detail\":\"Public key discovery is unavailable. No partial key document was returned and credentials were not changed. Retry later; never trust a token-selected key source.\",\"instance\":\"req-auth-jwks-unavailable\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}"
+    }
+  ]
+}

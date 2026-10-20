@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Authentication unavailable","status":503,"detail":"Public key discovery is unavailable. No partial key document was returned and credentials were not changed. Retry later; never trust a token-selected key source.","instance":"req-auth-jwks-unavailable","code":"auth.storage_unavailable","changed":false,"retryable":true}

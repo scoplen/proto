@@ -119,11 +119,11 @@ for (const [path, requestName, responseName, maxBytes] of [
       !request.description?.includes(`${maxBytes} bytes`) ||
       request.content?.["application/json"]?.schema?.$ref !== `#/components/schemas/${requestName}` ||
       operation.responses?.["200"]?.content?.["application/json"]?.schema?.$ref !== `#/components/schemas/${responseName}` ||
-      !["400", "413", "default"].every((status) => operation.responses?.[status]?.$ref === "#/components/responses/Problem")) {
+      !["400", "403", "413", "415", "default"].every((status) => operation.responses?.[status]?.$ref === "#/components/responses/AuthProblem")) {
     throw new Error(`${path} differs from the shared authentication endpoint`);
   }
 }
-if (document.paths["/auth/device"].post.responses?.["401"]?.$ref !== "#/components/responses/Problem") {
+if (document.paths["/auth/device"].post.responses?.["401"]?.$ref !== "#/components/responses/AuthAuthenticationRequired") {
   throw new Error("/auth/device must describe authentication failure");
 }
 const refresh = document.paths?.["/auth/refresh"]?.post;
@@ -141,10 +141,128 @@ if (JSON.stringify(refresh?.security) !== JSON.stringify([{ dpopProof: [] }]) ||
     refresh.responses?.["400"]?.content?.["application/problem+json"]?.schema?.$ref !==
       "#/components/schemas/ProblemDetails" ||
     !refresh.responses?.["400"]?.headers?.["DPoP-Nonce"] ||
-    !["401", "403", "413", "415", "default"].every((status) =>
-      refresh.responses?.[status]?.$ref === "#/components/responses/Problem")) {
+    refresh.responses?.["401"]?.$ref !== "#/components/responses/AuthAuthenticationRequired" ||
+    !["403", "413", "415", "default"].every((status) =>
+      refresh.responses?.[status]?.$ref === "#/components/responses/AuthProblem")) {
   throw new Error("/auth/refresh differs from the shared refresh contract");
 }
+
+const authCacheHeaders = {
+  "Cache-Control": { required: true, schema: { const: "no-store" } },
+  Pragma: { required: true, schema: { const: "no-cache" } },
+};
+const authBoundedDelay = "(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)";
+const authRateHeaders = {
+  "Retry-After": { required: true, schema: { type: "string", pattern: `^${authBoundedDelay}$` } },
+  "RateLimit-Policy": { required: true, schema: { const: '"authentication";q=30;w=60' } },
+  RateLimit: { required: true, schema: { type: "string", pattern: `^"authentication";r=0;t=${authBoundedDelay}$` }, description: "The t delay equals Retry-After." },
+  ...authCacheHeaders,
+};
+const authenticationResponses = document.components?.responses;
+if (JSON.stringify(authenticationResponses?.AuthRateLimited?.headers) !== JSON.stringify(authRateHeaders) ||
+    !authenticationResponses.AuthRateLimited.description.includes("1..300 seconds") ||
+    !authenticationResponses.AuthRateLimited.description.includes("draft-ietf-httpapi-ratelimit-headers-11")) {
+  throw new Error("authentication rate-limit headers differ from D-106");
+}
+for (const name of ["AuthProblem", "AuthAuthenticationRequired", "AuthStorageUnavailable", "AuthStorageFailure"]) {
+  if (JSON.stringify(authenticationResponses?.[name]?.headers) !== JSON.stringify(authCacheHeaders)) {
+    throw new Error(`${name} must prohibit caching`);
+  }
+}
+for (const [name, status, code, changed, retryable] of [
+  ["AuthRateLimitedProblem", 429, "auth.rate_limited", false, true],
+  ["AuthAuthenticationRequiredProblem", 401, "auth.authentication_required", undefined, false],
+  ["AuthStorageUnavailableProblem", 503, "auth.storage_unavailable", false, true],
+  ["AuthCommitOutcomeUnknownProblem", 503, "auth.commit_outcome_unknown", true, false],
+]) {
+  const properties = { status: { const: status }, code: { const: code } };
+  if (changed !== undefined) properties.changed = { const: changed };
+  properties.retryable = { const: retryable };
+  if (JSON.stringify(document.components?.schemas?.[name]?.allOf) !== JSON.stringify([
+    { $ref: "#/components/schemas/ProblemDetails" }, { type: "object", properties },
+  ])) throw new Error(`${name} differs from D-106`);
+  authLines.push(
+    `export type ${name} = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {`,
+    `  status: ${status};`, `  code: "${code}";`,
+    `  changed: ${changed === undefined ? "boolean" : changed};`, `  retryable: ${retryable};`,
+    "};", "",
+  );
+}
+for (const [response, schema] of [
+  ["AuthProblem", "ProblemDetails"],
+  ["AuthRateLimited", "AuthRateLimitedProblem"],
+  ["AuthAuthenticationRequired", "AuthAuthenticationRequiredProblem"],
+  ["AuthStorageUnavailable", "AuthStorageUnavailableProblem"],
+  ["AuthJwksUnavailable", "AuthStorageUnavailableProblem"],
+]) {
+  if (authenticationResponses[response].content?.["application/problem+json"]?.schema?.$ref !==
+      `#/components/schemas/${schema}`) throw new Error(`${response} uses the wrong problem schema`);
+}
+if (JSON.stringify(authenticationResponses.AuthStorageFailure.content?.["application/problem+json"]?.schema?.oneOf) !==
+    JSON.stringify([
+      { $ref: "#/components/schemas/AuthStorageUnavailableProblem" },
+      { $ref: "#/components/schemas/AuthCommitOutcomeUnknownProblem" },
+    ]) || !authenticationResponses.AuthStorageFailure.description.includes("Never automatically replay") ||
+    !authenticationResponses.AuthStorageFailure.description.includes("fresh challenge")) {
+  throw new Error("authentication storage failure and recovery differ from D-106");
+}
+for (const path of ["/auth/challenge", "/auth/device", "/auth/refresh"]) {
+  const operation = document.paths[path].post;
+  const headers = operation.responses["200"].headers;
+  if (!Object.entries(authCacheHeaders).every(([name, value]) =>
+      JSON.stringify(headers?.[name]) === JSON.stringify(value)) ||
+      operation.responses?.["429"]?.$ref !== "#/components/responses/AuthRateLimited" ||
+      operation.responses?.["503"]?.$ref !== `#/components/responses/${path === "/auth/challenge" ? "AuthStorageUnavailable" : "AuthStorageFailure"}` ||
+      !operation.description.includes("Idempotency-Key") ||
+      !operation.description.includes("failure-audit storage failure takes precedence")) {
+    throw new Error(`${path} admission, cache, or storage response differs from D-106`);
+  }
+}
+if (!Object.entries(authCacheHeaders).every(([name, value]) =>
+    JSON.stringify(refresh.responses["400"].headers?.[name]) === JSON.stringify(value)) ||
+    !refresh.responses["200"].description.includes("does not extend") ||
+    !refresh.responses["200"].description.includes("rounded down")) {
+  throw new Error("refresh nonce errors or absolute family lifetime differ from D-106");
+}
+const jwks = document.components?.schemas?.AuthJwks;
+const jwk = document.components?.schemas?.AuthJwk;
+const jwksOperation = document.paths?.["/.well-known/jwks.json"]?.get;
+if (jwks?.type !== "object" || jwks.additionalProperties !== true ||
+    JSON.stringify(jwks.required) !== '["keys"]' ||
+    jwks.properties?.keys?.type !== "array" || jwks.properties.keys.minItems !== 1 ||
+    jwks.properties.keys.maxItems !== 2 || jwks.properties.keys.items?.$ref !== "#/components/schemas/AuthJwk" ||
+    !jwks.description?.includes("4096 bytes") || !jwks.description.includes("duplicate JSON members") ||
+    jwk?.type !== "object" || jwk.additionalProperties !== true ||
+    JSON.stringify(jwk.required) !== '["kty","crv","x","kid","alg","use"]' ||
+    JSON.stringify(Object.keys(jwk.properties ?? {})) !== JSON.stringify(jwk.required) ||
+    JSON.stringify(jwk.not) !== '{"required":["d"]}' ||
+    jwk.properties.kty.const !== "OKP" || jwk.properties.crv.const !== "Ed25519" ||
+    jwk.properties.alg.const !== "Ed25519" || jwk.properties.use.const !== "sig" ||
+    jwk.properties.kid.type !== "string" || jwk.properties.kid.minLength !== 1 || jwk.properties.kid.maxLength !== 128 ||
+    jwk.properties.kid.pattern !== "^[A-Za-z0-9._-]{1,128}$" ||
+    jwk.properties.x.type !== "string" || jwk.properties.x.minLength !== 43 || jwk.properties.x.maxLength !== 43 ||
+    jwk.properties.x.pattern !== "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$" ||
+    JSON.stringify(document.servers) !== '[{"url":"/api/v1"}]' ||
+    JSON.stringify(jwksOperation?.servers) !== '[{"url":"/"}]' ||
+    JSON.stringify(jwksOperation.security) !== "[]" || jwksOperation.operationId !== "getAuthJwks" ||
+    jwksOperation.responses?.["200"]?.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/AuthJwks" ||
+    JSON.stringify(jwksOperation.responses["200"].headers) !== JSON.stringify({ "Cache-Control": authCacheHeaders["Cache-Control"] }) ||
+    JSON.stringify(authenticationResponses.AuthJwksUnavailable.headers) !== JSON.stringify({ "Cache-Control": authCacheHeaders["Cache-Control"] }) ||
+    jwksOperation.responses?.["503"]?.$ref !== "#/components/responses/AuthJwksUnavailable") {
+  throw new Error("public root JWKS discovery differs from D-106");
+}
+authLines.push(
+  "export interface AuthJwk {", '  kty: "OKP";', '  crv: "Ed25519";',
+  "  /** Canonical unpadded base64url, exactly 32 decoded bytes. */", "  x: string;",
+  "  /** 1..128 ASCII letters, digits, dots, hyphens, or underscores. */", "  kid: string;",
+  '  alg: "Ed25519";', '  use: "sig";', "  d?: never;", "  [extension: string]: unknown;", "}", "",
+  "export interface AuthJwks {", "  /** One or two distinct kid values; the complete document is at most 4096 bytes. */",
+  "  keys: [AuthJwk] | [AuthJwk, AuthJwk];", "  [extension: string]: unknown;", "}", "",
+  "export interface AuthRateLimitHeaders {", "  /** Decimal 1..300 seconds; RateLimit.t equals this delay. */",
+  '  "Retry-After": string;', '  "RateLimit-Policy": \'"authentication";q=30;w=60\';',
+  "  RateLimit: string;", '  "Cache-Control": "no-store";', '  Pragma: "no-cache";', "}", "",
+  "export type AuthStorageFailureProblem = AuthStorageUnavailableProblem | AuthCommitOutcomeUnknownProblem;", "",
+);
 
 const typesUrl = new URL("types.ts", root);
 const existingTypes = (await readFile(typesUrl, "utf8")).replaceAll("\r\n", "\n");

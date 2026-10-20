@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-106's independent authentication admission headers and bounded public-only Ed25519
+  JWKS codec, with canonical key ordering, recursive duplicate-name rejection, and public-key
+  field checks. OpenAPI and generated TypeScript include root JWKS discovery, authentication
+  no-store and rate responses, known rollback versus uncertain commit, and absolute refresh
+  family expiry. Public vectors and API parser seeds cover success and failure paths; durable
+  authentication and trusted key distribution remain consumer work.
 - Added an isolated Windows CI fixture for the native OpenSSH agent named-pipe connector. It
   verifies raw-key authentication to a disposable SSH server, exact command output and exit,
   identity, host-key, and pipe rejections, and precise cleanup of its generated test key.
