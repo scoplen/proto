@@ -4,6 +4,18 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|bytes: &[u8]| {
+    if let Ok(wrap) = scoplen_crypto::DeviceArkWrap::decode(bytes) {
+        assert_eq!(wrap.encode().as_slice(), bytes);
+    }
+    if let Ok(wrap) = scoplen_crypto::AccountSigningKeyWrap::decode(bytes) {
+        assert_eq!(wrap.encode().as_slice(), bytes);
+    }
+    if let Ok(wrap) = scoplen_crypto::AccountKemKeyWrap::decode(bytes) {
+        assert_eq!(wrap.encode().as_slice(), bytes);
+    }
+    if let Ok(wrap) = scoplen_crypto::PersonalVaultKeyWrap::decode(bytes) {
+        assert_eq!(wrap.encode().as_slice(), bytes);
+    }
     let _ = scoplen_crypto::DeviceCertificate::decode(bytes);
     let _ = scoplen_crypto::LocalDatabaseKeyEnvelope::decode(bytes);
     let _ = scoplen_crypto::ObjectEnvelope::decode(bytes);
