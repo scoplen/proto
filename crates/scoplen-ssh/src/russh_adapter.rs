@@ -19,7 +19,7 @@ use std::{
     str,
     sync::{
         Arc, Mutex, Weak,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
     time::Duration,
@@ -67,6 +67,50 @@ const DEFAULT_REKEY_TIME_LIMIT: Duration = Duration::from_secs(3600);
 /// Maximum number of channels that one client connection may keep open.
 pub const MAX_CLIENT_CHANNEL_LIMIT: usize = 256;
 const USERAUTH_REQUEST: u8 = 50;
+const CONNECTION_END_WAIT: Duration = Duration::from_secs(1);
+
+#[derive(Clone, Copy)]
+#[repr(u8)]
+enum ConnectionEndKind {
+    Pending,
+    NetworkLost,
+    Other,
+    Local,
+    Unknown,
+}
+
+struct ConnectionEnd(AtomicU8);
+
+impl ConnectionEnd {
+    fn new() -> Self {
+        Self(AtomicU8::new(ConnectionEndKind::Pending as u8))
+    }
+
+    fn record(&self, kind: ConnectionEndKind) {
+        let _ = self.0.compare_exchange(
+            ConnectionEndKind::Pending as u8,
+            kind as u8,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        );
+    }
+
+    fn is_network_lost(&self) -> bool {
+        self.0.load(Ordering::Acquire) == ConnectionEndKind::NetworkLost as u8
+    }
+}
+
+fn network_io_failure(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::UnexpectedEof
+            | io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::TimedOut
+            | io::ErrorKind::NotConnected
+    )
+}
 
 /// Errors raised while creating a concrete SSH client configuration.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -603,6 +647,9 @@ pub enum ClientError {
     /// The peer closed the connection or the event loop stopped.
     #[error("SSH connection closed")]
     ConnectionClosed,
+    /// An established connection ended after a confirmed network or engine timeout failure.
+    #[error("SSH network connection was lost")]
+    NetworkLost,
     /// The SSH protocol negotiation or packet validation failed.
     #[error("SSH protocol negotiation failed")]
     Protocol,
@@ -724,11 +771,10 @@ impl From<russh::Error> for ClientError {
             | russh::Error::RequestDenied
             | russh::Error::Pending => Self::Channel,
             russh::Error::NotAuthenticated => Self::NotAuthenticated,
-            russh::Error::Disconnect
-            | russh::Error::HUP
-            | russh::Error::ConnectionTimeout
+            russh::Error::Disconnect | russh::Error::HUP => Self::ConnectionClosed,
+            russh::Error::ConnectionTimeout
             | russh::Error::KeepaliveTimeout
-            | russh::Error::InactivityTimeout => Self::ConnectionClosed,
+            | russh::Error::InactivityTimeout => Self::NetworkLost,
             russh::Error::UnknownKey | russh::Error::WrongServerSig => {
                 Self::HostKey(HostKeyVerificationError::InvalidEncoding)
             }
@@ -744,6 +790,7 @@ pub struct ClientConnection {
     rsa_selection: RsaSelectionCache,
     transport_lifetime: Mutex<Option<oneshot::Sender<()>>>,
     stopped: watch::Receiver<bool>,
+    connection_end: Arc<ConnectionEnd>,
     channel_slots: Arc<Semaphore>,
     channel_limit: usize,
     forwarded_channels: mpsc::Receiver<ForwardedChannel>,
@@ -907,6 +954,7 @@ impl ClientConnection {
         let agent_sessions = Arc::new(Mutex::new(AgentSessionRegistry::default()));
         let (forwarded_tx, forwarded_channels) = mpsc::channel(config.channel_limit);
         let (stopped_tx, stopped) = watch::channel(false);
+        let connection_end = Arc::new(ConnectionEnd::new());
         let handler = ClientHandler::new(
             &config,
             Arc::clone(&channel_slots),
@@ -914,6 +962,7 @@ impl ClientConnection {
             Arc::clone(&agent_sessions),
             forwarded_tx,
             stopped_tx,
+            Arc::clone(&connection_end),
         );
         let (owner, lifetime) = oneshot::channel();
         let stream = ConnectionTransport { inner: stream, lifetime, closed: false };
@@ -925,6 +974,7 @@ impl ClientConnection {
             rsa_selection: None,
             transport_lifetime: Mutex::new(Some(owner)),
             stopped,
+            connection_end,
             channel_slots,
             channel_limit: config.channel_limit,
             forwarded_channels,
@@ -1418,7 +1468,13 @@ impl ClientConnection {
         let channel = self.handle.channel_open_session().await.map_err(ClientError::from)?;
         let lease = Arc::new(AgentForwardingLease::new(Arc::clone(&self.agent_forwarding)));
         opening.register(channel.id().number(), &lease);
-        Ok(ClientChannel::new(channel, permit, Some(lease)))
+        Ok(ClientChannel::new(
+            channel,
+            permit,
+            Some(lease),
+            self.stopped.clone(),
+            Arc::clone(&self.connection_end),
+        ))
     }
 
     /// Open an RFC 4254 `direct-tcpip` channel through this connection.
@@ -1442,7 +1498,15 @@ impl ClientConnection {
                 originator_port,
             )
             .await
-            .map(|channel| ClientChannel::new(channel, permit, None))
+            .map(|channel| {
+                ClientChannel::new(
+                    channel,
+                    permit,
+                    None,
+                    self.stopped.clone(),
+                    Arc::clone(&self.connection_end),
+                )
+            })
             .map_err(ClientError::from)
     }
 
@@ -1457,7 +1521,15 @@ impl ClientConnection {
         self.handle
             .channel_open_direct_streamlocal(socket_path.to_owned())
             .await
-            .map(|channel| ClientChannel::new(channel, permit, None))
+            .map(|channel| {
+                ClientChannel::new(
+                    channel,
+                    permit,
+                    None,
+                    self.stopped.clone(),
+                    Arc::clone(&self.connection_end),
+                )
+            })
             .map_err(ClientError::from)
     }
 
@@ -1540,6 +1612,7 @@ impl ClientConnection {
     /// Allow up to one second for a protocol disconnect and engine shutdown. Then close the
     /// transport even if a peer window, a saturated queue, or surviving channels prevent progress.
     pub async fn disconnect(&self) -> Result<(), ClientError> {
+        self.connection_end.record(ConnectionEndKind::Local);
         let mut stopped = self.stopped.clone();
         let result = async_timeout(Duration::from_secs(1), async {
             self.handle.disconnect(russh::Disconnect::ByApplication, "", "en").await?;
@@ -1549,6 +1622,12 @@ impl ClientConnection {
         .await;
         self.transport_lifetime.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
         result.unwrap_or(Ok(())).map_err(ClientError::from)
+    }
+}
+
+impl Drop for ClientConnection {
+    fn drop(&mut self) {
+        self.connection_end.record(ConnectionEndKind::Local);
     }
 }
 
@@ -1710,6 +1789,11 @@ pub struct ClientChannel {
     channel: russh::Channel<client::Msg>,
     permit: OwnedSemaphorePermit,
     agent_forwarding: Option<Arc<AgentForwardingLease>>,
+    stopped: watch::Receiver<bool>,
+    connection_end: Arc<ConnectionEnd>,
+    local_close: AtomicBool,
+    terminal_event_seen: bool,
+    event_stream_ended: bool,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -1804,8 +1888,19 @@ impl ClientChannel {
         channel: russh::Channel<client::Msg>,
         permit: OwnedSemaphorePermit,
         agent_forwarding: Option<Arc<AgentForwardingLease>>,
+        stopped: watch::Receiver<bool>,
+        connection_end: Arc<ConnectionEnd>,
     ) -> Self {
-        Self { channel, permit, agent_forwarding }
+        Self {
+            channel,
+            permit,
+            agent_forwarding,
+            stopped,
+            connection_end,
+            local_close: AtomicBool::new(false),
+            terminal_event_seen: false,
+            event_stream_ended: false,
+        }
     }
 
     /// Return the engine-local channel number for diagnostics and recorder correlation.
@@ -1934,6 +2029,7 @@ impl ClientChannel {
 
     /// Request channel close.
     pub async fn close(&self) -> Result<(), ClientError> {
+        self.local_close.store(true, Ordering::Release);
         if let Some(lease) = &self.agent_forwarding {
             lease.revoke();
         }
@@ -1954,14 +2050,33 @@ impl ClientChannel {
         }
     }
 
-    /// Wait for the next peer event. `Ok(None)` means the engine closed the event stream.
+    /// Wait for the next peer event. An unclosed stream can report a confirmed network loss.
+    /// `Ok(None)` means a terminal channel event was seen or no retryable loss was established.
     pub async fn next_event(&mut self) -> Result<Option<ChannelEvent>, ClientError> {
+        if self.event_stream_ended {
+            return Ok(None);
+        }
         loop {
             let Some(message) = self.channel.wait().await else {
                 if let Some(lease) = &self.agent_forwarding {
                     lease.revoke();
                 }
-                return Ok(None);
+                self.event_stream_ended = true;
+                if self.terminal_event_seen || self.local_close.load(Ordering::Acquire) {
+                    return Ok(None);
+                }
+                if !*self.stopped.borrow() {
+                    let _ = async_timeout(
+                        CONNECTION_END_WAIT,
+                        self.stopped.wait_for(|stopped| *stopped),
+                    )
+                    .await;
+                }
+                return if self.connection_end.is_network_lost() {
+                    Err(ClientError::NetworkLost)
+                } else {
+                    Ok(None)
+                };
             };
             let event = match message {
                 ChannelMsg::Data { data } => ChannelEvent::Data(data.to_vec()),
@@ -2000,6 +2115,15 @@ impl ClientChannel {
             };
             if let Some(lease) = &self.agent_forwarding {
                 lease.on_event(&event);
+            }
+            if matches!(
+                event,
+                ChannelEvent::Close
+                    | ChannelEvent::ExitStatus(_)
+                    | ChannelEvent::ExitSignal { .. }
+                    | ChannelEvent::OpenFailure { .. }
+            ) {
+                self.terminal_event_seen = true;
             }
             return Ok(Some(event));
         }
@@ -2197,6 +2321,7 @@ struct ClientHandler {
     agent_sessions: Arc<Mutex<AgentSessionRegistry>>,
     forwarded_tx: mpsc::Sender<ForwardedChannel>,
     stopped: watch::Sender<bool>,
+    connection_end: Arc<ConnectionEnd>,
     #[cfg(test)]
     completed_key_exchanges: Arc<std::sync::atomic::AtomicUsize>,
     #[cfg(test)]
@@ -2213,6 +2338,7 @@ impl Drop for ClientHandler {
             lease.revoke();
         }
         sessions.leases.clear();
+        self.connection_end.record(ConnectionEndKind::Unknown);
         self.stopped.send_replace(true);
         #[cfg(test)]
         self.event_loop_stopped.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -2227,6 +2353,7 @@ impl ClientHandler {
         agent_sessions: Arc<Mutex<AgentSessionRegistry>>,
         forwarded_tx: mpsc::Sender<ForwardedChannel>,
         stopped: watch::Sender<bool>,
+        connection_end: Arc<ConnectionEnd>,
     ) -> Self {
         Self {
             host: config.host.clone(),
@@ -2237,6 +2364,7 @@ impl ClientHandler {
             agent_sessions,
             forwarded_tx,
             stopped,
+            connection_end,
             #[cfg(test)]
             completed_key_exchanges: Arc::clone(&config.completed_key_exchanges),
             #[cfg(test)]
@@ -2259,7 +2387,13 @@ impl ClientHandler {
             return;
         };
         let forwarded = ForwardedChannel::new(
-            ClientChannel::new(channel, permit, None),
+            ClientChannel::new(
+                channel,
+                permit,
+                None,
+                self.stopped.subscribe(),
+                Arc::clone(&self.connection_end),
+            ),
             kind,
             Arc::clone(&self.agent_forwarding),
         );
@@ -2420,6 +2554,18 @@ impl Handler for ClientHandler {
         &mut self,
         reason: russh::client::DisconnectReason<Self::Error>,
     ) -> Result<(), Self::Error> {
+        let kind = match &reason {
+            russh::client::DisconnectReason::Error(ClientError::NetworkLost) => {
+                ConnectionEndKind::NetworkLost
+            }
+            russh::client::DisconnectReason::Error(ClientError::Transport(error))
+                if network_io_failure(error) =>
+            {
+                ConnectionEndKind::NetworkLost
+            }
+            _ => ConnectionEndKind::Other,
+        };
+        self.connection_end.record(kind);
         match reason {
             russh::client::DisconnectReason::ReceivedDisconnect(_) => Ok(()),
             russh::client::DisconnectReason::Error(error) => Err(error),
@@ -4281,6 +4427,7 @@ mod tests {
             Arc::new(Mutex::new(AgentSessionRegistry::default())),
             forwarded_tx,
             stopped,
+            Arc::new(ConnectionEnd::new()),
         );
         assert!(
             handler

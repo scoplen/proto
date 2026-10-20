@@ -12,7 +12,8 @@ use std::{
 
 use russh::keys::PrivateKey;
 use scoplen_ssh::{
-    ChannelEvent, ClientChannel, ClientConfig, ClientConfigError, ClientConnection, HostKey,
+    ChannelEvent, ClientChannel, ClientConfig, ClientConfigError, ClientConnection, ClientError,
+    HostKey,
 };
 use ssh_key::Algorithm;
 use tokio::{
@@ -29,7 +30,16 @@ const OBSERVE: u8 = 1;
 const BLACKHOLE: u8 = 2;
 
 #[derive(Clone)]
-struct EchoServer;
+struct EchoServer {
+    action: ServerDataAction,
+}
+
+#[derive(Clone, Copy)]
+enum ServerDataAction {
+    Echo,
+    Disconnect,
+    Eof,
+}
 
 impl russh::server::Handler for EchoServer {
     type Error = russh::Error;
@@ -62,7 +72,13 @@ impl russh::server::Handler for EchoServer {
         data: &[u8],
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
-        session.data(channel, data.to_vec())
+        match self.action {
+            ServerDataAction::Echo => session.data(channel, data.to_vec()),
+            ServerDataAction::Disconnect => {
+                session.disconnect(russh::Disconnect::ByApplication, "test disconnect", "en")
+            }
+            ServerDataAction::Eof => session.eof(channel),
+        }
     }
 }
 
@@ -111,6 +127,10 @@ where
 }
 
 async fn start_fixture() -> RelayFixture {
+    start_fixture_with_action(ServerDataAction::Echo).await
+}
+
+async fn start_fixture_with_action(action: ServerDataAction) -> RelayFixture {
     let mut server_config = russh::server::Config::default();
     server_config.keys.push(
         PrivateKey::random(
@@ -123,7 +143,8 @@ async fn start_fixture() -> RelayFixture {
     let server_address = server_listener.local_addr().expect("SSH server address");
     let server = tokio::spawn(async move {
         let (stream, _) = server_listener.accept().await.expect("accept SSH relay");
-        let _ = russh::server::run_stream(Arc::new(server_config), stream, EchoServer).await;
+        let _ =
+            russh::server::run_stream(Arc::new(server_config), stream, EchoServer { action }).await;
     });
 
     let relay_listener = TcpListener::bind("127.0.0.1:0").await.expect("bind relay");
@@ -217,11 +238,12 @@ async fn activity_resets_inactivity_timeout_and_silence_expires_connection() {
         sleep(INTERVAL).await;
         echo(&mut channel, b"active").await;
     }
-    let closed = timeout(DEADLINE, channel.next_event())
+    let error = timeout(DEADLINE, channel.next_event())
         .await
         .expect("idle connection expires")
-        .expect("read channel event");
-    assert!(closed.is_none(), "event stream closes after inactivity");
+        .expect_err("inactivity is a confirmed network loss");
+    assert!(matches!(error, ClientError::NetworkLost));
+    assert!(channel.next_event().await.expect("ended stream stays ended").is_none());
 }
 
 #[test]
@@ -286,11 +308,11 @@ async fn silent_peer_expires_only_the_host_with_keepalive_enabled() {
 
     configured.mode.store(BLACKHOLE, Ordering::SeqCst);
     default.mode.store(BLACKHOLE, Ordering::SeqCst);
-    let closed = timeout(DEADLINE, configured_channel.next_event())
+    let error = timeout(DEADLINE, configured_channel.next_event())
         .await
         .expect("configured keepalive closes a silent connection")
-        .expect("read configured channel");
-    assert!(closed.is_none(), "the client event stream closed after keepalive timeout");
+        .expect_err("keepalive timeout is a confirmed network loss");
+    assert!(matches!(error, ClientError::NetworkLost));
     assert!(configured.client_bytes.load(Ordering::SeqCst) > 0, "configured client sent probes");
     assert_eq!(default.client_bytes.load(Ordering::SeqCst), 0, "default keepalive is disabled");
     assert!(
@@ -298,4 +320,84 @@ async fn silent_peer_expires_only_the_host_with_keepalive_enabled() {
         "default connection remains open while its peer is silent"
     );
     default_connection.disconnect().await.expect("default connection remains live");
+}
+
+#[tokio::test]
+async fn established_transport_eof_reports_network_loss() {
+    let fixture = start_fixture().await;
+    let connection = connect(&fixture, None).await;
+    let mut channel = connection.open_session().await.expect("open session");
+    echo(&mut channel, b"connected").await;
+
+    fixture.relay.abort();
+    let error = timeout(DEADLINE, channel.next_event())
+        .await
+        .expect("transport loss closes event stream")
+        .expect_err("unclosed channel reports transport loss");
+    assert!(matches!(error, ClientError::NetworkLost));
+}
+
+#[tokio::test]
+async fn local_disconnect_does_not_report_network_loss() {
+    let fixture = start_fixture().await;
+    let connection = connect(&fixture, None).await;
+    let mut channel = connection.open_session().await.expect("open session");
+    echo(&mut channel, b"connected").await;
+
+    connection.disconnect().await.expect("disconnect established connection");
+    let ended = timeout(DEADLINE, channel.next_event())
+        .await
+        .expect("local disconnect closes event stream")
+        .expect("local disconnect is not a network loss");
+    assert!(ended.is_none());
+}
+
+#[tokio::test]
+async fn peer_ssh_disconnect_does_not_report_network_loss() {
+    let fixture = start_fixture_with_action(ServerDataAction::Disconnect).await;
+    let connection = connect(&fixture, None).await;
+    let mut channel = connection.open_session().await.expect("open session");
+    channel.send_data(b"disconnect").await.expect("send trigger");
+
+    let ended = timeout(DEADLINE, channel.next_event())
+        .await
+        .expect("peer disconnect closes event stream")
+        .expect("protocol disconnect is not a network loss");
+    assert!(ended.is_none());
+}
+
+#[tokio::test]
+async fn channel_eof_does_not_hide_later_network_loss() {
+    let fixture = start_fixture_with_action(ServerDataAction::Eof).await;
+    let connection = connect(&fixture, None).await;
+    let mut channel = connection.open_session().await.expect("open session");
+    channel.send_data(b"eof").await.expect("send trigger");
+    let event = timeout(DEADLINE, channel.next_event())
+        .await
+        .expect("peer EOF arrives")
+        .expect("read EOF")
+        .expect("channel remains open after EOF");
+    assert_eq!(event, ChannelEvent::Eof);
+
+    fixture.relay.abort();
+    let error = timeout(DEADLINE, channel.next_event())
+        .await
+        .expect("transport loss closes event stream")
+        .expect_err("EOF does not suppress network loss");
+    assert!(matches!(error, ClientError::NetworkLost));
+}
+
+#[tokio::test]
+async fn dropping_connection_does_not_report_network_loss() {
+    let fixture = start_fixture().await;
+    let connection = connect(&fixture, None).await;
+    let mut channel = connection.open_session().await.expect("open session");
+    echo(&mut channel, b"connected").await;
+
+    drop(connection);
+    let ended = timeout(DEADLINE, channel.next_event())
+        .await
+        .expect("dropping owner closes event stream")
+        .expect("local drop is not a network loss");
+    assert!(ended.is_none());
 }

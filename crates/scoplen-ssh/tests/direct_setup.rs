@@ -126,16 +126,14 @@ async fn direct_setup_authenticates_and_runs_a_command_over_loopback() {
     client.authenticate_password("user", b"test-password").await.expect("authenticate");
     let mut channel = client.open_session().await.expect("session channel");
     channel.exec(true, b"printf connected").await.expect("execute command");
-    let (mut output, mut status) = (Vec::new(), None);
+    let (mut output, mut status, mut closed) = (Vec::new(), None, false);
     timeout(DEADLINE, async {
         while let Some(event) = channel.next_event().await.expect("command event") {
             match event {
                 ChannelEvent::Data(data) => output.extend_from_slice(&data),
                 ChannelEvent::ExitStatus(code) => status = Some(code),
+                ChannelEvent::Close => closed = true,
                 _ => {}
-            }
-            if status.is_some() && output == b"connected" {
-                break;
             }
         }
     })
@@ -143,6 +141,7 @@ async fn direct_setup_authenticates_and_runs_a_command_over_loopback() {
     .expect("command completes");
     assert_eq!(output, b"connected");
     assert_eq!(status, Some(0));
+    assert!(closed, "peer closed the completed command channel");
     client.disconnect().await.expect("disconnect");
     timeout(DEADLINE, server).await.expect("server ends").expect("server task");
 }

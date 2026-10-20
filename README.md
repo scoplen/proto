@@ -132,6 +132,10 @@ while authenticated connections are idle. Completed exchanges reset counters and
 the event loop owns the timer and stops on disconnect, transport failure, or connection drop.
 Retained channel handles and streams cannot keep a dropped connection alive. Explicit disconnect
 allows one second for graceful protocol shutdown, then closes the transport if output is blocked.
+For an established channel without a terminal exit, open-failure, or close event,
+`next_event` reports `ClientError::NetworkLost` only after a confirmed transport I/O failure or
+engine keepalive, inactivity, or connection timeout. A normal shell exit, peer SSH disconnect,
+local close or disconnect, and an unknown shutdown end the event stream without that retry signal.
 Automatic rekey waits until authentication completes, including a pending keyboard-interactive
 prompt, then handles an expired elapsed limit without waiting for channel traffic. Full
 OpenSSH cipher-dependent default compatibility remains open.
