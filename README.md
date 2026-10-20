@@ -9,8 +9,7 @@ under Apache-2.0.
 ## Status
 
 Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1), K-1 object
-model (S2) are complete. The K-2 baseline is implemented; D-108 hierarchy artifact formats
-remain in progress before the cryptographic gate (S3) is complete. The model includes deterministic CBOR, schema-version
+model (S2), and K-2 cryptographic gate (S3) are complete. The model includes deterministic CBOR, schema-version
 handling, per-object limits, merge properties, and executable known-answer vectors. Protocol,
 cryptographic, and wire behavior is added only from the canonical specifications in `scoplen-docs`;
 the S3 primitive boundary now includes zeroizing secret containers, operating-system randomness,
@@ -18,6 +17,10 @@ XChaCha20-Poly1305, HKDF-SHA-256, Argon2id, P-256 and Ed25519 signatures, and HP
 for device and account recipients. The published K-2 known-answer set is exercised through the
 `scoplen-crypto` public API, including account/request-bound escrow share contexts and the
 administrator recovery verification code, CPace pairing exchange, and canonical QR pairing bindings.
+D-108 provides typed, versioned device ARK, account signing/KEM, and Personal vault key wraps,
+with exact-length decoders and account, device, key, vault, epoch, and purpose binding. Software
+keys export only through redacted zeroizing containers for encrypted persistence; hardware keys
+remain non-exportable. These wrappers do not establish bundle freshness or write authorization.
 The `scoplen-ssh` crate exposes K-7's ordered algorithm policy, role-specific offers, strict key
 exchange state, a bounded direct TCP byte transport, and engine-independent authentication
 boundaries. `TcpTransport` limits host resolution, uses bounded RFC 8305 style staggered Happy
