@@ -256,6 +256,12 @@ trust pin, authentication, exact command output, and exit status zero. Password,
 both RSA-SHA2 variants, Ed25519, and ECDSA P-256/P-384/P-521 passed against a disposable Linux
 OpenSSH container; wrong credentials and a wrong host key were rejected. The broader interoperability matrix remains
 open.
+`pwsh ./scripts/ssh-network-loss-interop.ps1` starts a disposable, loopback-only OpenSSH
+listener and runs `network_loss_interop` through a controllable TCP relay. It verifies that
+established, unclosed channels report `NetworkLost` after socket EOF, socket reset, or keepalive
+blackholing, while a completed shell and a locally closed channel end normally. The fixture
+removes its container after the run; these cases do not complete the broader interoperability
+matrix.
 `pwsh ./scripts/ssh-rsa-selection-interop.ps1` starts three disposable OpenSSH listeners with
 `PubkeyAcceptedAlgorithms` constrained to RSA-SHA2-256, both RSA SHA-2 variants, and legacy
 `ssh-rsa`. The `rsa_selection_interop` example verifies the advertised choice on each listener,

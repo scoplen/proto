@@ -3019,6 +3019,7 @@ dependencies = [
  "scoplen-crypto",
  "scoplen-test-vectors",
  "signature 3.0.0",
+ "socket2 0.6.5",
  "ssh-key",
  "thiserror",
  "tokio",
