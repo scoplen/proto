@@ -1883,6 +1883,23 @@ impl fmt::Debug for ClientChannel {
     }
 }
 
+async fn finish_channel_end(
+    stopped: &mut watch::Receiver<bool>,
+    connection_end: &ConnectionEnd,
+    local_close: &AtomicBool,
+    event_stream_ended: &mut bool,
+) -> Result<(), ClientError> {
+    if !*stopped.borrow() {
+        let _ = async_timeout(CONNECTION_END_WAIT, stopped.wait_for(|stopped| *stopped)).await;
+    }
+    // A cancelled wait must leave the channel eligible to report the eventual cause.
+    *event_stream_ended = true;
+    if local_close.load(Ordering::Acquire) {
+        return Ok(());
+    }
+    if connection_end.is_network_lost() { Err(ClientError::NetworkLost) } else { Ok(()) }
+}
+
 impl ClientChannel {
     fn new(
         channel: russh::Channel<client::Msg>,
@@ -2061,22 +2078,18 @@ impl ClientChannel {
                 if let Some(lease) = &self.agent_forwarding {
                     lease.revoke();
                 }
-                self.event_stream_ended = true;
                 if self.terminal_event_seen || self.local_close.load(Ordering::Acquire) {
+                    self.event_stream_ended = true;
                     return Ok(None);
                 }
-                if !*self.stopped.borrow() {
-                    let _ = async_timeout(
-                        CONNECTION_END_WAIT,
-                        self.stopped.wait_for(|stopped| *stopped),
-                    )
-                    .await;
-                }
-                return if self.connection_end.is_network_lost() {
-                    Err(ClientError::NetworkLost)
-                } else {
-                    Ok(None)
-                };
+                finish_channel_end(
+                    &mut self.stopped,
+                    &self.connection_end,
+                    &self.local_close,
+                    &mut self.event_stream_ended,
+                )
+                .await?;
+                return Ok(None);
             };
             let event = match message {
                 ChannelMsg::Data { data } => ChannelEvent::Data(data.to_vec()),
@@ -2787,6 +2800,93 @@ mod tests {
         HostKey, P256SshSigner, ProxyError, ProxyOperation, ProxyProtocol, ProxyTransportError,
         RsaSshSigner,
     };
+
+    #[tokio::test]
+    async fn cancelled_channel_end_wait_still_reports_later_network_loss() {
+        let (stopped_tx, mut stopped) = watch::channel(false);
+        let connection_end = ConnectionEnd::new();
+        let local_close = AtomicBool::new(false);
+        let mut event_stream_ended = false;
+
+        {
+            let finishing = finish_channel_end(
+                &mut stopped,
+                &connection_end,
+                &local_close,
+                &mut event_stream_ended,
+            );
+            tokio::pin!(finishing);
+            assert!(timeout(Duration::from_millis(20), &mut finishing).await.is_err());
+        }
+        assert!(!event_stream_ended, "cancellation must not consume the end event");
+
+        connection_end.record(ConnectionEndKind::NetworkLost);
+        stopped_tx.send_replace(true);
+        assert!(matches!(
+            finish_channel_end(
+                &mut stopped,
+                &connection_end,
+                &local_close,
+                &mut event_stream_ended,
+            )
+            .await,
+            Err(ClientError::NetworkLost)
+        ));
+        assert!(event_stream_ended);
+    }
+
+    #[tokio::test]
+    async fn local_close_during_channel_end_wait_suppresses_retry_signal() {
+        let (stopped_tx, mut stopped) = watch::channel(false);
+        let connection_end = ConnectionEnd::new();
+        let local_close = AtomicBool::new(false);
+        let mut event_stream_ended = false;
+
+        {
+            let finishing = finish_channel_end(
+                &mut stopped,
+                &connection_end,
+                &local_close,
+                &mut event_stream_ended,
+            );
+            tokio::pin!(finishing);
+            assert!(timeout(Duration::from_millis(20), &mut finishing).await.is_err());
+            local_close.store(true, Ordering::Release);
+            connection_end.record(ConnectionEndKind::NetworkLost);
+            stopped_tx.send_replace(true);
+            assert!(finishing.await.is_ok());
+        }
+        assert!(event_stream_ended);
+    }
+
+    #[tokio::test]
+    async fn cancelled_next_event_rechecks_delayed_connection_end() {
+        let (address, server) = start_echo_server().await;
+        let config =
+            ClientConfig::new("127.0.0.1", address.port(), |_host: &str, _key: &HostKey| Ok(()))
+                .expect("client config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect");
+        connection.authenticate_password("user", b"password").await.expect("authenticate");
+        let mut channel = connection.open_session().await.expect("open channel");
+        connection.disconnect().await.expect("close fixture connection");
+        timeout(Duration::from_secs(3), async { while channel.channel.wait().await.is_some() {} })
+            .await
+            .expect("engine channel stream closes");
+
+        let (stopped_tx, stopped) = watch::channel(false);
+        channel.stopped = stopped;
+        channel.connection_end = Arc::new(ConnectionEnd::new());
+        {
+            let waiting = channel.next_event();
+            tokio::pin!(waiting);
+            assert!(timeout(Duration::from_millis(20), &mut waiting).await.is_err());
+        }
+        assert!(!channel.event_stream_ended, "cancelled read must remain retryable");
+        channel.connection_end.record(ConnectionEndKind::NetworkLost);
+        stopped_tx.send_replace(true);
+        assert!(matches!(channel.next_event().await, Err(ClientError::NetworkLost)));
+        timeout(Duration::from_secs(3), server).await.expect("server stops").expect("server task");
+    }
 
     #[test]
     fn host_certificate_clock_failure_is_typed() {
