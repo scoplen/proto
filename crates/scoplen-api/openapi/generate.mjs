@@ -443,11 +443,57 @@ for (const [path, operationId, request, response, maxRequest, maxResponse, refer
       success.headers?.["Cache-Control"]?.schema?.const !== "no-store" ||
       success.headers?.Pragma?.schema?.const !== "no-cache" ||
       (referrer && success.headers?.["Referrer-Policy"]?.schema?.const !== "no-referrer") ||
+      operation.responses?.["429"]?.$ref !== "#/components/responses/PersonalRateLimited" ||
+      !operation.description?.includes("503 auth.storage_unavailable takes precedence") ||
+      !operation.description?.includes("mandatory failure auditing") ||
       !["400", "401", "403", "413", "415", "503", "default"].every((status) =>
         operation.responses?.[status]?.$ref === "#/components/responses/Problem")) {
-    throw new Error(`${path} differs from D-101`);
+    throw new Error(`${path} differs from D-101/D-104`);
   }
 }
+const personalRateHeaders = document.components?.responses?.PersonalRateLimited?.headers;
+const boundedDelay = "(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)";
+const expectedPersonalRateHeaders = {
+  "Retry-After": { required: true, schema: { type: "string", pattern: `^${boundedDelay}$` } },
+  "RateLimit-Policy": { required: true, schema: { const: '"personal";q=30;w=60' } },
+  RateLimit: { required: true, schema: { type: "string", pattern: `^"personal";r=0;t=${boundedDelay}$` }, description: "The t delay equals Retry-After." },
+  "Cache-Control": { required: true, schema: { const: "no-store" } },
+  Pragma: { required: true, schema: { const: "no-cache" } },
+  "Referrer-Policy": { required: true, schema: { const: "no-referrer" } },
+};
+const personalRateResponse = document.components?.responses?.PersonalRateLimited;
+const personalRateProblem = document.components?.schemas?.PersonalRateLimitedProblem;
+if (JSON.stringify(personalRateHeaders) !== JSON.stringify(expectedPersonalRateHeaders) ||
+    !personalRateResponse?.description?.includes("1..300 seconds") ||
+    !personalRateResponse.description.includes("draft-ietf-httpapi-ratelimit-headers-11") ||
+    personalRateResponse.content?.["application/problem+json"]?.schema?.$ref !==
+      "#/components/schemas/PersonalRateLimitedProblem" ||
+    JSON.stringify(personalRateProblem?.allOf) !== JSON.stringify([
+      { $ref: "#/components/schemas/ProblemDetails" },
+      { type: "object", properties: {
+        status: { const: 429 }, code: { const: "auth.rate_limited" },
+        changed: { const: false }, retryable: { const: true },
+      } },
+    ])) {
+  throw new Error("Personal rate-limit response differs from D-104");
+}
+personalLines.push(
+  "export interface PersonalRateLimitHeaders {",
+  "  /** Decimal 1..300 seconds; RateLimit.t equals this delay. */",
+  '  "Retry-After": string;',
+  '  "RateLimit-Policy": \'"personal";q=30;w=60\';',
+  "  RateLimit: string;",
+  '  "Cache-Control": "no-store";',
+  '  Pragma: "no-cache";',
+  '  "Referrer-Policy": "no-referrer";',
+  "}", "",
+  'export type PersonalRateLimitedProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {',
+  "  status: 429;",
+  '  code: "auth.rate_limited";',
+  "  changed: false;",
+  "  retryable: true;",
+  "};", "",
+);
 const personalStart = "// BEGIN GENERATED PersonalEnrollment\n";
 const personalEnd = "// END GENERATED PersonalEnrollment";
 const personalStartIndex = completeGeneratedTypes.indexOf(personalStart);

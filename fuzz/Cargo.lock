@@ -2430,6 +2430,7 @@ dependencies = [
  "scoplen-model",
  "scoplen-ssh",
  "scoplen-test-vectors",
+ "serde_json",
 ]
 
 [[package]]

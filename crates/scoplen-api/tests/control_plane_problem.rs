@@ -2,6 +2,7 @@
 
 use scoplen_api::{
     ErrorCode, ProblemDetails as SharedProblemDetails, control_plane::ProblemDetails,
+    personal_enrollment::PersonalRateLimitHeaders,
 };
 use scoplen_model::cbor::{self, Value};
 use serde_json::json;
@@ -24,7 +25,61 @@ fn published_problem_json_vectors_use_registered_codes() {
         );
         count += 1;
     }
-    assert_eq!(count, 10);
+    assert_eq!(count, 11);
+}
+
+#[test]
+fn personal_rate_and_storage_failure_vectors_keep_the_public_problem_shape() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-problem.json");
+    let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("problem vectors");
+    for (id, status, code, retryable) in [
+        ("api-problem-personal-rate-limited-json", 429, "auth.rate_limited", true),
+        ("api-problem-personal-storage-unavailable-json", 503, "auth.storage_unavailable", true),
+    ] {
+        let vector = document.vectors.iter().find(|vector| vector.id == id).expect(id);
+        let problem: SharedProblemDetails =
+            serde_json::from_str(&vector.input).expect("valid Personal problem");
+        assert_eq!(problem.status, status);
+        assert_eq!(problem.code.as_str(), code);
+        assert!(!problem.changed);
+        assert_eq!(problem.retryable, retryable);
+        assert!(!problem.detail.contains("token"));
+        assert!(!problem.detail.contains("digest"));
+    }
+}
+
+#[test]
+fn personal_rate_header_vectors_use_one_bounded_non_identifying_profile() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-problem.json");
+    let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("problem vectors");
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for vector in &document.vectors {
+        if !vector.kind.starts_with("api.personal.rate_headers") {
+            continue;
+        }
+        let delay = vector.input.parse::<u16>().expect("decimal delay");
+        let result = PersonalRateLimitHeaders::new(delay);
+        if vector.kind.ends_with(".reject") {
+            assert_eq!(vector.expected, "reject", "{}", vector.id);
+            assert!(result.is_err(), "{}", vector.id);
+            rejected += 1;
+            continue;
+        }
+        let headers = result.expect("accepted delay");
+        let actual = json!({
+            "Retry-After": headers.retry_after_seconds().to_string(),
+            "RateLimit-Policy": headers.rate_limit_policy(),
+            "RateLimit": headers.rate_limit(),
+        });
+        let expected: serde_json::Value =
+            serde_json::from_str(&vector.expected).expect("header vector");
+        assert_eq!(actual, expected, "{}", vector.id);
+        accepted += 1;
+    }
+    assert_eq!((accepted, rejected), (2, 2));
 }
 
 #[test]

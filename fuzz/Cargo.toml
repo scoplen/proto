@@ -18,6 +18,7 @@ scoplen-model = { path = "../crates/scoplen-model" }
 scoplen-crypto = { path = "../crates/scoplen-crypto" }
 scoplen-ssh = { path = "../crates/scoplen-ssh" }
 scoplen-api = { path = "../crates/scoplen-api" }
+serde_json = "1.0.140"
 
 [[bin]]
 name = "vector_loader"

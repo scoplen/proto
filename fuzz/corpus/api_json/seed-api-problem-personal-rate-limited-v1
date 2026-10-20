@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Personal request rate limited","status":429,"detail":"The request was not completed; no data changed. Wait for the indicated delay before retrying.","instance":"personal-rate-1","code":"auth.rate_limited","changed":false,"retryable":true}

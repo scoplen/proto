@@ -56,6 +56,7 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.enrollment_denied",
     "auth.invalid_dpop_proof",
     "auth.invalid_request",
+    "auth.rate_limited",
     "auth.storage_unavailable",
     "auth.use_dpop_nonce",
     "certificate.invalid_request",

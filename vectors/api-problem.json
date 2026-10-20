@@ -79,6 +79,36 @@
       "kind": "api.problem.json",
       "input": "{\"type\":\"about:blank\",\"title\":\"Enrollment unavailable\",\"status\":503,\"detail\":\"Storage is temporarily unavailable; retry later.\",\"instance\":\"enroll-2\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}",
       "expected": "{\"type\":\"about:blank\",\"title\":\"Enrollment unavailable\",\"status\":503,\"detail\":\"Storage is temporarily unavailable; retry later.\",\"instance\":\"enroll-2\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "api-problem-personal-rate-limited-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Personal request rate limited\",\"status\":429,\"detail\":\"The request was not completed; no data changed. Wait for the indicated delay before retrying.\",\"instance\":\"personal-rate-1\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Personal request rate limited\",\"status\":429,\"detail\":\"The request was not completed; no data changed. Wait for the indicated delay before retrying.\",\"instance\":\"personal-rate-1\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "api-personal-rate-headers-min",
+      "kind": "api.personal.rate_headers",
+      "input": "1",
+      "expected": "{\"Retry-After\":\"1\",\"RateLimit-Policy\":\"\\\"personal\\\";q=30;w=60\",\"RateLimit\":\"\\\"personal\\\";r=0;t=1\"}"
+    },
+    {
+      "id": "api-personal-rate-headers-max",
+      "kind": "api.personal.rate_headers",
+      "input": "300",
+      "expected": "{\"Retry-After\":\"300\",\"RateLimit-Policy\":\"\\\"personal\\\";q=30;w=60\",\"RateLimit\":\"\\\"personal\\\";r=0;t=300\"}"
+    },
+    {
+      "id": "api-personal-rate-headers-zero-reject",
+      "kind": "api.personal.rate_headers.reject",
+      "input": "0",
+      "expected": "reject"
+    },
+    {
+      "id": "api-personal-rate-headers-over-limit-reject",
+      "kind": "api.personal.rate_headers.reject",
+      "input": "301",
+      "expected": "reject"
     }
   ]
 }

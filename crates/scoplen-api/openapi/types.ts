@@ -30,6 +30,7 @@ export interface components {
     PersonalInvitationResponse: PersonalInvitationResponse;
     PersonalEnrollmentRequest: PersonalEnrollmentRequest;
     PersonalEnrollmentResponse: PersonalEnrollmentResponse;
+    PersonalRateLimitedProblem: PersonalRateLimitedProblem;
     Account: Resource;
     Device: Resource;
     Organization: Resource;
@@ -115,6 +116,23 @@ export interface PersonalEnrollmentResponse {
   personal_vault_id: string;
   [extension: string]: unknown;
 }
+
+export interface PersonalRateLimitHeaders {
+  /** Decimal 1..300 seconds; RateLimit.t equals this delay. */
+  "Retry-After": string;
+  "RateLimit-Policy": '"personal";q=30;w=60';
+  RateLimit: string;
+  "Cache-Control": "no-store";
+  Pragma: "no-cache";
+  "Referrer-Policy": "no-referrer";
+}
+
+export type PersonalRateLimitedProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {
+  status: 429;
+  code: "auth.rate_limited";
+  changed: false;
+  retryable: true;
+};
 // END GENERATED PersonalEnrollment
 // BEGIN GENERATED ProblemDetails
 export interface ProblemDetails {

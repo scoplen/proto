@@ -475,7 +475,7 @@ email enrollment remain server work.
 
 The D-101 Personal invitation and first-device enrollment codecs bound complete JSON bodies,
 reject duplicate and unknown request fields, enforce canonical base64url and revision-one
-artifact identities, and redact secret-bearing diagnostics. HTTP helpers reject prohibited
+artifact identities in the ordinary path, and redact secret-bearing diagnostics. HTTP helpers reject prohibited
 headers and a foreign browser Origin. OpenAPI, generated TypeScript, public vectors, and parser
 fuzz seeds describe the same messages. A parsed request does not verify signatures or invitation
 state; the server must authenticate the issuing operator and atomically create the account,
@@ -582,6 +582,14 @@ redact the input artifacts and token digest. Public signature-input and rejectio
 are in `vectors/personal-enrollment-proof.json`. The consumer still verifies the K-4
 bundle and K-2 certificate signatures, uses the bounded enrollment codec, and atomically redeems
 the invitation; possession-proof verification alone does not enroll or authenticate a device.
+For D-104 admission, `PersonalEnrollmentRequest::from_http_json_structural` performs strict
+header, Origin, JSON, artifact, and independent bound checks before exposing the decoded token
+for digest-based admission. After admission, the consumer calls `validate` and verifies the
+signatures; the ordinary `from_http_json` continues to reject identity mismatches immediately.
+The shared `auth.rate_limited` problem uses the existing eight-field shape. A bounded
+`PersonalRateLimitHeaders` value supplies the exact public `Retry-After`, `RateLimit`, and
+`RateLimit-Policy` profile without exposing private bucket identities. Durable admission,
+failure auditing, and their `503 auth.storage_unavailable` precedence remain server duties.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR
@@ -670,14 +678,16 @@ synthetic keyrings. Tracked seeds include the RFC proof, published gateway and a
 signed wrong-purpose and wrong-audience access tokens, signed duplicate header and nested claims,
 malformed signatures, truncation, a proof one byte over the 8 KiB bound, and access tokens at and
 one byte over their 4 KiB bound.
-The `api_json` target exercises all seven authentication/refresh message types, both gateway-ticket
-issuance messages, the certificate issuance request and response, and the current-account profile
+The `api_json` target exercises the shared problem body, all seven authentication/refresh message
+types, both gateway-ticket issuance messages, the certificate issuance request and response, and
+the current-account profile
 through public decoders. Accepted messages must preserve their values across canonical encoding,
 and a second encode must preserve those bytes. Gateway request checks also
 enforce rejection of an idempotency header. Seeds include the published JSON vectors, duplicate
 fields, forbidden browser refresh tokens, ambiguous edge hosts, nested response extensions,
 invalid certificate selectors and duplicate fields, signed certificate response Resource vectors,
-current-account email/null profiles and failures, duplicate nested response fields, truncation,
+current-account email/null profiles and failures, the Personal rate problem and structural
+enrollment identity mismatch, duplicate nested response fields, truncation,
 and complete bodies at and one byte above request and response limits. This checks
 message syntax; token authentication, ticket signatures, and authorization remain consumer work.
 Fuzz-discovered mutations remain ignored; review, minimize, and name useful regression inputs
