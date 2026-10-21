@@ -619,6 +619,9 @@ redact the input artifacts and token digest. Public signature-input and rejectio
 are in `vectors/personal-enrollment-proof.json`. The consumer still verifies the K-4
 bundle and K-2 certificate signatures, uses the bounded enrollment codec, and atomically redeems
 the invitation; possession-proof verification alone does not enroll or authenticate a device.
+The D-109 replacement-token vector and re-signing regression retain the same device key,
+origin, ids, and artifacts. The consumer still authorizes invitation replacement from the
+specified fresh device-authentication denial and requires a separate explicit Join action.
 For D-104 admission, `PersonalEnrollmentRequest::from_http_json_structural` performs strict
 header, Origin, JSON, artifact, and independent bound checks before exposing the decoded token
 for digest-based admission. After admission, the consumer calls `validate` and verifies the
