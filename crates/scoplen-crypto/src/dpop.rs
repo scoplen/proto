@@ -212,6 +212,39 @@ impl DpopProof {
         required_nonce: Option<&str>,
     ) -> Result<VerifiedDpopProof, DpopError> {
         let expected = decode_fixed_32(expected_jkt).map_err(|_| DpopError::InvalidContext)?;
+        self.verify_key(target, token, Some(expected), now, required_nonce)
+    }
+
+    /// Verify possession of the proof's presented public key and return its verified thumbprint.
+    ///
+    /// Use this for an initial access-token-free ceremony before a trusted key binding exists,
+    /// or independently enforce that binding after verification. This proves neither account
+    /// identity nor authorization, and does not claim replay state. Before accepting the proof,
+    /// consumers must durably claim `(jkt, jti)` and apply their current ceremony/credential
+    /// checks. Use [`Self::verify`] when a trusted expected thumbprint is already available.
+    /// Signature, target, token hash, time and optional nonce checks are identical to `verify`.
+    ///
+    /// # Errors
+    ///
+    /// Rejects an invalid proof or credential context without exposing input values.
+    pub fn verify_presented_key(
+        &self,
+        target: &DpopTarget,
+        token: DpopToken<'_>,
+        now: u64,
+        required_nonce: Option<&str>,
+    ) -> Result<VerifiedDpopProof, DpopError> {
+        self.verify_key(target, token, None, now, required_nonce)
+    }
+
+    fn verify_key(
+        &self,
+        target: &DpopTarget,
+        token: DpopToken<'_>,
+        expected_jkt: Option<[u8; 32]>,
+        now: u64,
+        required_nonce: Option<&str>,
+    ) -> Result<VerifiedDpopProof, DpopError> {
         if required_nonce.is_some_and(|value| !valid_nonce(value)) {
             return Err(DpopError::InvalidContext);
         }
@@ -232,7 +265,7 @@ impl DpopProof {
         let jwk = PublicJwk::from_value(header.get("jwk").ok_or(DpopError::InvalidProof)?)?;
         let thumbprint = jwk.thumbprint();
         let actual = decode_fixed_32(&thumbprint)?;
-        if !bool::from(actual.ct_eq(&expected)) {
+        if expected_jkt.is_some_and(|expected| !bool::from(actual.ct_eq(&expected))) {
             return Err(DpopError::InvalidProof);
         }
         let signature = decode_segment(encoded_signature)?;

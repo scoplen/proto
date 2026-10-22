@@ -606,6 +606,11 @@ trusted canonical HTTPS origin with the router's canonical absolute path; protec
 ASCII access token with `ath`, while refresh proofs omit it. Verification returns a JWK thumbprint,
 proof identifier, creation time, and last accepted second. It checks the signature, request,
 key/token binding, nonce, and 60-second past/future window, but does not authorize or prevent replay.
+`DpopProof::verify` requires an independently trusted expected key thumbprint.
+`verify_presented_key` applies the same proof checks and returns the verified presented-key
+thumbprint for an initial Operator ceremony before a binding exists, or for a consumer that
+independently enforces the binding. Presented-key possession establishes no account identity,
+credential ownership, or route authority; it cannot replace an existing trusted key binding.
 Consumers must atomically claim `(jkt, jti)` across instances through the inclusive acceptance
 boundary before authorizing or rotating credentials. The published RFC 9449 vector exercises a
 signature and token hash from an independent source.

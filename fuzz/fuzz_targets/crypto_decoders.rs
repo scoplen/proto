@@ -42,6 +42,12 @@ fuzz_target!(|bytes: &[u8]| {
                 1_562_262_618,
                 None,
             );
+            let _ = proof.verify_presented_key(
+                &target,
+                scoplen_crypto::DpopToken::Refresh,
+                1_562_262_618,
+                None,
+            );
         }
         if let Ok(ticket) = scoplen_crypto::GatewayTicket::parse(proof_text) {
             let signer = scoplen_crypto::Ed25519SigningKey::from_bytes(&[0x42; 32])
