@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-111's separate Operator browser access-token signing and verification boundary,
+  family binding, independent trust type, public signed/rejection vectors and parser seeds.
+  Device profiles remain separate; passkey verification and current-state authorization are
+  consumer responsibilities.
 - Updated the workspace and fuzz TLS certificate verifier locks to `rustls-webpki` 0.103.16 for
   RUSTSEC-2026-0382, rejecting certificate paths through the distrusted intermediates.
 - Added D-110 public JSON and independently encoded CBOR problem regressions and sync parser

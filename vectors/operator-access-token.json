@@ -1,0 +1,42 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "operator-access-token-ed25519-v1",
+      "kind": "crypto.operator_access_token.valid",
+      "input": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoib3BlcmF0b3ItMSIsInR5cCI6InNwbC1vcGVyYXRvci1hY2Nlc3Mrand0In0.eyJhdWQiOiJzcGwtYWRtaW4vMSIsImNuZiI6eyJqa3QiOiIwdGdFX003a2d4YVc5aFBjX0VqeHRZc3lqeE1UdkJNemlXMHhUTzZ0c3pBIn0sImV4cCI6MTcwMDAwMDYwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJodHRwczovL2NvbnRyb2wuZXhhbXBsZS5jb20iLCJqdGkiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDMiLCJzY29wZSI6InBlcnNvbmFsLWludml0YXRpb246aXNzdWUiLCJzaWQiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDIiLCJzdWIiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEifQ.MSG-mmilBxe5o7jgXECxAkFwin-D6w1VLn5HYGl8QHIE_WeizlAEo1PyMLhcMq_MOal5KoNY-OtedfPpg3zADg",
+      "expected": "00000000-0000-7000-8000-000000000003|1700000600"
+    },
+    {
+      "id": "operator-access-token-device-purpose-v1",
+      "kind": "crypto.operator_access_token.invalid",
+      "input": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoib3BlcmF0b3ItMSIsInR5cCI6InNwbC1kZXZpY2UtYWNjZXNzK2p3dCJ9.eyJhdWQiOiJzcGwtYWRtaW4vMSIsImNuZiI6eyJqa3QiOiIwdGdFX003a2d4YVc5aFBjX0VqeHRZc3lqeE1UdkJNemlXMHhUTzZ0c3pBIn0sImV4cCI6MTcwMDAwMDYwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJodHRwczovL2NvbnRyb2wuZXhhbXBsZS5jb20iLCJqdGkiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDMiLCJzY29wZSI6InBlcnNvbmFsLWludml0YXRpb246aXNzdWUiLCJzaWQiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDIiLCJzdWIiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEifQ.udGkHs8rQeTkT3jw52SQxjxPXhbaIfpsDH8Kxlq1eLA0t4IKOz8oGpFpqdInRsM4NP0Y3pRz3ldwpdhYRFEbAg",
+      "expected": "invalid"
+    },
+    {
+      "id": "operator-access-token-device-audience-v1",
+      "kind": "crypto.operator_access_token.invalid",
+      "input": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoib3BlcmF0b3ItMSIsInR5cCI6InNwbC1vcGVyYXRvci1hY2Nlc3Mrand0In0.eyJhdWQiOiJzcGwtYXBpLzEiLCJjbmYiOnsiamt0IjoiMHRnRV9NN2tneGFXOWhQY19Fanh0WXN5anhNVHZCTXppVzB4VE82dHN6QSJ9LCJleHAiOjE3MDAwMDA2MDAsImlhdCI6MTcwMDAwMDAwMCwiaXNzIjoiaHR0cHM6Ly9jb250cm9sLmV4YW1wbGUuY29tIiwianRpIjoiMDAwMDAwMDAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwic2NvcGUiOiJwZXJzb25hbC1pbnZpdGF0aW9uOmlzc3VlIiwic2lkIjoiMDAwMDAwMDAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwic3ViIjoiMDAwMDAwMDAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDAwMDAxIn0.lwr6skjXy5ibx1wrkaV6lUiWZIAx5fazLC6bX1s-e8c7fxq9yB-jCTZMPKo22t6pQYWD3vVtYZ78nLIEmz-tBQ",
+      "expected": "invalid"
+    },
+    {
+      "id": "operator-access-token-device-id-v1",
+      "kind": "crypto.operator_access_token.invalid",
+      "input": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoib3BlcmF0b3ItMSIsInR5cCI6InNwbC1vcGVyYXRvci1hY2Nlc3Mrand0In0.eyJhdWQiOiJzcGwtYWRtaW4vMSIsImNuZiI6eyJqa3QiOiIwdGdFX003a2d4YVc5aFBjX0VqeHRZc3lqeE1UdkJNemlXMHhUTzZ0c3pBIn0sImV4cCI6MTcwMDAwMDYwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJodHRwczovL2NvbnRyb2wuZXhhbXBsZS5jb20iLCJqdGkiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDMiLCJzY29wZSI6InBlcnNvbmFsLWludml0YXRpb246aXNzdWUiLCJzaWQiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDIiLCJzdWIiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJkaWQiOm51bGx9.mnYYF6Xwi-mWJb4InkImLAycigDgFTfPV8Fvh-P-kMlwkbDXGdZDU_uyjsn5nnA83UdJJg8NzqxRko4Vb3uIBw",
+      "expected": "invalid"
+    },
+    {
+      "id": "operator-access-token-organization-v1",
+      "kind": "crypto.operator_access_token.invalid",
+      "input": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoib3BlcmF0b3ItMSIsInR5cCI6InNwbC1vcGVyYXRvci1hY2Nlc3Mrand0In0.eyJhdWQiOiJzcGwtYWRtaW4vMSIsImNuZiI6eyJqa3QiOiIwdGdFX003a2d4YVc5aFBjX0VqeHRZc3lqeE1UdkJNemlXMHhUTzZ0c3pBIn0sImV4cCI6MTcwMDAwMDYwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJodHRwczovL2NvbnRyb2wuZXhhbXBsZS5jb20iLCJqdGkiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDMiLCJzY29wZSI6InBlcnNvbmFsLWludml0YXRpb246aXNzdWUiLCJzaWQiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDIiLCJzdWIiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJvcmciOltdfQ.Jmbix_B-6FzdXfmg9-2Bo-q8KvE6GqI88xg5rkmUjbpflZ7cse7u9M8MRcCxUV2HgJkhsnoPsSAo7U_9FI7tCw",
+      "expected": "invalid"
+    },
+    {
+      "id": "operator-access-token-missing-family-v1",
+      "kind": "crypto.operator_access_token.invalid",
+      "input": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoib3BlcmF0b3ItMSIsInR5cCI6InNwbC1vcGVyYXRvci1hY2Nlc3Mrand0In0.eyJhdWQiOiJzcGwtYWRtaW4vMSIsImNuZiI6eyJqa3QiOiIwdGdFX003a2d4YVc5aFBjX0VqeHRZc3lqeE1UdkJNemlXMHhUTzZ0c3pBIn0sImV4cCI6MTcwMDAwMDYwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJodHRwczovL2NvbnRyb2wuZXhhbXBsZS5jb20iLCJqdGkiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDMiLCJzY29wZSI6InBlcnNvbmFsLWludml0YXRpb246aXNzdWUiLCJzdWIiOiIwMDAwMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEifQ.SNnzhW85WJ2_JUYmfXVb56zbZ5WD1Aa2Z4Wspeg7KGz3zHvpu5iGylSfPyqXD_ZeNQu3xjJu4UbxqZnpBTvlBw",
+      "expected": "invalid"
+    }
+  ]
+}
