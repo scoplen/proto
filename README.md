@@ -17,6 +17,9 @@ XChaCha20-Poly1305, HKDF-SHA-256, Argon2id, P-256 and Ed25519 signatures, and HP
 for device and account recipients. The published K-2 known-answer set is exercised through the
 `scoplen-crypto` public API, including account/request-bound escrow share contexts and the
 administrator recovery verification code, CPace pairing exchange, and canonical QR pairing bindings.
+K-1 reference discovery follows the documented object paths, including live membership keys
+and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
+fields; consumers resolve the returned identifiers against their live object inventory.
 D-111 provides a distinct Operator browser JWT signer, trust set and stateless verifier with
 `spl-operator-access+jwt`, `spl-admin/1`, and a required refresh-family `sid`. It rejects device
 and organization claims; current Operator/credential/family state, DPoP replay and exact route

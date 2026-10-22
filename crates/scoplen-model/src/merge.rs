@@ -48,6 +48,9 @@ pub fn merge(local: &Object, remote: &Object) -> Result<Object, MergeError> {
 }
 
 /// Return the object references that must resolve before an object can be shown.
+///
+/// Only the documented object-reference paths are followed. Identity provenance, unknown
+/// fields, and cleared optional fields or map entries do not reference replicated objects.
 #[must_use]
 pub fn references(object: &Object) -> Vec<Uuid> {
     let mut references = Vec::new();
@@ -63,21 +66,13 @@ pub fn references(object: &Object) -> Vec<Uuid> {
         crate::ObjectType::ACCESS_PROFILE => {
             add_scalar(1);
             add_scalar(4);
-            if let Some(entry) = object.field(5)
-                && let Value::Bytes(bytes) = &entry.value
-                && let Ok(id) = uuid(bytes)
-            {
-                references.push(id);
-            }
+            add_scalar(5);
         }
         crate::ObjectType::HOST => {
-            for (path, _) in object.field_entries(5) {
-                if let FieldPath::MapEntry { key: crate::MapKey::Bytes(bytes), .. } = path
-                    && let Ok(id) = uuid(bytes)
-                {
-                    references.push(id);
-                }
-            }
+            add_scalar(8);
+        }
+        crate::ObjectType::HOST_GROUP => {
+            add_scalar(2);
         }
         crate::ObjectType::ROUTE => {
             add_scalar(5);
@@ -96,20 +91,18 @@ pub fn references(object: &Object) -> Vec<Uuid> {
         }
         crate::ObjectType::TRUST_RECORD => {
             add_scalar(1);
-            add_scalar(7);
-            add_scalar(8);
         }
         crate::ObjectType::FORWARD => {
-            add_scalar(5);
             add_scalar(7);
         }
         crate::ObjectType::WORKSPACE => {
             for (path, entry) in object.field_entries(3) {
                 if let FieldPath::MapEntry { .. } = path
-                    && let Value::Array(values) = &entry.value
+                    && let Value::Map(fields) = &entry.value
                 {
-                    for value in values {
-                        if let Value::Bytes(bytes) = value
+                    for (field, value) in fields {
+                        if matches!(field, Value::UInt(1 | 3))
+                            && let Value::Bytes(bytes) = value
                             && let Ok(id) = uuid(bytes)
                         {
                             references.push(id);
@@ -119,6 +112,21 @@ pub fn references(object: &Object) -> Vec<Uuid> {
             }
         }
         _ => {}
+    }
+    let membership_field = match object.object_type {
+        crate::ObjectType::HOST => Some(5),
+        crate::ObjectType::ACCESS_PROFILE => Some(8),
+        _ => None,
+    };
+    if let Some(field) = membership_field {
+        for (path, entry) in object.field_entries(field) {
+            if !matches!(entry.value, Value::Null)
+                && let FieldPath::MapEntry { key: crate::MapKey::Bytes(bytes), .. } = path
+                && let Ok(id) = uuid(bytes)
+            {
+                references.push(id);
+            }
+        }
     }
     references.sort_unstable();
     references.dedup();

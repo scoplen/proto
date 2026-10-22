@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Fixed K-1 reference discovery for Host default profiles and live groups, AccessProfile
+  forwards, HostGroup parents, and Workspace session maps. Cleared memberships, TrustRecord
+  account/device provenance, and unknown fields no longer create false object dependencies.
+  Public round-trip regressions also retain Route and Forward reference behavior.
 - Added D-111's separate Operator browser access-token signing and verification boundary,
   family binding, independent trust type, public signed/rejection vectors and parser seeds.
   Device profiles remain separate; passkey verification and current-state authorization are
