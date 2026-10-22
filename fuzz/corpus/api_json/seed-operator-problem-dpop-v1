@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Operator request rejected","status":400,"detail":"The Operator request could not complete.","instance":"operator-dpop","code":"auth.invalid_dpop_proof","changed":false,"retryable":false}

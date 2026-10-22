@@ -54,7 +54,7 @@
     "/admin/personal-invitations": {
       "post": {
         "operationId": "issuePersonalInvitation",
-        "description": "Authenticated deployment operator only; organization roles do not grant authority. Idempotency-Key is forbidden. Each authorized POST creates a fresh 24-hour invitation. The response contains a one-use bearer URL and must not be logged or replayed. Durable source admission precedes body parsing; authenticated operator admission applies only after authentication. If durable admission or mandatory failure auditing cannot commit, 503 auth.storage_unavailable takes precedence over an otherwise applicable 400, 401, 403, 413, 415, or 429 without identity mutation.",
+        "description": "Authenticated deployment operator only; organization roles do not grant authority. Idempotency-Key is forbidden. Each authorized POST creates a fresh 24-hour invitation. The response contains a one-use bearer URL and must not be logged or replayed. Durable source admission precedes body parsing; authenticated operator admission applies only after authentication. If durable admission or mandatory failure auditing cannot commit, 503 auth.storage_unavailable takes precedence over an otherwise applicable 400, 401, 403, 413, 415, or 429 without identity mutation. Requires independent Operator token, current sid family/credential/status, exact personal-invitation:issue scope and Cedar issuePersonalInvitation on Deployment::\"self\"; Account/organization roles grant no authority.",
         "requestBody": {
           "required": true,
           "description": "Exactly {} as application/json; complete UTF-8 body at most 256 bytes, including whitespace.",
@@ -86,7 +86,8 @@
           "429": { "$ref": "#/components/responses/PersonalRateLimited" },
           "503": { "$ref": "#/components/responses/PersonalStorageFailure" },
           "default": { "$ref": "#/components/responses/Problem" }
-        }
+        },
+        "x-scoplen-required-operator-scope": "personal-invitation:issue"
       }
     },
     "/auth/personal-enroll": {
@@ -264,7 +265,7 @@
     "/auth/refresh": {
       "post": {
         "operationId": "refreshAuthentication",
-        "description": "Scoplen JSON refresh profile (not the OAuth form-encoded token endpoint). Exactly one DPoP proof is required without an access token. Native callers supply a body token; browser callers supply an empty body and one endpoint-scoped HttpOnly refresh cookie. Mixed or absent credentials, Authorization and Idempotency-Key headers are rejected. Browser Origin must match the configured console origin. All responses use Cache-Control: no-store and Pragma: no-cache. Proof, cookie, Origin, atomic rotation, and family-reuse checks are server responsibilities. Durable source admission precedes body parsing; private device and verified-account quotas never use unverified account ids. Malformed requests use 400 auth.invalid_request, excess bodies 413 auth.invalid_request, wrong content type 415 auth.invalid_request, and foreign Origin 403 policy.denied, all changed=false and retryable=false. Mandatory admission or failure-audit storage failure takes precedence. Every success and failure uses Cache-Control: no-store and Pragma: no-cache. Problems include an instance request id and no credential values.",
+        "description": "Scoplen JSON refresh profile (not the OAuth form-encoded token endpoint). Exactly one DPoP proof is required without an access token. Native callers supply a body token; browser callers supply an empty body and one endpoint-scoped HttpOnly refresh cookie. Mixed or absent credentials, Authorization and Idempotency-Key headers are rejected. Browser Origin must match the configured console origin. All responses use Cache-Control: no-store and Pragma: no-cache. Proof, cookie, Origin, atomic rotation, and family-reuse checks are server responsibilities. Durable source admission precedes body parsing; private device and verified-account quotas never use unverified account ids. Malformed requests use 400 auth.invalid_request, excess bodies 413 auth.invalid_request, wrong content type 415 auth.invalid_request, and foreign Origin 403 policy.denied, all changed=false and retryable=false. Mandatory admission or failure-audit storage failure takes precedence. Every success and failure uses Cache-Control: no-store and Pragma: no-cache. Problems include an instance request id and no credential values. Operator families are browser-cookie only: a native/body credential must return generic 401 auth.authentication_required changed=false retryable=false without rotation or revocation. Verify against the separate Operator JWT audience/type/key source and preserve or narrow its original personal-invitation:issue ceiling.",
         "security": [
           {
             "dpopProof": []
@@ -3427,6 +3428,368 @@
           }
         }
       }
+    },
+    "/auth/operator/setup/options": {
+      "post": {
+        "operationId": "operatorSetupOptions",
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "description": "Independent Operator browser ceremony: HTTPS application/json, exact trusted Origin, one fresh ES256 DPoP proof at most 8192 ASCII bytes. Reject Authorization, Idempotency-Key, refresh credentials and query parameters. No initial DPoP nonce or token ath is required. Recursive duplicate outer JSON members and unknown request fields are rejected. Outer lexical errors consume no ceremony; embedded client-data JSON, CBOR and signature bytes remain opaque until a matching live bound finish attempt atomically consumes the ceremony with success or denial audit. Missing/wrong Origin gets 403 policy.denied before credential lookup. Invalid/missing/replayed/wrong-key DPoP gets 400 auth.invalid_dpop_proof without consumption. Authentication denial is uniform 401 auth.authentication_required, retryable=false and changed=true only when this finish consumed a live bound ceremony. Mandatory admission, replay and audit storage failures take precedence. Options-only writes are not business mutations. Never log or echo credentials. All responses use no-store, no-cache and no-referrer.",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 4096,
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 body at most 256 bytes including whitespace; request writer uses declared field order.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorSetupOptionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete UTF-8 body at most 4096 bytes.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "Referrer-Policy": {
+                "required": true,
+                "schema": {
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSetupOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OperatorInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OperatorAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OperatorOriginDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/OperatorBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OperatorContentType"
+          },
+          "429": {
+            "$ref": "#/components/responses/OperatorRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OperatorStorageUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/OperatorProblem"
+          }
+        }
+      }
+    },
+    "/auth/operator/setup/finish": {
+      "post": {
+        "operationId": "operatorSetupFinish",
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "description": "Independent Operator browser ceremony: HTTPS application/json, exact trusted Origin, one fresh ES256 DPoP proof at most 8192 ASCII bytes. Reject Authorization, Idempotency-Key, refresh credentials and query parameters. No initial DPoP nonce or token ath is required. Recursive duplicate outer JSON members and unknown request fields are rejected. Outer lexical errors consume no ceremony; embedded client-data JSON, CBOR and signature bytes remain opaque until a matching live bound finish attempt atomically consumes the ceremony with success or denial audit. Missing/wrong Origin gets 403 policy.denied before credential lookup. Invalid/missing/replayed/wrong-key DPoP gets 400 auth.invalid_dpop_proof without consumption. Authentication denial is uniform 401 auth.authentication_required, retryable=false and changed=true only when this finish consumed a live bound ceremony. Mandatory admission, replay and audit storage failures take precedence. Options-only writes are not business mutations. Never log or echo credentials. All responses use no-store, no-cache and no-referrer. Registers a passkey and permanently closes first setup; creates no Account/Device/vault, session, access token or cookie.",
+        "x-scoplen-request-max-bytes": 32768,
+        "x-scoplen-response-max-bytes": 256,
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 body at most 32768 bytes including whitespace; request writer uses declared field order.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorSetupFinishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Complete UTF-8 body at most 256 bytes.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "Referrer-Policy": {
+                "required": true,
+                "schema": {
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSetupFinishResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OperatorInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OperatorAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OperatorOriginDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/OperatorBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OperatorContentType"
+          },
+          "429": {
+            "$ref": "#/components/responses/OperatorRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OperatorStorageFailure"
+          },
+          "default": {
+            "$ref": "#/components/responses/OperatorProblem"
+          }
+        }
+      }
+    },
+    "/auth/operator/login/options": {
+      "post": {
+        "operationId": "operatorLoginOptions",
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "description": "Independent Operator browser ceremony: HTTPS application/json, exact trusted Origin, one fresh ES256 DPoP proof at most 8192 ASCII bytes. Reject Authorization, Idempotency-Key, refresh credentials and query parameters. No initial DPoP nonce or token ath is required. Recursive duplicate outer JSON members and unknown request fields are rejected. Outer lexical errors consume no ceremony; embedded client-data JSON, CBOR and signature bytes remain opaque until a matching live bound finish attempt atomically consumes the ceremony with success or denial audit. Missing/wrong Origin gets 403 policy.denied before credential lookup. Invalid/missing/replayed/wrong-key DPoP gets 400 auth.invalid_dpop_proof without consumption. Authentication denial is uniform 401 auth.authentication_required, retryable=false and changed=true only when this finish consumed a live bound ceremony. Mandatory admission, replay and audit storage failures take precedence. Options-only writes are not business mutations. Never log or echo credentials. All responses use no-store, no-cache and no-referrer.",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 4096,
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 body at most 256 bytes including whitespace; request writer uses declared field order.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorLoginOptionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete UTF-8 body at most 4096 bytes.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "Referrer-Policy": {
+                "required": true,
+                "schema": {
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorLoginOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OperatorInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OperatorAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OperatorOriginDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/OperatorBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OperatorContentType"
+          },
+          "429": {
+            "$ref": "#/components/responses/OperatorRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OperatorStorageUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/OperatorProblem"
+          }
+        }
+      }
+    },
+    "/auth/operator/login/finish": {
+      "post": {
+        "operationId": "operatorLoginFinish",
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "description": "Independent Operator browser ceremony: HTTPS application/json, exact trusted Origin, one fresh ES256 DPoP proof at most 8192 ASCII bytes. Reject Authorization, Idempotency-Key, refresh credentials and query parameters. No initial DPoP nonce or token ath is required. Recursive duplicate outer JSON members and unknown request fields are rejected. Outer lexical errors consume no ceremony; embedded client-data JSON, CBOR and signature bytes remain opaque until a matching live bound finish attempt atomically consumes the ceremony with success or denial audit. Missing/wrong Origin gets 403 policy.denied before credential lookup. Invalid/missing/replayed/wrong-key DPoP gets 400 auth.invalid_dpop_proof without consumption. Authentication denial is uniform 401 auth.authentication_required, retryable=false and changed=true only when this finish consumed a live bound ceremony. Mandatory admission, replay and audit storage failures take precedence. Options-only writes are not business mutations. Never log or echo credentials. All responses use no-store, no-cache and no-referrer. Issues only personal-invitation:issue after a genuine assertion; 600-second access token and absolute 30-day browser refresh family.",
+        "x-scoplen-request-max-bytes": 16384,
+        "x-scoplen-response-max-bytes": 8192,
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 body at most 16384 bytes including whitespace; request writer uses declared field order.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorLoginFinishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete UTF-8 body at most 8192 bytes. Browser four-field token response, never refresh_token.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "Referrer-Policy": {
+                "required": true,
+                "schema": {
+                  "const": "no-referrer"
+                }
+              },
+              "Set-Cookie": {
+                "required": true,
+                "schema": {
+                  "type": "string"
+                },
+                "description": "__Secure-spl-refresh; Path=/api/v1/auth/refresh; HttpOnly; Secure; SameSite=Strict; no Domain; Max-Age=refresh_expires_in."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserAuthTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OperatorInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OperatorAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OperatorOriginDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/OperatorBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OperatorContentType"
+          },
+          "429": {
+            "$ref": "#/components/responses/OperatorRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OperatorStorageFailure"
+          },
+          "default": {
+            "$ref": "#/components/responses/OperatorProblem"
+          }
+        }
+      }
+    },
+    "/.well-known/operator-jwks.json": {
+      "get": {
+        "operationId": "getOperatorAuthJwks",
+        "servers": [
+          {
+            "url": "/"
+          }
+        ],
+        "security": [],
+        "description": "Independent Operator access-token key discovery only, outside /api/v1, from the trusted configured origin. Reuses AuthJwks public shape and 4096-byte bound. Separate keyring from enrolled-device JWKS; never token-directed trust.",
+        "responses": {
+          "200": {
+            "description": "One active and optionally one unexpired overlap public Ed25519 key, ordered by kid; complete UTF-8 JSON at most 4096 bytes.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthJwks"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/AuthJwksUnavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3752,6 +4115,311 @@
               { "$ref": "#/components/schemas/PersonalStorageUnavailableProblem" },
               { "$ref": "#/components/schemas/PersonalCommitOutcomeUnknownProblem" }
             ] }
+          }
+        }
+      },
+      "OperatorInvalidRequest": {
+        "description": "Malformed outer request; no ceremony consumption.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/OperatorInvalidRequestProblem"
+                },
+                {
+                  "$ref": "#/components/schemas/OperatorInvalidDpopProblem"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "OperatorOriginDenied": {
+        "description": "Missing, null or mismatched Origin; no credential or entitlement lookup.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/OperatorOriginDeniedProblem"
+            }
+          }
+        }
+      },
+      "OperatorAuthenticationRequired": {
+        "description": "Uniform Operator credential denial without revealing setup entitlement, ceremony, credential or Operator existence. changed=true only when this finish consumed a live matching bound ceremony; otherwise changed=false. retryable=false. Failure creates no Operator, consumes no setup entitlement and revokes no refresh family. Restart with fresh options; after uncertain setup first try fresh passkey login.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthAuthenticationRequiredProblem"
+            }
+          }
+        }
+      },
+      "OperatorRateLimited": {
+        "description": "Authentication admission rejected without ceremony or setup entitlement consumption, refresh rotation or family revocation. Retry-After is the greatest applicable wait rounded up to 1..300 seconds and does not guarantee admission. RateLimit and RateLimit-Policy use draft-ietf-httpapi-ratelimit-headers-11 and reveal only the nominal source quota, never the private bucket.",
+        "headers": {
+          "Retry-After": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            }
+          },
+          "RateLimit-Policy": {
+            "required": true,
+            "schema": {
+              "const": "\"authentication\";q=30;w=60"
+            }
+          },
+          "RateLimit": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"authentication\";r=0;t=(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            },
+            "description": "The t delay equals Retry-After."
+          },
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthRateLimitedProblem"
+            }
+          }
+        }
+      },
+      "OperatorStorageUnavailable": {
+        "description": "Known precommit rollback, including durable admission, replay, mandatory audit, KMS or identity storage: auth.storage_unavailable, changed=false, retryable=true. A coupled ceremony consumption rolls back on audit failure. Lost options-only writes create no business state and safely permit new options. Storage failure takes precedence over an otherwise applicable denial.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthStorageUnavailableProblem"
+            }
+          }
+        }
+      },
+      "OperatorStorageFailure": {
+        "description": "Known rollback returns auth.storage_unavailable changed=false retryable=true. Unconfirmed finish COMMIT returns auth.commit_outcome_unknown changed=true retryable=false. Never automatically replay finish. After uncertain setup, first try fresh passkey login; after uncertain login, restart fresh options. No token/cookie is disclosed until confirmed commit.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AuthStorageUnavailableProblem"
+                },
+                {
+                  "$ref": "#/components/schemas/AuthCommitOutcomeUnknownProblem"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "OperatorBodyTooLarge": {
+        "description": "Outer request rejected (413); no ceremony consumption.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/OperatorBodyTooLargeProblem"
+            }
+          }
+        }
+      },
+      "OperatorContentType": {
+        "description": "Outer request rejected (415); no ceremony consumption.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/OperatorContentTypeProblem"
+            }
+          }
+        }
+      },
+      "OperatorProblem": {
+        "description": "Bounded RFC 9457 problem with a non-sensitive request-id instance; no ceremony secrets or credential bytes.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
           }
         }
       }
@@ -4601,6 +5269,523 @@
             "format": "uuid"
           }
         }
+      },
+      "OperatorSetupOptionsRequest": {
+        "type": "object",
+        "required": [
+          "setup_token"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "setup_token": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 32,
+              "maximum": 32
+            },
+            "description": "Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits."
+          }
+        }
+      },
+      "OperatorSetupFinishRequest": {
+        "type": "object",
+        "required": [
+          "setup_token",
+          "ceremony_id",
+          "credential_id",
+          "client_data_json",
+          "attestation_object"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "setup_token": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 32,
+              "maximum": 32
+            },
+            "description": "Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "ceremony_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "credential_id": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 1364,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 1,
+              "maximum": 1023
+            },
+            "description": "Canonical unpadded base64url, 1..1023 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "client_data_json": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 5462,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "description": "Canonical unpadded base64url, 1..4096 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "attestation_object": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 21846,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 1,
+              "maximum": 16384
+            },
+            "description": "Canonical unpadded base64url, 1..16384 decoded bytes; no aliases or unused nonzero pad bits."
+          }
+        }
+      },
+      "OperatorLoginOptionsRequest": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "OperatorLoginFinishRequest": {
+        "type": "object",
+        "required": [
+          "ceremony_id",
+          "credential_id",
+          "client_data_json",
+          "authenticator_data",
+          "signature",
+          "user_handle"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ceremony_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "credential_id": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 1364,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 1,
+              "maximum": 1023
+            },
+            "description": "Canonical unpadded base64url, 1..1023 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "client_data_json": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 5462,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "description": "Canonical unpadded base64url, 1..4096 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "authenticator_data": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 5462,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 37,
+              "maximum": 4096
+            },
+            "description": "Canonical unpadded base64url, 37..4096 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "signature": {
+            "type": "string",
+            "minLength": 11,
+            "maxLength": 96,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 8,
+              "maximum": 72
+            },
+            "description": "Canonical unpadded base64url, 8..72 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "user_handle": {
+            "type": "string",
+            "minLength": 22,
+            "maxLength": 22,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 16,
+              "maximum": 16
+            },
+            "description": "Canonical unpadded base64url, 16..16 decoded bytes; no aliases or unused nonzero pad bits."
+          }
+        }
+      },
+      "OperatorCreationOptions": {
+        "type": "object",
+        "required": [
+          "rp",
+          "user",
+          "challenge",
+          "pubKeyCredParams",
+          "timeout",
+          "excludeCredentials",
+          "authenticatorSelection",
+          "attestation"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "rp": {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "description": "Configured canonical lowercase DNS RP host; no IP literal, scheme, port or trailing dot."
+              },
+              "name": {
+                "const": "Scoplen"
+              }
+            }
+          },
+          "user": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "displayName"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 22,
+                "maxLength": 22,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "x-scoplen-decoded-bytes": {
+                  "minimum": 16,
+                  "maximum": 16
+                },
+                "description": "Canonical unpadded base64url, 16..16 decoded bytes; no aliases or unused nonzero pad bits."
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^operator:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "displayName": {
+                "const": "Deployment operator"
+              }
+            }
+          },
+          "challenge": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 32,
+              "maximum": 32
+            },
+            "description": "Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "pubKeyCredParams": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "type",
+                "alg"
+              ],
+              "additionalProperties": true,
+              "properties": {
+                "type": {
+                  "const": "public-key"
+                },
+                "alg": {
+                  "const": -7
+                }
+              }
+            }
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 300000,
+            "multipleOf": 1000
+          },
+          "excludeCredentials": {
+            "type": "array",
+            "maxItems": 0,
+            "items": {}
+          },
+          "authenticatorSelection": {
+            "type": "object",
+            "required": [
+              "residentKey",
+              "requireResidentKey",
+              "userVerification"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "residentKey": {
+                "const": "required"
+              },
+              "requireResidentKey": {
+                "const": true
+              },
+              "userVerification": {
+                "const": "required"
+              }
+            }
+          },
+          "attestation": {
+            "const": "none"
+          }
+        }
+      },
+      "OperatorRequestOptions": {
+        "type": "object",
+        "required": [
+          "challenge",
+          "timeout",
+          "rpId",
+          "allowCredentials",
+          "userVerification"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "x-scoplen-decoded-bytes": {
+              "minimum": 32,
+              "maximum": 32
+            },
+            "description": "Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits."
+          },
+          "timeout": {
+            "const": 300000
+          },
+          "rpId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "description": "Configured canonical lowercase DNS RP host; no IP literal, scheme, port or trailing dot."
+          },
+          "allowCredentials": {
+            "type": "array",
+            "maxItems": 0,
+            "items": {}
+          },
+          "userVerification": {
+            "const": "required"
+          }
+        }
+      },
+      "OperatorSetupOptionsResponse": {
+        "type": "object",
+        "required": [
+          "ceremony_id",
+          "expires_at",
+          "public_key"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "ceremony_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9]Z$",
+            "description": "Valid Gregorian UTC calendar instant, exactly whole-second precision."
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/OperatorCreationOptions"
+          }
+        }
+      },
+      "OperatorLoginOptionsResponse": {
+        "type": "object",
+        "required": [
+          "ceremony_id",
+          "expires_at",
+          "public_key"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "ceremony_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9]Z$",
+            "description": "Valid Gregorian UTC calendar instant, exactly whole-second precision."
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/OperatorRequestOptions"
+          }
+        }
+      },
+      "OperatorSetupFinishResponse": {
+        "type": "object",
+        "required": [
+          "operator_id"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "operator_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      },
+      "OperatorInvalidRequestProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 400
+              },
+              "code": {
+                "const": "auth.invalid_request"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "OperatorInvalidDpopProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 400
+              },
+              "code": {
+                "const": "auth.invalid_dpop_proof"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "OperatorOriginDeniedProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 403
+              },
+              "code": {
+                "const": "policy.denied"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "OperatorBodyTooLargeProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 413
+              },
+              "code": {
+                "const": "auth.invalid_request"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "OperatorContentTypeProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 415
+              },
+              "code": {
+                "const": "auth.invalid_request"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
       }
     }
   }

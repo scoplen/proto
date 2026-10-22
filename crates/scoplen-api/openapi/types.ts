@@ -15,6 +15,20 @@ export interface components {
     BrowserAuthTokenResponse: BrowserAuthTokenResponse;
     AuthJwk: AuthJwk;
     AuthJwks: AuthJwks;
+    OperatorSetupOptionsRequest: OperatorSetupOptionsRequest;
+    OperatorSetupFinishRequest: OperatorSetupFinishRequest;
+    OperatorLoginOptionsRequest: OperatorLoginOptionsRequest;
+    OperatorLoginFinishRequest: OperatorLoginFinishRequest;
+    OperatorSetupOptionsResponse: OperatorSetupOptionsResponse;
+    OperatorLoginOptionsResponse: OperatorLoginOptionsResponse;
+    OperatorSetupFinishResponse: OperatorSetupFinishResponse;
+    OperatorCreationOptions: OperatorCreationOptions;
+    OperatorRequestOptions: OperatorRequestOptions;
+    OperatorInvalidRequestProblem: OperatorInvalidRequestProblem;
+    OperatorInvalidDpopProblem: OperatorInvalidDpopProblem;
+    OperatorOriginDeniedProblem: OperatorOriginDeniedProblem;
+    OperatorBodyTooLargeProblem: OperatorBodyTooLargeProblem;
+    OperatorContentTypeProblem: OperatorContentTypeProblem;
     AuthRateLimitedProblem: AuthRateLimitedProblem;
     AuthAuthenticationRequiredProblem: AuthAuthenticationRequiredProblem;
     AuthStorageUnavailableProblem: AuthStorageUnavailableProblem;
@@ -337,3 +351,92 @@ export interface paths {
     get?: unknown; post?: unknown; patch?: unknown; delete?: unknown;
   };
 }
+// BEGIN GENERATED OperatorAuthentication
+export interface OperatorSetupOptionsRequest {
+  /** Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits. */
+  setup_token: string;
+}
+
+export interface OperatorSetupFinishRequest {
+  /** Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits. */
+  setup_token: string;
+  ceremony_id: string;
+  /** Canonical unpadded base64url, 1..1023 decoded bytes; no aliases or unused nonzero pad bits. */
+  credential_id: string;
+  /** Canonical unpadded base64url, 1..4096 decoded bytes; no aliases or unused nonzero pad bits. */
+  client_data_json: string;
+  /** Canonical unpadded base64url, 1..16384 decoded bytes; no aliases or unused nonzero pad bits. */
+  attestation_object: string;
+}
+
+export type OperatorLoginOptionsRequest = Record<string, never>;
+
+export interface OperatorLoginFinishRequest {
+  ceremony_id: string;
+  /** Canonical unpadded base64url, 1..1023 decoded bytes; no aliases or unused nonzero pad bits. */
+  credential_id: string;
+  /** Canonical unpadded base64url, 1..4096 decoded bytes; no aliases or unused nonzero pad bits. */
+  client_data_json: string;
+  /** Canonical unpadded base64url, 37..4096 decoded bytes; no aliases or unused nonzero pad bits. */
+  authenticator_data: string;
+  /** Canonical unpadded base64url, 8..72 decoded bytes; no aliases or unused nonzero pad bits. */
+  signature: string;
+  /** Canonical unpadded base64url, 16..16 decoded bytes; no aliases or unused nonzero pad bits. */
+  user_handle: string;
+}
+
+export interface OperatorSetupOptionsResponse {
+  ceremony_id: string;
+  /** Valid Gregorian UTC calendar instant, exactly whole-second precision. */
+  expires_at: string;
+  public_key: OperatorCreationOptions;
+  [extension: string]: unknown;
+}
+
+export interface OperatorLoginOptionsResponse {
+  ceremony_id: string;
+  /** Valid Gregorian UTC calendar instant, exactly whole-second precision. */
+  expires_at: string;
+  public_key: OperatorRequestOptions;
+  [extension: string]: unknown;
+}
+
+export interface OperatorSetupFinishResponse {
+  operator_id: string;
+  [extension: string]: unknown;
+}
+
+export interface OperatorCreationOptions {
+  rp: { id: string; name: "Scoplen"; [extension: string]: unknown; };
+  user: { id: string; name: string; displayName: "Deployment operator"; [extension: string]: unknown; };
+  /** Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits. */
+  challenge: string;
+  pubKeyCredParams: Array<{ type: "public-key"; alg: -7; [extension: string]: unknown; }>;
+  timeout: number;
+  excludeCredentials: [];
+  authenticatorSelection: { residentKey: "required"; requireResidentKey: true; userVerification: "required"; [extension: string]: unknown; };
+  attestation: "none";
+  [extension: string]: unknown;
+}
+
+export interface OperatorRequestOptions {
+  /** Canonical unpadded base64url, 32..32 decoded bytes; no aliases or unused nonzero pad bits. */
+  challenge: string;
+  timeout: 300000;
+  /** Configured canonical lowercase DNS RP host; no IP literal, scheme, port or trailing dot. */
+  rpId: string;
+  allowCredentials: [];
+  userVerification: "required";
+  [extension: string]: unknown;
+}
+
+export type OperatorInvalidRequestProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & { status: 400; code: "auth.invalid_request"; changed: false; retryable: false; };
+
+export type OperatorInvalidDpopProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & { status: 400; code: "auth.invalid_dpop_proof"; changed: false; retryable: false; };
+
+export type OperatorOriginDeniedProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & { status: 403; code: "policy.denied"; changed: false; retryable: false; };
+
+export type OperatorBodyTooLargeProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & { status: 413; code: "auth.invalid_request"; changed: false; retryable: false; };
+
+export type OperatorContentTypeProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & { status: 415; code: "auth.invalid_request"; changed: false; retryable: false; };
+// END GENERATED OperatorAuthentication

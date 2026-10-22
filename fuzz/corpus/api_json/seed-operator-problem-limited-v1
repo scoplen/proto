@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Operator request rejected","status":429,"detail":"The Operator request could not complete.","instance":"operator-limited","code":"auth.rate_limited","changed":false,"retryable":true}

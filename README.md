@@ -661,6 +661,26 @@ expire absolutely 30 days after initial authentication or browser bootstrap; rot
 the remaining positive whole seconds without extending expiry. The public reader continues
 accepting any positive lifetime. Durable admission, nonce consumption, key rotation, and
 refresh transactions remain server responsibilities.
+
+The D-111 `operator_auth` module provides four bounded byte-oriented request codecs and
+three public registration/login result codecs for the independent deployment Operator.
+Requests reject unknown fields, recursive duplicate names, noncanonical UUIDv7/base64url,
+and complete-body or decoded-byte overflow. Embedded client-data JSON, attestation CBOR,
+authenticator data and DER signatures remain opaque: lexical success does not authenticate
+a passkey. Live bound finish consumption and verification belong to the maintained server
+WebAuthn verifier. Options enforce discoverable resident credentials, ES256, required user
+verification, no attestation and bounded saved challenge/expiry projections; response extensions
+are ignored after recursive duplicate checks. Setup finish returns only `operator_id`, never
+a session. Login reuses `BrowserAuthTokenResponse` and the browser refresh cookie profile.
+OpenAPI exposes the four POSTs, independent root `/.well-known/operator-jwks.json` using
+`AuthJwks`, authentication admission/recovery errors, and no-store/no-cache/no-referrer headers.
+`OperatorAccessScope` and `OperatorAccessOperation` register only `personal-invitation:issue`
+for `POST /api/v1/admin/personal-invitations`. Cedar authorizes only a current active `Operator`
+on `Deployment::"self"`; Account role policies explicitly retain organization actions without
+granting deployment authority. `vectors/operator-auth.json` and named `api_json` seeds cover
+the public wire independently, including malformed embedded bytes and complete-body limits.
+The shared UUID dependency is pinned to 1.28.0 to satisfy the maintained WebAuthn verifier's
+compatible UUID requirement, preserving existing canonical UUIDv7 identities and vectors.
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR
 codec enforces the 4 KiB token, 8 KiB proof, and 16 KiB complete-message bounds and compact-JWS
 lexical form; it does not verify a JWT, DPoP claims, device state, proof replay, or the WebSocket

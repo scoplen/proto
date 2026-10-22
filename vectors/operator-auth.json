@@ -1,0 +1,156 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "operator-setup-options-request-v1",
+      "kind": "operator.setup-options.request",
+      "input": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\"}",
+      "expected": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\"}"
+    },
+    {
+      "id": "operator-setup-finish-opaque-v1",
+      "kind": "operator.setup-finish.request",
+      "input": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"credential_id\":\"_w\",\"client_data_json\":\"_w\",\"attestation_object\":\"_w\"}",
+      "expected": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"credential_id\":\"_w\",\"client_data_json\":\"_w\",\"attestation_object\":\"_w\"}"
+    },
+    {
+      "id": "operator-login-options-request-v1",
+      "kind": "operator.login-options.request",
+      "input": "{}",
+      "expected": "{}"
+    },
+    {
+      "id": "operator-login-finish-opaque-v1",
+      "kind": "operator.login-finish.request",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"credential_id\":\"_w\",\"client_data_json\":\"_w\",\"authenticator_data\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"signature\":\"__________8\",\"user_handle\":\"_____________________w\"}",
+      "expected": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"credential_id\":\"_w\",\"client_data_json\":\"_w\",\"authenticator_data\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"signature\":\"__________8\",\"user_handle\":\"_____________________w\"}"
+    },
+    {
+      "id": "operator-setup-options-response-v1",
+      "kind": "operator.setup-options.response",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"attestation\":\"none\",\"authenticatorSelection\":{\"requireResidentKey\":true,\"residentKey\":\"required\",\"userVerification\":\"required\"},\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"excludeCredentials\":[],\"pubKeyCredParams\":[{\"alg\":-7,\"type\":\"public-key\"}],\"rp\":{\"id\":\"scoplen.example.test\",\"name\":\"Scoplen\"},\"timeout\":300000,\"user\":{\"displayName\":\"Deployment operator\",\"id\":\"AY811B-PfiqeVnpeip8RoQ\",\"name\":\"operator:018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}}}",
+      "expected": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"attestation\":\"none\",\"authenticatorSelection\":{\"requireResidentKey\":true,\"residentKey\":\"required\",\"userVerification\":\"required\"},\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"excludeCredentials\":[],\"pubKeyCredParams\":[{\"alg\":-7,\"type\":\"public-key\"}],\"rp\":{\"id\":\"scoplen.example.test\",\"name\":\"Scoplen\"},\"timeout\":300000,\"user\":{\"displayName\":\"Deployment operator\",\"id\":\"AY811B-PfiqeVnpeip8RoQ\",\"name\":\"operator:018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}}}"
+    },
+    {
+      "id": "operator-login-options-response-v1",
+      "kind": "operator.login-options.response",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"allowCredentials\":[],\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"rpId\":\"scoplen.example.test\",\"timeout\":300000,\"userVerification\":\"required\"}}",
+      "expected": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"allowCredentials\":[],\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"rpId\":\"scoplen.example.test\",\"timeout\":300000,\"userVerification\":\"required\"}}"
+    },
+    {
+      "id": "operator-setup-finish-response-v1",
+      "kind": "operator.setup-finish.response",
+      "input": "{\"operator_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}",
+      "expected": "{\"operator_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}"
+    },
+    {
+      "id": "operator-setup-token-padding-v1",
+      "kind": "operator.setup-options.request.reject",
+      "input": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE=\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-setup-extra-v1",
+      "kind": "operator.setup-options.request.reject",
+      "input": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"operator_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-login-handle-short-v1",
+      "kind": "operator.login-finish.request.reject",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"credential_id\":\"_w\",\"client_data_json\":\"_w\",\"authenticator_data\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"signature\":\"__________8\",\"user_handle\":\"AAAAAAAAAAAAAAAAAAAA\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-login-der-oversize-v1",
+      "kind": "operator.login-finish.request.reject",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"credential_id\":\"_w\",\"client_data_json\":\"_w\",\"authenticator_data\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"user_handle\":\"_____________________w\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-uuid-alias-v1",
+      "kind": "operator.setup-finish.request.reject",
+      "input": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"ceremony_id\":\"018F35D4-1F8F-7E2A-9E56-7A5E8A9F11A1\",\"credential_id\":\"_w\",\"client_data_json\":\"_w\",\"attestation_object\":\"_w\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-login-query-field-v1",
+      "kind": "operator.login-options.request.reject",
+      "input": "{\"operator_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-outer-duplicate-v1",
+      "kind": "operator.setup-options.request.reject",
+      "input": "{\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"setup_token\":\"ERERERERERERERERERERERERERERERERERERERERERE\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-response-nested-duplicate-v1",
+      "kind": "operator.setup-options.response.reject",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"attestation\":\"none\",\"authenticatorSelection\":{\"requireResidentKey\":true,\"residentKey\":\"required\",\"userVerification\":\"required\"},\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"excludeCredentials\":[],\"pubKeyCredParams\":[{\"alg\":-7,\"type\":\"public-key\"}],\"rp\":{\"id\":\"scoplen.example.test\",\"name\":\"Scoplen\",\"x\":{\"y\":1,\"y\":2}},\"timeout\":300000,\"user\":{\"displayName\":\"Deployment operator\",\"id\":\"AY811B-PfiqeVnpeip8RoQ\",\"name\":\"operator:018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}}}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-resident-weakened-v1",
+      "kind": "operator.setup-options.response.reject",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"attestation\":\"none\",\"authenticatorSelection\":{\"requireResidentKey\":true,\"residentKey\":\"preferred\",\"userVerification\":\"required\"},\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"excludeCredentials\":[],\"pubKeyCredParams\":[{\"alg\":-7,\"type\":\"public-key\"}],\"rp\":{\"id\":\"scoplen.example.test\",\"name\":\"Scoplen\"},\"timeout\":300000,\"user\":{\"displayName\":\"Deployment operator\",\"id\":\"AY811B-PfiqeVnpeip8RoQ\",\"name\":\"operator:018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}}}",
+      "expected": "reject"
+    },
+    {
+      "id": "operator-response-additive-v1",
+      "kind": "operator.setup-options.response",
+      "input": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"attestation\":\"none\",\"authenticatorSelection\":{\"requireResidentKey\":true,\"residentKey\":\"required\",\"userVerification\":\"required\"},\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"excludeCredentials\":[],\"pubKeyCredParams\":[{\"alg\":-7,\"type\":\"public-key\"}],\"rp\":{\"id\":\"scoplen.example.test\",\"name\":\"Scoplen\"},\"timeout\":300000,\"user\":{\"displayName\":\"Deployment operator\",\"id\":\"AY811B-PfiqeVnpeip8RoQ\",\"name\":\"operator:018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"},\"future\":{\"value\":2}},\"future\":{\"value\":1}}",
+      "expected": "{\"ceremony_id\":\"018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\",\"expires_at\":\"2026-10-22T12:00:00Z\",\"public_key\":{\"attestation\":\"none\",\"authenticatorSelection\":{\"requireResidentKey\":true,\"residentKey\":\"required\",\"userVerification\":\"required\"},\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"excludeCredentials\":[],\"pubKeyCredParams\":[{\"alg\":-7,\"type\":\"public-key\"}],\"rp\":{\"id\":\"scoplen.example.test\",\"name\":\"Scoplen\"},\"timeout\":300000,\"user\":{\"displayName\":\"Deployment operator\",\"id\":\"AY811B-PfiqeVnpeip8RoQ\",\"name\":\"operator:018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1\"}}}"
+    },
+    {
+      "id": "operator-problem-outer-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":400,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-outer\",\"code\":\"auth.invalid_request\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":400,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-outer\",\"code\":\"auth.invalid_request\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "operator-problem-dpop-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":400,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-dpop\",\"code\":\"auth.invalid_dpop_proof\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":400,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-dpop\",\"code\":\"auth.invalid_dpop_proof\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "operator-problem-origin-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":403,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-origin\",\"code\":\"policy.denied\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":403,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-origin\",\"code\":\"policy.denied\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "operator-problem-denied-unused-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":401,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-denied-unused\",\"code\":\"auth.authentication_required\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":401,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-denied-unused\",\"code\":\"auth.authentication_required\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "operator-problem-denied-consumed-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":401,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-denied-consumed\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":401,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-denied-consumed\",\"code\":\"auth.authentication_required\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "operator-problem-limited-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":429,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-limited\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":429,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-limited\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "operator-problem-rollback-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":503,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-rollback\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":503,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-rollback\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "operator-problem-uncertain-v1",
+      "kind": "operator.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":503,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-uncertain\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Operator request rejected\",\"status\":503,\"detail\":\"The Operator request could not complete.\",\"instance\":\"operator-uncertain\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
+    }
+  ]
+}

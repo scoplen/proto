@@ -16,6 +16,7 @@ pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
 pub mod internal_grpc;
+pub mod operator_auth;
 pub mod personal_enrollment;
 mod request_wire;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.

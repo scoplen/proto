@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Operator request rejected","status":503,"detail":"The Operator request could not complete.","instance":"operator-rollback","code":"auth.storage_unavailable","changed":false,"retryable":true}
