@@ -4,7 +4,7 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
-- Updated the locked TLS certificate verifier to `rustls-webpki` 0.103.16 for
+- Updated the workspace and fuzz TLS certificate verifier locks to `rustls-webpki` 0.103.16 for
   RUSTSEC-2026-0382, rejecting certificate paths through the distrusted intermediates.
 - Added D-110 public JSON and independently encoded CBOR problem regressions and sync parser
   seeds for known rollback and uncertain write or acknowledgement commits. Both retain
