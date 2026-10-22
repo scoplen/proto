@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Operator request rejected","status":400,"detail":"The Operator request could not complete.","instance":"operator-outer","code":"auth.invalid_request","changed":false,"retryable":false}

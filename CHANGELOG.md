@@ -8,6 +8,11 @@ All notable changes to the `proto` repository will be recorded here.
   family binding, independent trust type, public signed/rejection vectors and parser seeds.
   Device profiles remain separate; passkey verification and current-state authorization are
   consumer responsibilities.
+- Added D-111 bounded independent Operator ceremony codecs, discoverable ES256 options,
+  a separate Operator route/scope registry, four OpenAPI POSTs and Operator JWKS discovery,
+  generated TypeScript, public vectors and parser seeds. Cedar distinguishes current active
+  Operators from Account roles and limits deployment invitations to `Deployment::"self"`.
+  Wire decoding leaves embedded WebAuthn parsing and ceremony consumption to the server.
 - Updated the shared UUID dependency to 1.28.0 for compatibility with the maintained
   WebAuthn verifier's UUID requirement; canonical UUIDv7 identity bytes are unchanged.
 - Updated the workspace and fuzz TLS certificate verifier locks to `rustls-webpki` 0.103.16 for

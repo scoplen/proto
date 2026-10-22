@@ -12,6 +12,11 @@ use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceRe
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
 };
+use scoplen_api::operator_auth::{
+    OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
+    OperatorSetupFinishRequest, OperatorSetupFinishResponse, OperatorSetupOptionsRequest,
+    OperatorSetupOptionsResponse,
+};
 use scoplen_api::personal_enrollment::{
     PersonalEnrollmentRequest, PersonalEnrollmentResponse, PersonalInvitationRequest,
     PersonalInvitationResponse,
@@ -38,6 +43,13 @@ fuzz_target!(|bytes: &[u8]| {
     }
     round_trip!(AccountProfile, bytes);
     round_trip!(AuthJwks, bytes);
+    round_trip!(OperatorSetupOptionsRequest, bytes);
+    round_trip!(OperatorSetupFinishRequest, bytes);
+    round_trip!(OperatorLoginOptionsRequest, bytes);
+    round_trip!(OperatorLoginFinishRequest, bytes);
+    round_trip!(OperatorSetupOptionsResponse, bytes);
+    round_trip!(OperatorLoginOptionsResponse, bytes);
+    round_trip!(OperatorSetupFinishResponse, bytes);
     round_trip!(CertificateIssuanceRequest, bytes);
     round_trip!(CertificateIssuanceResponse, bytes);
     round_trip!(GatewayTicketRequest, bytes);

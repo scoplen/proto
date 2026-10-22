@@ -6,6 +6,8 @@ entity Account {
     groups: Set<Group>,
     status: String,
 };
+entity Operator { status: String };
+entity Deployment {};
 entity Group {
     name: String,
     source: String,
@@ -63,3 +65,4 @@ action manage_members appliesTo { principal: Account, resource: Organization, co
 action manage_ca appliesTo { principal: Account, resource: Organization, context: { now: Long } };
 action manage_gateways appliesTo { principal: Account, resource: Organization, context: { now: Long } };
 action view_audit appliesTo { principal: Account, resource: Organization, context: { now: Long } };
+action issuePersonalInvitation appliesTo { principal: Operator, resource: Deployment, context: {} };
