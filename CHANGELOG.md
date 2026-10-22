@@ -4,6 +4,8 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Updated the shared UUID dependency to 1.28.0 for compatibility with the maintained
+  WebAuthn verifier's UUID requirement; canonical UUIDv7 identity bytes are unchanged.
 - Updated the workspace and fuzz TLS certificate verifier locks to `rustls-webpki` 0.103.16 for
   RUSTSEC-2026-0382, rejecting certificate paths through the distrusted intermediates.
 - Added D-110 public JSON and independently encoded CBOR problem regressions and sync parser
