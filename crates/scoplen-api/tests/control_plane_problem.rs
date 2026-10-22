@@ -25,7 +25,58 @@ fn published_problem_json_vectors_use_registered_codes() {
         );
         count += 1;
     }
-    assert_eq!(count, 13);
+    assert_eq!(count, 15);
+}
+
+#[test]
+fn sync_storage_failure_vectors_distinguish_rollback_from_uncertain_commit() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-problem.json");
+    let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("problem vectors");
+    for (outcome, changed, retryable) in
+        [("precommit", false, true), ("commit-outcome-unknown", true, false)]
+    {
+        let id = format!("api-problem-sync-storage-{outcome}");
+        let json = document
+            .vectors
+            .iter()
+            .find(|vector| vector.id == format!("{id}-json"))
+            .expect("JSON vector");
+        let cbor = document
+            .vectors
+            .iter()
+            .find(|vector| vector.id == format!("{id}-cbor"))
+            .expect("CBOR vector");
+        assert_eq!(json.input, cbor.input);
+        let problem: SharedProblemDetails =
+            serde_json::from_str(&json.input).expect("published sync storage problem");
+        assert_eq!(problem.status, 503);
+        assert_eq!(problem.code.as_str(), "sync.storage_unavailable");
+        assert_eq!(problem.changed, changed);
+        assert_eq!(problem.retryable, retryable);
+        assert_eq!(serde_json::to_string(&problem).expect("JSON"), json.expected);
+        let expected = cbor
+            .expected
+            .as_bytes()
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).expect("ASCII hex"), 16))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("CBOR hex");
+        assert_eq!(problem.to_cbor().expect("CBOR"), expected);
+        assert_eq!(SharedProblemDetails::from_cbor(&expected).expect("CBOR round trip"), problem);
+        let seed_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("../../fuzz/corpus/sync_data/seed-16-{id}-cbor"));
+        let seed = std::fs::read(seed_path).expect("tracked sync_data seed");
+        assert_eq!(seed.first(), Some(&16), "problem parser selector");
+        assert_eq!(&seed[1..], expected);
+        assert_eq!(SharedProblemDetails::from_cbor(&seed[1..]).expect("seed problem"), problem);
+        let decoded: SharedProblemDetails =
+            serde_json::from_slice(&serde_json::to_vec(&problem).expect("JSON"))
+                .expect("JSON round trip");
+        assert_eq!(decoded, problem);
+    }
 }
 
 #[test]
