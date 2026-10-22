@@ -94,34 +94,77 @@ fn published_vectors_match_independently_encoded_signature_bytes() {
 
 #[test]
 fn every_enrollment_field_is_bound_to_the_certified_device_signature() {
-    let input = fixture();
-    let context = input.context().expect("valid context");
     let signer = P256SigningKey::from_bytes(&[1; 32]).expect("synthetic key");
-    let signature = context.sign(&signer).expect("device signature");
-    context.verify(&signer.public_key_sec1(), &signature).expect("verified proof");
-    for field in 0..9 {
-        let mut changed = input.clone();
-        match field {
-            0 => changed.origin = "https://other.example.com".into(),
-            1 => changed.invitation_token = "ff".repeat(32),
-            2 => changed.account_id = Uuid::now_v7().to_string(),
-            3 => changed.personal_vault_id = Uuid::now_v7().to_string(),
-            4 => changed.account_signing_public_key = "44".repeat(32),
-            5 => changed.account_kem_public_key = "55".repeat(32),
-            6 => changed.key_bundle_update.push_str("00"),
-            7 => changed.device_certificate.push_str("00"),
-            8 => changed.wrapped_personal_vault_key.push_str("00"),
-            _ => unreachable!(),
+    for vector in
+        vectors().vectors.into_iter().filter(|vector| vector.kind == "enrollment.signature-input")
+    {
+        let input: Fixture = serde_json::from_str(&vector.input).expect("fixture fields");
+        let context = input.context().expect("valid context");
+        let signature = context.sign(&signer).expect("device signature");
+        context.verify(&signer.public_key_sec1(), &signature).expect("verified proof");
+        for field in 0..9 {
+            let mut changed = input.clone();
+            match field {
+                0 => changed.origin = "https://other.example.com".into(),
+                1 => changed.invitation_token = "ff".repeat(32),
+                2 => changed.account_id = Uuid::now_v7().to_string(),
+                3 => changed.personal_vault_id = Uuid::now_v7().to_string(),
+                4 => changed.account_signing_public_key = "44".repeat(32),
+                5 => changed.account_kem_public_key = "55".repeat(32),
+                6 => changed.key_bundle_update.push_str("00"),
+                7 => changed.device_certificate.push_str("00"),
+                8 => changed.wrapped_personal_vault_key.push_str("00"),
+                _ => unreachable!(),
+            }
+            assert!(
+                changed
+                    .context()
+                    .expect("valid altered context")
+                    .verify(&signer.public_key_sec1(), &signature)
+                    .is_err(),
+                "{} field {field} was not bound",
+                vector.id,
+            );
         }
-        assert!(
-            changed
-                .context()
-                .expect("valid altered context")
-                .verify(&signer.public_key_sec1(), &signature)
-                .is_err(),
-            "field {field} was not bound"
-        );
     }
+}
+
+#[test]
+fn replacing_an_invitation_requires_a_new_proof_from_the_retained_device() {
+    let original = fixture().context().expect("original context");
+    let replacement_vector = vectors()
+        .vectors
+        .into_iter()
+        .find(|vector| vector.id == "personal-enrollment-replacement-token-signature-input-v1")
+        .expect("published replacement vector");
+    let replacement_fixture: Fixture =
+        serde_json::from_str(&replacement_vector.input).expect("fixture fields");
+    let replacement = replacement_fixture.context().expect("replacement context");
+    let token_digest_start = b"spl-personal-enroll-v1".len() + 2 + replacement_fixture.origin.len();
+    let token_digest_end = token_digest_start + 32;
+    assert_eq!(
+        &original.signature_input()[..token_digest_start],
+        &replacement.signature_input()[..token_digest_start],
+    );
+    assert_ne!(
+        &original.signature_input()[token_digest_start..token_digest_end],
+        &replacement.signature_input()[token_digest_start..token_digest_end],
+    );
+    assert_eq!(
+        &original.signature_input()[token_digest_end..],
+        &replacement.signature_input()[token_digest_end..],
+    );
+
+    let signer = P256SigningKey::from_bytes(&[1; 32]).expect("retained synthetic device key");
+    let original_signature = original.sign(&signer).expect("original proof");
+    assert!(replacement.verify(&signer.public_key_sec1(), &original_signature).is_err());
+    let replacement_signature = replacement.sign(&signer).expect("replacement proof");
+    replacement
+        .verify(&signer.public_key_sec1(), &replacement_signature)
+        .expect("replacement proof with retained device key");
+    assert!(original.verify(&signer.public_key_sec1(), &replacement_signature).is_err());
+    let other = P256SigningKey::from_bytes(&[2; 32]).expect("different synthetic device key");
+    assert!(replacement.verify(&other.public_key_sec1(), &replacement_signature).is_err());
 }
 
 #[test]

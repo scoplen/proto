@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-109 retained-device invitation re-signing regressions and an independently encoded
+  replacement-token vector. Both original and replacement proofs reject every changed signed
+  field; the signing contract is unchanged and recovery decisions remain consumer work.
+
 - Added D-107's exact initial enrolled-device scope ceiling and typed 16-operation route
   registry, with public scope/mapping vectors and signed-token compatibility checks. OpenAPI
   records issuance, non-expanding refresh, and current-account scope requirements. Unknown
