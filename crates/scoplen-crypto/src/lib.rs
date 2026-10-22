@@ -17,6 +17,7 @@ mod gateway_ticket;
 mod hierarchy;
 mod hpke;
 mod keys;
+mod operator_access_token;
 mod pairing;
 mod personal_enrollment;
 mod primitives;
@@ -63,6 +64,11 @@ pub use keys::{
     AccountKeys, AccountRootKey, DeviceKeys, LocalDatabaseKey, LocalDatabaseKeyEnvelope, VaultKey,
     VaultKeyEpoch, generate_account_keys, generate_device_keys, generate_symmetric_key,
     generate_vault_epoch, unwrap_key_from_device, wrap_key_to_device,
+};
+pub use operator_access_token::{
+    MAX_OPERATOR_ACCESS_TOKEN_BYTES, OPERATOR_ACCESS_TOKEN_LIFETIME_SECONDS, OperatorAccessToken,
+    OperatorAccessTokenClaims, OperatorAccessTokenError, OperatorAccessTokenSigner,
+    TrustedOperatorAccessTokenKeys, VerifiedOperatorAccessToken,
 };
 pub use pairing::{PairingQrError, PairingQrPayload};
 pub use personal_enrollment::{

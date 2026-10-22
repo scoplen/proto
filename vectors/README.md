@@ -5,6 +5,12 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`operator-access-token.json` contains D-111 compact JWS vectors independently signed using
+Node's Ed25519 implementation with synthetic key material. The public crypto API verifies the
+exact token, Operator `sub`, browser family `sid`, JKT and 600-second lifetime. Negative vectors
+reject device type/audience substitution, device/organization fields and missing family binding.
+Matching parser seeds exercise the verifier; they do not establish replay or current-state checks.
+
 The baseline document includes K-1 vectors for shortest-form maps, NFC text, the complete CBOR
 negative-integer range, a Route proxy-username envelope, and executable object merges including
 paired proxy-authentication field clears. `model.cbor` vectors use hexadecimal CBOR

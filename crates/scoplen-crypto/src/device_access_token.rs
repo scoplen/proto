@@ -426,13 +426,13 @@ fn identifier(object: &Map<String, Value>, key: &str) -> Result<Uuid, DeviceAcce
     Ok(id)
 }
 
-fn valid_kid(kid: &str) -> bool {
+pub(crate) fn valid_kid(kid: &str) -> bool {
     !kid.is_empty()
         && kid.len() <= 128
         && kid.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
 }
 
-fn valid_scope(scope: &str) -> bool {
+pub(crate) fn valid_scope(scope: &str) -> bool {
     if scope.is_empty() || scope.len() > 512 || !scope.is_ascii() {
         return false;
     }

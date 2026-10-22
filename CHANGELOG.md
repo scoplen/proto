@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-111's separate Operator browser access-token signing and verification boundary,
+  family binding, independent trust type, public signed/rejection vectors and parser seeds.
+  Device profiles remain separate; passkey verification and current-state authorization are
+  consumer responsibilities.
 - Updated the shared UUID dependency to 1.28.0 for compatibility with the maintained
   WebAuthn verifier's UUID requirement; canonical UUIDv7 identity bytes are unchanged.
 - Updated the workspace and fuzz TLS certificate verifier locks to `rustls-webpki` 0.103.16 for
