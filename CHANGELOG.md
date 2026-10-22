@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-110 public JSON and independently encoded CBOR problem regressions and sync parser
+  seeds for known rollback and uncertain write or acknowledgement commits. Both retain
+  `sync.storage_unavailable` and the existing wire shape, while preserving distinct mutation
+  and retry flags. Transaction classification and recovery remain consumer responsibilities.
 - Added D-109 retained-device invitation re-signing regressions and an independently encoded
   replacement-token vector. Both original and replacement proofs reject every changed signed
   field; the signing contract is unchanged and recovery decisions remain consumer work.

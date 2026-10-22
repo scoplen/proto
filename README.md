@@ -637,6 +637,14 @@ POST. Enrollment keeps its local identity and first tries device authentication,
 operator explicitly decides whether to issue another invitation when the original token may be
 unrecoverable. The shared codec preserves the existing eight-field problem representation;
 classifying database commit outcomes remains a server responsibility.
+For D-110, public JSON and independently encoded CBOR problem vectors retain
+`503 sync.storage_unavailable` for both known precommit rollback (`changed: false`,
+`retryable: true`) and an uncertain object-write or acknowledgement commit (`changed: true`,
+`retryable: false`). An uncertain result does not establish success or permit automatic batch
+replay: clients retain edits and keys, then pull and reconcile before another write. A confirmed
+acknowledgement no-op has no business-state mutation. The generic problem codec does not infer
+transaction state or enforce endpoint-specific flag combinations; storage adapters and consumers
+remain responsible for those decisions.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
 For D-106, `auth::AuthRateLimitHeaders` supplies the separate `"authentication"` response

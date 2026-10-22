@@ -21,6 +21,30 @@
       "expected": "a864636f64657173796e632e726174655f6c696d6974656464747970656b61626f75743a626c616e6b657469746c65781853796e6320777269746520726174652065786365656465646664657461696c775265747279206166746572206f6e65207365636f6e642e667374617475731901ad676368616e676564f468696e7374616e636566726174652d3169726574727961626c65f5"
     },
     {
+      "id": "api-problem-sync-storage-precommit-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Sync storage unavailable\",\"status\":503,\"detail\":\"The transaction rolled back; no sync data changed. Keep local edits and keys, then retry later.\",\"instance\":\"sync-rollback-1\",\"code\":\"sync.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Sync storage unavailable\",\"status\":503,\"detail\":\"The transaction rolled back; no sync data changed. Keep local edits and keys, then retry later.\",\"instance\":\"sync-rollback-1\",\"code\":\"sync.storage_unavailable\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "api-problem-sync-storage-precommit-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Sync storage unavailable\",\"status\":503,\"detail\":\"The transaction rolled back; no sync data changed. Keep local edits and keys, then retry later.\",\"instance\":\"sync-rollback-1\",\"code\":\"sync.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "a864636f6465781873796e632e73746f726167655f756e617661696c61626c6564747970656b61626f75743a626c616e6b657469746c65781853796e632073746f7261676520756e617661696c61626c656664657461696c785f546865207472616e73616374696f6e20726f6c6c6564206261636b3b206e6f2073796e632064617461206368616e6765642e204b656570206c6f63616c20656469747320616e64206b6579732c207468656e207265747279206c617465722e667374617475731901f7676368616e676564f468696e7374616e63656f73796e632d726f6c6c6261636b2d3169726574727961626c65f5"
+    },
+    {
+      "id": "api-problem-sync-storage-commit-outcome-unknown-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Sync outcome unknown\",\"status\":503,\"detail\":\"The write or acknowledgement may have committed. Keep local edits and keys; pull and reconcile before another write. Do not automatically replay the batch.\",\"instance\":\"sync-unknown-1\",\"code\":\"sync.storage_unavailable\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Sync outcome unknown\",\"status\":503,\"detail\":\"The write or acknowledgement may have committed. Keep local edits and keys; pull and reconcile before another write. Do not automatically replay the batch.\",\"instance\":\"sync-unknown-1\",\"code\":\"sync.storage_unavailable\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-sync-storage-commit-outcome-unknown-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Sync outcome unknown\",\"status\":503,\"detail\":\"The write or acknowledgement may have committed. Keep local edits and keys; pull and reconcile before another write. Do not automatically replay the batch.\",\"instance\":\"sync-unknown-1\",\"code\":\"sync.storage_unavailable\",\"changed\":true,\"retryable\":false}",
+      "expected": "a864636f6465781873796e632e73746f726167655f756e617661696c61626c6564747970656b61626f75743a626c616e6b657469746c657453796e63206f7574636f6d6520756e6b6e6f776e6664657461696c789b546865207772697465206f722061636b6e6f776c656467656d656e74206d6179206861766520636f6d6d69747465642e204b656570206c6f63616c20656469747320616e64206b6579733b2070756c6c20616e64207265636f6e63696c65206265666f726520616e6f746865722077726974652e20446f206e6f74206175746f6d61746963616c6c79207265706c6179207468652062617463682e667374617475731901f7676368616e676564f568696e7374616e63656e73796e632d756e6b6e6f776e2d3169726574727961626c65f4"
+    },
+    {
       "id": "api-problem-auth-refresh-invalid-request-json",
       "kind": "api.problem.json",
       "input": "{\"type\":\"about:blank\",\"title\":\"Invalid refresh request\",\"status\":400,\"detail\":\"The refresh body is invalid; no state changed. Correct the request.\",\"instance\":\"refresh-1\",\"code\":\"auth.invalid_request\",\"changed\":false,\"retryable\":false}",
