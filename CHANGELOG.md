@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added public DPoP presented-key verification for initial Operator ceremonies. It shares the
+  existing signature, exact target, token hash, time, and nonce checks and returns the verified
+  JWK thumbprint without requiring an existing binding. Trusted identity, credential binding,
+  authorization, and durable replay claims remain consumer responsibilities; existing
+  expected-thumbprint verification and wire formats are unchanged.
 - Fixed K-1 reference discovery for Host default profiles and live groups, AccessProfile
   forwards, HostGroup parents, and Workspace session maps. Cleared memberships, TrustRecord
   account/device provenance, and unknown fields no longer create false object dependencies.

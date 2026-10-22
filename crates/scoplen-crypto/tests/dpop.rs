@@ -74,6 +74,15 @@ fn rfc_9449_protected_vector_verifies_without_reserializing() {
     assert_eq!(verified.jti, expected[1]);
     assert_eq!(verified.iat.to_string(), expected[2]);
     assert_eq!(verified.last_accepted_at.to_string(), expected[3]);
+    assert_eq!(
+        proof.verify_presented_key(
+            &target,
+            DpopToken::Protected(ACCESS_TOKEN),
+            1_562_262_618,
+            None
+        ),
+        Ok(verified.clone())
+    );
     let encoded_claims = vector.input.split('.').nth(1).expect("RFC claims");
     let claims: Value =
         serde_json::from_slice(&URL_SAFE_NO_PAD.decode(encoded_claims).expect("base64url"))
@@ -205,6 +214,120 @@ fn refresh_proofs_omit_and_do_not_require_ath() {
     extra["ath"] = json!("ignored-even-if-invalid");
     let extra = sign_json(&header(), &extra);
     assert!(extra.verify(&target, DpopToken::Refresh, &jkt, 1_000, None).is_ok());
+    assert!(extra.verify_presented_key(&target, DpopToken::Refresh, 1_000, None).is_ok());
+}
+
+#[test]
+fn presented_key_verification_preserves_signed_bytes_and_leaves_replay_to_consumer() {
+    let path = "/api/v1/auth/operator/setup/options";
+    let request_target = target("POST", path);
+    let signed_header = serde_json::to_string_pretty(&header()).expect("header");
+    let signed_claims = serde_json::to_string_pretty(&claims("POST", path, 1_000)).expect("claims");
+    let proof = sign_raw(&signed_header, &signed_claims);
+    let verified = proof
+        .verify_presented_key(&request_target, DpopToken::Refresh, 1_000, None)
+        .expect("presented-key possession");
+    assert_eq!(verified.jkt, local_jkt());
+    assert_eq!(verified.jti, "test-jti");
+    assert_eq!(verified.iat, 1_000);
+    assert_eq!(verified.last_accepted_at, 1_060);
+    assert_eq!(
+        proof.verify(&request_target, DpopToken::Refresh, RFC_JKT, 1_000, None),
+        Err(DpopError::InvalidProof),
+        "possession cannot replace an existing different trusted key binding"
+    );
+    let second = proof
+        .verify_presented_key(&request_target, DpopToken::Refresh, 1_000, None)
+        .expect("stateless verification does not claim a replay");
+    assert_eq!(second, verified);
+    let mut replay_claims = std::collections::BTreeSet::new();
+    assert!(replay_claims.insert((verified.jkt, verified.jti)));
+    assert!(!replay_claims.insert((second.jkt, second.jti)));
+
+    let signature = proof.as_str().rsplit('.').next().expect("signature");
+    let reserialized = DpopProof::parse(&format!(
+        "{}.{}.{signature}",
+        URL_SAFE_NO_PAD.encode(header().to_string()),
+        URL_SAFE_NO_PAD.encode(claims("POST", path, 1_000).to_string())
+    ))
+    .expect("canonical compact envelope");
+    assert_ne!(reserialized, proof);
+    assert_eq!(
+        reserialized.verify_presented_key(&request_target, DpopToken::Refresh, 1_000, None),
+        Err(DpopError::InvalidProof)
+    );
+}
+
+#[test]
+fn presented_key_verification_keeps_signature_target_token_time_and_nonce_checks() {
+    let path = "/api/v1/auth/operator/setup/finish";
+    let request_target = target("POST", path);
+    let proof = DpopProof::sign(
+        &key(),
+        &key().public_key_sec1(),
+        &request_target,
+        DpopToken::Protected("access.jwt"),
+        1_000,
+        Some("nonce-1"),
+    )
+    .expect("proof");
+    assert!(
+        proof
+            .verify_presented_key(
+                &request_target,
+                DpopToken::Protected("access.jwt"),
+                1_000,
+                Some("nonce-1")
+            )
+            .is_ok()
+    );
+    for (request_target, token, now, nonce) in [
+        (target("GET", path), DpopToken::Protected("access.jwt"), 1_000, Some("nonce-1")),
+        (
+            target("POST", "/api/v1/auth/operator/setup/options"),
+            DpopToken::Protected("access.jwt"),
+            1_000,
+            Some("nonce-1"),
+        ),
+        (target("POST", path), DpopToken::Protected("other.jwt"), 1_000, Some("nonce-1")),
+        (target("POST", path), DpopToken::Protected("access.jwt"), 939, Some("nonce-1")),
+        (target("POST", path), DpopToken::Protected("access.jwt"), 1_061, Some("nonce-1")),
+        (target("POST", path), DpopToken::Protected("access.jwt"), 1_000, Some("nonce-2")),
+    ] {
+        assert_eq!(
+            proof.verify_presented_key(&request_target, token, now, nonce),
+            Err(DpopError::InvalidProof)
+        );
+    }
+    for invalid_token in ["", "non-ascii-é"] {
+        assert_eq!(
+            proof.verify_presented_key(
+                &request_target,
+                DpopToken::Protected(invalid_token),
+                1_000,
+                None
+            ),
+            Err(DpopError::InvalidContext)
+        );
+    }
+    assert_eq!(
+        proof.verify_presented_key(&request_target, DpopToken::Refresh, 1_000, Some("bad nonce")),
+        Err(DpopError::InvalidContext)
+    );
+    let parts: Vec<_> = proof.as_str().split('.').collect();
+    let mut signature = URL_SAFE_NO_PAD.decode(parts[2]).expect("signature bytes");
+    signature[0] ^= 1;
+    let tampered = DpopProof::parse(&format!(
+        "{}.{}.{}",
+        parts[0],
+        parts[1],
+        URL_SAFE_NO_PAD.encode(signature)
+    ))
+    .expect("compact proof");
+    assert_eq!(
+        tampered.verify_presented_key(&request_target, DpopToken::Refresh, 1_000, None),
+        Err(DpopError::InvalidProof)
+    );
 }
 
 #[test]
@@ -267,7 +390,10 @@ fn signed_claims_and_headers_reject_ambiguity_and_wrong_types() {
     let good_header = header();
     let good_claims = claims("GET", "/x", 1_000);
     let check = |header: &Value, claims: &Value| {
-        sign_json(header, claims).verify(&target, DpopToken::Refresh, &jkt, 1_000, None)
+        let proof = sign_json(header, claims);
+        let bound = proof.verify(&target, DpopToken::Refresh, &jkt, 1_000, None);
+        assert_eq!(bound, proof.verify_presented_key(&target, DpopToken::Refresh, 1_000, None));
+        bound
     };
     for (field, value) in [
         ("typ", json!("jwt")),
