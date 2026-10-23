@@ -20,6 +20,16 @@ other output is deterministic. Negative maps cover changed root/anchor/device, r
 unknown fields, bad keys and trailing bytes. Public tests additionally exercise real confirmed
 CPace frames, key opening, substituted contexts and every relevant size boundary.
 
+`pairing.json` contains D-114 create/claim, seven relay slots, acknowledgement, receipt, snapshot
+and completion JSON vectors. Accepted cases round-trip to exact contract field order; rejected
+cases identify redacted syntax/field/state errors. Capabilities, frames and signatures are public
+synthetic boundary values. The approval includes canonical K-2/K-4 artifacts for syntax checks,
+without asserting signature validity or admission. Exact matching `api_json` corpus seeds are
+replayed through the public codecs; tests additionally exercise every decoded frame boundary,
+full-body whitespace limits, HTTP metadata, roles, expiry, immutable retransmission, cancellation,
+known rollback and receipt recovery after an unknown commit. The reference peer delegates
+cryptographic/current-revision/capacity checks to an explicit external verifier.
+
 `account-devices.json` contains D-113 complete signed-statement snapshot JSON vectors. Valid
 inputs round-trip to exact canonical JSON; failure vectors identify redacted field or JSON
 errors. Artifacts are deliberately opaque synthetic bytes: the wire codec performs no K-2

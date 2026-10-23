@@ -18,6 +18,11 @@ use scoplen_api::operator_auth::{
     OperatorSetupFinishRequest, OperatorSetupFinishResponse, OperatorSetupOptionsRequest,
     OperatorSetupOptionsResponse,
 };
+use scoplen_api::pairing::{
+    PairingClaimRequest, PairingClaimResponse, PairingCompleteRequest, PairingCreateRequest,
+    PairingCreateResponse, PairingMessageAck, PairingMessageRequest, PairingReceipt,
+    PairingSnapshot,
+};
 use scoplen_api::personal_enrollment::{
     PersonalEnrollmentRequest, PersonalEnrollmentResponse, PersonalInvitationRequest,
     PersonalInvitationResponse,
@@ -44,6 +49,15 @@ fuzz_target!(|bytes: &[u8]| {
     }
     round_trip!(AccountProfile, bytes);
     round_trip!(AccountDeviceStatements, bytes);
+    round_trip!(PairingCreateRequest, bytes);
+    round_trip!(PairingCreateResponse, bytes);
+    round_trip!(PairingClaimRequest, bytes);
+    round_trip!(PairingClaimResponse, bytes);
+    round_trip!(PairingMessageRequest, bytes);
+    round_trip!(PairingMessageAck, bytes);
+    round_trip!(PairingReceipt, bytes);
+    round_trip!(PairingSnapshot, bytes);
+    round_trip!(PairingCompleteRequest, bytes);
     round_trip!(AuthJwks, bytes);
     round_trip!(OperatorSetupOptionsRequest, bytes);
     round_trip!(OperatorSetupFinishRequest, bytes);

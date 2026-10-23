@@ -5,6 +5,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { generateOperatorTypes } from "./generate-operator.mjs";
 import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
+import { generatePairingTypes } from "./generate-pairing.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -699,7 +700,13 @@ const deviceStartIndex = completeOperatorTypes.indexOf(deviceStart);
 const deviceEndIndex = completeOperatorTypes.indexOf(deviceEnd, deviceStartIndex + deviceStart.length);
 if (deviceStartIndex < 0 || deviceEndIndex < 0) throw new Error("types.ts is missing its generated account-device section");
 const completeDeviceTypes = `${completeOperatorTypes.slice(0, deviceStartIndex + deviceStart.length)}${generateAccountDeviceTypes(document)}${completeOperatorTypes.slice(deviceEndIndex)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeDeviceTypes]];
+const pairingStart = "// BEGIN GENERATED Pairing\n";
+const pairingEnd = "// END GENERATED Pairing";
+const pairingStartIndex = completeDeviceTypes.indexOf(pairingStart);
+const pairingEndIndex = completeDeviceTypes.indexOf(pairingEnd, pairingStartIndex + pairingStart.length);
+if (pairingStartIndex < 0 || pairingEndIndex < 0) throw new Error("types.ts is missing its generated pairing section");
+const completePairingTypes = `${completeDeviceTypes.slice(0, pairingStartIndex + pairingStart.length)}${generatePairingTypes(document)}${completeDeviceTypes.slice(pairingEndIndex)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completePairingTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

@@ -3995,6 +3995,253 @@
           }
         }
       }
+    },
+    "/auth/pairings": {
+      "post": {
+        "operationId": "createPairing",
+        "description": "D-114 native finite-slot pairing. Reject every query, Idempotency-Key, If-Match and conditional cache header; reject cookies and mixed role credentials. Supplied Origin exactly matches trusted canonical HTTPS origin. No ETag, 304, redirect or credentialed CORS. Reject duplicate JSON names recursively and unknown request fields. Capability is not an account-root authenticator. Password/QR never enter HTTP. Every mutation and audit is atomic. Fixed five-minute expiry, terminal receipt retention 24 hours, exact immutable replay only. Poll at least two seconds apart. See 06 section 2.2 and 08 section 2.7 for cryptographic/checkpoint/uncertainty rules.",
+        "security": [],
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 4096,
+        "responses": {
+          "201": {
+            "description": "Exact bounded D-114 response.",
+            "headers": {
+              "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+              "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+              "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+            },
+            "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingCreateResponse"}}}
+          },
+          "400": {"$ref":"#/components/responses/PairingProblem400"},
+          "401": {"$ref":"#/components/responses/PairingProblem401"},
+          "403": {"$ref":"#/components/responses/PairingProblem403"},
+          "409": {"$ref":"#/components/responses/PairingProblem409"},
+          "413": {"$ref":"#/components/responses/PairingProblem413"},
+          "429": {"$ref":"#/components/responses/PairingProblem429"},
+          "503": {"$ref":"#/components/responses/PairingProblem503"},
+          "default": {"$ref":"#/components/responses/PairingProblem"}
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON at most 256 bytes including whitespace.",
+          "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingCreateRequest"}}}
+        }
+      }
+    },
+    "/auth/pairings/{pairing}": {
+      "parameters": [
+        {
+          "name": "pairing",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getPairing",
+        "description": "D-114 native finite-slot pairing. Reject every query, Idempotency-Key, If-Match and conditional cache header; reject cookies and mixed role credentials. Supplied Origin exactly matches trusted canonical HTTPS origin. No ETag, 304, redirect or credentialed CORS. Reject duplicate JSON names recursively and unknown request fields. Capability is not an account-root authenticator. Password/QR never enter HTTP. Every mutation and audit is atomic. Fixed five-minute expiry, terminal receipt retention 24 hours, exact immutable replay only. Poll at least two seconds apart. See 06 section 2.2 and 08 section 2.7 for cryptographic/checkpoint/uncertainty rules.",
+        "security": [{"accessToken":[],"dpopProof":[]},{"pairingCapability":[]}],
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8388608,
+        "responses": {
+          "200": {
+            "description": "Exact bounded D-114 response.",
+            "headers": {
+              "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+              "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+              "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+            },
+            "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingSnapshot"}}}
+          },
+          "400": {"$ref":"#/components/responses/PairingProblem400"},
+          "401": {"$ref":"#/components/responses/PairingProblem401"},
+          "403": {"$ref":"#/components/responses/PairingProblem403"},
+          "409": {"$ref":"#/components/responses/PairingProblem409"},
+          "413": {"$ref":"#/components/responses/PairingProblem413"},
+          "429": {"$ref":"#/components/responses/PairingProblem429Read"},
+          "503": {"$ref":"#/components/responses/PairingProblem503"},
+          "default": {"$ref":"#/components/responses/PairingProblem"}
+        },
+        "x-scoplen-required-device-scope": "keys:write"
+      },
+      "delete": {
+        "operationId": "cancelPairing",
+        "description": "D-114 native finite-slot pairing. Reject every query, Idempotency-Key, If-Match and conditional cache header; reject cookies and mixed role credentials. Supplied Origin exactly matches trusted canonical HTTPS origin. No ETag, 304, redirect or credentialed CORS. Reject duplicate JSON names recursively and unknown request fields. Capability is not an account-root authenticator. Password/QR never enter HTTP. Every mutation and audit is atomic. Fixed five-minute expiry, terminal receipt retention 24 hours, exact immutable replay only. Poll at least two seconds apart. See 06 section 2.2 and 08 section 2.7 for cryptographic/checkpoint/uncertainty rules.",
+        "security": [{"accessToken":[],"dpopProof":[]},{"pairingCapability":[]}],
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 0,
+        "responses": {
+          "204": {
+            "description": "Exact bounded D-114 response.",
+            "headers": {
+              "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+              "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+              "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+            }
+          },
+          "400": {"$ref":"#/components/responses/PairingProblem400"},
+          "401": {"$ref":"#/components/responses/PairingProblem401"},
+          "403": {"$ref":"#/components/responses/PairingProblem403"},
+          "409": {"$ref":"#/components/responses/PairingProblem409"},
+          "413": {"$ref":"#/components/responses/PairingProblem413"},
+          "429": {"$ref":"#/components/responses/PairingProblem429"},
+          "503": {"$ref":"#/components/responses/PairingProblem503"},
+          "default": {"$ref":"#/components/responses/PairingProblem"}
+        },
+        "x-scoplen-required-device-scope": "keys:write"
+      }
+    },
+    "/auth/pairings/{pairing}/claim": {
+      "parameters": [
+        {
+          "name": "pairing",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "claimPairing",
+        "description": "D-114 native finite-slot pairing. Reject every query, Idempotency-Key, If-Match and conditional cache header; reject cookies and mixed role credentials. Supplied Origin exactly matches trusted canonical HTTPS origin. No ETag, 304, redirect or credentialed CORS. Reject duplicate JSON names recursively and unknown request fields. Capability is not an account-root authenticator. Password/QR never enter HTTP. Every mutation and audit is atomic. Fixed five-minute expiry, terminal receipt retention 24 hours, exact immutable replay only. Poll at least two seconds apart. See 06 section 2.2 and 08 section 2.7 for cryptographic/checkpoint/uncertainty rules.",
+        "security": [{"accessToken":[],"dpopProof":[]}],
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 4096,
+        "responses": {
+          "200": {
+            "description": "Exact bounded D-114 response.",
+            "headers": {
+              "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+              "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+              "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+            },
+            "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingClaimResponse"}}}
+          },
+          "400": {"$ref":"#/components/responses/PairingProblem400"},
+          "401": {"$ref":"#/components/responses/PairingProblem401"},
+          "403": {"$ref":"#/components/responses/PairingProblem403"},
+          "409": {"$ref":"#/components/responses/PairingProblem409"},
+          "413": {"$ref":"#/components/responses/PairingProblem413"},
+          "429": {"$ref":"#/components/responses/PairingProblem429"},
+          "503": {"$ref":"#/components/responses/PairingProblem503"},
+          "default": {"$ref":"#/components/responses/PairingProblem"}
+        },
+        "x-scoplen-required-device-scope": "keys:write",
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON at most 256 bytes including whitespace.",
+          "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingClaimRequest"}}}
+        }
+      }
+    },
+    "/auth/pairings/{pairing}/messages": {
+      "parameters": [
+        {
+          "name": "pairing",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "postPairingMessage",
+        "description": "D-114 native finite-slot pairing. Reject every query, Idempotency-Key, If-Match and conditional cache header; reject cookies and mixed role credentials. Supplied Origin exactly matches trusted canonical HTTPS origin. No ETag, 304, redirect or credentialed CORS. Reject duplicate JSON names recursively and unknown request fields. Capability is not an account-root authenticator. Password/QR never enter HTTP. Every mutation and audit is atomic. Fixed five-minute expiry, terminal receipt retention 24 hours, exact immutable replay only. Poll at least two seconds apart. See 06 section 2.2 and 08 section 2.7 for cryptographic/checkpoint/uncertainty rules.",
+        "security": [{"accessToken":[],"dpopProof":[]},{"pairingCapability":[]}],
+        "x-scoplen-request-max-bytes": 6291456,
+        "x-scoplen-response-max-bytes": 256,
+        "responses": {
+          "200": {
+            "description": "Exact bounded D-114 response.",
+            "headers": {
+              "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+              "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+              "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+            },
+            "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingMessageAck"}}}
+          },
+          "400": {"$ref":"#/components/responses/PairingProblem400"},
+          "401": {"$ref":"#/components/responses/PairingProblem401"},
+          "403": {"$ref":"#/components/responses/PairingProblem403"},
+          "409": {"$ref":"#/components/responses/PairingProblem409"},
+          "413": {"$ref":"#/components/responses/PairingProblem413"},
+          "429": {"$ref":"#/components/responses/PairingProblem429"},
+          "503": {"$ref":"#/components/responses/PairingProblem503"},
+          "default": {"$ref":"#/components/responses/PairingProblem"}
+        },
+        "x-scoplen-required-device-scope": "keys:write",
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON at most 6291456 bytes including whitespace.",
+          "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingMessageRequest"}}}
+        },
+        "x-scoplen-step-body-max-bytes": {
+          "initiator_share": 256,
+          "responder_share": 256,
+          "responder_confirmation": 256,
+          "initiator_confirmation": 256,
+          "new_device": 196608,
+          "handoff": 6291456,
+          "acceptance": 256
+        }
+      }
+    },
+    "/auth/pairings/{pairing}/complete": {
+      "parameters": [
+        {
+          "name": "pairing",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "completePairing",
+        "description": "D-114 native finite-slot pairing. Reject every query, Idempotency-Key, If-Match and conditional cache header; reject cookies and mixed role credentials. Supplied Origin exactly matches trusted canonical HTTPS origin. No ETag, 304, redirect or credentialed CORS. Reject duplicate JSON names recursively and unknown request fields. Capability is not an account-root authenticator. Password/QR never enter HTTP. Every mutation and audit is atomic. Fixed five-minute expiry, terminal receipt retention 24 hours, exact immutable replay only. Poll at least two seconds apart. See 06 section 2.2 and 08 section 2.7 for cryptographic/checkpoint/uncertainty rules.",
+        "security": [{"accessToken":[],"dpopProof":[]}],
+        "x-scoplen-request-max-bytes": 6291456,
+        "x-scoplen-response-max-bytes": 256,
+        "responses": {
+          "200": {
+            "description": "Exact bounded D-114 response.",
+            "headers": {
+              "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+              "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+              "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+            },
+            "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingReceipt"}}}
+          },
+          "400": {"$ref":"#/components/responses/PairingProblem400"},
+          "401": {"$ref":"#/components/responses/PairingProblem401"},
+          "403": {"$ref":"#/components/responses/PairingProblem403"},
+          "409": {"$ref":"#/components/responses/PairingProblem409"},
+          "413": {"$ref":"#/components/responses/PairingProblem413"},
+          "429": {"$ref":"#/components/responses/PairingProblem429"},
+          "503": {"$ref":"#/components/responses/PairingProblem503"},
+          "default": {"$ref":"#/components/responses/PairingProblem"}
+        },
+        "x-scoplen-required-device-scope": "keys:write",
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON at most 6291456 bytes including whitespace.",
+          "content": {"application/json":{"schema":{"$ref":"#/components/schemas/PairingCompleteRequest"}}}
+        }
+      }
     }
   },
   "components": {
@@ -4008,6 +4255,12 @@
         "type": "apiKey",
         "in": "header",
         "name": "DPoP"
+      },
+      "pairingCapability": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Exactly Pairing <canonical 43-character base64url 32-byte capability>; responder role only. No DPoP, cookie or mixed credentials."
       }
     },
     "parameters": {
@@ -4627,6 +4880,335 @@
             }
           }
         }
+      },
+      "PairingProblem400": {
+        "description": "Bounded redacted RFC 9457 pairing failure; complete body <=4096 bytes.",
+        "headers": {
+          "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+          "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+          "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {"$ref":"#/components/schemas/ProblemDetails"},
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {"const":400},
+                    "code": {"enum":["auth.invalid_request","auth.invalid_dpop_proof","auth.use_dpop_nonce"]},
+                    "changed": {"const":false},
+                    "retryable": {"const":false}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem401": {
+        "description": "Bounded redacted RFC 9457 pairing failure; complete body <=4096 bytes.",
+        "headers": {
+          "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+          "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+          "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {"$ref":"#/components/schemas/ProblemDetails"},
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {"const":401},
+                    "code": {"enum":["auth.pairing_denied","auth.authentication_required","auth.device_revoked"]},
+                    "changed": {"const":false},
+                    "retryable": {"const":false}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem403": {
+        "description": "Bounded redacted RFC 9457 pairing failure; complete body <=4096 bytes.",
+        "headers": {
+          "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+          "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+          "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {"$ref":"#/components/schemas/ProblemDetails"},
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {"const":403},
+                    "code": {"enum":["policy.denied"]},
+                    "changed": {"const":false},
+                    "retryable": {"const":false}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem409": {
+        "description": "Bounded redacted RFC 9457 pairing failure; complete body <=4096 bytes.",
+        "headers": {
+          "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+          "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+          "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {"$ref":"#/components/schemas/ProblemDetails"},
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {"const":409},
+                    "code": {"enum":["auth.pairing_conflict"]},
+                    "changed": {"const":false},
+                    "retryable": {"const":false}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem413": {
+        "description": "Bounded redacted RFC 9457 pairing failure; complete body <=4096 bytes.",
+        "headers": {
+          "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+          "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+          "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {"$ref":"#/components/schemas/ProblemDetails"},
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {"const":413},
+                    "code": {"enum":["auth.invalid_request","sync.quota_exceeded"]},
+                    "changed": {"const":false},
+                    "retryable": {"const":false}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem429": {
+        "description": "Pairing mutation admission rejected before business mutation. Retry-After equals the greatest applicable delay rounded up to 1..300 seconds; RateLimit t equals that delay. Headers expose only the nominal source policy.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          },
+          "Retry-After": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            }
+          },
+          "RateLimit": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"pairing\";r=0;t=(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            }
+          },
+          "RateLimit-Policy": {
+            "required": true,
+            "schema": {
+              "const": "\"pairing\";q=30;w=60"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": 429
+                    },
+                    "code": {
+                      "enum": [
+                        "auth.rate_limited"
+                      ]
+                    },
+                    "changed": {
+                      "const": false
+                    },
+                    "retryable": {
+                      "const": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem429Read": {
+        "description": "Pairing read admission rejected before business mutation. Retry-After equals the greatest applicable delay rounded up to 1..300 seconds; RateLimit t equals that delay. Headers expose only the nominal source policy.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "Referrer-Policy": {
+            "required": true,
+            "schema": {
+              "const": "no-referrer"
+            }
+          },
+          "Retry-After": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            }
+          },
+          "RateLimit": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"pairing\";r=0;t=(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            }
+          },
+          "RateLimit-Policy": {
+            "required": true,
+            "schema": {
+              "const": "\"pairing\";q=120;w=60"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": 429
+                    },
+                    "code": {
+                      "enum": [
+                        "auth.rate_limited"
+                      ]
+                    },
+                    "changed": {
+                      "const": false
+                    },
+                    "retryable": {
+                      "const": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem503": {
+        "description": "Known rollback: auth.storage_unavailable changed=false retryable=true. Unconfirmed attempted commit: auth.commit_outcome_unknown changed=true retryable=false; retain identity and inspect receipt/authentication before exact replay.",
+        "headers": {
+          "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+          "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+          "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {"$ref":"#/components/schemas/ProblemDetails"},
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {"const":503},
+                        "code": {"enum":["auth.storage_unavailable"]},
+                        "changed": {"const":false},
+                        "retryable": {"const":true}
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {"$ref":"#/components/schemas/ProblemDetails"},
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {"const":503},
+                        "code": {"enum":["auth.commit_outcome_unknown"]},
+                        "changed": {"const":true},
+                        "retryable": {"const":false}
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PairingProblem": {
+        "description": "Other authentication, policy or transport problem; no secret or payload disclosure.",
+        "headers": {
+          "Cache-Control": {"required":true,"schema":{"const":"no-store"}},
+          "Pragma": {"required":true,"schema":{"const":"no-cache"}},
+          "Referrer-Policy": {"required":true,"schema":{"const":"no-referrer"}}
+        },
+        "content": {"application/problem+json":{"schema":{"$ref":"#/components/schemas/ProblemDetails"}}}
       }
     },
     "schemas": {
@@ -6041,6 +6623,402 @@
             }
           }
         ]
+      },
+      "PairingCreateRequest": {
+        "type": "object",
+        "required": ["device_id"],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PairingContext": {
+        "type": "object",
+        "required": ["origin","pairing_id","initiator_device_id","responder_device_id","expires_at"],
+        "properties": {
+          "origin": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048,
+            "description": "Canonical ASCII HTTPS origin under 06 section 4.1; compare with retained local origin."
+          },
+          "pairing_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "initiator_device_id": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {"type":"null"}
+            ]
+          },
+          "responder_device_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          }
+        },
+        "additionalProperties": true
+      },
+      "PairingCreateResponse": {
+        "type": "object",
+        "required": ["context","new_device_token"],
+        "properties": {
+          "context": {"$ref":"#/components/schemas/PairingContext"},
+          "new_device_token": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+            "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+          }
+        },
+        "additionalProperties": true,
+        "description": "Unclaimed context; capability disclosed once, retained only in encrypted core storage."
+      },
+      "PairingClaimRequest": {"type":"object","required":[],"properties":{},"additionalProperties":false},
+      "PairingClaimResponse": {
+        "type": "object",
+        "required": ["context"],
+        "properties": {"context":{"$ref":"#/components/schemas/PairingContext"}},
+        "additionalProperties": true,
+        "description": "Claimed context requires non-null immutable initiator_device_id."
+      },
+      "PairingStep": {
+        "type": "string",
+        "enum": [
+          "initiator_share",
+          "responder_share",
+          "responder_confirmation",
+          "initiator_confirmation",
+          "new_device",
+          "handoff",
+          "acceptance"
+        ]
+      },
+      "PairingMessageRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"initiator_share"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"responder_share"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"responder_confirmation"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"initiator_confirmation"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"new_device"},
+              "payload": {
+                "type": "string",
+                "minLength": 55,
+                "maxLength": 174763,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":41,"maximum":131072}
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"handoff"},
+              "payload": {
+                "type": "string",
+                "minLength": 55,
+                "maxLength": 5941931,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":41,"maximum":4456448}
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"acceptance"},
+              "payload": {
+                "type": "string",
+                "minLength": 86,
+                "maxLength": 86,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":64,"maximum":64}
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PairingRelayMessage": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"initiator_share"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"responder_share"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"responder_confirmation"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"initiator_confirmation"},
+              "payload": {
+                "type": "string",
+                "minLength": 43,
+                "maxLength": 43,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":32,"maximum":32}
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"new_device"},
+              "payload": {
+                "type": "string",
+                "minLength": 55,
+                "maxLength": 174763,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":41,"maximum":131072}
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"handoff"},
+              "payload": {
+                "type": "string",
+                "minLength": 55,
+                "maxLength": 5941931,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":41,"maximum":4456448}
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["step","payload"],
+            "properties": {
+              "step": {"type":"string","const":"acceptance"},
+              "payload": {
+                "type": "string",
+                "minLength": 86,
+                "maxLength": 86,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+                "x-scoplen-decoded-bytes": {"minimum":64,"maximum":64}
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
+      },
+      "PairingMessageAck": {
+        "type": "object",
+        "required": ["step"],
+        "properties": {"step":{"$ref":"#/components/schemas/PairingStep"}},
+        "additionalProperties": true
+      },
+      "PairingReceipt": {
+        "type": "object",
+        "required": ["account_id","device_id","revision"],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "format": "uint64",
+            "description": "Positive unsigned 64-bit integer, at most 18446744073709551615; consumers preserve integer precision."
+          }
+        },
+        "additionalProperties": true
+      },
+      "PairingSnapshot": {
+        "type": "object",
+        "required": ["context","state","messages","receipt"],
+        "properties": {
+          "context": {"$ref":"#/components/schemas/PairingContext"},
+          "state": {"type":"string","enum":["waiting","exchanging","ready","completed","cancelled","expired"]},
+          "messages": {
+            "type": "array",
+            "maxItems": 7,
+            "items": {"$ref":"#/components/schemas/PairingRelayMessage"},
+            "x-scoplen-sort": "immutable-complete-prefix"
+          },
+          "receipt": {"oneOf":[{"$ref":"#/components/schemas/PairingReceipt"},{"type":"null"}]}
+        },
+        "additionalProperties": true,
+        "description": "One consistent snapshot: waiting=null initiator and zero slots; exchanging=fixed initiator and 0..6 prefix slots; ready=all seven. Terminal phases have no slots. Only completed has a receipt matching responder id. Reject phase/prefix/receipt inconsistencies."
+      },
+      "PairingCompleteRequest": {
+        "type": "object",
+        "required": ["device_certificate","key_bundle_update","new_device_signature"],
+        "properties": {
+          "device_certificate": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 87382,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+            "x-scoplen-decoded-bytes": {"minimum":1,"maximum":65536}
+          },
+          "key_bundle_update": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 5592406,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+            "x-scoplen-decoded-bytes": {"minimum":1,"maximum":4194304}
+          },
+          "new_device_signature": {
+            "type": "string",
+            "minLength": 86,
+            "maxLength": 86,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "Canonical unpadded base64url; reject nonzero unused pad bits, padding and aliases.",
+            "x-scoplen-decoded-bytes": {"minimum":64,"maximum":64}
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

@@ -28,6 +28,13 @@ signature. Key projection and approval fingerprints have one domain-separated im
 Consumers still enforce durable one-attempt state, trusted out-of-band transfer, expected device
 metadata, opened private-key/Personal-epoch equality, checkpoints and atomic server admission.
 These exports do not establish complete pairing or two-device sync.
+The D-114 `pairing` API module provides bounded create/claim, seven-slot relay, complete-prefix
+snapshot and exact admission-approval codecs, with redacted diagnostics, canonical UUID/base64url
+syntax and complete-body limits. OpenAPI and generated TypeScript describe the same route and
+role boundaries. `pairing_reference` exercises immutable slots, current caller authorization,
+expiry/cancellation, exact completion replay and known rollback versus unknown commit outcomes;
+its callback represents independent cryptographic admission checks and it is not a production
+authentication, rate-limit, audit or transaction store.
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
@@ -749,7 +756,7 @@ remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admi
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
 `vectors/sync-vault-members.json`, `vectors/gateway.json`, `vectors/gateway-ticket-issuance.json`,
 `vectors/certificate-issuance-request.json`, `vectors/certificate-issuance-response.json`,
-`vectors/account-profile.json` and `vectors/account-devices.json`.
+`vectors/account-profile.json`, `vectors/account-devices.json` and `vectors/pairing.json`.
 The shared loader is usable by both workstreams.
 
 ## Development
@@ -808,7 +815,10 @@ both valid application maps, a public link, a QRv2 and the rejected QRv1 form.
 The `api_json` target exercises the shared problem body, all seven authentication/refresh message
 types, both gateway-ticket issuance messages, the certificate issuance request and response, and
 the current-account profile and complete signed device-statement snapshot
-through public decoders, including the D-106 public JWKS document. Its seeds cover sorted and
+through public decoders, including the D-106 public JWKS document and all nine D-114 pairing
+message forms. Pairing seeds cover complete prefixes and receipts, seven slot bounds,
+canonical approval artifacts, response extensions, recursive duplicate names and malformed
+phase/capability encodings. Its seeds cover sorted and
 unordered keys, recursive duplicate members, duplicate identifiers, private `d`, malformed
 public fields, and exact and exceeded 4 KiB bodies. Authentication failure seeds preserve the
 shared problem body. Accepted messages must preserve their values across canonical encoding,
