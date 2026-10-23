@@ -33,8 +33,10 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   codec, separate authentication rate headers, and documented failure/recovery responses with
   public vectors and parser seeds; it does not establish issuer or keyring trust. D-107 adds
   exact coarse device scopes and explicit operation requirements with public vectors, while
-  complete current-state and resource authorization remain consumer work. The canonical
-  roadmap records each outcome.
+  complete current-state and resource authorization remain consumer work. Notification route
+  lookup covers both defined opening methods, with public exact-route and DPoP method-binding
+  regressions; production notification lifecycle remains consumer work. The canonical roadmap
+  records each outcome.
   D-113 adds bounded complete signed-statement transport and its existing-scope operation,
   with precise OpenAPI/TypeScript, public vectors and parser seeds. Account context, K-2
   signatures, completeness/freshness and current-state authorization remain consumer checks.

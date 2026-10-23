@@ -165,6 +165,8 @@ impl DeviceAccessOperation {
     }
 
     /// The router's canonical method for this operation.
+    /// Notifications return the classic handshake's `GET`; [`Self::from_route`] also recognizes
+    /// the defined HTTP/2 `CONNECT`. Bind `DPoP` to the actual opening method in either case.
     #[must_use]
     pub const fn http_method(self) -> &'static str {
         match self {
@@ -223,10 +225,13 @@ impl DeviceAccessOperation {
     ///
     /// Never pass an untrusted path as a template or normalize an alias into this table.
     /// A missing mapping cannot authorize a protected route with this device profile.
+    /// Notifications accept both the classic `GET` and HTTP/2 extended `CONNECT` handshakes.
     #[must_use]
     pub fn from_route(method: &str, route_template: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|operation| {
-            operation.http_method() == method && operation.route_template() == route_template
+            operation.route_template() == route_template
+                && (operation.http_method() == method
+                    || (*operation == Self::Notifications && method == "CONNECT"))
         })
     }
 }

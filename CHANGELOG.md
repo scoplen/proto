@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Fixed notification route lookup to recognize D-75's HTTP/2 extended `CONNECT` alongside the
+  classic `GET`, both requiring exactly `sync:read`. Public route vectors and regressions reject
+  other methods, path aliases and query-bearing templates. DPoP public tests retain the actual
+  opening method and HTTPS target and reject proof substitution between handshakes. The wire
+  format and operation's canonical `GET` method are unchanged; production transport, replay,
+  current-state and subscription authorization remain consumer work.
+
 - Added D-114's strict public pairing link and secret-bearing QRv2, canonical authenticated
   new-device/handoff codecs and confirmed-channel frame helpers. Account roots, certificates,
   key projection anchors and exact new-device acceptance/approval inputs now share one crypto
