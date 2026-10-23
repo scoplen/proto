@@ -46,6 +46,7 @@ export interface components {
     CertificateHostGroupRequest: CertificateHostGroupRequest;
     CertificateIssuanceResponse: CertificateIssuanceResponse;
     AccountProfile: AccountProfile;
+    AccountDeviceStatements: AccountDeviceStatements;
     PersonalInvitationRequest: PersonalInvitationRequest;
     PersonalInvitationResponse: PersonalInvitationResponse;
     PersonalEnrollmentRequest: PersonalEnrollmentRequest;
@@ -111,6 +112,17 @@ export interface AccountProfileData {
   [extension: string]: unknown;
 }
 // END GENERATED AccountProfile
+// BEGIN GENERATED AccountDeviceStatements
+/** Complete JSON <=6291456 bytes; decoded statements total <=4194304 bytes. */
+export interface AccountDeviceStatements {
+  account_id: string;
+  /** Canonical unpadded base64url, 1..65536 decoded bytes each, strictly ordered by decoded bytes. */
+  certificates: string[];
+  /** Same bounds/order as certificates; consumers verify every account signature before use. */
+  revocations: string[];
+  [extension: string]: unknown;
+}
+// END GENERATED AccountDeviceStatements
 // BEGIN GENERATED PersonalEnrollment
 export type PersonalInvitationRequest = Record<string, never>;
 

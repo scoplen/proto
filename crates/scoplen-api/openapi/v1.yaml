@@ -413,12 +413,217 @@
     "/accounts/me/devices": {
       "get": {
         "operationId": "listCurrentAccountDevices",
+        "x-scoplen-required-device-scope": "account:read",
+        "x-scoplen-response-max-bytes": 6291456,
+        "x-scoplen-decoded-artifact-max-bytes": 4194304,
+        "description": "D-113 complete, consistent current-account K-2 signed-statement snapshot. Requires an enrolled-device access token, exact account:read, fresh token-bound DPoP, durable replay protection and current account/device/certificate authorization. Only verified identity selects the account; Operator, browser and service principals are refused. Origin, if present, must equal the trusted deployment origin. Reject every query, a nonempty body, Idempotency-Key and If-Match. No pagination, ETag, revision or conditional 304. Complete JSON including whitespace, escapes and ignored extensions is at most 6291456 bytes; combined decoded artifacts at most 4194304 bytes. Reject duplicate JSON names recursively. Consumers bind the expected account, decode every K-2 artifact, verify every account signature and certificate account binding using the already trusted account key, reject repeated device ids within each array, apply every revocation and sort active certificates by UUID before displaying anything. A device id may occur once in each array; a revocation may name an absent certificate. Valid signatures do not prove completeness or freshness. Signed metadata is not server admission or hardware attestation. Missing key state, corrupt stored statements or unencodable full sets fail wholly with 503; never truncate.",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Page"
+            "description": "Complete signed-statement snapshot, with empty arrays when appropriate. The container itself has no new signature.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeviceStatements"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed or forbidden request input; no collection details.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "const": 400
+                        },
+                        "code": {
+                          "const": "auth.invalid_request"
+                        },
+                        "changed": {
+                          "const": false
+                        },
+                        "retryable": {
+                          "const": false
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials or current identity; existing enrolled-device authentication failure profile. changed=false and retryable=false.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing exact account:read scope, disallowed principal or Origin; no collection details.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "const": 403
+                        },
+                        "code": {
+                          "const": "policy.denied"
+                        },
+                        "changed": {
+                          "const": false
+                        },
+                        "retryable": {
+                          "const": false
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required account-key state is missing, stored statements are corrupt, or the complete consistent set exceeds transport bounds. No partial success.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "const": 503
+                        },
+                        "code": {
+                          "const": "auth.storage_unavailable"
+                        },
+                        "changed": {
+                          "const": false
+                        },
+                        "retryable": {
+                          "const": true
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Existing DPoP, nonce and authentication failure profiles; changed=false and retryable=false. No collection details.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -4771,6 +4976,56 @@
           "refresh_expires_in": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      },
+      "AccountDeviceStatements": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "certificates",
+          "revocations"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "certificates": {
+            "type": "array",
+            "minItems": 0,
+            "x-scoplen-sort": "strictly-increasing-decoded-bytes",
+            "description": "All stored signed statements of this kind; strictly increasing by decoded raw bytes, not base64 text. No duplicate artifacts; no arbitrary count cap.",
+            "items": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 87382,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "x-scoplen-decoded-bytes": {
+                "minimum": 1,
+                "maximum": 65536
+              },
+              "description": "Canonical unpadded base64url K-2 bytes. Reject padding, nonzero unused pad bits and noncanonical aliases. Wire syntax alone does not verify the statement."
+            }
+          },
+          "revocations": {
+            "type": "array",
+            "minItems": 0,
+            "x-scoplen-sort": "strictly-increasing-decoded-bytes",
+            "description": "All stored signed statements of this kind; strictly increasing by decoded raw bytes, not base64 text. No duplicate artifacts; no arbitrary count cap.",
+            "items": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 87382,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "x-scoplen-decoded-bytes": {
+                "minimum": 1,
+                "maximum": 65536
+              },
+              "description": "Canonical unpadded base64url K-2 bytes. Reject padding, nonzero unused pad bits and noncanonical aliases. Wire syntax alone does not verify the statement."
+            }
           }
         }
       },

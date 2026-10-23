@@ -112,7 +112,7 @@ fn every_registered_operation_has_one_exact_method_template_and_required_scope()
             );
         }
     }
-    assert_eq!(routes.len(), 16);
+    assert_eq!(routes.len(), 17);
 }
 
 #[test]
@@ -168,5 +168,9 @@ fn authored_openapi_uses_the_shared_scope_ceiling_and_account_requirement() {
     assert_eq!(
         document["paths"]["/accounts/me"]["get"]["x-scoplen-required-device-scope"],
         DeviceAccessOperation::AccountProfileRead.required_scope().as_str()
+    );
+    assert_eq!(
+        document["paths"]["/accounts/me/devices"]["get"]["x-scoplen-required-device-scope"],
+        DeviceAccessOperation::AccountDevicesRead.required_scope().as_str()
     );
 }

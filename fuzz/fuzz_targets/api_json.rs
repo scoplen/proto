@@ -3,6 +3,7 @@
 
 use libfuzzer_sys::fuzz_target;
 use scoplen_api::ProblemDetails;
+use scoplen_api::account_devices::AccountDeviceStatements;
 use scoplen_api::account_profile::AccountProfile;
 use scoplen_api::auth::{
     AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthJwks, AuthRefreshRequest,
@@ -42,6 +43,7 @@ fuzz_target!(|bytes: &[u8]| {
         );
     }
     round_trip!(AccountProfile, bytes);
+    round_trip!(AccountDeviceStatements, bytes);
     round_trip!(AuthJwks, bytes);
     round_trip!(OperatorSetupOptionsRequest, bytes);
     round_trip!(OperatorSetupFinishRequest, bytes);

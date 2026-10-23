@@ -4,6 +4,14 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-113's complete account device-statement snapshot codec with canonical base64url,
+  strict raw-byte ordering, recursive duplicate-name rejection, per-artifact, aggregate and
+  complete-body bounds, cache-header validation and input-free GET validation. Registered
+  `AccountDevicesRead` under the unchanged `account:read` ceiling and replaced the provisional
+  OpenAPI Page with the precise snapshot, generated TypeScript, public vectors and parser seeds.
+  Account binding, K-2 signature verification, complete-set trust and current authorization
+  remain consumer responsibilities; K-4 codecs are unchanged.
+
 - Raised the Tokio minimum and updated workspace and fuzz locks to 1.53.3 for
   RUSTSEC-2026-0386, addressing Unix `AsyncFd` I/O safety.
 
