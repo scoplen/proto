@@ -5,6 +5,21 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`pairing-crypto.json` contains D-114 public links/QRv2, canonical new-device and handoff CBOR,
+five-field key projection hashes, new-device acceptance inputs/signature verification and exact
+approval fingerprints. The producer `node scripts/generate-pairing-crypto-vectors.mjs` uses only
+Node's built-in crypto and an independent finite CBOR encoder, with existing synthetic public
+artifacts. Link/QR inputs expect their canonical text or `reject`; application maps use exact
+hexadecimal CBOR or `reject`; key-anchor input is JSON with hexadecimal artifacts. Acceptance
+input is JSON containing origin/ids and hexadecimal frame/certificate/update/public key, and
+expects `signature-input-hex|signature-hex`. Its frame/update are opaque synthetic boundary
+inputs, not evidence of valid encrypted-channel or K-4 messages. Approval input is
+`certificate-hex|update-hex|signature-hex`, expecting the exact domain-separated hash.
+The producer verifies and retains an existing valid ECDSA signature for stable regeneration;
+other output is deterministic. Negative maps cover changed root/anchor/device, revision zero,
+unknown fields, bad keys and trailing bytes. Public tests additionally exercise real confirmed
+CPace frames, key opening, substituted contexts and every relevant size boundary.
+
 `account-devices.json` contains D-113 complete signed-statement snapshot JSON vectors. Valid
 inputs round-trip to exact canonical JSON; failure vectors identify redacted field or JSON
 errors. Artifacts are deliberately opaque synthetic bytes: the wire codec performs no K-2
@@ -189,32 +204,32 @@ document are synthetic, public test material and must never be used for real dat
 field is lowercase hexadecimal; fields in `input` are separated by `|`. Decimal integer fields and the
 recovery display and safety-number outputs are written as text.
 
-| Kind | Input fields, in order | Expected |
-| --- | --- | --- |
-| `crypto.hkdf-sha256` | IKM, salt, info, output length | Derived bytes (RFC 5869 case 1) |
-| `crypto.xchacha20poly1305` | key, nonce, plaintext, AAD | ciphertext and tag |
-| `crypto.p256-signature` | private scalar, message | uncompressed public key, fixed-width signature |
-| `crypto.ed25519-signature` | private seed, message | public key, signature |
-| `crypto.hpke-account-open`, `crypto.hpke-device-open` | recipient private key, encapsulated key, info, AAD, ciphertext | plaintext |
-| `crypto.device-key-wrap-open` | device private key, encapsulated key, info, AAD, ciphertext | 32-byte unwrapped key |
-| `crypto.device-certificate` | account signing seed, device UUID, account UUID, device signing scalar, device KEM private key, UTF-8 name, UTF-8 platform, Unix milliseconds | signed deterministic CBOR |
-| `crypto.device-revocation` | account signing seed, device UUID, Unix milliseconds, UTF-8 reason | signed deterministic CBOR |
-| `crypto.object-envelope` | vault UUID, epoch, K-1 object CBOR, vault key, signer UUID, P-256 signing scalar, nonce | signed encrypted envelope |
-| `crypto.recovery-display` | raw recovery key | `SPL1-` display with checksum |
-| `crypto.recovery-blob` | raw recovery key, account UUID, ARK, nonce | encoded wrapped ARK |
-| `crypto.shamir-split` | secret, threshold, share count, coefficient bytes | serialized shares, separated by `|` |
-| `crypto.safety-number` | account UUID, Ed25519 public key, and X25519 KEM public key for each account | sixty decimal digits, both 32-byte fingerprints, and canonical `splsafety2:` QR text |
-| `crypto.local-db-key` | UTF-8 passphrase, database key, Argon2 memory KiB, time cost, parallelism, salt, nonce | encoded Argon2id wrapper |
-| `crypto.escrow-account-open` | account UUID, administrator UUID, recipient private key, encapsulated key, ciphertext | serialized authenticated Shamir share |
-| `crypto.escrow-device-open` | account UUID, request UUID, device signing public key, recipient private key, encapsulated key, ciphertext | serialized authenticated Shamir share |
-| `crypto.escrow-verification` | account UUID, administrator UUID, request UUID, device signing and KEM public keys | grouped 80-bit verification code and account/device contexts |
-| `crypto.qr-pairing` | pairing UUIDv7, P-256 KEM public key, P-256 signing public key | canonical `splpair1:` QR text |
-| `crypto.cpace-pairing` | pairing UUIDv7, initiator and responder UUIDv7, code, initiator and responder RNG bytes, nonce, plaintext | initiator share, responder share, 64-byte CPace session id, both confirmations, and nonce-prefixed XChaCha frame |
+| Kind                                                  | Input fields, in order                                                                                                                        | Expected                                                                                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `crypto.hkdf-sha256`                                  | IKM, salt, info, output length                                                                                                                | Derived bytes (RFC 5869 case 1)                                                                                  |
+| `crypto.xchacha20poly1305`                            | key, nonce, plaintext, AAD                                                                                                                    | ciphertext and tag                                                                                               |
+| `crypto.p256-signature`                               | private scalar, message                                                                                                                       | uncompressed public key, fixed-width signature                                                                   |
+| `crypto.ed25519-signature`                            | private seed, message                                                                                                                         | public key, signature                                                                                            |
+| `crypto.hpke-account-open`, `crypto.hpke-device-open` | recipient private key, encapsulated key, info, AAD, ciphertext                                                                                | plaintext                                                                                                        |
+| `crypto.device-key-wrap-open`                         | device private key, encapsulated key, info, AAD, ciphertext                                                                                   | 32-byte unwrapped key                                                                                            |
+| `crypto.device-certificate`                           | account signing seed, device UUID, account UUID, device signing scalar, device KEM private key, UTF-8 name, UTF-8 platform, Unix milliseconds | signed deterministic CBOR                                                                                        |
+| `crypto.device-revocation`                            | account signing seed, device UUID, Unix milliseconds, UTF-8 reason                                                                            | signed deterministic CBOR                                                                                        |
+| `crypto.object-envelope`                              | vault UUID, epoch, K-1 object CBOR, vault key, signer UUID, P-256 signing scalar, nonce                                                       | signed encrypted envelope                                                                                        |
+| `crypto.recovery-display`                             | raw recovery key                                                                                                                              | `SPL1-` display with checksum                                                                                    |
+| `crypto.recovery-blob`                                | raw recovery key, account UUID, ARK, nonce                                                                                                    | encoded wrapped ARK                                                                                              |
+| `crypto.shamir-split`                                 | secret, threshold, share count, coefficient bytes                                                                                             | serialized shares, separated by `                                                                                | `   |
+| `crypto.safety-number`                                | account UUID, Ed25519 public key, and X25519 KEM public key for each account                                                                  | sixty decimal digits, both 32-byte fingerprints, and canonical `splsafety2:` QR text                             |
+| `crypto.local-db-key`                                 | UTF-8 passphrase, database key, Argon2 memory KiB, time cost, parallelism, salt, nonce                                                        | encoded Argon2id wrapper                                                                                         |
+| `crypto.escrow-account-open`                          | account UUID, administrator UUID, recipient private key, encapsulated key, ciphertext                                                         | serialized authenticated Shamir share                                                                            |
+| `crypto.escrow-device-open`                           | account UUID, request UUID, device signing public key, recipient private key, encapsulated key, ciphertext                                    | serialized authenticated Shamir share                                                                            |
+| `crypto.escrow-verification`                          | account UUID, administrator UUID, request UUID, device signing and KEM public keys                                                            | grouped 80-bit verification code and account/device contexts                                                     |
+| `crypto.qr-pairing`                                   | pairing UUIDv7, P-256 KEM public key, P-256 signing public key                                                                                | canonical `splpair1:` QR text                                                                                    |
+| `crypto.cpace-pairing`                                | pairing UUIDv7, initiator and responder UUIDv7, code, initiator and responder RNG bytes, nonce, plaintext                                     | initiator share, responder share, 64-byte CPace session id, both confirmations, and nonce-prefixed XChaCha frame |
 
 The `crypto.cpace-pairing` expected fields are lowercase hexadecimal and are
 separated by `|` in this order: initiator share, responder share, session id,
 initiator confirmation, responder confirmation, and the frame (`nonce ||
-ciphertext || tag`).  Its fixed context and role ordering are the K-3
+ciphertext || tag`). Its fixed context and role ordering are the K-3
 typed-code contract from `06-identity-and-authentication.md` §2; the RNG fields
 make the published shares reproducible without exposing production secrets.
 

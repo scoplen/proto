@@ -17,6 +17,17 @@ XChaCha20-Poly1305, HKDF-SHA-256, Argon2id, P-256 and Ed25519 signatures, and HP
 for device and account recipients. The published K-2 known-answer set is exercised through the
 `scoplen-crypto` public API, including account/request-bound escrow share contexts and the
 administrator recovery verification code, CPace pairing exchange, and canonical QR pairing bindings.
+D-114 replaces the unreleased QRv1 with a public link plus separate secret, or one native
+secret-bearing QRv2 scan. Shared application codecs bind the canonical origin, session and both
+roles, validate complete new-device/handoff maps and certificate/root/anchor bindings, and seal
+or open bounded frames only through the confirmed role-specific CPace session. The secret QR
+and plaintext encodings use zeroizing containers and redacted debug output. Acceptance helpers
+bind the exact handoff frame, certificate and full update hash through `DeviceSigner`; the new
+device can use the authenticated handoff's update hash before saving identity plus its exact
+signature. Key projection and approval fingerprints have one domain-separated implementation.
+Consumers still enforce durable one-attempt state, trusted out-of-band transfer, expected device
+metadata, opened private-key/Personal-epoch equality, checkpoints and atomic server admission.
+These exports do not establish complete pairing or two-device sync.
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
@@ -723,7 +734,12 @@ identity, and audit storage remain owned by the server application.
 
 The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`, and
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
-in `vectors/crypto.json`. The published K-3 auth and API problem, sync session, change-feed, and
+in `vectors/crypto.json` and `vectors/pairing-crypto.json`. The latter is generated independently
+with Node's built-in crypto and a finite canonical CBOR encoder:
+`node scripts/generate-pairing-crypto-vectors.mjs`. It retains a verified previous ECDSA signature
+for stable regeneration. Its opaque acceptance frame/update test that input boundary; complete
+K-4 parsing, key opening and account trust remain separate checks.
+The published K-3 auth and API problem, sync session, change-feed, and
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admission.json`,
 `vectors/auth-scopes.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
 `vectors/sync-session.json`, `vectors/sync-session-limits.json`, `vectors/sync-changes.json`, `vectors/sync-messages.json`,
@@ -786,6 +802,9 @@ synthetic keyrings. Tracked seeds include the RFC proof, published gateway and a
 signed wrong-purpose and wrong-audience access tokens, signed duplicate header and nested claims,
 malformed signatures, truncation, a proof one byte over the 8 KiB bound, and access tokens at and
 one byte over their 4 KiB bound.
+It also parses D-114 public links, secret-bearing QRv2 and exact new-device/handoff plaintexts,
+requiring accepted values to re-encode to the same canonical bytes. Named pairing seeds include
+both valid application maps, a public link, a QRv2 and the rejected QRv1 form.
 The `api_json` target exercises the shared problem body, all seven authentication/refresh message
 types, both gateway-ticket issuance messages, the certificate issuance request and response, and
 the current-account profile and complete signed device-statement snapshot
