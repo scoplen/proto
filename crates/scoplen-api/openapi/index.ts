@@ -3,6 +3,7 @@
 export type { components, paths } from "./types";
 export type {
   AccountProfile,
+  AccountDeviceStatements,
   AccountProfileData,
   AuthChallengeRequest,
   AuthChallengeResponse,

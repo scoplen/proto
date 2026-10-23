@@ -11,7 +11,7 @@ pub const INITIAL_DEVICE_ACCESS_SCOPE: &str =
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeviceAccessScope {
-    /// Read the current device's account profile.
+    /// Read the current device's account profile and signed device statements.
     AccountRead,
     /// Read that account's encrypted K-4 key bundle.
     KeysRead,
@@ -65,6 +65,8 @@ impl DeviceAccessScope {
 pub enum DeviceAccessOperation {
     /// Read the current account profile.
     AccountProfileRead,
+    /// Read the complete current-account signed device-statement snapshot.
+    AccountDevicesRead,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -99,8 +101,9 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::AccountProfileRead,
+        Self::AccountDevicesRead,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -122,7 +125,7 @@ impl DeviceAccessOperation {
     #[must_use]
     pub const fn required_scope(self) -> DeviceAccessScope {
         match self {
-            Self::AccountProfileRead => DeviceAccessScope::AccountRead,
+            Self::AccountProfileRead | Self::AccountDevicesRead => DeviceAccessScope::AccountRead,
             Self::AccountKeysRead => DeviceAccessScope::KeysRead,
             Self::AccountKeysWrite => DeviceAccessScope::KeysWrite,
             Self::SyncSession
@@ -146,6 +149,7 @@ impl DeviceAccessOperation {
     pub const fn http_method(self) -> &'static str {
         match self {
             Self::AccountProfileRead
+            | Self::AccountDevicesRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
@@ -169,6 +173,7 @@ impl DeviceAccessOperation {
     pub const fn route_template(self) -> &'static str {
         match self {
             Self::AccountProfileRead => "/api/v1/accounts/me",
+            Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",

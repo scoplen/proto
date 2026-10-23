@@ -4,6 +4,7 @@
 // deterministic path-name fragment and problem type consumed by @scoplen/api.
 import { readFile, writeFile } from "node:fs/promises";
 import { generateOperatorTypes } from "./generate-operator.mjs";
+import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -692,7 +693,13 @@ const operatorStartIndex = completePersonalTypes.indexOf(operatorStart);
 const operatorEndIndex = completePersonalTypes.indexOf(operatorEnd, operatorStartIndex + operatorStart.length);
 if (operatorStartIndex < 0 || operatorEndIndex < 0) throw new Error("types.ts is missing its generated Operator section");
 const completeOperatorTypes = `${completePersonalTypes.slice(0, operatorStartIndex + operatorStart.length)}${generateOperatorTypes(document)}${completePersonalTypes.slice(operatorEndIndex)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeOperatorTypes]];
+const deviceStart = "// BEGIN GENERATED AccountDeviceStatements\n";
+const deviceEnd = "// END GENERATED AccountDeviceStatements";
+const deviceStartIndex = completeOperatorTypes.indexOf(deviceStart);
+const deviceEndIndex = completeOperatorTypes.indexOf(deviceEnd, deviceStartIndex + deviceStart.length);
+if (deviceStartIndex < 0 || deviceEndIndex < 0) throw new Error("types.ts is missing its generated account-device section");
+const completeDeviceTypes = `${completeOperatorTypes.slice(0, deviceStartIndex + deviceStart.length)}${generateAccountDeviceTypes(document)}${completeOperatorTypes.slice(deviceEndIndex)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeDeviceTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

@@ -24,6 +24,12 @@ D-111 provides a distinct Operator browser JWT signer, trust set and stateless v
 `spl-operator-access+jwt`, `spl-admin/1`, and a required refresh-family `sid`. It rejects device
 and organization claims; current Operator/credential/family state, DPoP replay and exact route
 authorization remain consumer checks. It does not implement passkey verification or setup.
+D-113 adds the complete current-account signed device-statement JSON transport and exact
+`account:read` operation mapping. The public codec checks canonical base64url, independent strict
+raw-byte array ordering, recursive duplicate names, cache headers and bounded full-body sizes.
+Consumers still bind the account, verify every K-2 signature with an already trusted account
+key, reject repeated device ids and apply revocations before display. Individual signatures
+cannot prove completeness or freshness; the transport adds no new trust root or K-4 format.
 D-108 provides typed, versioned device ARK, account signing/KEM, and Personal vault key wraps,
 with exact-length decoders and account, device, key, vault, epoch, and purpose binding. Software
 keys export only through redacted zeroizing containers for encrypted persistence; hardware keys
@@ -515,7 +521,7 @@ response continues to treat the token as opaque.
 `scoplen-api::auth` publishes D-107's `DeviceAccessScope`, `INITIAL_DEVICE_ACCESS_SCOPE`,
 and `DeviceAccessOperation`. Initial first-party device issuance uses exactly
 `account:read keys:read keys:write sync:read sync:write`; refresh may preserve or narrow its
-recorded ceiling, never widen it. The 16-operation registry requires router-owned canonical
+recorded ceiling, never widen it. The 17-operation registry requires router-owned canonical
 methods and route templates. Unknown protected routes fail closed for this device profile.
 Unknown syntactically valid JWT scopes still parse but grant no registered rights. Scope
 membership is exact, with no wildcard, prefix, role, or implied read-from-write matches.
@@ -726,8 +732,8 @@ remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admi
 `vectors/sync-keys-failures.json`,
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
 `vectors/sync-vault-members.json`, `vectors/gateway.json`, `vectors/gateway-ticket-issuance.json`,
-`vectors/certificate-issuance-request.json`, `vectors/certificate-issuance-response.json`, and
-`vectors/account-profile.json`.
+`vectors/certificate-issuance-request.json`, `vectors/certificate-issuance-response.json`,
+`vectors/account-profile.json` and `vectors/account-devices.json`.
 The shared loader is usable by both workstreams.
 
 ## Development
@@ -782,7 +788,7 @@ malformed signatures, truncation, a proof one byte over the 8 KiB bound, and acc
 one byte over their 4 KiB bound.
 The `api_json` target exercises the shared problem body, all seven authentication/refresh message
 types, both gateway-ticket issuance messages, the certificate issuance request and response, and
-the current-account profile
+the current-account profile and complete signed device-statement snapshot
 through public decoders, including the D-106 public JWKS document. Its seeds cover sorted and
 unordered keys, recursive duplicate members, duplicate identifiers, private `d`, malformed
 public fields, and exact and exceeded 4 KiB bodies. Authentication failure seeds preserve the

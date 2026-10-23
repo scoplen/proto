@@ -5,6 +5,16 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`account-devices.json` contains D-113 complete signed-statement snapshot JSON vectors. Valid
+inputs round-trip to exact canonical JSON; failure vectors identify redacted field or JSON
+errors. Artifacts are deliberately opaque synthetic bytes: the wire codec performs no K-2
+verification. The cases cover empty sets, ignored extensions, strict decoded-byte ordering
+that differs from base64 text order, independent arrays, duplicate names, noncanonical
+base64url and UUID aliases. Public tests separately exercise exact item/aggregate/JSON limits,
+mutable-field revalidation, HTTP cache prevention and input-free GET rejection. Matching API
+fuzz seeds cover both accepted and rejected messages. `auth-scopes.json` adds the exact D-113
+GET mapping and rejects method, trailing-slash and account-path aliases.
+
 `operator-access-token.json` contains D-111 compact JWS vectors independently signed using
 Node's Ed25519 implementation with synthetic key material. The public crypto API verifies the
 exact token, Operator `sub`, browser family `sid`, JKT and 600-second lifetime. Negative vectors

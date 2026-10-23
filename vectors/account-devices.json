@@ -1,0 +1,126 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "account-devices-empty-v1",
+      "kind": "account.devices.response_json",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[]}",
+      "expected": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[]}"
+    },
+    {
+      "id": "account-devices-raw-order-and-independent-arrays-v1",
+      "kind": "account.devices.response_json",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"AA\",\"0A\"],\"revocations\":[\"AA\",\"_w\"]}",
+      "expected": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"AA\",\"0A\"],\"revocations\":[\"AA\",\"_w\"]}"
+    },
+    {
+      "id": "account-devices-extensions-v1",
+      "kind": "account.devices.response_json",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[],\"extension\":{\"nested\":[{\"ok\":true}]}}",
+      "expected": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[]}"
+    },
+    {
+      "id": "account-devices-field-order-v1",
+      "kind": "account.devices.response_json",
+      "input": " { \"revocations\": [], \"certificates\": [], \"account_id\": \"019bdad6-b800-7000-8000-000000000001\" } ",
+      "expected": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[]}"
+    },
+    {
+      "id": "account-devices-opaque-not-crypto-v1",
+      "kind": "account.devices.response_json",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"AQ\"],\"revocations\":[]}",
+      "expected": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"AQ\"],\"revocations\":[]}"
+    },
+    {
+      "id": "account-devices-missing-certificates-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-missing-revocations-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[]}",
+      "expected": "InvalidField(revocations)"
+    },
+    {
+      "id": "account-devices-null-certificates-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":null,\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-nonstring-item-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[1],\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-empty-artifact-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"\"],\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-padded-base64-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"AA==\"],\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-pad-bits-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[\"AB\"]}",
+      "expected": "InvalidField(revocations)"
+    },
+    {
+      "id": "account-devices-standard-alphabet-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"/w\"],\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-duplicate-artifact-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"AA\",\"AA\"],\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-reverse-raw-order-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[\"0A\",\"AA\"],\"revocations\":[]}",
+      "expected": "InvalidField(certificates)"
+    },
+    {
+      "id": "account-devices-uppercase-account-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019BDAD6-B800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[]}",
+      "expected": "InvalidField(account_id)"
+    },
+    {
+      "id": "account-devices-non-v7-account-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-4000-8000-000000000001\",\"certificates\":[],\"revocations\":[]}",
+      "expected": "InvalidField(account_id)"
+    },
+    {
+      "id": "account-devices-duplicate-account-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[],\"account_id\":\"019bdad6-b800-7000-8000-000000000001\"}",
+      "expected": "InvalidJson"
+    },
+    {
+      "id": "account-devices-duplicate-extension-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[],\"x\":[{\"same\":1,\"same\":2}]}",
+      "expected": "InvalidJson"
+    },
+    {
+      "id": "account-devices-trailing-json-v1",
+      "kind": "account.devices.response_invalid",
+      "input": "{\"account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"certificates\":[],\"revocations\":[]} null",
+      "expected": "InvalidJson"
+    }
+  ]
+}

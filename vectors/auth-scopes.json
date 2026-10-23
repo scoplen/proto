@@ -295,6 +295,30 @@
       "kind": "auth.scope.contains",
       "input": "{\"scope\":\"admin owner\",\"required\":\"account:read\"}",
       "expected": "missing"
+    },
+    {
+      "id": "auth-scope-route-account-devices-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/accounts/me/devices\"}",
+      "expected": "account:read"
+    },
+    {
+      "id": "auth-scope-route-account-devices-wrong-method-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/accounts/me/devices\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-route-account-devices-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/accounts/me/devices/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-route-account-devices-other-account-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/accounts/019bdad6-b800-7000-8000-000000000001/devices\"}",
+      "expected": "unmapped"
     }
   ]
 }
