@@ -516,6 +516,11 @@ fn reference_peer_expiry_cancel_and_lost_message_do_not_restart_cpace() {
         peer.complete(&old(), &complete(), 4, |_, _, _| panic!("cancelled")),
         Err(PeerError::Conflict)
     );
+    assert_eq!(
+        peer.read(&new(), 86_699_999).expect("last retained millisecond").state,
+        PairingState::Cancelled
+    );
+    assert_eq!(peer.read(&new(), 86_700_000), Err(PeerError::Denied));
     for (error, code, changed, retryable) in [
         (PeerError::StorageUnavailable, "auth.storage_unavailable", false, true),
         (PeerError::CommitOutcomeUnknown, "auth.commit_outcome_unknown", true, false),
