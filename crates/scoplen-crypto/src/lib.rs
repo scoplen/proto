@@ -19,6 +19,7 @@ mod hpke;
 mod keys;
 mod operator_access_token;
 mod pairing;
+mod pairing_application;
 mod personal_enrollment;
 mod primitives;
 mod recovery;
@@ -70,7 +71,12 @@ pub use operator_access_token::{
     OperatorAccessTokenClaims, OperatorAccessTokenError, OperatorAccessTokenSigner,
     TrustedOperatorAccessTokenKeys, VerifiedOperatorAccessToken,
 };
-pub use pairing::{PairingQrError, PairingQrPayload};
+pub use pairing::{PairingLink, PairingQrError, PairingQrPayload};
+pub use pairing_application::{
+    MAX_PAIRING_HANDOFF_FRAME_BYTES, MAX_PAIRING_NEW_DEVICE_FRAME_BYTES, PairingApplicationContext,
+    PairingApplicationError, PairingCompletionContext, PairingHandoff, PairingKeyProjection,
+    PairingNewDevice, pairing_approval_fingerprint, pairing_key_anchor,
+};
 pub use personal_enrollment::{
     PersonalEnrollmentArtifacts, PersonalEnrollmentContext, PersonalEnrollmentError,
 };

@@ -514,12 +514,14 @@ fn fixture(kind: &str, input: &str, expected: &str) {
             );
         }
         "crypto.qr-pairing" => {
-            let f = fields(input, 3);
+            let f = fields(input, 5);
             let pairing_id = uuid(f[0]);
             let kem = unhex(f[1]);
             let signing = unhex(f[2]);
-            let payload = PairingQrPayload::new(pairing_id, &kem, &signing).expect("QR payload");
-            assert_eq!(payload.encode(), expected);
+            let code = PairingCode::from_ascii(&unhex(f[4])).expect("pairing secret");
+            let payload =
+                PairingQrPayload::new(f[3], pairing_id, &kem, &signing, code).expect("QR payload");
+            assert_eq!(payload.encode().as_bytes(), expected.as_bytes());
             let decoded = PairingQrPayload::decode(expected).expect("QR decode");
             assert_eq!(decoded.pairing_id(), pairing_id);
             decoded.verify_public_keys(&kem, &signing).expect("relay keys match QR");

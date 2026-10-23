@@ -4,6 +4,12 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|bytes: &[u8]| {
+    if let Ok(value) = scoplen_crypto::PairingNewDevice::decode(bytes) {
+        assert_eq!(value.encode().expect("validated pairing device").as_bytes(), bytes);
+    }
+    if let Ok(value) = scoplen_crypto::PairingHandoff::decode(bytes) {
+        assert_eq!(value.encode().expect("validated pairing handoff").as_bytes(), bytes);
+    }
     if let Ok(wrap) = scoplen_crypto::DeviceArkWrap::decode(bytes) {
         assert_eq!(wrap.encode().as_slice(), bytes);
     }
@@ -27,6 +33,12 @@ fuzz_target!(|bytes: &[u8]| {
     let _ = scoplen_crypto::RecoveryKey::parse_display(&text);
 
     if let Ok(proof_text) = std::str::from_utf8(bytes) {
+        if let Ok(link) = scoplen_crypto::PairingLink::decode(proof_text) {
+            assert_eq!(link.encode(), proof_text);
+        }
+        if let Ok(qr) = scoplen_crypto::PairingQrPayload::decode(proof_text) {
+            assert_eq!(qr.encode().as_bytes(), bytes);
+        }
         let _ = scoplen_crypto::GatewayProof::parse(proof_text);
         if let Ok(proof) = scoplen_crypto::DpopProof::parse(proof_text) {
             let target = scoplen_crypto::DpopTarget::new(

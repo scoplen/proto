@@ -4,6 +4,14 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-114's strict public pairing link and secret-bearing QRv2, canonical authenticated
+  new-device/handoff codecs and confirmed-channel frame helpers. Account roots, certificates,
+  key projection anchors and exact new-device acceptance/approval inputs now share one crypto
+  boundary. QRv1 is removed without a compatibility path. QR and plaintext encodings use
+  zeroizing containers with redacted debug output. Public independent Node-produced vectors,
+  role/context/substitution/limit regressions and parser seeds cover these exports; durable
+  single-attempt state, key opening, admission and client/server integration remain consumer work.
+
 - Added D-113's complete account device-statement snapshot codec with canonical base64url,
   strict raw-byte ordering, recursive duplicate-name rejection, per-artifact, aggregate and
   complete-body bounds, cache-header validation and input-free GET validation. Registered

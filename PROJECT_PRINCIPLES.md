@@ -38,5 +38,9 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   D-113 adds bounded complete signed-statement transport and its existing-scope operation,
   with precise OpenAPI/TypeScript, public vectors and parser seeds. Account context, K-2
   signatures, completeness/freshness and current-state authorization remain consumer checks.
+  D-114 adds strict QRv2/public-link, authenticated application/frame, key-anchor and exact
+  acceptance/approval helpers with independent vectors and parser seeds. Durable one-attempt
+  state, private-key/epoch equality, client checkpoints and server admission remain consumer work;
+  these shared exports do not establish complete second-device pairing.
   S5 and S7 have no completed gate evidence.
 - Independent security review and interoperability evidence are required before a Stable release.

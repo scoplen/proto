@@ -191,7 +191,8 @@ impl PairingContext {
 /// The eight-symbol uppercase Crockford code used for typed pairing.
 ///
 /// The code is kept in a zeroizing container and its debug representation is
-/// redacted.  Callers should transmit it only through the pairing relay.
+/// redacted. Transfer it only out of band or through the dedicated native QR UI,
+/// never through the pairing relay or a public locator.
 pub struct PairingCode(SecretBytes<8>);
 
 impl PairingCode {
@@ -394,6 +395,12 @@ impl fmt::Debug for PairingSession {
 }
 
 impl PairingSession {
+    /// Return the fixed role/session context for application-frame binding.
+    #[must_use]
+    pub const fn context(&self) -> PairingContext {
+        self.context
+    }
+
     fn from_output(
         context: PairingContext,
         role: PairingRole,
