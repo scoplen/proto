@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Raised the Tokio minimum and updated workspace and fuzz locks to 1.53.3 for
+  RUSTSEC-2026-0386, addressing Unix `AsyncFd` I/O safety.
+
 - Updated workspace and fuzz `ctutils` locks to 0.4.4 for RUSTSEC-2026-0385,
   fixing non-constant-time mask generation and integer comparison.
 
