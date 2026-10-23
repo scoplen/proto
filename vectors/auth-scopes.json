@@ -135,6 +135,48 @@
       "expected": "sync:read"
     },
     {
+      "id": "auth-scope-notify-connect-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"CONNECT\",\"route_template\":\"/sync/v1/notify\"}",
+      "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-notify-wrong-method-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/notify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-notify-head-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"HEAD\",\"route_template\":\"/sync/v1/notify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-notify-connect-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"connect\",\"route_template\":\"/sync/v1/notify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-notify-connect-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"CONNECT\",\"route_template\":\"/sync/v1/notify/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-notify-connect-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"CONNECT\",\"route_template\":\"/sync/v1/notify?future=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-notify-connect-other-route-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"CONNECT\",\"route_template\":\"/sync/v1/keys\"}",
+      "expected": "unmapped"
+    },
+    {
       "id": "auth-scope-operation-10-v1",
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"POST\",\"route_template\":\"/sync/v1/vaults\"}",

@@ -97,7 +97,7 @@ fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
 }
 
 #[test]
-fn every_registered_operation_has_one_exact_method_template_and_required_scope() {
+fn every_registered_operation_has_a_unique_canonical_route_and_required_scope() {
     let mut routes = HashSet::new();
     for operation in DeviceAccessOperation::ALL {
         assert!(routes.insert((operation.http_method(), operation.route_template())));
@@ -113,6 +113,54 @@ fn every_registered_operation_has_one_exact_method_template_and_required_scope()
         }
     }
     assert_eq!(routes.len(), 22);
+}
+
+#[test]
+fn notification_routes_accept_both_defined_opening_methods_with_exact_read_scope() {
+    for method in ["GET", "CONNECT"] {
+        let operation = DeviceAccessOperation::from_route(method, "/sync/v1/notify")
+            .expect("registered notification handshake");
+        assert_eq!(operation, DeviceAccessOperation::Notifications);
+        assert_eq!(operation.required_scope(), DeviceAccessScope::SyncRead);
+        for scope in DeviceAccessScope::ALL {
+            assert_eq!(
+                operation.required_scope().is_present_in(scope.as_str()),
+                scope == DeviceAccessScope::SyncRead
+            );
+        }
+    }
+}
+
+#[test]
+fn notification_routes_reject_other_methods_paths_and_queries() {
+    for method in [
+        "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE", "get", "connect", "Get",
+        "Connect", "CONNECT ", " CONNECT",
+    ] {
+        assert_eq!(DeviceAccessOperation::from_route(method, "/sync/v1/notify"), None);
+    }
+    for method in ["GET", "CONNECT"] {
+        for route in [
+            "/sync/v1/notify/",
+            "/sync/v1/Notify",
+            "/sync/v1/%6Eotify",
+            "/sync/v1/notify?",
+            "/sync/v1/notify?future=1",
+            "/sync/v1/notify#fragment",
+            "/sync/v1/notify/events",
+            "https://example.com/sync/v1/notify",
+        ] {
+            assert_eq!(DeviceAccessOperation::from_route(method, route), None, "{method} {route}");
+        }
+    }
+    for operation in DeviceAccessOperation::ALL {
+        if operation != DeviceAccessOperation::Notifications {
+            assert_eq!(
+                DeviceAccessOperation::from_route("CONNECT", operation.route_template()),
+                None
+            );
+        }
+    }
 }
 
 #[test]

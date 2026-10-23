@@ -39,6 +39,11 @@ base64url and UUID aliases. Public tests separately exercise exact item/aggregat
 mutable-field revalidation, HTTP cache prevention and input-free GET rejection. Matching API
 fuzz seeds cover both accepted and rejected messages. `auth-scopes.json` adds the exact D-113
 GET mapping and rejects method, trailing-slash and account-path aliases.
+The same scope vectors cover D-75's `GET` and HTTP/2 `CONNECT` notification handshakes under
+`sync:read`, rejecting other methods, method case, trailing slashes, query-bearing templates
+and `CONNECT` on another protected route. Public crypto tests verify each opening method's
+HTTPS DPoP proof and reject swapping the method or target; replay and subscription checks
+remain consumer responsibilities.
 
 `operator-access-token.json` contains D-111 compact JWS vectors independently signed using
 Node's Ed25519 implementation with synthetic key material. The public crypto API verifies the

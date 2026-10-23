@@ -539,8 +539,12 @@ response continues to treat the token as opaque.
 `scoplen-api::auth` publishes D-107's `DeviceAccessScope`, `INITIAL_DEVICE_ACCESS_SCOPE`,
 and `DeviceAccessOperation`. Initial first-party device issuance uses exactly
 `account:read keys:read keys:write sync:read sync:write`; refresh may preserve or narrow its
-recorded ceiling, never widen it. The 17-operation registry requires router-owned canonical
+recorded ceiling, never widen it. The operation registry requires router-owned canonical
 methods and route templates. Unknown protected routes fail closed for this device profile.
+Notification route lookup accepts both the classic `GET` and HTTP/2 extended `CONNECT` at
+exactly `/sync/v1/notify`, each requiring `sync:read`. Its canonical `http_method()` remains
+`GET`; consumers bind the DPoP target to the actual opening method reported in the context,
+using the HTTPS target without query or fragment. Method, path and query aliases remain unmapped.
 Unknown syntactically valid JWT scopes still parse but grant no registered rights. Scope
 membership is exact, with no wildcard, prefix, role, or implied read-from-write matches.
 Consumers check signatures, DPoP, replay, and current account/device state before scope, then

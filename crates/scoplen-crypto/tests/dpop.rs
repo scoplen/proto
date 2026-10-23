@@ -194,6 +194,47 @@ fn generated_proofs_bind_method_uri_token_and_nonce() {
 }
 
 #[test]
+fn notification_proofs_cannot_swap_opening_methods_or_targets() {
+    let key = key();
+    let jkt = local_jkt();
+    for (method, other) in [("GET", "CONNECT"), ("CONNECT", "GET")] {
+        let request_target = target(method, "/sync/v1/notify");
+        assert_eq!(request_target.method(), method);
+        assert_eq!(request_target.uri(), "https://example.com/sync/v1/notify");
+        let proof = DpopProof::sign(
+            &key,
+            &key.public_key_sec1(),
+            &request_target,
+            DpopToken::Protected("access.jwt"),
+            1_000,
+            None,
+        )
+        .expect("notification proof");
+        assert!(
+            proof
+                .verify(&request_target, DpopToken::Protected("access.jwt"), &jkt, 1_000, None)
+                .is_ok()
+        );
+        for wrong in [target(other, "/sync/v1/notify"), target(method, "/sync/v1/session")] {
+            assert_eq!(
+                proof.verify(&wrong, DpopToken::Protected("access.jwt"), &jkt, 1_000, None),
+                Err(DpopError::InvalidProof)
+            );
+        }
+        for path in ["/sync/v1/notify?", "/sync/v1/notify?future=1", "/sync/v1/notify#fragment"] {
+            assert_eq!(
+                DpopTarget::new(method, "https://example.com", path),
+                Err(DpopError::InvalidTarget)
+            );
+        }
+        assert_eq!(
+            DpopTarget::new(method, "wss://example.com", "/sync/v1/notify"),
+            Err(DpopError::InvalidTarget)
+        );
+    }
+}
+
+#[test]
 fn refresh_proofs_omit_and_do_not_require_ath() {
     let key = key();
     let jkt = local_jkt();
