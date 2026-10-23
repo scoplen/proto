@@ -319,6 +319,36 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/accounts/019bdad6-b800-7000-8000-000000000001/devices\"}",
       "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-pairing-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/auth/pairings/{pairing}\"}",
+      "expected": "keys:write"
+    },
+    {
+      "id": "auth-scope-pairing-claim-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/auth/pairings/{pairing}/claim\"}",
+      "expected": "keys:write"
+    },
+    {
+      "id": "auth-scope-pairing-message-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/auth/pairings/{pairing}/messages\"}",
+      "expected": "keys:write"
+    },
+    {
+      "id": "auth-scope-pairing-complete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/auth/pairings/{pairing}/complete\"}",
+      "expected": "keys:write"
+    },
+    {
+      "id": "auth-scope-pairing-cancel-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/auth/pairings/{pairing}\"}",
+      "expected": "keys:write"
     }
   ]
 }

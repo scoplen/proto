@@ -39,7 +39,10 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   with precise OpenAPI/TypeScript, public vectors and parser seeds. Account context, K-2
   signatures, completeness/freshness and current-state authorization remain consumer checks.
   D-114 adds strict QRv2/public-link, authenticated application/frame, key-anchor and exact
-  acceptance/approval helpers with independent vectors and parser seeds. Durable one-attempt
+  acceptance/approval helpers with independent vectors and parser seeds. Its bounded API codecs,
+  exact route scopes, OpenAPI/TypeScript and reference relay cover role-owned immutable slots,
+  complete snapshots, expiry, replay and lost-commit recovery with explicit external admission
+  verification. Durable one-attempt
   state, private-key/epoch equality, client checkpoints and server admission remain consumer work;
   these shared exports do not establish complete second-device pairing.
   S5 and S7 have no completed gate evidence.

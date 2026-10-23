@@ -18,6 +18,8 @@ pub mod gateway;
 pub mod gateway_ticket;
 pub mod internal_grpc;
 pub mod operator_auth;
+pub mod pairing;
+pub mod pairing_reference;
 pub mod personal_enrollment;
 mod request_wire;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
@@ -59,6 +61,8 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.enrollment_denied",
     "auth.invalid_dpop_proof",
     "auth.invalid_request",
+    "auth.pairing_conflict",
+    "auth.pairing_denied",
     "auth.rate_limited",
     "auth.storage_unavailable",
     "auth.use_dpop_nonce",

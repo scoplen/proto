@@ -112,7 +112,7 @@ fn every_registered_operation_has_one_exact_method_template_and_required_scope()
             );
         }
     }
-    assert_eq!(routes.len(), 17);
+    assert_eq!(routes.len(), 22);
 }
 
 #[test]
