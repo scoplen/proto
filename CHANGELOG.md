@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Updated workspace and fuzz `ctutils` locks to 0.4.4 for RUSTSEC-2026-0385,
+  fixing non-constant-time mask generation and integer comparison.
+
 - Added public DPoP presented-key verification for initial Operator ceremonies. It shares the
   existing signature, exact target, token hash, time, and nonce checks and returns the verified
   JWK thumbprint without requiring an existing binding. Trusted identity, credential binding,
