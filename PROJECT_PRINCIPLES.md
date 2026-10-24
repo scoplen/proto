@@ -48,4 +48,9 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   state, private-key/epoch equality, client checkpoints and server admission remain consumer work;
   these shared exports do not establish complete second-device pairing.
   S5 and S7 have no completed gate evidence.
+- D-121 uses an asynchronous bounded interactive responder with connection termination after
+  dispatched interruption and local refusal of later operations. Public encrypted-peer tests and
+  a pinned OpenSSH/PAM fixture cover protocol acceptance; consumer prompt UI, cancellation UX,
+  credential custody and the broader PAM/server matrix remain consumer acceptance work. The
+  consumer owns user-input deadlines because a pending engine response may defer observing EOF.
 - Independent security review and interoperability evidence are required before a Stable release.

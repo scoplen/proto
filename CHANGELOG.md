@@ -4,6 +4,14 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Implemented D-121 by replacing the synchronous keyboard-interactive callback with an async responder
+  accepting an owned checked request and returning `KeyboardInteractiveResponse`. This is a
+  pre-Stable source and behavior break, with no synchronous wrapper or wire change. Complete
+  peer rejection permits another factor on the same connection; interruption after dispatch
+  closes the engine and transport and locally refuses later authentication, channels and
+  forwarding. Callers own timeout/cancellation and reconnect after interruption. Added public
+  encrypted-peer scheduling/cancellation tests and a pinned OpenSSH/PAM acceptance fixture.
+
 - Added D-116's object-safe async signing hook for concrete public-key and certificate
   authentication. The built-in SSH agent signer now moves its complete synchronous exchange to
   Tokio's blocking pool, preserving channel serialization and fail-closed response ordering after

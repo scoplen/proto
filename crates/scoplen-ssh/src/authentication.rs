@@ -697,7 +697,7 @@ impl KeyboardInteractivePrompt {
     }
 }
 
-/// A server keyboard-interactive information request containing one or more prompts.
+/// A server keyboard-interactive information request containing bounded prompts.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyboardInteractiveInfoRequest {
     name: Vec<u8>,
@@ -772,6 +772,24 @@ impl KeyboardInteractiveInfoRequest {
         ensure_auth_message_size(&encoded)
     }
 
+    /// Return the server-provided display name.
+    #[must_use]
+    pub fn name(&self) -> &[u8] {
+        &self.name
+    }
+
+    /// Return the server-provided instructions.
+    #[must_use]
+    pub fn instruction(&self) -> &[u8] {
+        &self.instruction
+    }
+
+    /// Return the server-provided language tag.
+    #[must_use]
+    pub fn language_tag(&self) -> &[u8] {
+        &self.language_tag
+    }
+
     /// Return the prompts in their server-provided order.
     #[must_use]
     pub fn prompts(&self) -> &[KeyboardInteractivePrompt] {
@@ -831,12 +849,22 @@ impl KeyboardInteractiveResponse {
 
     /// Encode one `SSH_MSG_USERAUTH_INFO_RESPONSE` payload.
     pub fn encode(&self) -> Result<Vec<u8>, AuthMethodError> {
+        self.validate_message_size()?;
         let mut encoded = vec![USERAUTH_INFO_RESPONSE];
         append_auth_count(&mut encoded, self.responses.len(), "response count")?;
         for response in &self.responses {
             append_auth_string(&mut encoded, response.as_bytes(), MAX_AUTH_PASSWORD, "response")?;
         }
         ensure_auth_message_size(&encoded)
+    }
+
+    pub(crate) fn validate_message_size(&self) -> Result<(), AuthMethodError> {
+        let encoded_len =
+            5 + self.responses.iter().map(|response| 4 + response.len()).sum::<usize>();
+        if encoded_len > MAX_AUTH_MESSAGE {
+            return Err(AuthMethodError::FieldTooLarge("authentication message"));
+        }
+        Ok(())
     }
 
     /// Return response bytes in prompt order.

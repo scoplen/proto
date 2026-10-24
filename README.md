@@ -95,8 +95,13 @@ Software Ed25519, ECDSA P-256/P-384/P-521, and RSA/SHA-2 signers, FIDO2 security
 integration, RFC 4252 `none`, password and keyboard-interactive codecs, certificate validation, and
 host-verification callbacks are available. The concrete client
 exposes a `none` probe that reports the server's remaining methods, and handles bounded
-keyboard-interactive challenge rounds with prompt and response validation before sending answers
-to the SSH engine. It also authenticates with validated OpenSSH user certificates through the
+keyboard-interactive challenge rounds through an asynchronous responder. It receives an owned
+checked `KeyboardInteractiveInfoRequest` and returns a future producing a zeroizing
+`KeyboardInteractiveResponse`. The adapter awaits one matching reply at a time, preserving prompt
+order and echo flags; counts, field sizes and UTF-8 responses are validated before sending answers
+to the SSH engine. Waiting for an OTP or PAM prompt leaves the executor and independent SSH
+connections available. This replaces the pre-Stable synchronous callback without a wrapper.
+It also authenticates with validated OpenSSH user certificates through the
 shared signer boundary, checking the requested principal and subject key before dispatch. RSA
 certificates retain their legacy blob type while selecting the requested SHA-2 certificate
 algorithm; signing binds the complete certificate and selected hash. `EcdsaSshSigner` selects the
@@ -108,7 +113,15 @@ connection and reports SHA-512, SHA-256, an advertised SHA-1-only RSA choice, or
 choice. It never selects SHA-1 or sends an authentication probe. The complete query has a
 two-second deadline; success, timeout, engine failure, and cancellation are terminal cached
 outcomes. Callers may explicitly try an existing SHA-2 signer when the result is undetermined.
-Callers can complete another factor on the same connection. Until full authentication succeeds,
+A complete peer rejection, with either value of `partial_success`, leaves the connection usable
+for another factor. Dropping keyboard-interactive authentication after dispatch, a responder
+failure, an invalid answer, or an uncertain engine exchange closes that authentication connection;
+later authentication, channels and forwarding return `ConnectionClosed` locally. A late reply
+cannot be reused by another attempt. The consumer owns timeouts/cancellation and creates a fresh
+connection after interruption. Local validation failure before dispatch preserves the connection.
+The engine may defer observing peer EOF while a reply is pending, so consumers must bound user
+input even after a peer disappears; an observed engine shutdown cancels the pending responder.
+Until full authentication succeeds,
 channel opens and remote-forwarding operations return `NotAuthenticated` locally. Real SSH tests
 cover OTP followed by password, wrong factors, premature channel/forwarding operations, and both
 RSA certificate hashes. Once authenticated, all five authentication and probe entrypoints return
@@ -386,6 +399,16 @@ certificates over one key: a KRL rejects one by serial and one by key ID, while 
 certificate and the same raw public key still authenticate and run the exact command with exit
 status zero. OpenSSH enforces the KRL; the client does not load or parse it. The Linux CI workflow
 runs the same script on each change; disposable keys and the container are removed afterward.
+`pwsh ./scripts/ssh-keyboard-interactive-interop.ps1` uses Alpine 3.21 with pinned
+`openssh-server-pam=9.9_p2-r0` and `linux-pam=1.6.1-r1`. It verifies the package versions, banner
+and effective configuration, forces PAM keyboard-interactive with password/public-key fallback
+disabled, and checks a valid answer, wrong-answer refusal, and a fresh valid connection. Accepted
+connections run an exact command and require its exact output and exit status zero. The fixture
+uses a disposable `pam_unix` account and removes its container; it does not establish consumer UI
+acceptance or every PAM module's behavior. `async_interactive` exercises real encrypted peers on
+a single-thread Tokio executor, pending replies, independent connections, ordered rounds, invalid
+answers, cancellation, peer disconnect and late replies. Existing authentication wire vectors
+remain unchanged because this contract changes scheduling and connection ownership.
 `UserCertificate::parse_and_validate` checks the embedded CA signature, certificate role,
 principal, validity, and critical options. The caller still decides whether to trust that CA;
 the interoperability example compares it with an explicitly pinned CA public key before calling

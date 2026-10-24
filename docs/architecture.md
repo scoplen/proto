@@ -114,7 +114,21 @@ names, and forwarding failure reasons; the concrete engine and connection multip
 separate outcomes.
 The authentication boundary also encodes `none`, `password` and password-change, and
 keyboard-interactive exchanges with bounded context, prompt, and response fields; password and
-interactive response bytes are held in zeroizing secret containers. `EcdsaSshSigner` accepts only
+interactive response bytes are held in zeroizing secret containers. D-121's concrete interactive
+responder receives an owned checked request and asynchronously returns `KeyboardInteractiveResponse`.
+One response is awaited before another round, preserving prompt order and echo flags. The engine
+accepts UTF-8 responses; invalid counts, encoding or bounds terminate the dispatched connection.
+A scoped guard drops both the engine handle and transport owner on cancellation, responder failure
+or an uncertain exchange, fencing later authentication, channel and forwarding calls locally.
+Complete peer rejection disarms the guard even when `partial_success` is false, allowing another
+factor without opening channels prematurely. There is no synchronous compatibility wrapper.
+The caller owns the user-input timeout/cancel action and creates a fresh connection after
+interruption. In russh 0.64.1, a pending interactive response can defer socket reads, so peer EOF
+alone may remain unobserved until the reply or consumer cancellation; no immediate EOF detection
+is promised. Observed engine shutdown cancels the pending responder. This connection lifetime
+rule is separate from the D-116 agent signer's serialized blocking exchange described above.
+The SSH wire format and existing authentication vectors are unchanged.
+`EcdsaSshSigner` accepts only
 OpenSSH ECDSA private keys and selects NIST P-256, P-384, or P-521 from the key; the existing
 `P256SshSigner` still wraps Scoplen's P-256 key type. `RsaSshSigner` accepts only RSA
 private keys and binds the selected `rsa-sha2-256` or `rsa-sha2-512` hash to the signature wrapper;
