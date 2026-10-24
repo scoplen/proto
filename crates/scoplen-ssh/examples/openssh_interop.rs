@@ -357,6 +357,69 @@ async fn verify_fsetstat_closed(
     Ok(())
 }
 
+async fn verify_setstat(
+    session: &mut SftpSession,
+    path: &[u8],
+    missing_path: &[u8],
+    original_size: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let changed = SftpAttributes {
+        size: Some(original_size + 1),
+        access_time: Some(1_650_000_000),
+        modify_time: Some(1_650_000_000),
+        ..SftpAttributes::default()
+    };
+    let missing = session.client_mut().setstat(missing_path.to_vec(), changed.clone())?;
+    if !matches!(sftp_response(session, missing).await?, SftpPacket::Status { code: 2, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP setstat did not reject a missing path cleanly".into());
+    }
+
+    let set = session.client_mut().setstat(path.to_vec(), changed)?;
+    if !matches!(sftp_response(session, set).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP setstat failed or retained a request slot".into());
+    }
+    let stat = session.client_mut().stat(path.to_vec())?;
+    if !matches!(
+        sftp_response(session, stat).await?,
+        SftpPacket::Attrs { attrs, .. }
+            if attrs.size == Some(original_size + 1)
+                && attrs.modify_time == Some(1_650_000_000)
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP setstat size or timestamp was not visible through stat".into());
+    }
+
+    let truncate = session.client_mut().setstat(
+        path.to_vec(),
+        SftpAttributes {
+            size: Some(original_size),
+            access_time: Some(1_650_000_000),
+            modify_time: Some(1_650_000_000),
+            ..SftpAttributes::default()
+        },
+    )?;
+    if !matches!(sftp_response(session, truncate).await?, SftpPacket::Status { code: 0, .. })
+        || session.pending_requests() != 0
+    {
+        return Err("SFTP setstat truncation failed or retained a request slot".into());
+    }
+    let stat = session.client_mut().stat(path.to_vec())?;
+    if !matches!(
+        sftp_response(session, stat).await?,
+        SftpPacket::Attrs { attrs, .. }
+            if attrs.size == Some(original_size)
+                && attrs.modify_time == Some(1_650_000_000)
+    ) || session.pending_requests() != 0
+    {
+        return Err("SFTP setstat truncation was not visible through stat".into());
+    }
+    Ok(())
+}
+
 async fn verify_hardlink(
     session: &mut SftpSession,
     path: &[u8],
@@ -1108,6 +1171,7 @@ async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::e
     verify_fstatvfs(&mut session, &write_handle, false).await?;
     verify_fstat(&mut session, &write_handle, None).await?;
     verify_fsetstat_closed(&mut session, &write_handle, &path, data.len() as u64).await?;
+    verify_setstat(&mut session, &path, &missing_path, data.len() as u64).await?;
     verify_realpath(&mut session, &path, &missing_path).await?;
     verify_lsetstat(&mut session, &path, &missing_path).await?;
 

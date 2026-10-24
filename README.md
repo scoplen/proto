@@ -443,7 +443,9 @@ progress and byte comparison, `fsync@openssh.com` and `fstatvfs@openssh.com` on 
 handle, rejection of both requests after closing that handle without retaining request state,
 standard SFTP v3 `FSTAT` reporting the uploaded file's exact size on the open handle and rejecting
 the closed handle without retaining request state, standard `FSETSTAT` growing and restoring its
-size on the open handle and rejecting the closed handle without changing the file, and
+size on the open handle and rejecting the closed handle without changing the file, standard
+`SETSTAT` growing and truncating the file by path with its timestamp and size checked through
+`STAT`, missing-path rejection, request-slot release, and subsequent session use, and
 `hardlink@openssh.com` success with identical
 linked bytes, missing-source and existing-destination
 rejection, plus `posix-rename@openssh.com` missing-source rejection, a rename preserving file bytes,
