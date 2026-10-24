@@ -56,7 +56,12 @@ channel-data fragments. `AuthAgentChannel` composes that adapter with the bounde
 `auth-agent@openssh.com` open, data, EOF, and close lifecycle; it validates channel numbers and
 peer packet limits and reports clean versus truncated close outcomes. Pageant named-pipe
 compatibility is available on Windows through the same bounded framing; legacy WM_COPYDATA discovery
-remains open. The concrete `russh` client adapter now owns TCP and caller-supplied stream
+remains open. Concrete async authentication awaits the object-safe `Signer::sign_async` hook; the
+built-in agent signer runs its complete serialized exchange on Tokio's blocking pool. Dropping an
+authentication future does not interrupt that exchange: the task retains the channel until I/O
+completes or its existing deadline fails. Other synchronous signer implementations use the hook's
+default and must override it if their signing I/O can block.
+The concrete `russh` client adapter now owns TCP and caller-supplied stream
 handshakes, validates host keys and certificates before the trust callback, supports password
 authentication, and exposes opaque session and `direct-tcpip` channels with PTY, shell, exec,
 window-change, bounded data, EOF, close, and peer-event operations. `ClientChannelStream` adapts a

@@ -8,7 +8,14 @@
 
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
-use std::{collections::BTreeSet, fmt, net::IpAddr, sync::Mutex};
+use std::{
+    collections::BTreeSet,
+    fmt,
+    future::Future,
+    net::IpAddr,
+    pin::Pin,
+    sync::{Arc, Mutex},
+};
 
 use scoplen_crypto::{Ed25519SigningKey, P256SigningKey, PrimitiveError, SecretVec};
 use ssh_key::{Certificate, EcdsaCurve, HashAlg, PublicKey};
@@ -225,6 +232,20 @@ pub trait Signer {
     /// algorithms return the bytes enclosed by a signature string. The algorithm wrapper is
     /// added by this crate.
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignerError>;
+
+    /// Sign an owned payload for asynchronous authentication.
+    ///
+    /// The default calls [`Self::sign`] when polled. Signers that perform blocking I/O must
+    /// override this method to keep the async executor responsive.
+    fn sign_async(
+        &self,
+        message: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, SignerError>> + Send + '_>>
+    where
+        Self: Sync,
+    {
+        Box::pin(async move { self.sign(&message) })
+    }
 }
 
 /// A public-key signer backed by an external SSH agent.
@@ -235,7 +256,7 @@ pub trait Signer {
 pub struct AgentSshSigner<C> {
     algorithm: SignatureAlgorithm,
     key_blob: Vec<u8>,
-    client: Mutex<AgentClient<C>>,
+    client: Arc<Mutex<AgentClient<C>>>,
 }
 
 impl<C: AgentChannel + Send> AgentSshSigner<C> {
@@ -247,7 +268,48 @@ impl<C: AgentChannel + Send> AgentSshSigner<C> {
     ) -> Result<Self, SignerError> {
         let key_blob = key_blob.into();
         PublicKeyIdentity::new(algorithm.name(), key_blob.clone())?;
-        Ok(Self { algorithm, key_blob, client: Mutex::new(client) })
+        Ok(Self { algorithm, key_blob, client: Arc::new(Mutex::new(client)) })
+    }
+
+    fn sign_with_client(
+        client: &Mutex<AgentClient<C>>,
+        algorithm: SignatureAlgorithm,
+        key_blob: &[u8],
+        message: &[u8],
+    ) -> Result<Vec<u8>, SignerError> {
+        let flags = match algorithm {
+            SignatureAlgorithm::RsaSha2_256 => AGENT_SIGN_FLAG_RSA_SHA2_256,
+            SignatureAlgorithm::RsaSha2_512 => AGENT_SIGN_FLAG_RSA_SHA2_512,
+            SignatureAlgorithm::Ed25519
+            | SignatureAlgorithm::EcdsaSha2Nistp256
+            | SignatureAlgorithm::EcdsaSha2Nistp384
+            | SignatureAlgorithm::EcdsaSha2Nistp521
+            | SignatureAlgorithm::SkEd25519
+            | SignatureAlgorithm::SkEcdsaSha2Nistp256 => 0,
+        };
+        let signature = client
+            .lock()
+            .map_err(|_| SignerError::Signing("SSH agent signer lock poisoned".to_owned()))?
+            .sign(key_blob, message, flags)
+            .map_err(|error| SignerError::Signing(error.to_string()))?;
+        let (returned_algorithm, rest) = read_string(&signature)
+            .ok_or(SignerError::InvalidInput("agent returned malformed signature"))?;
+        if returned_algorithm != algorithm.name().as_bytes() {
+            return Err(SignerError::InvalidInput(
+                "agent returned a mismatched signature algorithm",
+            ));
+        }
+        if let Some(security_key_algorithm) = algorithm.security_key() {
+            SecurityKeySignature::from_ssh_blob(security_key_algorithm, rest)
+                .map_err(|_| SignerError::InvalidInput("agent returned an invalid signature"))?;
+            return Ok(rest.to_vec());
+        }
+        let (signature, trailing) = read_string(rest)
+            .ok_or(SignerError::InvalidInput("agent returned malformed signature"))?;
+        if !trailing.is_empty() || signature.is_empty() || signature.len() > MAX_SIGNATURE {
+            return Err(SignerError::InvalidInput("agent returned an invalid signature"));
+        }
+        Ok(signature.to_vec())
     }
 }
 
@@ -261,40 +323,23 @@ impl<C: AgentChannel + Send + 'static> Signer for AgentSshSigner<C> {
     }
 
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignerError> {
-        let flags = match self.algorithm {
-            SignatureAlgorithm::RsaSha2_256 => AGENT_SIGN_FLAG_RSA_SHA2_256,
-            SignatureAlgorithm::RsaSha2_512 => AGENT_SIGN_FLAG_RSA_SHA2_512,
-            SignatureAlgorithm::Ed25519
-            | SignatureAlgorithm::EcdsaSha2Nistp256
-            | SignatureAlgorithm::EcdsaSha2Nistp384
-            | SignatureAlgorithm::EcdsaSha2Nistp521
-            | SignatureAlgorithm::SkEd25519
-            | SignatureAlgorithm::SkEcdsaSha2Nistp256 => 0,
-        };
-        let signature = self
-            .client
-            .lock()
-            .map_err(|_| SignerError::Signing("SSH agent signer lock poisoned".to_owned()))?
-            .sign(&self.key_blob, message, flags)
-            .map_err(|error| SignerError::Signing(error.to_string()))?;
-        let (algorithm, rest) = read_string(&signature)
-            .ok_or(SignerError::InvalidInput("agent returned malformed signature"))?;
-        if algorithm != self.algorithm.name().as_bytes() {
-            return Err(SignerError::InvalidInput(
-                "agent returned a mismatched signature algorithm",
-            ));
-        }
-        if let Some(algorithm) = self.algorithm.security_key() {
-            SecurityKeySignature::from_ssh_blob(algorithm, rest)
-                .map_err(|_| SignerError::InvalidInput("agent returned an invalid signature"))?;
-            return Ok(rest.to_vec());
-        }
-        let (signature, trailing) = read_string(rest)
-            .ok_or(SignerError::InvalidInput("agent returned malformed signature"))?;
-        if !trailing.is_empty() || signature.is_empty() || signature.len() > MAX_SIGNATURE {
-            return Err(SignerError::InvalidInput("agent returned an invalid signature"));
-        }
-        Ok(signature.to_vec())
+        Self::sign_with_client(&self.client, self.algorithm, &self.key_blob, message)
+    }
+
+    fn sign_async(
+        &self,
+        message: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, SignerError>> + Send + '_>> {
+        let client = Arc::clone(&self.client);
+        let algorithm = self.algorithm;
+        let key_blob = self.key_blob.clone();
+        Box::pin(async move {
+            tokio::task::spawn_blocking(move || {
+                Self::sign_with_client(&client, algorithm, &key_blob, &message)
+            })
+            .await
+            .map_err(|_| SignerError::Signing("SSH agent signing task failed".to_owned()))?
+        })
     }
 }
 
@@ -824,9 +869,30 @@ impl PublicKeyAuthRequest {
         identity: PublicKeyIdentity,
         signer: &S,
     ) -> Result<Self, SignerError> {
-        if !signer.algorithm().accepts_identity(identity.algorithm()) {
+        let (unsigned, algorithm) = Self::prepare_signed(context, identity, signer)?;
+        let signature_blob = signer.sign(&unsigned.signature_payload())?;
+        unsigned.with_signature(algorithm, &signature_blob)
+    }
+
+    pub(crate) async fn signed_async<S: Signer + Sync + ?Sized>(
+        context: PublicKeyAuthContext,
+        identity: PublicKeyIdentity,
+        signer: &S,
+    ) -> Result<Self, SignerError> {
+        let (unsigned, algorithm) = Self::prepare_signed(context, identity, signer)?;
+        let signature_blob = signer.sign_async(unsigned.signature_payload()).await?;
+        unsigned.with_signature(algorithm, &signature_blob)
+    }
+
+    fn prepare_signed<S: Signer + ?Sized>(
+        context: PublicKeyAuthContext,
+        identity: PublicKeyIdentity,
+        signer: &S,
+    ) -> Result<(Self, SignatureAlgorithm), SignerError> {
+        let algorithm = signer.algorithm();
+        if !algorithm.accepts_identity(identity.algorithm()) {
             return Err(SignerError::AlgorithmMismatch {
-                signer: signer.algorithm().name().to_owned(),
+                signer: algorithm.name().to_owned(),
                 identity: identity.algorithm().to_owned(),
             });
         }
@@ -838,9 +904,14 @@ impl PublicKeyAuthRequest {
         if signer_key != identity.signing_key_blob {
             return Err(SignerError::InvalidInput("signer key does not match public-key identity"));
         }
-        let unsigned = Self::probe(context, identity)?;
-        let signature_payload = unsigned.signature_payload();
-        let signature_blob = signer.sign(&signature_payload)?;
+        Ok((Self::probe(context, identity)?, algorithm))
+    }
+
+    fn with_signature(
+        self,
+        algorithm: SignatureAlgorithm,
+        signature_blob: &[u8],
+    ) -> Result<Self, SignerError> {
         if signature_blob.is_empty() {
             return Err(SignerError::EmptySignature);
         }
@@ -848,16 +919,16 @@ impl PublicKeyAuthRequest {
             return Err(SignerError::InvalidInput("SSH signature blob is too large"));
         }
         let mut signature =
-            Vec::with_capacity(4 + signer.algorithm().name().len() + 4 + signature_blob.len());
-        write_string(&mut signature, signer.algorithm().name().as_bytes())?;
-        if let Some(algorithm) = signer.algorithm().security_key() {
-            SecurityKeySignature::from_ssh_blob(algorithm, &signature_blob)
+            Vec::with_capacity(4 + algorithm.name().len() + 4 + signature_blob.len());
+        write_string(&mut signature, algorithm.name().as_bytes())?;
+        if let Some(security_key_algorithm) = algorithm.security_key() {
+            SecurityKeySignature::from_ssh_blob(security_key_algorithm, signature_blob)
                 .map_err(|_| SignerError::InvalidInput("malformed security-key signature body"))?;
-            signature.extend_from_slice(&signature_blob);
+            signature.extend_from_slice(signature_blob);
         } else {
-            write_string(&mut signature, &signature_blob)?;
+            write_string(&mut signature, signature_blob)?;
         }
-        Ok(Self { signature: Some(signature), ..unsigned })
+        Ok(Self { signature: Some(signature), ..self })
     }
 
     /// Return whether this request carries a signature.
@@ -2011,6 +2082,18 @@ mod tests {
         fixed_signature.extend_from_slice(&mpint_to_fixed(s, 32));
         p256_verify(p256_key, &p256_request.signature_payload(), &fixed_signature)
             .expect("p256 signature verifies");
+    }
+
+    #[tokio::test]
+    async fn default_async_signer_remains_object_safe() {
+        let signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
+        let signer: &(dyn Signer + Sync) = &signer;
+        let payload = b"session-bound payload";
+        assert_eq!(
+            signer.sign_async(payload.to_vec()).await.expect("async signature"),
+            signer.sign(payload).expect("sync signature")
+        );
     }
 
     struct OversizedSigner {

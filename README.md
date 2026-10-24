@@ -128,6 +128,12 @@ or response-frame failure. The failing exchange returns its original error; late
 `ChannelUnusable` without I/O. Callers must reconnect before retrying. Local request rejection and
 a complete agent `Failure` response leave the stream usable. This does not add a blocking-I/O
 deadline or cancellation guarantee.
+Concrete async public-key and certificate authentication await `Signer::sign_async`. Its default
+calls the existing synchronous signer; custom signers with blocking I/O must override it. The
+built-in `AgentSshSigner` runs its complete exchange and response checks on a Tokio blocking task,
+so an agent wait does not occupy the SSH executor. Cancelling authentication leaves that task in
+progress until the underlying I/O completes or its existing deadline fails; the channel lock
+prevents another request from consuming a late response. Agent connection setup remains synchronous.
 Bounded RFC 4254 channel codecs cover session and forwarding requests. The engine-independent
 `AuthAgentChannel` composes the `auth-agent@openssh.com` channel lifecycle with bounded agent
 framing, per-signature forwarding authorization, peer packet limits, and clean/truncated close

@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-116's object-safe async signing hook for concrete public-key and certificate
+  authentication. The built-in SSH agent signer now moves its complete synchronous exchange to
+  Tokio's blocking pool, preserving channel serialization and fail-closed response ordering after
+  cancellation. Existing signers keep the synchronous default; this adds no agent I/O deadline or
+  asynchronous connection setup and changes no wire format.
+
 - Fixed notification route lookup to recognize D-75's HTTP/2 extended `CONNECT` alongside the
   classic `GET`, both requiring exactly `sync:read`. Public route vectors and regressions reject
   other methods, path aliases and query-bearing templates. DPoP public tests retain the actual
