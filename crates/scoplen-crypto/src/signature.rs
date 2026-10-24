@@ -10,7 +10,9 @@ use ed25519_dalek::{
     VerifyingKey as DalekVerifyingKey,
 };
 use p256::ecdsa::{
-    Signature as P256Signature, SigningKey as P256DalekSigningKey, VerifyingKey as P256VerifyingKey,
+    Signature as P256Signature, SigningKey as P256DalekSigningKey,
+    VerifyingKey as P256VerifyingKey,
+    signature::{Signer as _, Verifier as _},
 };
 
 use crate::{PrimitiveError, SecretBytes, random_bytes};
@@ -35,8 +37,7 @@ impl P256SigningKey {
     /// Parse a SEC1 private scalar from exactly 32 bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, PrimitiveError> {
         let secret = SecretBytes::from_slice(bytes).ok_or(PrimitiveError::InvalidKey)?;
-        P256DalekSigningKey::from_bytes(p256::FieldBytes::from_slice(secret.as_ref()))
-            .map_err(|_| PrimitiveError::InvalidKey)?;
+        P256DalekSigningKey::from_slice(secret.as_ref()).map_err(|_| PrimitiveError::InvalidKey)?;
         Ok(Self { secret })
     }
 
@@ -44,7 +45,7 @@ impl P256SigningKey {
     #[must_use]
     pub fn public_key_sec1(&self) -> Vec<u8> {
         let signing_key = self.to_signing_key();
-        signing_key.verifying_key().to_encoded_point(false).as_bytes().to_vec()
+        signing_key.verifying_key().to_sec1_point(false).as_bytes().to_vec()
     }
 
     /// Export this software key for encrypted device-local persistence.
@@ -61,7 +62,7 @@ impl P256SigningKey {
     }
 
     fn to_signing_key(&self) -> P256DalekSigningKey {
-        P256DalekSigningKey::from_bytes(p256::FieldBytes::from_slice(self.secret.as_ref()))
+        P256DalekSigningKey::from_slice(self.secret.as_ref())
             .expect("P-256 key validated at construction")
     }
 }

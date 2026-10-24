@@ -16,6 +16,15 @@ validation, tombstones, and pure merge helpers. Later gates add contract behavio
 defined by `scoplen-docs/17-implementation-roadmap.md`; no consumer may define a second copy of a
 wire format or cryptographic construction.
 
+The K-2 implementation uses HPKE 0.14 and P-256 0.14 with the existing RFC 9180
+P-256/X25519, HKDF-SHA-256 and ChaCha20-Poly1305 suites. HPKE's features are explicit;
+its optional post-quantum suites are not enabled. The workspace and fuzz locks pin
+`crypto-bigint` to 0.7.6 and `ctutils` to 0.4.5 after
+[RUSTSEC-2026-0387](https://rustsec.org/advisories/RUSTSEC-2026-0387.html).
+Dependency upgrades must preserve the published K-2 known answers, including fixed-width
+ECDSA signatures and existing HPKE ciphertexts. Consumers resolve their own locks and must
+update affected transitive versions when upgrading their pinned shared revision.
+
 The K-7 crate owns the client algorithm preference lists from `10-protocol-core.md` §3.
 `HostAlgorithmPolicy::with_legacy` validates an explicit list for one Host and appends accepted
 legacy names after modern defaults. Host certificate algorithms precede raw host keys (D-42).

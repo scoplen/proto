@@ -12,7 +12,6 @@ use hpke::{
     kem::{DhP256HkdfSha256, X25519HkdfSha256},
     setup_receiver, setup_sender,
 };
-use rand_core::OsRng;
 
 use crate::{PrimitiveError, SecretBytes};
 
@@ -31,7 +30,7 @@ pub struct DeviceKemKeyPair {
 impl DeviceKemKeyPair {
     /// Generate a random device HPKE key pair.
     pub fn generate() -> Result<Self, PrimitiveError> {
-        let (private, public) = DeviceKem::gen_keypair(&mut OsRng);
+        let (private, public) = DeviceKem::gen_keypair();
         let private = SecretBytes::from_slice(private.to_bytes().as_slice())
             .ok_or(PrimitiveError::InvalidKey)?;
         Ok(Self { private, public: public.to_bytes().to_vec() })
@@ -81,7 +80,7 @@ pub struct AccountKemKeyPair {
 impl AccountKemKeyPair {
     /// Generate a random account HPKE key pair.
     pub fn generate() -> Result<Self, PrimitiveError> {
-        let (private, public) = AccountKem::gen_keypair(&mut OsRng);
+        let (private, public) = AccountKem::gen_keypair();
         let private = SecretBytes::from_slice(private.to_bytes().as_slice())
             .ok_or(PrimitiveError::InvalidKey)?;
         Ok(Self { private, public: public.to_bytes().to_vec() })
@@ -183,13 +182,9 @@ where
 {
     let recipient_public_key =
         Kem::PublicKey::from_bytes(recipient_public_key).map_err(|_| PrimitiveError::InvalidKey)?;
-    let (encapsulated_key, mut context) = setup_sender::<HpkeAead, HpkeKdf, Kem, _>(
-        &OpModeS::Base,
-        &recipient_public_key,
-        info,
-        &mut OsRng,
-    )
-    .map_err(|_| PrimitiveError::InvalidKey)?;
+    let (encapsulated_key, mut context) =
+        setup_sender::<HpkeAead, HpkeKdf, Kem>(&OpModeS::Base, &recipient_public_key, info)
+            .map_err(|_| PrimitiveError::InvalidKey)?;
     let ciphertext = context.seal(plaintext, aad).map_err(|_| PrimitiveError::Authentication)?;
     Ok(HpkeCiphertext { encapsulated_key: encapsulated_key.to_bytes().to_vec(), ciphertext })
 }
