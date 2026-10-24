@@ -483,6 +483,15 @@ The transfer uses 100,000 bytes cycling through every byte value. Four pipelined
 read-only handle must return a remote status failure and leave that SFTP session unusable. A
 fresh SFTP channel reads the unchanged file, and an independent SSH session still opens on the
 same authenticated connection.
+The 9.9p2 script also sets `SCOPLEN_OPENSSH_SHARED_CONNECTION=1` for one separate run of the
+same example. One authenticated connection keeps a raw PTY terminal, an SFTP session, and a
+`direct-tcpip` forwarding channel open together. The forward carries another authenticated SSH
+session to the same disposable peer. During the existing binary SFTP workflow, both live sessions
+exchange exact bytes. They still work after the failed-pipeline SFTP session is replaced and after
+a separate SFTP channel is deliberately dropped with one outstanding
+request. A new SFTP channel receives its own response, and the four-channel limit is reached and
+released before the connection disconnects. The deliberate drop checks local close isolation; it
+does not simulate an arbitrary server-side SFTP failure or establish client connection ownership.
 The same SFTP run creates a unique directory and file, reads directory entries until EOF, rejects
 a missing directory, a nonempty directory removal, and a read from a closed directory handle,
 then removes both paths and checks that the directory is gone. Each response releases its request

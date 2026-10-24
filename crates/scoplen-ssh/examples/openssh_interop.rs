@@ -6,10 +6,10 @@ use std::{
 
 use scoplen_crypto::{Ed25519SigningKey, P256SigningKey};
 use scoplen_ssh::{
-    CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, ClientError,
-    EcdsaSshSigner, Ed25519SshSigner, HostKey, HostKeyVerificationError, P256SshSigner,
-    RsaSshSigner, SftpAttributes, SftpChannelError, SftpPacket, SftpSession, SignatureAlgorithm,
-    Signer, UserCertificate,
+    CertificateValidationPolicy, ChannelEvent, ClientChannel, ClientConfig, ClientConnection,
+    ClientError, EcdsaSshSigner, Ed25519SshSigner, HostKey, HostKeyVerificationError,
+    P256SshSigner, PtyRequest, RsaSshSigner, SftpAttributes, SftpChannelError, SftpPacket,
+    SftpSession, SignatureAlgorithm, Signer, UserCertificate,
 };
 use ssh_key::{Certificate, PrivateKey, PublicKey};
 use tokio::time::timeout;
@@ -26,9 +26,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port =
         env::var("SCOPLEN_OPENSSH_PORT").unwrap_or_else(|_| "22223".to_owned()).parse::<u16>()?;
     let username = env::var("SCOPLEN_OPENSSH_USER").unwrap_or_else(|_| "scoplen".to_owned());
-    let config = client_config(host, port)?;
+    let shared_connection = env::var("SCOPLEN_OPENSSH_SHARED_CONNECTION").as_deref() == Ok("1");
+    let mut config = client_config(host, port)?;
+    if shared_connection {
+        config = config.with_channel_limit(4)?;
+    }
     let mut connection = timeout(SSH_STEP_TIMEOUT, ClientConnection::connect(config)).await??;
     timeout(SSH_STEP_TIMEOUT, authenticate(&mut connection, &username)).await??;
+    if shared_connection {
+        timeout(Duration::from_secs(90), verify_shared_connection(&connection, &username))
+            .await??;
+        timeout(SSH_STEP_TIMEOUT, connection.disconnect()).await??;
+        println!("openssh shared connection interop ok");
+        return Ok(());
+    }
     let channel = timeout(SSH_STEP_TIMEOUT, connection.open_session()).await??;
     timeout(SSH_STEP_TIMEOUT, channel.exec(true, b"printf scoplen-openssh-ok")).await??;
     let mut channel = channel;
@@ -203,6 +214,138 @@ async fn verify_forwarding(
     let channel = connection.open_session().await?;
     channel.close().await?;
     println!("openssh forwarding interop ok");
+    Ok(())
+}
+
+async fn read_exact_channel_data(
+    channel: &mut ClientChannel,
+    expected: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut received = Vec::with_capacity(expected.len());
+    while received.len() < expected.len() {
+        match channel.next_event().await? {
+            Some(ChannelEvent::Data(data)) if received.len() + data.len() <= expected.len() => {
+                received.extend_from_slice(&data);
+            }
+            Some(ChannelEvent::Success) => {}
+            other => return Err(format!("unexpected echo channel event: {other:?}").into()),
+        }
+    }
+    if received != expected {
+        return Err("echo channel returned different bytes".into());
+    }
+    Ok(())
+}
+
+async fn verify_channel_echo(
+    channel: &mut ClientChannel,
+    bytes: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(SSH_STEP_TIMEOUT, channel.send_data(bytes)).await??;
+    timeout(SSH_STEP_TIMEOUT, read_exact_channel_data(channel, bytes)).await??;
+    Ok(())
+}
+
+async fn verify_shared_connection(
+    connection: &ClientConnection,
+    username: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut terminal = connection.open_session().await?;
+    terminal
+        .request_pty(
+            &PtyRequest {
+                term: b"xterm".to_vec(),
+                columns: 80,
+                rows: 24,
+                pixel_width: 0,
+                pixel_height: 0,
+                modes: vec![0],
+            },
+            true,
+        )
+        .await?;
+    terminal.exec(true, b"stty raw -echo; printf scoplen-ready; exec cat").await?;
+    timeout(SSH_STEP_TIMEOUT, read_exact_channel_data(&mut terminal, b"scoplen-ready")).await??;
+
+    let forward_port = env::var("SCOPLEN_OPENSSH_JUMP_TARGET_PORT")?.parse::<u16>()?;
+    let forward_config = client_config("127.0.0.1".to_owned(), forward_port)?;
+    let mut forwarded =
+        ClientConnection::connect_via_direct_tcpip(forward_config, connection, "127.0.0.1", 0)
+            .await?;
+    authenticate(&mut forwarded, username).await?;
+    let mut forwarded_echo = forwarded.open_session().await?;
+    forwarded_echo.exec(true, b"cat").await?;
+
+    let sftp = SftpSession::open(connection, 4).await?;
+    let spare = connection.open_session().await?;
+    if !matches!(connection.open_session().await, Err(ClientError::ChannelLimitReached { max: 4 }))
+    {
+        return Err("four occupied channels did not enforce the connection limit".into());
+    }
+    spare.close().await?;
+    drop(spare);
+
+    let terminal_probes = async {
+        for index in 0..20 {
+            let bytes = format!("scoplen-terminal-{index:02}\n");
+            verify_channel_echo(&mut terminal, bytes.as_bytes()).await?;
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        Ok::<_, Box<dyn std::error::Error>>(())
+    };
+    let forward_probes = async {
+        for index in 0..20 {
+            let bytes = [0, index, 255, b'F', b'W', b'D'];
+            verify_channel_echo(&mut forwarded_echo, &bytes).await?;
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        Ok::<_, Box<dyn std::error::Error>>(())
+    };
+    timeout(Duration::from_secs(60), async {
+        tokio::try_join!(verify_sftp_session(connection, sftp), terminal_probes, forward_probes)
+    })
+    .await??;
+
+    verify_channel_echo(&mut terminal, b"terminal-after-sftp-failure\n").await?;
+    verify_channel_echo(&mut forwarded_echo, b"\0forward-after-sftp-failure\xff").await?;
+
+    let mut closed = SftpSession::open(connection, 2).await?;
+    let request = closed.client_mut().realpath(b".".to_vec())?;
+    closed.send_request(&request).await?;
+    if closed.pending_requests() != 1 {
+        return Err("SFTP close did not retain its in-flight request".into());
+    }
+    drop(closed);
+    verify_channel_echo(&mut terminal, b"terminal-after-sftp-close\n").await?;
+    verify_channel_echo(&mut forwarded_echo, b"\0forward-after-sftp-close\xff").await?;
+
+    let mut reopened = SftpSession::open(connection, 2).await?;
+    let request = reopened.client_mut().realpath(b".".to_vec())?;
+    if !matches!(sftp_response(&mut reopened, request).await?, SftpPacket::Name { .. })
+        || reopened.pending_requests() != 0
+    {
+        return Err("replacement SFTP channel did not return a complete response".into());
+    }
+    drop(reopened);
+
+    terminal.close().await?;
+    drop(terminal);
+    forwarded_echo.close().await?;
+    drop(forwarded_echo);
+    forwarded.disconnect().await?;
+    drop(forwarded);
+
+    let mut final_channels = Vec::new();
+    for _ in 0..4 {
+        final_channels.push(connection.open_session().await?);
+    }
+    if !matches!(connection.open_session().await, Err(ClientError::ChannelLimitReached { max: 4 }))
+    {
+        return Err("closed channels retained a connection slot".into());
+    }
+    for channel in final_channels {
+        channel.close().await?;
+    }
     Ok(())
 }
 
@@ -1132,8 +1275,15 @@ fn sftp_profile() -> Result<(bool, bool), Box<dyn std::error::Error>> {
 }
 
 async fn verify_sftp(connection: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
+    let session = SftpSession::open(connection, 4).await?;
+    verify_sftp_session(connection, session).await
+}
+
+async fn verify_sftp_session(
+    connection: &ClientConnection,
+    mut session: SftpSession,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (openssh_8, dropbear) = sftp_profile()?;
-    let mut session = SftpSession::open(connection, 4).await?;
     verify_sftp_capabilities(&session, openssh_8)?;
     if dropbear {
         verify_unsupported_sftp_extension(&mut session).await?;

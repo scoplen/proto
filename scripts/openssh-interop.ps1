@@ -25,6 +25,7 @@ $testVariables = @(
     'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY', 'SCOPLEN_OPENSSH_ECDSA_KEY',
     'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY',
     'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_SFTP_PROFILE', 'SCOPLEN_OPENSSH_FORWARD',
+    'SCOPLEN_OPENSSH_SHARED_CONNECTION',
     'SCOPLEN_OPENSSH_JUMP_TARGET_PORT'
 )
 foreach ($name in $testVariables) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
@@ -252,6 +253,15 @@ done
 
     cargo run --quiet --locked -p scoplen-ssh --example openssh_interop
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH SFTP or forwarding interop failed' }
+    if ($ServerVersion -eq '9.9p2') {
+        $env:SCOPLEN_OPENSSH_SHARED_CONNECTION = '1'
+        $sharedOutput = & cargo run --quiet --locked -p scoplen-ssh --example openssh_interop 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -or $sharedOutput -notmatch '(?m)^openssh shared connection interop ok\s*$') {
+            throw "OpenSSH shared-connection interop failed: $sharedOutput"
+        }
+        Write-Output 'OpenSSH shared connection interop passed'
+        Remove-Item Env:SCOPLEN_OPENSSH_SHARED_CONNECTION
+    }
     cargo run --quiet --locked -p scoplen-ssh --example proxy_command_interop
     if ($LASTEXITCODE -ne 0) { throw 'OpenSSH ProxyCommand interop failed' }
     cargo run --quiet --locked -p scoplen-ssh --example dynamic_socks_interop
