@@ -139,6 +139,18 @@ The D-105 `auth.commit_outcome_unknown` vectors cover both Personal POSTs with `
 and `retryable: false`; callers must not automatically replay either operation. They retain the
 same eight-field JSON shape as the known precommit `auth.storage_unavailable` vector, whose
 `changed: false` guarantees no business-state mutation from the failed operation.
+The D-115 `api-problem-sync-keys-storage-*` JSON and CBOR vectors use
+`503 sync.storage_unavailable` for both confirmed unchanged account-key PUT failure
+(`changed: false`, `retryable: true`) and uncertain new-update commit (`changed: true`,
+`retryable: false`). Their selector-16 `sync_data` seeds retain the exact CBOR bytes. The public
+codec preserves these fields; it does not classify transaction phases or prove publication.
+Consumers retain the exact signed request and keys, verify the current GET bundle first and
+require request-bound success from explicit recovery. GET omits the other wraps and PUT
+signature, so its revision and visible projection alone cannot prove exact replay. A stored
+revision requires complete exact comparison; a still-next revision requires all new-update
+checks and a confirmed commit. Current authorization and the original identity/proof-key
+binding apply to both paths. Storage, audit, recipient verification and recovery remain
+consumer responsibilities.
 
 `api-dpop.json` publishes the compact ES256 protected-resource proof from RFC 9449 Figure 13,
 with its public JWK thumbprint from Figure 11, proof id and timestamp, inclusive

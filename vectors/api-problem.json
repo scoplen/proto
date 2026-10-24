@@ -145,6 +145,30 @@
       "kind": "api.personal.rate_headers.reject",
       "input": "301",
       "expected": "reject"
+    },
+    {
+      "id": "api-problem-sync-keys-storage-precommit-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Account-key storage unavailable\",\"status\":503,\"detail\":\"The account-key update did not commit; no account keys changed. Keep local keys and the exact signed request, then retry later.\",\"instance\":\"sync-keys-rollback-1\",\"code\":\"sync.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Account-key storage unavailable\",\"status\":503,\"detail\":\"The account-key update did not commit; no account keys changed. Keep local keys and the exact signed request, then retry later.\",\"instance\":\"sync-keys-rollback-1\",\"code\":\"sync.storage_unavailable\",\"changed\":false,\"retryable\":true}"
+    },
+    {
+      "id": "api-problem-sync-keys-storage-precommit-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Account-key storage unavailable\",\"status\":503,\"detail\":\"The account-key update did not commit; no account keys changed. Keep local keys and the exact signed request, then retry later.\",\"instance\":\"sync-keys-rollback-1\",\"code\":\"sync.storage_unavailable\",\"changed\":false,\"retryable\":true}",
+      "expected": "a864636f6465781873796e632e73746f726167655f756e617661696c61626c6564747970656b61626f75743a626c616e6b657469746c65781f4163636f756e742d6b65792073746f7261676520756e617661696c61626c656664657461696c787f546865206163636f756e742d6b65792075706461746520646964206e6f7420636f6d6d69743b206e6f206163636f756e74206b657973206368616e6765642e204b656570206c6f63616c206b65797320616e6420746865206578616374207369676e656420726571756573742c207468656e207265747279206c617465722e667374617475731901f7676368616e676564f468696e7374616e63657473796e632d6b6579732d726f6c6c6261636b2d3169726574727961626c65f5"
+    },
+    {
+      "id": "api-problem-sync-keys-storage-commit-outcome-unknown-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Account-key outcome unknown\",\"status\":503,\"detail\":\"The account-key update may have committed. Keep local keys and the exact signed request; retrieve and verify the current bundle first. Recover explicitly with fresh DPoP and current authorization; do not automatically replay.\",\"instance\":\"sync-keys-unknown-1\",\"code\":\"sync.storage_unavailable\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Account-key outcome unknown\",\"status\":503,\"detail\":\"The account-key update may have committed. Keep local keys and the exact signed request; retrieve and verify the current bundle first. Recover explicitly with fresh DPoP and current authorization; do not automatically replay.\",\"instance\":\"sync-keys-unknown-1\",\"code\":\"sync.storage_unavailable\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-sync-keys-storage-commit-outcome-unknown-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Account-key outcome unknown\",\"status\":503,\"detail\":\"The account-key update may have committed. Keep local keys and the exact signed request; retrieve and verify the current bundle first. Recover explicitly with fresh DPoP and current authorization; do not automatically replay.\",\"instance\":\"sync-keys-unknown-1\",\"code\":\"sync.storage_unavailable\",\"changed\":true,\"retryable\":false}",
+      "expected": "a864636f6465781873796e632e73746f726167655f756e617661696c61626c6564747970656b61626f75743a626c616e6b657469746c65781b4163636f756e742d6b6579206f7574636f6d6520756e6b6e6f776e6664657461696c78e1546865206163636f756e742d6b657920757064617465206d6179206861766520636f6d6d69747465642e204b656570206c6f63616c206b65797320616e6420746865206578616374207369676e656420726571756573743b20726574726965766520616e6420766572696679207468652063757272656e742062756e646c652066697273742e205265636f766572206578706c696369746c7920776974682066726573682044506f5020616e642063757272656e7420617574686f72697a6174696f6e3b20646f206e6f74206175746f6d61746963616c6c79207265706c61792e667374617475731901f7676368616e676564f568696e7374616e63657373796e632d6b6579732d756e6b6e6f776e2d3169726574727961626c65f4"
     }
   ]
 }

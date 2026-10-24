@@ -25,18 +25,27 @@ fn published_problem_json_vectors_use_registered_codes() {
         );
         count += 1;
     }
-    assert_eq!(count, 15);
+    assert_eq!(count, 17);
 }
 
 #[test]
 fn sync_storage_failure_vectors_distinguish_rollback_from_uncertain_commit() {
+    assert_sync_storage_failure_vectors("api-problem-sync-storage");
+}
+
+#[test]
+fn account_key_storage_failure_vectors_distinguish_rollback_from_uncertain_commit() {
+    assert_sync_storage_failure_vectors("api-problem-sync-keys-storage");
+}
+
+fn assert_sync_storage_failure_vectors(prefix: &str) {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/api-problem.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("problem vectors");
     for (outcome, changed, retryable) in
         [("precommit", false, true), ("commit-outcome-unknown", true, false)]
     {
-        let id = format!("api-problem-sync-storage-{outcome}");
+        let id = format!("{prefix}-{outcome}");
         let json = document
             .vectors
             .iter()
