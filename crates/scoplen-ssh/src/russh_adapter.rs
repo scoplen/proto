@@ -674,6 +674,29 @@ fn authentication_rejected(
     }
 }
 
+fn keyboard_interactive_responses(
+    response: &KeyboardInteractiveResponse,
+    prompt_count: usize,
+) -> Result<Vec<String>, ClientError> {
+    if response.responses().len() != prompt_count {
+        return Err(ClientError::InvalidInput("keyboard response count does not match prompts"));
+    }
+    response
+        .validate_message_size()
+        .map_err(|_| ClientError::InvalidInput("keyboard response count or size is invalid"))?;
+    Ok(response
+        .responses()
+        .iter()
+        .map(|response| {
+            str::from_utf8(response.as_bytes())
+                .map_err(|_| ClientError::InvalidInput("keyboard response is not UTF-8"))
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(str::to_owned)
+        .collect())
+}
+
 /// Result of an RFC 4252 `none` probe. The server may accept `none` or advertise further
 /// methods. Methods recognized by the SSH engine retain server order; unknown names are omitted.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -785,7 +808,7 @@ impl From<russh::Error> for ClientError {
 
 /// A connected and authenticated-capable SSH client.
 pub struct ClientConnection {
-    handle: client::Handle<ClientHandler>,
+    handle: Option<client::Handle<ClientHandler>>,
     authenticated: AtomicBool,
     rsa_selection: RsaSelectionCache,
     transport_lifetime: Mutex<Option<oneshot::Sender<()>>>,
@@ -796,6 +819,27 @@ pub struct ClientConnection {
     forwarded_channels: mpsc::Receiver<ForwardedChannel>,
     agent_forwarding: Arc<AtomicUsize>,
     agent_sessions: Arc<Mutex<AgentSessionRegistry>>,
+}
+
+struct KeyboardInteractiveGuard<'a> {
+    connection: &'a mut ClientConnection,
+    complete: bool,
+}
+
+impl Drop for KeyboardInteractiveGuard<'_> {
+    fn drop(&mut self) {
+        if !self.complete {
+            self.connection.connection_end.record(ConnectionEndKind::Local);
+            // The engine can be waiting on its authentication queue rather than socket I/O.
+            // Drop both owners so either wait wakes and no late response can reuse this session.
+            self.connection.handle.take();
+            self.connection
+                .transport_lifetime
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+        }
+    }
 }
 
 #[derive(Default)]
@@ -969,7 +1013,7 @@ impl ClientConnection {
         let handle =
             client::connect_stream(Arc::new(config.russh_config()), stream, handler).await?;
         Ok(Self {
-            handle,
+            handle: Some(handle),
             authenticated: AtomicBool::new(false),
             rsa_selection: None,
             transport_lifetime: Mutex::new(Some(owner)),
@@ -991,7 +1035,8 @@ impl ClientConnection {
     pub async fn server_rsa_sha2_selection(
         &mut self,
     ) -> Result<ServerRsaSha2Selection, ClientError> {
-        select_server_rsa_sha2(&mut self.rsa_selection, self.handle.best_supported_rsa_hash()).await
+        let handle = self.handle.as_ref().ok_or(ClientError::ConnectionClosed)?;
+        select_server_rsa_sha2(&mut self.rsa_selection, handle.best_supported_rsa_hash()).await
     }
 
     /// Write the K-6 gateway client hello over an already negotiated TLS/ALPN stream, then start
@@ -1235,6 +1280,8 @@ impl ClientConnection {
         let mut adapter = RusshSignerAdapter { signer, identity, username: username.to_owned() };
         let result = self
             .handle
+            .as_mut()
+            .ok_or(ClientError::ConnectionClosed)?
             .authenticate_publickey_with(username.to_owned(), key, hash_alg, &mut adapter)
             .await
             .map_err(ClientError::PublicKey)?;
@@ -1294,6 +1341,8 @@ impl ClientConnection {
         let mut adapter = RusshSignerAdapter { signer, identity, username: username.to_owned() };
         let result = self
             .handle
+            .as_mut()
+            .ok_or(ClientError::ConnectionClosed)?
             .authenticate_certificate_with(username.to_owned(), certificate, hash_alg, &mut adapter)
             .await
             .map_err(ClientError::PublicKey)?;
@@ -1323,6 +1372,8 @@ impl ClientConnection {
             .map_err(|_| ClientError::PasswordEncoding)?;
         let result = self
             .handle
+            .as_mut()
+            .ok_or(ClientError::ConnectionClosed)?
             .authenticate_password(username.to_owned(), password.clone())
             .await
             .map_err(ClientError::from);
@@ -1349,7 +1400,14 @@ impl ClientConnection {
         self.reject_if_authenticated()?;
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
             .map_err(ClientError::Config)?;
-        match self.handle.authenticate_none(username.to_owned()).await.map_err(ClientError::from)? {
+        match self
+            .handle
+            .as_mut()
+            .ok_or(ClientError::ConnectionClosed)?
+            .authenticate_none(username.to_owned())
+            .await
+            .map_err(ClientError::from)?
+        {
             russh::client::AuthResult::Success => {
                 self.authenticated.store(true, Ordering::Release);
                 Ok(NoneAuthOutcome::Authenticated)
@@ -1365,19 +1423,25 @@ impl ClientConnection {
 
     /// Authenticate with RFC 4256 keyboard-interactive prompts.
     ///
-    /// The responder is called once for each bounded server information request. Prompt text and
-    /// response strings are validated through the shared K-7 authentication boundary before any
-    /// response is sent to `russh`; prompt order and response count are preserved exactly. The
-    /// engine defers automatic rekey until authentication completes, then handles any expired
-    /// elapsed limit without waiting for channel traffic.
-    pub async fn authenticate_keyboard_interactive<F>(
+    /// The asynchronous responder receives each checked request in peer order. Its future may
+    /// wait for user input without blocking the executor. Responses remain zeroizing and bounded
+    /// until they cross the engine's UTF-8 response boundary; counts must match the prompts.
+    ///
+    /// A complete peer rejection preserves this connection for the next factor. After dispatch,
+    /// dropping this future, a responder error, an invalid response, or an incomplete engine
+    /// exchange closes this connection. The caller owns timeouts and cancellation, and must create
+    /// a fresh connection after interruption. Local validation before dispatch leaves it usable.
+    /// The engine may defer observing peer EOF while waiting for a response; callers must bound
+    /// user input even if the peer disappears. An observed engine shutdown cancels the responder.
+    pub async fn authenticate_keyboard_interactive<F, R>(
         &mut self,
         username: &str,
         submethods: Option<&str>,
         mut responder: F,
     ) -> Result<(), ClientError>
     where
-        F: FnMut(&KeyboardInteractiveInfoRequest) -> Result<Vec<String>, ClientError> + Send,
+        F: FnMut(KeyboardInteractiveInfoRequest) -> R + Send,
+        R: Future<Output = Result<KeyboardInteractiveResponse, ClientError>> + Send,
     {
         self.reject_if_authenticated()?;
         validate_text(username.as_bytes(), MAX_CLIENT_HOST, "username", true)
@@ -1391,26 +1455,32 @@ impl ClientConnection {
             )
             .map_err(ClientError::Config)?;
         }
-        let mut reply = {
-            let handle = &mut self.handle;
-            handle
-                .authenticate_keyboard_interactive_start(
-                    username.to_owned(),
-                    submethods.map(str::to_owned),
-                )
-                .await
-                .map_err(ClientError::from)?
-        };
+        let mut guard = KeyboardInteractiveGuard { connection: self, complete: false };
+        let mut reply = guard
+            .connection
+            .handle
+            .as_mut()
+            .ok_or(ClientError::ConnectionClosed)?
+            .authenticate_keyboard_interactive_start(
+                username.to_owned(),
+                submethods.map(str::to_owned),
+            )
+            .await
+            .map_err(ClientError::from)?;
         loop {
             reply = match reply {
                 russh::client::KeyboardInteractiveAuthResponse::Success => {
-                    self.authenticated.store(true, Ordering::Release);
+                    guard.connection.authenticated.store(true, Ordering::Release);
+                    guard.complete = true;
                     return Ok(());
                 }
                 russh::client::KeyboardInteractiveAuthResponse::Failure {
                     remaining_methods,
                     partial_success,
-                } => return Err(authentication_rejected(&remaining_methods, partial_success)),
+                } => {
+                    guard.complete = true;
+                    return Err(authentication_rejected(&remaining_methods, partial_success));
+                }
                 russh::client::KeyboardInteractiveAuthResponse::InfoRequest {
                     name,
                     instructions,
@@ -1437,22 +1507,20 @@ impl ClientConnection {
                     info.encode().map_err(|_| {
                         ClientError::InvalidInput("keyboard information request is invalid")
                     })?;
-                    let responses = responder(&info)?;
-                    if responses.len() != info.prompts().len() {
-                        return Err(ClientError::InvalidInput(
-                            "keyboard response count does not match prompts",
-                        ));
-                    }
-                    let response_bytes = responses
-                        .iter()
-                        .map(|response| response.as_bytes().to_vec())
-                        .collect::<Vec<_>>();
-                    KeyboardInteractiveResponse::new(response_bytes)
-                        .and_then(|response| response.encode())
-                        .map_err(|_| {
-                            ClientError::InvalidInput("keyboard response count or size is invalid")
-                        })?;
-                    self.handle
+                    let prompt_count = info.prompts().len();
+                    let mut stopped = guard.connection.stopped.clone();
+                    let response = tokio::select! {
+                        response = responder(info) => response?,
+                        _ = stopped.wait_for(|stopped| *stopped) => {
+                            return Err(ClientError::ConnectionClosed);
+                        }
+                    };
+                    let responses = keyboard_interactive_responses(&response, prompt_count)?;
+                    guard
+                        .connection
+                        .handle
+                        .as_mut()
+                        .ok_or(ClientError::ConnectionClosed)?
                         .authenticate_keyboard_interactive_respond(responses)
                         .await
                         .map_err(ClientError::from)?
@@ -1465,7 +1533,13 @@ impl ClientConnection {
     pub async fn open_session(&self) -> Result<ClientChannel, ClientError> {
         let permit = self.channel_permit()?;
         let opening = AgentSessionOpenGuard::new(&self.agent_sessions);
-        let channel = self.handle.channel_open_session().await.map_err(ClientError::from)?;
+        let channel = self
+            .handle
+            .as_ref()
+            .ok_or(ClientError::ConnectionClosed)?
+            .channel_open_session()
+            .await
+            .map_err(ClientError::from)?;
         let lease = Arc::new(AgentForwardingLease::new(Arc::clone(&self.agent_forwarding)));
         opening.register(channel.id().number(), &lease);
         Ok(ClientChannel::new(
@@ -1491,6 +1565,8 @@ impl ClientConnection {
             .map_err(ClientError::Config)?;
         let permit = self.channel_permit()?;
         self.handle
+            .as_ref()
+            .ok_or(ClientError::ConnectionClosed)?
             .channel_open_direct_tcpip(
                 target_address.to_owned(),
                 target_port,
@@ -1519,6 +1595,8 @@ impl ClientConnection {
             .map_err(ClientError::Config)?;
         let permit = self.channel_permit()?;
         self.handle
+            .as_ref()
+            .ok_or(ClientError::ConnectionClosed)?
             .channel_open_direct_streamlocal(socket_path.to_owned())
             .await
             .map(|channel| {
@@ -1545,7 +1623,12 @@ impl ClientConnection {
         self.require_authenticated()?;
         validate_text(address.as_bytes(), MAX_CHANNEL_ADDRESS, "forward address", false)
             .map_err(ClientError::Config)?;
-        self.handle.tcpip_forward(address.to_owned(), port).await.map_err(ClientError::from)
+        self.handle
+            .as_ref()
+            .ok_or(ClientError::ConnectionClosed)?
+            .tcpip_forward(address.to_owned(), port)
+            .await
+            .map_err(ClientError::from)
     }
 
     /// Cancel a remote TCP forwarding definition.
@@ -1553,7 +1636,12 @@ impl ClientConnection {
         self.require_authenticated()?;
         validate_text(address.as_bytes(), MAX_CHANNEL_ADDRESS, "forward address", false)
             .map_err(ClientError::Config)?;
-        self.handle.cancel_tcpip_forward(address.to_owned(), port).await.map_err(ClientError::from)
+        self.handle
+            .as_ref()
+            .ok_or(ClientError::ConnectionClosed)?
+            .cancel_tcpip_forward(address.to_owned(), port)
+            .await
+            .map_err(ClientError::from)
     }
 
     /// Ask the server to listen for a remote Unix-socket forwarding definition.
@@ -1561,7 +1649,12 @@ impl ClientConnection {
         self.require_authenticated()?;
         validate_text(socket_path.as_bytes(), MAX_CHANNEL_ADDRESS, "socket path", true)
             .map_err(ClientError::Config)?;
-        self.handle.streamlocal_forward(socket_path.to_owned()).await.map_err(ClientError::from)
+        self.handle
+            .as_ref()
+            .ok_or(ClientError::ConnectionClosed)?
+            .streamlocal_forward(socket_path.to_owned())
+            .await
+            .map_err(ClientError::from)
     }
 
     /// Cancel a remote Unix-socket forwarding definition.
@@ -1570,6 +1663,8 @@ impl ClientConnection {
         validate_text(socket_path.as_bytes(), MAX_CHANNEL_ADDRESS, "socket path", true)
             .map_err(ClientError::Config)?;
         self.handle
+            .as_ref()
+            .ok_or(ClientError::ConnectionClosed)?
             .cancel_streamlocal_forward(socket_path.to_owned())
             .await
             .map_err(ClientError::from)
@@ -1581,6 +1676,7 @@ impl ClientConnection {
     /// it, new forwarded channels are rejected with `resource shortage` instead of accumulating
     /// unbounded channel state in the event loop.  `None` means that the SSH event loop closed.
     pub async fn next_forwarded_channel(&mut self) -> Option<ForwardedChannel> {
+        self.handle.as_ref()?;
         self.forwarded_channels.recv().await
     }
 
@@ -1592,7 +1688,9 @@ impl ClientConnection {
     }
 
     fn reject_if_authenticated(&self) -> Result<(), ClientError> {
-        if self.authenticated.load(Ordering::Acquire) {
+        if self.handle.is_none() {
+            Err(ClientError::ConnectionClosed)
+        } else if self.authenticated.load(Ordering::Acquire) {
             Err(ClientError::AlreadyAuthenticated)
         } else {
             Ok(())
@@ -1600,7 +1698,9 @@ impl ClientConnection {
     }
 
     fn require_authenticated(&self) -> Result<(), ClientError> {
-        if self.authenticated.load(Ordering::Acquire) {
+        if self.handle.is_none() {
+            Err(ClientError::ConnectionClosed)
+        } else if self.authenticated.load(Ordering::Acquire) {
             Ok(())
         } else {
             Err(ClientError::NotAuthenticated)
@@ -1613,9 +1713,12 @@ impl ClientConnection {
     /// transport even if a peer window, a saturated queue, or surviving channels prevent progress.
     pub async fn disconnect(&self) -> Result<(), ClientError> {
         self.connection_end.record(ConnectionEndKind::Local);
+        let Some(handle) = self.handle.as_ref() else {
+            return Ok(());
+        };
         let mut stopped = self.stopped.clone();
         let result = async_timeout(Duration::from_secs(1), async {
-            self.handle.disconnect(russh::Disconnect::ByApplication, "", "en").await?;
+            handle.disconnect(russh::Disconnect::ByApplication, "", "en").await?;
             let _ = stopped.wait_for(|stopped| *stopped).await;
             Ok::<_, russh::Error>(())
         })
@@ -4824,12 +4927,12 @@ mod tests {
                 if round == 1 {
                     assert_eq!(info.prompts()[0].text(), b"Code: ");
                     assert!(!info.prompts()[0].echo());
-                    Ok(vec!["123456".to_owned()])
+                    std::future::ready(keyboard_answers(&["123456"]))
                 } else {
                     assert_eq!(round, 2);
                     assert_eq!(info.prompts()[0].text(), b"Continue? ");
                     assert!(info.prompts()[0].echo());
-                    Ok(vec!["yes".to_owned()])
+                    std::future::ready(keyboard_answers(&["yes"]))
                 }
             })
             .await
@@ -4840,7 +4943,9 @@ mod tests {
 
         let (mut connection, server) = keyboard_server(false).await;
         let error = connection
-            .authenticate_keyboard_interactive("user", Some("otp"), |_| Ok(Vec::new()))
+            .authenticate_keyboard_interactive("user", Some("otp"), |_| async {
+                keyboard_answers(&[])
+            })
             .await
             .expect_err("wrong response count");
         assert!(matches!(
@@ -4852,8 +4957,8 @@ mod tests {
 
         let (mut connection, server) = keyboard_server(false).await;
         let error = connection
-            .authenticate_keyboard_interactive("user", Some("otp"), |_| {
-                Ok(vec!["x".repeat(65_537)])
+            .authenticate_keyboard_interactive("user", Some("otp"), |_| async {
+                keyboard_answers(&[&"x".repeat(65_537)])
             })
             .await
             .expect_err("oversized response");
@@ -4866,8 +4971,8 @@ mod tests {
 
         let (mut connection, server) = keyboard_server(false).await;
         let error = connection
-            .authenticate_keyboard_interactive("user", Some("otp"), |_| {
-                Ok(vec!["wrong".to_owned()])
+            .authenticate_keyboard_interactive("user", Some("otp"), |_| async {
+                keyboard_answers(&["wrong"])
             })
             .await
             .expect_err("rejected response");
@@ -4876,7 +4981,14 @@ mod tests {
         server.await.expect("server task");
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    fn keyboard_answers(answers: &[&str]) -> Result<KeyboardInteractiveResponse, ClientError> {
+        KeyboardInteractiveResponse::new(
+            answers.iter().map(|answer| answer.as_bytes().to_vec()).collect(),
+        )
+        .map_err(|_| ClientError::InvalidInput("keyboard response count or size is invalid"))
+    }
+
+    #[tokio::test]
     async fn keyboard_prompt_defers_automatic_rekey_until_authentication_completes() {
         let (mut connection, server, completed) =
             keyboard_server_with_rekey(false, Duration::from_millis(80)).await;
@@ -4885,18 +4997,19 @@ mod tests {
         timeout(
             Duration::from_secs(5),
             connection.authenticate_keyboard_interactive("user", Some("otp"), move |info| {
-                if info.prompts()[0].text() == b"Code: " {
-                    tokio::task::block_in_place(|| {
-                        std::thread::sleep(Duration::from_millis(200));
-                    });
-                    assert_eq!(
-                        observed.load(Ordering::SeqCst),
-                        baseline,
-                        "automatic rekey does not interrupt an authentication prompt"
-                    );
-                    Ok(vec!["123456".to_owned()])
-                } else {
-                    Ok(vec!["yes".to_owned()])
+                let observed = Arc::clone(&observed);
+                async move {
+                    if info.prompts()[0].text() == b"Code: " {
+                        tokio::time::sleep(Duration::from_millis(200)).await;
+                        assert_eq!(
+                            observed.load(Ordering::SeqCst),
+                            baseline,
+                            "automatic rekey does not interrupt an authentication prompt"
+                        );
+                        keyboard_answers(&["123456"])
+                    } else {
+                        keyboard_answers(&["yes"])
+                    }
                 }
             }),
         )
@@ -4936,11 +5049,11 @@ mod tests {
             }
         );
         connection
-            .authenticate_keyboard_interactive("user", Some("otp"), |info| {
+            .authenticate_keyboard_interactive("user", Some("otp"), |info| async move {
                 if info.prompts()[0].text() == b"Code: " {
-                    Ok(vec!["123456".to_owned()])
+                    keyboard_answers(&["123456"])
                 } else {
-                    Ok(vec!["yes".to_owned()])
+                    keyboard_answers(&["yes"])
                 }
             })
             .await

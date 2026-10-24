@@ -14,7 +14,7 @@ use russh::keys::PrivateKey;
 use scoplen_crypto::Ed25519SigningKey;
 use scoplen_ssh::{
     CertificateValidationPolicy, ChannelEvent, ClientConfig, ClientConnection, ClientError,
-    Ed25519SshSigner, HostKey, Signer, UserCertificate,
+    Ed25519SshSigner, HostKey, KeyboardInteractiveResponse, Signer, UserCertificate,
 };
 use ssh_key::Algorithm;
 use tokio::{net::TcpListener, task::JoinHandle, time::timeout};
@@ -148,11 +148,12 @@ async fn connect() -> (ClientConnection, Arc<AtomicUsize>, JoinHandle<()>) {
 async fn one_time_code(connection: &mut ClientConnection, answer: &str) -> ClientError {
     timeout(
         DEADLINE,
-        connection.authenticate_keyboard_interactive("user", Some("otp"), |info| {
+        connection.authenticate_keyboard_interactive("user", Some("otp"), |info| async move {
             assert_eq!(info.prompts().len(), 1);
             assert_eq!(info.prompts()[0].text(), b"Code: ");
             assert!(!info.prompts()[0].echo());
-            Ok(vec![answer.to_owned()])
+            Ok(KeyboardInteractiveResponse::new(vec![answer.as_bytes().to_vec()])
+                .expect("bounded answer"))
         }),
     )
     .await
@@ -332,7 +333,7 @@ async fn completed_authentication_rejects_all_further_authentication_without_blo
     assert!(matches!(
         timeout(
             DEADLINE,
-            connection.authenticate_keyboard_interactive("", None, |_| {
+            connection.authenticate_keyboard_interactive("", None, |_| async {
                 panic!("completed authentication must not call the responder")
             })
         )
