@@ -852,6 +852,7 @@ mod tests {
     struct SftpServer {
         buffer: Vec<u8>,
         file: Vec<u8>,
+        file_mtime: Option<u32>,
         advertise_limits: bool,
         advertise_statvfs: bool,
         extension_handle_open: Option<bool>,
@@ -1042,6 +1043,24 @@ mod tests {
             SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
         }
 
+        fn setstat_response(&mut self, id: u32, path: &[u8], attrs: &SftpAttributes) -> SftpPacket {
+            let size = attrs.size.and_then(|size| usize::try_from(size).ok());
+            let code = if path != b"file" || self.rename_phase != Some(RenamePhase::Original) {
+                2
+            } else if attrs.size.is_some() && size.is_none_or(|size| size > 1024 * 1024) {
+                4
+            } else {
+                if let Some(size) = size {
+                    self.file.resize(size, 0);
+                }
+                if let Some(mtime) = attrs.modify_time {
+                    self.file_mtime = Some(mtime);
+                }
+                0
+            };
+            SftpPacket::Status { id, code, message: Vec::new(), language: Vec::new() }
+        }
+
         fn copy_data_response(&mut self, id: u32, data: &[u8]) -> SftpPacket {
             let expected = SftpPacket::copy_data_request(id, b"h", 2, 4, b"copy", 1).unwrap();
             let code = if self.extension_handle_open == Some(true)
@@ -1090,7 +1109,11 @@ mod tests {
                     language: Vec::new(),
                 };
             }
-            let mtime = if follow { 1_700_000_000 } else { self.lsetstat_link_mtime.unwrap() };
+            let mtime = if follow {
+                self.file_mtime.unwrap_or(1_700_000_000)
+            } else {
+                self.lsetstat_link_mtime.unwrap()
+            };
             SftpPacket::Attrs {
                 id,
                 attrs: SftpAttributes {
@@ -1405,6 +1428,24 @@ mod tests {
         fn path_or_metadata_response(&mut self, packet: &SftpPacket) -> Option<SftpPacket> {
             match packet {
                 SftpPacket::Realpath { id, path } => Some(Self::realpath_response(*id, path)),
+                SftpPacket::Stat { id, path }
+                    if self.file_mtime.is_some()
+                        && path == b"file"
+                        && self.rename_phase == Some(RenamePhase::Original) =>
+                {
+                    Some(SftpPacket::Attrs {
+                        id: *id,
+                        attrs: SftpAttributes {
+                            size: Some(self.file.len() as u64),
+                            access_time: self.file_mtime,
+                            modify_time: self.file_mtime,
+                            ..SftpAttributes::default()
+                        },
+                    })
+                }
+                SftpPacket::Setstat { id, path, attrs } if self.file_mtime.is_some() => {
+                    Some(self.setstat_response(*id, path, attrs))
+                }
                 SftpPacket::Rename { id, old_path, new_path } if self.rename_phase.is_some() => {
                     Some(self.standard_rename_response(*id, old_path, new_path))
                 }
@@ -1661,6 +1702,7 @@ mod tests {
                 SftpServer {
                     buffer: Vec::new(),
                     file,
+                    file_mtime: None,
                     advertise_limits: false,
                     advertise_statvfs: false,
                     extension_handle_open: None,
@@ -2322,6 +2364,66 @@ mod tests {
         assert_eq!(session.pending_requests(), 0);
     }
 
+    async fn assert_setstat(session: &mut SftpSession) {
+        let changed = SftpAttributes {
+            size: Some(13),
+            access_time: Some(1_650_000_000),
+            modify_time: Some(1_650_000_000),
+            ..SftpAttributes::default()
+        };
+        let missing = session.client_mut().setstat(b"missing", changed.clone()).unwrap();
+        session.send_request(&missing).await.expect("send missing setstat");
+        assert!(matches!(
+            session.read_response().await.expect("read missing setstat"),
+            SftpPacket::Status { code: 2, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+
+        let set = session.client_mut().setstat(b"file", changed).unwrap();
+        session.send_request(&set).await.expect("send setstat");
+        assert!(matches!(
+            session.read_response().await.expect("read setstat"),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let stat = session.client_mut().stat(b"file").unwrap();
+        session.send_request(&stat).await.expect("send stat after setstat");
+        assert!(matches!(
+            session.read_response().await.expect("read stat after setstat"),
+            SftpPacket::Attrs { attrs, .. }
+                if attrs.size == Some(13) && attrs.modify_time == Some(1_650_000_000)
+        ));
+        assert_eq!(session.pending_requests(), 0);
+
+        let restore = session
+            .client_mut()
+            .setstat(
+                b"file",
+                SftpAttributes {
+                    size: Some(12),
+                    access_time: Some(1_700_000_000),
+                    modify_time: Some(1_700_000_000),
+                    ..SftpAttributes::default()
+                },
+            )
+            .unwrap();
+        session.send_request(&restore).await.expect("send truncating setstat");
+        assert!(matches!(
+            session.read_response().await.expect("read truncating setstat"),
+            SftpPacket::Status { code: 0, .. }
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        let stat = session.client_mut().stat(b"file").unwrap();
+        session.send_request(&stat).await.expect("send stat after truncation");
+        assert!(matches!(
+            session.read_response().await.expect("read stat after truncation"),
+            SftpPacket::Attrs { attrs, .. }
+                if attrs.size == Some(12) && attrs.modify_time == Some(1_700_000_000)
+        ));
+        assert_eq!(session.pending_requests(), 0);
+        assert_file_bytes(session, b"file", b"linked bytes").await;
+    }
+
     async fn assert_hardlink(session: &mut SftpSession) {
         let missing = session
             .client_mut()
@@ -2680,6 +2782,7 @@ mod tests {
                 SftpServer {
                     buffer: Vec::new(),
                     file: b"linked bytes".to_vec(),
+                    file_mtime: None,
                     advertise_limits: false,
                     advertise_statvfs: false,
                     extension_handle_open: Some(false),
@@ -2779,6 +2882,7 @@ mod tests {
                 SftpServer {
                     buffer: Vec::new(),
                     file: b"linked bytes".to_vec(),
+                    file_mtime: Some(1_700_000_000),
                     advertise_limits: true,
                     advertise_statvfs: true,
                     extension_handle_open: Some(false),
@@ -2843,6 +2947,7 @@ mod tests {
         assert_fstatvfs(&mut session, &handle, false).await;
         assert_fstat(&mut session, &handle, None).await;
         assert_fsetstat_closed(&mut session, &handle).await;
+        assert_setstat(&mut session).await;
         assert_hardlink(&mut session).await;
         assert_expand_path(&mut session).await;
         assert_lsetstat(&mut session).await;
@@ -2874,6 +2979,7 @@ mod tests {
                 SftpServer {
                     buffer: Vec::new(),
                     file: Vec::new(),
+                    file_mtime: None,
                     advertise_limits: false,
                     advertise_statvfs: false,
                     extension_handle_open: None,
@@ -2943,6 +3049,7 @@ mod tests {
                 SftpServer {
                     buffer: Vec::new(),
                     file: b"abcdef".to_vec(),
+                    file_mtime: None,
                     advertise_limits: false,
                     advertise_statvfs: false,
                     extension_handle_open: None,
