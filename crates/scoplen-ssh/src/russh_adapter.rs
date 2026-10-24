@@ -2191,15 +2191,11 @@ struct RusshSignerAdapter<'a, S: Signer + Sync> {
 }
 
 impl<S: Signer + Sync> RusshSignerAdapter<'_, S> {
-    fn sign_request(
+    async fn sign_request(
         &self,
-        presented_key: &AgentIdentity,
+        presented_key: &[u8],
         payload: Vec<u8>,
     ) -> Result<Vec<u8>, PublicKeyAuthError> {
-        let presented_key = presented_key
-            .public_key()
-            .to_bytes()
-            .map_err(|_| PublicKeyAuthError::MalformedPayload("presented public key"))?;
         if presented_key != self.identity.signing_key_blob() {
             return Err(PublicKeyAuthError::KeyMismatch);
         }
@@ -2212,7 +2208,8 @@ impl<S: Signer + Sync> RusshSignerAdapter<'_, S> {
         {
             return Err(PublicKeyAuthError::KeyMismatch);
         }
-        let request = PublicKeyAuthRequest::signed(context, self.identity.clone(), self.signer)?;
+        let request =
+            PublicKeyAuthRequest::signed_async(context, self.identity.clone(), self.signer).await?;
         if request.signature_payload() != payload {
             return Err(PublicKeyAuthError::MalformedPayload("session-bound payload changed"));
         }
@@ -2234,8 +2231,11 @@ impl<S: Signer + Sync> RusshSigner for RusshSignerAdapter<'_, S> {
         _hash_alg: Option<HashAlg>,
         to_sign: Vec<u8>,
     ) -> impl std::future::Future<Output = Result<Vec<u8>, Self::Error>> + Send {
-        let result = self.sign_request(key, to_sign);
-        async move { result }
+        let presented_key = key
+            .public_key()
+            .to_bytes()
+            .map_err(|_| PublicKeyAuthError::MalformedPayload("presented public key"));
+        async move { self.sign_request(&presented_key?, to_sign).await }
     }
 }
 
@@ -2776,6 +2776,7 @@ fn unix_time_at(time: std::time::SystemTime) -> Result<u64, ClientError> {
 #[cfg(test)]
 mod tests {
     use std::{
+        io::{Read, Write},
         net::{IpAddr, SocketAddr, TcpListener as StdTcpListener},
         thread,
     };
@@ -2783,6 +2784,7 @@ mod tests {
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
+        mpsc as blocking_mpsc,
     };
 
     use russh::keys::PrivateKey;
@@ -2982,6 +2984,62 @@ mod tests {
             );
             ssh_signature.extend_from_slice(&signature);
             AgentMessage::SignResponse { signature: ssh_signature }.encode_frame()
+        }
+    }
+
+    struct WaitingSigningAgent {
+        inner: SigningAgent,
+        started: Arc<AtomicBool>,
+        release: blocking_mpsc::Receiver<()>,
+    }
+
+    impl AgentChannel for WaitingSigningAgent {
+        fn exchange(&mut self, request: &[u8]) -> Result<Vec<u8>, AgentError> {
+            self.started.store(true, Ordering::Release);
+            self.release
+                .recv_timeout(Duration::from_secs(1))
+                .map_err(|_| AgentError::AgentFailure)?;
+            self.inner.exchange(request)
+        }
+    }
+
+    struct RefusingAgent;
+
+    impl AgentChannel for RefusingAgent {
+        fn exchange(&mut self, request: &[u8]) -> Result<Vec<u8>, AgentError> {
+            if !matches!(AgentMessage::decode_frame(request)?, AgentMessage::SignRequest { .. }) {
+                return Err(AgentError::UnexpectedResponse);
+            }
+            AgentMessage::Failure.encode_frame()
+        }
+    }
+
+    struct TimedOutAgentStream {
+        read_started: Arc<AtomicBool>,
+        read_finished: Arc<AtomicBool>,
+        release: blocking_mpsc::Receiver<()>,
+        io_calls: Arc<AtomicUsize>,
+    }
+
+    impl Read for TimedOutAgentStream {
+        fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+            self.io_calls.fetch_add(1, Ordering::Relaxed);
+            self.read_started.store(true, Ordering::Release);
+            let _ = self.release.recv_timeout(Duration::from_secs(2));
+            self.read_finished.store(true, Ordering::Release);
+            Err(io::Error::new(io::ErrorKind::TimedOut, "agent read timed out"))
+        }
+    }
+
+    impl Write for TimedOutAgentStream {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            self.io_calls.fetch_add(1, Ordering::Relaxed);
+            Ok(buffer.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.io_calls.fetch_add(1, Ordering::Relaxed);
+            Ok(())
         }
     }
 
@@ -6371,11 +6429,160 @@ mod tests {
         assert_real_publickey_authentication(&agent).await;
     }
 
+    #[tokio::test]
+    async fn agent_refusal_is_reported_during_real_ssh_authentication() {
+        let software_signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
+        let key_blob = software_signer.public_key_blob().expect("agent key blob");
+        let agent = AgentSshSigner::new(
+            AgentClient::new(RefusingAgent),
+            SignatureAlgorithm::Ed25519,
+            key_blob.clone(),
+        )
+        .expect("agent signer");
+        let (mut connection, server) = start_publickey_server(key_blob).await;
+        assert!(matches!(
+            connection.authenticate_publickey("alice", &agent).await,
+            Err(ClientError::PublicKey(PublicKeyAuthError::Signer(SignerError::Signing(_))))
+        ));
+        connection.disconnect().await.expect("disconnect client");
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("SSH server task")
+            .expect("SSH server");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn agent_signing_does_not_stall_the_async_executor() {
+        let software_key = Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key");
+        let software_signer = Ed25519SshSigner::new(software_key);
+        let key_blob = software_signer.public_key_blob().expect("agent key blob");
+        let started = Arc::new(AtomicBool::new(false));
+        let (release, wait_for_release) = blocking_mpsc::channel();
+        let agent = AgentSshSigner::new(
+            AgentClient::new(WaitingSigningAgent {
+                inner: SigningAgent {
+                    key: Ed25519SigningKey::from_bytes(&[9; 32]).expect("agent key"),
+                    key_blob: key_blob.clone(),
+                },
+                started: Arc::clone(&started),
+                release: wait_for_release,
+            }),
+            SignatureAlgorithm::Ed25519,
+            key_blob,
+        )
+        .expect("agent signer");
+        let identity = PublicKeyIdentity::from_signer(&agent).expect("identity");
+        let context =
+            PublicKeyAuthContext::new([3; 32], "alice", "ssh-connection").expect("context");
+        let payload = PublicKeyAuthRequest::probe(context, identity.clone())
+            .expect("probe")
+            .signature_payload();
+        let public_key =
+            ssh_key::PublicKey::from_bytes(identity.signing_key_blob()).expect("public key");
+        let agent_identity = AgentIdentity::from(public_key);
+        let heartbeat = tokio::spawn(async move {
+            while !started.load(Ordering::Acquire) {
+                tokio::task::yield_now().await;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            release.send(()).expect("release agent exchange");
+        });
+        let mut adapter = RusshSignerAdapter { signer: &agent, identity, username: "alice".into() };
+        let signed = timeout(
+            Duration::from_secs(2),
+            <RusshSignerAdapter<'_, AgentSshSigner<WaitingSigningAgent>> as RusshSigner>::auth_sign(
+                &mut adapter,
+                &agent_identity,
+                None,
+                payload.clone(),
+            ),
+        )
+        .await
+        .expect("agent signing deadline")
+        .expect("agent signing");
+        heartbeat.await.expect("heartbeat task");
+        assert!(signed.starts_with(&payload));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn cancelled_agent_authentication_preserves_channel_failure() {
+        let software_signer =
+            Ed25519SshSigner::new(Ed25519SigningKey::from_bytes(&[9; 32]).expect("Ed25519 key"));
+        let key_blob = software_signer.public_key_blob().expect("agent key blob");
+        let read_started = Arc::new(AtomicBool::new(false));
+        let read_finished = Arc::new(AtomicBool::new(false));
+        let io_calls = Arc::new(AtomicUsize::new(0));
+        let (release, wait_for_release) = blocking_mpsc::channel();
+        let agent = AgentSshSigner::new(
+            AgentClient::new(crate::FramedAgentChannel::new(TimedOutAgentStream {
+                read_started: Arc::clone(&read_started),
+                read_finished: Arc::clone(&read_finished),
+                release: wait_for_release,
+                io_calls: Arc::clone(&io_calls),
+            })),
+            SignatureAlgorithm::Ed25519,
+            key_blob.clone(),
+        )
+        .expect("agent signer");
+        let (mut connection, server) = start_publickey_server(key_blob).await;
+        let mut authentication = Box::pin(connection.authenticate_publickey("alice", &agent));
+        timeout(Duration::from_secs(5), async {
+            while !read_started.load(Ordering::Acquire) {
+                tokio::select! {
+                    result = &mut authentication => panic!("authentication ended before agent read: {result:?}"),
+                    () = tokio::task::yield_now() => {}
+                }
+            }
+        })
+        .await
+        .expect("agent read started");
+        assert!(timeout(Duration::from_millis(30), &mut authentication).await.is_err());
+        drop(authentication);
+        release.send(()).expect("release agent read");
+        timeout(Duration::from_secs(5), async {
+            while !read_finished.load(Ordering::Acquire) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("agent read finished");
+        let first_exchange_io = io_calls.load(Ordering::Relaxed);
+        assert!(matches!(
+            agent.sign_async(b"second request".to_vec()).await,
+            Err(SignerError::Signing(error)) if error.contains("channel is unusable")
+        ));
+        assert_eq!(io_calls.load(Ordering::Relaxed), first_exchange_io);
+        timeout(Duration::from_secs(5), connection.disconnect())
+            .await
+            .expect("disconnect deadline")
+            .expect("disconnect client");
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("SSH server task")
+            .expect("SSH server");
+    }
+
     async fn assert_real_publickey_authentication<S>(signer: &S)
     where
         S: Signer + Sync,
     {
         let expected_key = signer.public_key_blob().expect("signer public key");
+        let (mut connection, server) = start_publickey_server(expected_key).await;
+        connection
+            .authenticate_publickey("alice", signer)
+            .await
+            .expect("public-key authentication");
+        connection.disconnect().await.expect("disconnect client");
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("SSH server task")
+            .expect("SSH server");
+    }
+
+    async fn start_publickey_server(
+        expected_key: Vec<u8>,
+    ) -> (ClientConnection, tokio::task::JoinHandle<()>) {
         let mut server_config = russh::server::Config::default();
         server_config.keys.push(
             PrivateKey::random(
@@ -6396,16 +6603,8 @@ mod tests {
 
         let verifier = |_host: &str, _key: &HostKey| Ok(());
         let config = ClientConfig::new("127.0.0.1", address.port(), verifier).expect("SSH config");
-        let mut connection = ClientConnection::connect(config).await.expect("connect client");
-        connection
-            .authenticate_publickey("alice", signer)
-            .await
-            .expect("public-key authentication");
-        connection.disconnect().await.expect("disconnect client");
-        timeout(Duration::from_secs(5), server)
-            .await
-            .expect("SSH server task")
-            .expect("SSH server");
+        let connection = ClientConnection::connect(config).await.expect("connect client");
+        (connection, server)
     }
 
     #[tokio::test]
@@ -6450,6 +6649,7 @@ mod tests {
         builder.valid_principal("alice").expect("certificate principal");
         let certificate = builder.sign(&ca).expect("signed certificate");
         let encoded_certificate = certificate.to_bytes().expect("certificate bytes");
+        let agent_certificate = encoded_certificate.clone();
         let user_certificate = UserCertificate::parse_and_validate(
             &encoded_certificate,
             &CertificateValidationPolicy::user("alice", now),
@@ -6499,9 +6699,30 @@ mod tests {
             .await
             .expect("SSH server task")
             .expect("SSH server");
+
+        let key_blob = signer.public_key_blob().expect("agent subject key");
+        let agent = AgentSshSigner::new(
+            AgentClient::new(SigningAgent {
+                key: Ed25519SigningKey::from_bytes(&[9; 32]).expect("agent key"),
+                key_blob: key_blob.clone(),
+            }),
+            SignatureAlgorithm::Ed25519,
+            key_blob,
+        )
+        .expect("agent signer");
+        let (mut connection, server) = start_publickey_server(agent_certificate).await;
+        connection
+            .authenticate_certificate("alice", &user_certificate, &agent)
+            .await
+            .expect("agent certificate authentication");
+        connection.disconnect().await.expect("disconnect client");
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("SSH server task")
+            .expect("SSH server");
     }
 
-    fn assert_rsa_certificate_payload_binding(
+    async fn assert_rsa_certificate_payload_binding(
         signer: &RsaSshSigner,
         identity: &PublicKeyIdentity,
         presented_key: &AgentIdentity,
@@ -6509,6 +6730,7 @@ mod tests {
     ) {
         let adapter =
             RusshSignerAdapter { signer, identity: identity.clone(), username: "alice".to_owned() };
+        let presented_key = presented_key.public_key().to_bytes().expect("presented key");
         let context =
             PublicKeyAuthContext::new([3; 32], "alice", "ssh-connection").expect("context");
         let other_algorithm = match signer.algorithm() {
@@ -6526,7 +6748,7 @@ mod tests {
             .expect("probe")
             .signature_payload();
         assert!(matches!(
-            adapter.sign_request(presented_key, changed_hash_payload),
+            adapter.sign_request(&presented_key, changed_hash_payload).await,
             Err(PublicKeyAuthError::KeyMismatch)
         ));
         let changed_certificate = PublicKeyIdentity::for_certificate(
@@ -6539,7 +6761,7 @@ mod tests {
             .expect("probe")
             .signature_payload();
         assert!(matches!(
-            adapter.sign_request(presented_key, changed_certificate_payload),
+            adapter.sign_request(&presented_key, changed_certificate_payload).await,
             Err(PublicKeyAuthError::KeyMismatch)
         ));
     }
@@ -6597,7 +6819,8 @@ mod tests {
                 &identity,
                 &presented_key,
                 &other_certificate,
-            );
+            )
+            .await;
             let mut server_config = russh::server::Config::default();
             server_config.keys.push(
                 PrivateKey::random(
