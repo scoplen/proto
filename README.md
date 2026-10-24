@@ -685,6 +685,20 @@ replay: clients retain edits and keys, then pull and reconcile before another wr
 acknowledgement no-op has no business-state mutation. The generic problem codec does not infer
 transaction state or enforce endpoint-specific flag combinations; storage adapters and consumers
 remain responsible for those decisions.
+For D-115, account-key PUT problem vectors retain the same code and flags for confirmed unchanged
+failure and an uncertain new-update commit. Clients keep their local keys and exact signed pending
+request, then retrieve and verify the current bundle. Its revision and device-specific projection
+cannot establish exact replay because GET omits the other wraps and PUT signature. A subsequent
+explicit recovery sends the retained bytes with fresh DPoP and current authorization: a stored
+revision needs complete exact comparison, while a still-next revision needs every new-update
+transaction check and a confirmed commit. Only a successful response bound to that request
+confirms publication. A newer revision requires verified reconciliation; the error never permits
+automatic replay, local identity replacement or a newly signed plan. Storage adapters must
+recheck the original identity/proof-key binding and current authority inside the account
+transaction, including for exact replay; the latter makes no second business audit and does not
+reverify stored bytes against a later signing root. Signature/recipient validation, revision CAS,
+projected response bounds, audit and serialization with pairing remain consumer duties. These
+shared codecs do not implement account-root rotation, device revocation or a transaction store.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
 For D-106, `auth::AuthRateLimitHeaders` supplies the separate `"authentication"` response
