@@ -416,6 +416,14 @@ impl AccountRegistrationRequest {
     /// # Errors
     /// Rejects syntax/bounds/unknown fields and publicly verifiable protected binding failures.
     pub fn from_json(input: &[u8]) -> Result<Self, AccountAdmissionCodecError> {
+        let value = Self::from_json_envelope(input)?;
+        AccountRegistrationPayload::from_cbor(value.payload.as_bytes())?;
+        Ok(value)
+    }
+
+    // Transaction peers must finish structural decoding before authenticating and consuming
+    // a matched challenge. The public decoder retains its complete strict validation.
+    pub(crate) fn from_json_envelope(input: &[u8]) -> Result<Self, AccountAdmissionCodecError> {
         let mut f = object(input, 524_288)?;
         let value = Self {
             intent: take_intent(&mut f)?,
@@ -430,7 +438,6 @@ impl AccountRegistrationRequest {
             device_proof: take_fixed(&mut f, "device_proof")?,
         };
         no_extensions(&f)?;
-        AccountRegistrationPayload::from_cbor(value.payload.as_bytes())?;
         Ok(value)
     }
     /// Encode deterministic native request fields while preserving original business bytes.

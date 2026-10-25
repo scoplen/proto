@@ -4,13 +4,22 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add a registration-only D-128/D-129 reference peer with real Account/Device signature checks,
+  exact original-key receipt confirmation, serialized one-row retention/capacity and complete
+  restart images. Public fixtures cover deletion/recreation denial, racing instances, explicit
+  maintenance increases, upgrade reservation, warning thresholds and atomic audit/commit faults.
+  Complete structural parsing preserves malformed-request rejection before challenge lookup;
+  inner/outer signature and context denials consume live challenges with their mandatory audit.
+  The peer does not implement password login, Device admission, rate admission, HTTP, a durable
+  database or the production audit chain; those boundaries remain separate work.
+
 - Wait for complete RSA fixture setup and an OpenSSH banner from every constrained listener
   before copying the disposable key or starting interoperability checks. A published Docker
   port alone does not establish that key generation or the SSH listener is ready.
 
 - Add the D-129 Account-only used-id SHA-256 helper, independent Node known answers, invalid
   UUID version/variant checks and decoder corpus seeds. No timestamp window or additional
-  namespace is added. Atomic retention/capacity reference and production storage remain separate.
+  namespace is added. Production retention and capacity storage remain separate work.
 
 - Fix the independent password-bootstrap vector generator's CLI detection through directory
   symlinks. Temporary checkout generation now follows the same canonical entry path on all

@@ -206,6 +206,28 @@ impl AccountRegistrationPayload {
     /// # Errors
     /// Rejects syntax, bounds and publicly verifiable binding failures.
     pub fn from_cbor(input: &[u8]) -> Result<Self, Error> {
+        let value = Self::decode_fields(input)?;
+        value.validate()?;
+        Ok(value)
+    }
+
+    // Complete every artifact's syntax checks before a transaction claims its challenge;
+    // signatures and identity relationships are authenticated under that transaction.
+    pub(crate) fn from_cbor_structural(input: &[u8]) -> Result<Self, Error> {
+        let value = Self::decode_fields(input)?;
+        validate_origin_username(&value.origin, &value.username)?;
+        password_wrap(&value.password_ark)?;
+        PersonalVaultKeyWrap::decode(&value.personal_wrapped_key)
+            .map_err(|_| Error::InvalidProtected)?;
+        let cert = certificate_structure(&value.device_certificate)?;
+        for key in [&cert.signing_public_key, &cert.kem_public_key] {
+            canonical_device_public_key(key).map_err(|_| Error::InvalidProtected)?;
+        }
+        bundle_artifacts(&bundle_structure(&value.key_bundle)?)?;
+        Ok(value)
+    }
+
+    fn decode_fields(input: &[u8]) -> Result<Self, Error> {
         let mut f = decode(input, super::MAX_ACCOUNT_REGISTRATION_PAYLOAD_BYTES)?;
         one(&mut f, "version")?;
         one(&mut f, "credential_generation")?;
@@ -228,7 +250,6 @@ impl AccountRegistrationPayload {
             personal_wrapped_key: fixed(&mut f, "personal_wrapped_key")?,
         };
         empty(&f)?;
-        value.validate()?;
         Ok(value)
     }
 }
@@ -578,6 +599,14 @@ fn ids(values: &[Uuid]) -> Result<(), Error> {
     Ok(())
 }
 fn certificate(bytes: &[u8], account: Uuid, root: &[u8; 32]) -> Result<DeviceCertificate, Error> {
+    let value = certificate_structure(bytes)?;
+    if value.account_id != account {
+        return Err(Error::Binding);
+    }
+    value.verify(root).map_err(|_| Error::Binding)?;
+    Ok(value)
+}
+fn certificate_structure(bytes: &[u8]) -> Result<DeviceCertificate, Error> {
     if bytes.is_empty() {
         return Err(Error::InvalidProtected);
     }
@@ -585,12 +614,7 @@ fn certificate(bytes: &[u8], account: Uuid, root: &[u8; 32]) -> Result<DeviceCer
         return Err(Error::TooLarge);
     }
     preflight(bytes)?;
-    let value = DeviceCertificate::decode(bytes).map_err(|_| Error::InvalidProtected)?;
-    if value.account_id != account {
-        return Err(Error::Binding);
-    }
-    value.verify(root).map_err(|_| Error::Binding)?;
-    Ok(value)
+    DeviceCertificate::decode(bytes).map_err(|_| Error::InvalidProtected)
 }
 fn distinct_device_keys(cert: &DeviceCertificate) -> Result<[[u8; 65]; 2], Error> {
     let a = canonical_device_public_key(&cert.signing_public_key)
@@ -603,6 +627,17 @@ fn distinct_device_keys(cert: &DeviceCertificate) -> Result<[[u8; 65]; 2], Error
     Ok([a, b])
 }
 fn signed_bundle(bytes: &[u8], root: &[u8; 32]) -> Result<SyncAccountKeyBundleUpdate, Error> {
+    let value = bundle_structure(bytes)?;
+    ed25519_verify(
+        root,
+        &value.signature_input().map_err(|_| Error::InvalidProtected)?,
+        &value.signature,
+    )
+    .map_err(|_| Error::Binding)?;
+    bundle_artifacts(&value)?;
+    Ok(value)
+}
+fn bundle_structure(bytes: &[u8]) -> Result<SyncAccountKeyBundleUpdate, Error> {
     if bytes.is_empty() {
         return Err(Error::InvalidProtected);
     }
@@ -610,14 +645,9 @@ fn signed_bundle(bytes: &[u8], root: &[u8; 32]) -> Result<SyncAccountKeyBundleUp
         return Err(Error::TooLarge);
     }
     preflight(bytes)?;
-    let value =
-        SyncAccountKeyBundleUpdate::from_cbor(bytes).map_err(|_| Error::InvalidProtected)?;
-    ed25519_verify(
-        root,
-        &value.signature_input().map_err(|_| Error::InvalidProtected)?,
-        &value.signature,
-    )
-    .map_err(|_| Error::Binding)?;
+    SyncAccountKeyBundleUpdate::from_cbor(bytes).map_err(|_| Error::InvalidProtected)
+}
+fn bundle_artifacts(value: &SyncAccountKeyBundleUpdate) -> Result<(), Error> {
     AccountSigningKeyWrap::decode(&value.account_signing_key)
         .map_err(|_| Error::InvalidProtected)?;
     AccountKemKeyWrap::decode(&value.account_kem_key).map_err(|_| Error::InvalidProtected)?;
@@ -625,7 +655,7 @@ fn signed_bundle(bytes: &[u8], root: &[u8; 32]) -> Result<SyncAccountKeyBundleUp
     for wrap in &value.device_wraps {
         DeviceArkWrap::decode(&wrap.wrapped_ark).map_err(|_| Error::InvalidProtected)?;
     }
-    Ok(value)
+    Ok(())
 }
 
 type Fields = BTreeMap<String, Value>;
