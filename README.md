@@ -388,6 +388,23 @@ key, password, host, port, and user variables, plus `SCOPLEN_OPENSSH_JUMP_TARGET
 server's SSH port as seen from inside the server. It checks the host pin and password at every
 hop, session commands on each connection, wrong-pin and closed-target rejection, and parent
 connection reuse after the failures. The disposable OpenSSH script below runs this example.
+
+`pwsh ./scripts/ssh-mixed-jump-interop.ps1` checks alternating OpenSSH 9.9p2 and
+Dropbear 2024.86 routes with one, two and three jump hosts, starting through either
+implementation. Four independent listeners use distinct host keys, usernames and
+passwords; only the two ingress ports are published on loopback. Each next hop is
+resolved by its SSH parent. Wrong host keys and passwords fail at every position,
+closed targets return a channel-open error, and existing parents still execute
+their exact identity commands after refusal, canceled nested handshakes and child
+disconnect. Targets echo 131,087 binary bytes with an EOF-only trailer and exit zero.
+Each connection has only two channel slots, so retaining one child leaves one slot
+for probes and exposes leaked slots after failed or canceled setup.
+Server-side counters require all twelve canceled handshakes to reach SSH identification
+and then close; no SSH or stalled-handshake socket may remain after reverse teardown.
+It requires PowerShell 7 and Docker. Successful runs remove owned resources; failed
+runs stop their owned container and retain private diagnostics. This fixture does not
+complete the authentication, server or platform interoperability matrix.
+
 `pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH 9.9p2 server;
 `pwsh ./scripts/openssh-interop.ps1 -ServerVersion 10.6p1` runs the same checks against the
 current OpenSSH 10.6p1 package from Alpine edge. Both paths check the installed package and SSH
