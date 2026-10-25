@@ -53,6 +53,7 @@ LogLevel VERBOSE
 SSHD
     /usr/sbin/sshd -t -f "/tmp/$mode.conf"
 done
+touch /tmp/rsa-selection-configured
 /usr/sbin/sshd -D -e -f /tmp/sha256.conf &
 /usr/sbin/sshd -D -e -f /tmp/dual.conf &
 exec /usr/sbin/sshd -D -e -f /tmp/sha1.conf
@@ -70,8 +71,9 @@ exec /usr/sbin/sshd -D -e -f /tmp/sha1.conf
         $ports[$serverPort] = [int]$Matches[1]
     }
     $ready = $false
-    for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        $hostKey = docker exec $container cat /tmp/host_key.pub 2>$null
+    $deadline = [DateTime]::UtcNow.AddSeconds(60)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $hostKey = docker exec $container sh -c 'test -f /tmp/rsa-selection-configured && cat /tmp/host_key.pub' 2>$null
         if ($LASTEXITCODE -ne 0 -or $hostKey -notmatch '^ssh-ed25519 ') {
             Start-Sleep -Seconds 1
             continue
@@ -79,14 +81,30 @@ exec /usr/sbin/sshd -D -e -f /tmp/sha1.conf
         $ready = $true
         foreach ($port in $ports.Values) {
             $socket = [System.Net.Sockets.TcpClient]::new()
-            try { $socket.Connect('127.0.0.1', $port) }
+            try {
+                $socket.Connect('127.0.0.1', $port)
+                $socket.ReceiveTimeout = 1000
+                $stream = $socket.GetStream()
+                $banner = [System.Text.StringBuilder]::new()
+                while ($banner.Length -lt 256) {
+                    $value = $stream.ReadByte()
+                    if ($value -lt 0 -or $value -eq 10) { break }
+                    [void]$banner.Append([char]$value)
+                }
+                if ($banner.ToString() -notmatch '^SSH-2\.0-OpenSSH_[^\r\n]+\r?$') {
+                    $ready = $false
+                }
+            }
             catch { $ready = $false }
             finally { $socket.Dispose() }
         }
         if ($ready) { break }
         Start-Sleep -Seconds 1
     }
-    if (-not $ready) { throw 'OpenSSH listeners did not become ready within 60 seconds' }
+    if (-not $ready) {
+        docker logs --tail 20 $container
+        throw 'OpenSSH listeners did not become ready within 60 seconds'
+    }
 
     $userKey = Join-Path $tempRoot 'user_rsa'
     docker cp "${container}:/tmp/user_rsa" $userKey | Out-Null

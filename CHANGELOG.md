@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Wait for complete RSA fixture setup and an OpenSSH banner from every constrained listener
+  before copying the disposable key or starting interoperability checks. A published Docker
+  port alone does not establish that key generation or the SSH listener is ready.
+
 - Fix the independent password-bootstrap vector generator's CLI detection through directory
   symlinks. Temporary checkout generation now follows the same canonical entry path on all
   supported platforms; linked-directory regressions retain drift and exact seed validation.
