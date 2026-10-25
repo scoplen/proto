@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Take zeroizing ownership of every keyboard-interactive response before validating count or
+  size, so rejected input buffers are also cleared on drop. Public errors and bounds are unchanged.
+
 - Registered D-123 Credential kind 8 for explicit SSH keyboard-interactive login, requiring
   none binding and no saved secret, device entry, public key, provider or certificate scope.
   Cleared-field markers and unknown fields retain ordinary model behavior. This registry

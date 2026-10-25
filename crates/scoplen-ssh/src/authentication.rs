@@ -819,11 +819,12 @@ impl fmt::Debug for KeyboardInteractiveResponse {
 impl KeyboardInteractiveResponse {
     /// Create bounded responses matching the prompts in one information request.
     pub fn new(responses: Vec<Vec<u8>>) -> Result<Self, AuthMethodError> {
+        let responses: Vec<_> = responses.into_iter().map(SecretVec::new).collect();
         validate_prompt_count(responses.len())?;
         for response in &responses {
-            validate_auth_size(response, MAX_AUTH_PASSWORD, "response")?;
+            validate_auth_size(response.as_bytes(), MAX_AUTH_PASSWORD, "response")?;
         }
-        Ok(Self { responses: responses.into_iter().map(SecretVec::new).collect() })
+        Ok(Self { responses })
     }
 
     /// Parse one `SSH_MSG_USERAUTH_INFO_RESPONSE` payload.
