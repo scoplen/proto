@@ -4,7 +4,7 @@
 //! This slice verifies real Account and Device signatures and models atomic business state,
 //! digest retention and complete restart images. It is not HTTP transport, durable database
 //! storage, an audit chain or rate admission. Callers admit work before invoking this peer.
-//! Password login and Device admission are separate reference work.
+//! Password options/login share this storage; Device admission remains separate reference work.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -27,6 +27,12 @@ use crate::{
         AccountRegistrationPayload, AccountRegistrationRequest, AccountRequestChallengeRequest,
         AccountRequestChallengeResponse, AccountRequestIntent, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
     },
+};
+
+mod password;
+pub use password::{
+    ReferenceAdmissionCapability, ReferencePasswordAttempt, ReferencePasswordCredential,
+    ReferencePasswordError, ReferencePasswordSummary,
 };
 
 /// The admitted default deployment-lifetime Account-id row ceiling.
@@ -200,7 +206,9 @@ struct Account {
     vault_id: Uuid,
     device_id: Uuid,
     operation_id: Uuid,
-    verifier: SecretBytes<32>,
+    signing_root: [u8; 32],
+    kem_root: [u8; 32],
+    credential: ReferencePasswordCredential,
     bootstrap: SecretVec,
     active: bool,
 }
@@ -225,6 +233,7 @@ struct State {
     denials: u64,
     ceiling_changes: u64,
     fault: Option<ReferenceRegistrationFault>,
+    password: password::PasswordState,
 }
 
 impl State {
@@ -319,7 +328,7 @@ impl ReferenceAccountRegistrationPeer {
     /// Create a fixture with the accepted default permanent Account-id ceiling.
     ///
     /// # Errors
-    /// Rejects a noncanonical trusted origin.
+    /// Rejects a noncanonical trusted origin or unavailable OS randomness.
     pub fn new(origin: &str) -> Result<Self, ReferenceRegistrationError> {
         Self::with_retention_ceiling(origin, DEFAULT_USED_ACCOUNT_ID_CEILING)
     }
@@ -327,7 +336,7 @@ impl ReferenceAccountRegistrationPeer {
     /// Select a smaller positive fixture ceiling to exercise exact capacity boundaries.
     ///
     /// # Errors
-    /// Rejects a noncanonical origin, zero ceiling or checked application-byte overflow.
+    /// Rejects a noncanonical origin, invalid ceiling or unavailable OS randomness.
     pub fn with_retention_ceiling(
         origin: &str,
         ceiling: u64,
@@ -353,6 +362,7 @@ impl ReferenceAccountRegistrationPeer {
             denials: 0,
             ceiling_changes: 0,
             fault: None,
+            password: password::PasswordState::new()?,
         }))))
     }
 
@@ -435,7 +445,7 @@ impl ReferenceAccountRegistrationPeer {
     ) -> Result<Option<ReferenceRegistrationAccountMaterial>, ReferenceRegistrationError> {
         Ok(self.lock()?.accounts.get(&account_id).map(|account| {
             ReferenceRegistrationAccountMaterial {
-                verifier: account.verifier.clone(),
+                verifier: account.credential.verifier.clone(),
                 bootstrap: account.bootstrap.clone(),
                 active: account.active,
             }
@@ -701,6 +711,7 @@ impl ReferenceAccountRegistrationPeer {
         state.vaults.remove(&account.vault_id);
         state.devices.remove(&account.device_id);
         state.receipts.remove(&account.operation_id);
+        state.password.remove_account(account_id, &account.username);
         let challenges: Vec<_> = state
             .challenges
             .iter()
@@ -880,7 +891,14 @@ fn submit_registration(
         vault_id: payload.personal_vault_id,
         device_id: payload.device_id,
         operation_id: payload.operation_id,
-        verifier: SecretBytes::new(payload.verifier),
+        signing_root: payload.account_signing_public_key,
+        kem_root: payload.account_kem_public_key,
+        credential: ReferencePasswordCredential {
+            profile: 1,
+            salt: payload.password_salt,
+            generation: 1,
+            verifier: SecretBytes::new(payload.verifier),
+        },
         bootstrap: SecretVec::new(bootstrap),
         active: true,
     };

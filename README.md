@@ -40,8 +40,17 @@ Complete structural parsing precedes challenge lookup; a live attempt's denied b
 signature consumes that challenge with its denial audit, and an audit failure rolls both back.
 This peer does not supply HTTP transport, durable storage, an audit chain or rate admission.
 Maintenance controls model confirmed precommit faults; their own uncertain commits are not covered.
-Password options/login, Device admission and their current-state CAS remain separate reference
-work; production retention, migration and operator warning delivery remain consumer work.
+Password options/login now share the registration peer's complete image and Account lock.
+Options use one retained deployment probe key, fixed shapes and stable synthetic salts. Login
+consumes an attempt with its denial or success audit, verifies the transaction-current password
+and complete signed bootstrap, and issues only a bounded digest-keyed admission capability.
+Registered Account roots are retained separately from the bootstrap; a pending Personal rotation
+or a self-consistent bootstrap with unverified replacement roots is denied with an audited conflict.
+The owned login body, comparison buffers and unreturned raw capabilities use zeroizing storage;
+capability records retain no raw token, authentication secret or snapshot copy. Unknown commits
+return no token and never claim an Account/Device mutation. Device admission/CAS, durable rate
+admission, coordinated probe-key replacement and production storage/KMS remain separate work.
+Production retention, migration and operator warning delivery remain consumer work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
 complete recipient equality, retained Personal epochs and exact historical confirmation binding.
 Native request metadata rejects session/cookie/header alternatives; response readers enforce

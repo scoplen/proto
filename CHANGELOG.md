@@ -9,14 +9,23 @@ All notable changes to the `proto` repository will be recorded here.
   available for challenge consumption with mandatory denial audit. Strict decoders and wire
   bytes are unchanged, and structural results grant no authority.
 
+- Extend the shared Account reference peer with complete D-128 password options/login,
+  stable synthetic salts, fixed-size verifier checks, one-use attempts and complete signed
+  transaction-current snapshots. Digest-only bounded capabilities, indexed expiry, restart
+  images and audit/commit faults preserve the no-business-change login boundary. Owned secret
+  bodies and comparison buffers are zeroized. Independent registered root anchors and audited
+  current-state conflicts reject pending rotations or unverified replacement roots. Device
+  admission/CAS, shared rate admission, probe-key replacement, HTTP and production database/KMS
+  integration remain separate work.
+
 - Add a registration-only D-128/D-129 reference peer with real Account/Device signature checks,
   exact original-key receipt confirmation, serialized one-row retention/capacity and complete
   restart images. Public fixtures cover deletion/recreation denial, racing instances, explicit
   maintenance increases, upgrade reservation, warning thresholds and atomic audit/commit faults.
   Complete structural parsing preserves malformed-request rejection before challenge lookup;
   inner/outer signature and context denials consume live challenges with their mandatory audit.
-  The peer does not implement password login, Device admission, rate admission, HTTP, a durable
-  database or the production audit chain; those boundaries remain separate work.
+  This registration slice leaves password login, Device admission, rate admission, HTTP,
+  a durable database and the production audit chain to separate work.
 
 - Wait for complete RSA fixture setup and an OpenSSH banner from every constrained listener
   before copying the disposable key or starting interoperability checks. A published Docker
