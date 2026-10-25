@@ -321,3 +321,17 @@ pub fn account_bootstrap_digest(bytes: &[u8]) -> [u8; 32] {
 pub fn account_capability_digest(token: &[u8; 32]) -> [u8; 32] {
     Sha256::digest(token).into()
 }
+
+/// D-129 deployment-lifetime retention digest of one Account id.
+///
+/// The exact input is the domain label followed by the raw 16 UUID bytes. Retention, atomic
+/// insertion, capacity and deletion behavior remain store responsibilities.
+/// # Errors
+/// Rejects an id that is not an RFC 4122-variant `UUIDv7`; no timestamp window is applied.
+pub fn account_used_id_digest(account_id: Uuid) -> Result<[u8; 32], AccountRequestError> {
+    validate_uuid_v7(account_id).map_err(|_| AccountRequestError)?;
+    let mut hash = Sha256::new();
+    hash.update(b"spl-account-used-id-v1");
+    hash.update(account_id.as_bytes());
+    Ok(hash.finalize().into())
+}

@@ -25,6 +25,9 @@ D-128 adds five native Account entry routes with JSON codecs, exact protected re
 and complete-bootstrap CBOR, additional Account signatures and fresh Device possession inputs.
 The public deployment probe-key helper derives stable synthetic salts, denial verifiers and
 private username admission identities with separate HMAC-SHA-256 domains and canonical context.
+D-129's Account-only retention digest uses the exact domain and raw UUID bytes, without adding
+wire fields or permanent Device, vault or operation identities. Atomic lifetime retention and
+capacity enforcement remain separate reference and production store work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
 complete recipient equality, retained Personal epochs and exact historical confirmation binding.
 Native request metadata rejects session/cookie/header alternatives; response readers enforce

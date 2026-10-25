@@ -5,6 +5,11 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`account-used-id.json` contains D-129's independently computed Account-only SHA-256 digests over
+the exact domain label and raw UUID bytes, plus rejected UUID versions and variants. The future
+timestamp fixture remains valid without a clock window. Run
+`node scripts/generate-account-used-id-vectors.mjs [--check]` to check the vectors and UUID seeds.
+
 `account-admission.json` contains independently generated D-128 native JSON, protected canonical
 CBOR and exact Account/fresh Device proof inputs for both kinds and submit/confirm intents.
 Its `account.admission.probe` known answers independently derive all three deployment-key HMAC

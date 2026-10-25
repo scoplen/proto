@@ -1,0 +1,48 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "account-used-id-account",
+      "kind": "account.used-id.digest",
+      "input": "04000000-0000-7000-8000-000000000000",
+      "expected": "5b18e6e81ef0f78a21a1de0a659ad29da8567555b766dd5dda11fc4e49c218a9"
+    },
+    {
+      "id": "account-used-id-adjacent",
+      "kind": "account.used-id.digest",
+      "input": "04000000-0000-7000-8000-000000000001",
+      "expected": "baa9e9b7d008ce0f702c60fdf306021296992b811f7d6cd82736d7c046d25991"
+    },
+    {
+      "id": "account-used-id-maximum-time",
+      "kind": "account.used-id.digest",
+      "input": "ffffffff-ffff-7fff-bfff-ffffffffffff",
+      "expected": "c863a85509b8ae6b96b6a9fad4e586ff60e7e168f0675663e34b622f923b55ef"
+    },
+    {
+      "id": "account-used-id-nil",
+      "kind": "account.used-id.digest",
+      "input": "00000000-0000-0000-0000-000000000000",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-used-id-v4",
+      "kind": "account.used-id.digest",
+      "input": "018f35d4-1f8f-4e2a-9e56-7a5e8a9f1101",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-used-id-v8",
+      "kind": "account.used-id.digest",
+      "input": "018f35d4-1f8f-8e2a-9e56-7a5e8a9f1101",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-used-id-variant",
+      "kind": "account.used-id.digest",
+      "input": "018f35d4-1f8f-7e2a-7e56-7a5e8a9f1101",
+      "expected": "rejected"
+    }
+  ]
+}

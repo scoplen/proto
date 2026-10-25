@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add the D-129 Account-only used-id SHA-256 helper, independent Node known answers, invalid
+  UUID version/variant checks and decoder corpus seeds. No timestamp window or additional
+  namespace is added. Atomic retention/capacity reference and production storage remain separate.
+
 - Fix the independent password-bootstrap vector generator's CLI detection through directory
   symlinks. Temporary checkout generation now follows the same canonical entry path on all
   supported platforms; linked-directory regressions retain drift and exact seed validation.
