@@ -22,9 +22,14 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
 
 ## Open gaps
 
-- The S1 baseline, S2 object-model gate, and S3 cryptographic gate are complete, including schema
-  handling, model limits, merge laws, key hierarchy, device certificates, encrypted envelopes,
-  recovery, Shamir, escrow wrapping, CPace/QR pairing, and executable known-answer vectors.
+- The S1 baseline and S2 object-model gate are complete, including schema handling, model limits
+  and merge laws. S3 remains Incomplete under D-125 through D-127: shared key hierarchy,
+  certificates, encrypted envelopes and password bootstrap are implemented, while scoped recovery
+  and retirement work remains open. Historical whole-Account escrow and Personal-pairing exports
+  do not implement the current recovery/admission flow. D-127 adds fixed Unicode 17 NFC,
+  Argon2id-v19, separate authentication/KEK outputs, the exact ARK envelope and reconstruction of
+  both Account roots, with independent vectors, failure tests and bounded parser fuzz targets.
+  Transport, freshness and credential lifecycle remain consumer work under D-128.
   S4 has a concrete client adapter for transport, authentication, channels, routes, and SFTP,
   with per-Host algorithm, incoming/outgoing byte and elapsed rekey configuration, and initial and
   repeated strict-KEX interoperability verification; complete algorithm/extension support, default compatibility, interoperability, and performance remain

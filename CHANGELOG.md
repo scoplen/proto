@@ -13,6 +13,14 @@ All notable changes to the `proto` repository will be recorded here.
   Operator scope encoding is unchanged. Public role and failure vectors cover the boundary;
   current-state storage, transactional checks and consumer delivery remain separate work.
 
+- Implement D-127's fixed Unicode 17 NFC / Argon2id-v19 password bootstrap with separate
+  AuthSecret and private KEK, a constant-time SHA-256 verifier check, exact context/AAD and
+  73-byte ARK envelope. Credential creation and sealing generate fresh salt/nonce internally;
+  complete opening reconstructs both D108 Account roots. Explicit zeroizing Argon2 block storage,
+  bounded owned buffers, independent Node known answers, failure tests and parser seeds cover
+  the shared K-2 boundary. Upstream scratch and OS/compiler copies have documented erasure limits;
+  transport, freshness, credential lifecycle and production Account login remain separate work.
+
 - Add D-124 current Operator-family logout codecs, explicit authenticated intrinsic operation,
   OpenAPI/TypeScript, independent vectors, parser bounds and a scripted reference peer. The
   fixed confirmation never supplies general authorization. Replace the pre-Stable Operator

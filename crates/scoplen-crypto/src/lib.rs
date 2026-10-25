@@ -20,6 +20,7 @@ mod keys;
 mod operator_access_token;
 mod pairing;
 mod pairing_application;
+mod password_bootstrap;
 mod personal_enrollment;
 mod primitives;
 mod recovery;
@@ -76,6 +77,11 @@ pub use pairing_application::{
     MAX_PAIRING_HANDOFF_FRAME_BYTES, MAX_PAIRING_NEW_DEVICE_FRAME_BYTES, PairingApplicationContext,
     PairingApplicationError, PairingCompletionContext, PairingHandoff, PairingKeyProjection,
     PairingNewDevice, pairing_approval_fingerprint, pairing_key_anchor,
+};
+pub use password_bootstrap::{
+    PASSWORD_ARK_WRAP_BYTES, PASSWORD_BOOTSTRAP_PROFILE, PasswordArkWrap, PasswordBootstrap,
+    PasswordBootstrapContext, PasswordBootstrapError, PasswordKdfContext, PasswordSecrets,
+    PasswordVerifier, normalize_account_password,
 };
 pub use personal_enrollment::{
     PersonalEnrollmentArtifacts, PersonalEnrollmentContext, PersonalEnrollmentError,

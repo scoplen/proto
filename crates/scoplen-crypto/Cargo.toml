@@ -7,7 +7,7 @@ rust-version.workspace = true
 description = "Scoplen's reviewed cryptographic formats and key operations."
 
 [dependencies]
-argon2 = "0.5.3"
+argon2 = { version = "0.5.3", features = ["zeroize"] }
 base64 = "0.22.1"
 chacha20poly1305 = "0.10.1"
 ed25519-dalek = "2.1.1"
@@ -26,6 +26,7 @@ serde_json = "1.0.140"
 sha2 = "0.10.9"
 subtle = "2.6.1"
 thiserror.workspace = true
+unicode-normalization.workspace = true
 uuid.workspace = true
 zeroize = { version = "1.8.1", features = ["derive"] }
 
