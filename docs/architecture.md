@@ -16,6 +16,13 @@ validation, tombstones, and pure merge helpers. Later gates add contract behavio
 defined by `scoplen-docs/17-implementation-roadmap.md`; no consumer may define a second copy of a
 wire format or cryptographic construction.
 
+D-123 adds Credential kind 8 as a secretless keyboard-interactive descriptor. Validation
+requires binding none and rejects all live authentication fields, including decomposed device
+entries; clearing markers remain valid for conversion and merge. Public tests decode independent
+Node-produced canonical vectors and check conversion through the object encoding boundary.
+Older rejecting readers are incompatible before Stable. Consumers separately implement prompt
+ownership, deadlines, cancellation and saved Login resolution; the model stores no answers.
+
 The K-2 implementation uses HPKE 0.14 and P-256 0.14 with the existing RFC 9180
 P-256/X25519, HKDF-SHA-256 and ChaCha20-Poly1305 suites. HPKE's features are explicit;
 its optional post-quantum suites are not enabled. The workspace and fuzz locks pin

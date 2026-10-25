@@ -38,6 +38,13 @@ authentication, rate-limit, audit or transaction store.
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
+Credential kind 8 describes explicit keyboard-interactive login with none binding and no
+saved authentication fields. It may retain cleared-field markers when converting a credential;
+live device-map entries must also be cleared. The Login still references this descriptor using
+its ordinary Credential field. Existing readers reject this new kind, making D-123 a breaking
+pre-Stable registry extension. It does not implement desktop prompts or select an implicit
+fallback. Independent vectors and named object-decoder corpus seeds are regenerated or checked with
+`node scripts/generate-interactive-credential-vectors.mjs [--check]`.
 D-111 provides a distinct Operator browser JWT signer, trust set and stateless verifier with
 `spl-operator-access+jwt`, `spl-admin/1`, and a required refresh-family `sid`. It rejects device
 and organization claims; current Operator/credential/family state, DPoP replay and exact route
