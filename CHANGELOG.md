@@ -4,6 +4,17 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Complete D-128 Device admission in the shared Account reference peer: transaction-current
+  snapshot CAS, exact next signed bundle, new Device/certificate, consumed capability, immutable
+  receipt and atomic audit/commit faults. Live capability indexes are removed on success or CAS
+  invalidation. Deployment-wide cross-role freshness uses Account-lifetime key-to-receipt indexes
+  with multiple owners; complete Account deletion removes all ordinary Device, receipt, challenge
+  and password rows while retaining only D-129's permanent Account-id digest. Fresh original-key
+  confirmation survives current-state changes without granting current authorization or falling
+  through after deletion. Public fixtures exercise the receipt boundary at a lower owned-fixture
+  ceiling, not 65,536 admissions. HTTP, durable storage, rates and production auditing remain
+  separate work.
+
 - Expose complete registration/admission structural decoding for production transaction peers.
   Nested malformed artifacts fail before challenge lookup; binding/signature failures remain
   available for challenge consumption with mandatory denial audit. Strict decoders and wire

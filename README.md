@@ -48,8 +48,24 @@ Registered Account roots are retained separately from the bootstrap; a pending P
 or a self-consistent bootstrap with unverified replacement roots is denied with an audited conflict.
 The owned login body, comparison buffers and unreturned raw capabilities use zeroizing storage;
 capability records retain no raw token, authentication secret or snapshot copy. Unknown commits
-return no token and never claim an Account/Device mutation. Device admission/CAS, durable rate
-admission, coordinated probe-key replacement and production storage/KMS remain separate work.
+return no token and never claim an Account/Device mutation.
+Device admission uses that same Account lock to compare the complete current snapshot and publish
+the exact next bundle, new Device/certificate, immutable receipt and success audit atomically.
+A stale capability commits only its invalidation, challenge consumption and denial audit. Success
+and CAS invalidation remove the live capability and both indexes; no spent-token collection grows.
+New Device admission checks freshness deployment-wide across both key roles. Ordinary key-to-receipt
+indexes retain multiple Account owners and are removed with their Account's Devices and receipts;
+only D-129's Account-id digest survives Account deletion. The default receipt ceiling is 65,536
+per Account lifetime, including registration. Public submission fixtures exercise the real boundary
+with an explicitly lower owned-fixture ceiling; they do not run 65,536 successful admissions.
+The multi-owner fixture deliberately repeats keys under the existing registration reference
+behavior; compliant clients still generate independent fresh keys.
+Exact confirmation checks only the original receipt, Account root and fresh original-Device proof,
+including after current credentials, roots, status or revocations changed. It grants no new Device
+authority and can never fall through to submission after deletion. Audit/commit faults and restart
+images cover both business publication and receipt-only challenge consumption.
+Durable rate admission, coordinated probe-key replacement and production HTTP/database/KMS
+integration remain separate work.
 Production retention, migration and operator warning delivery remain consumer work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
 complete recipient equality, retained Personal epochs and exact historical confirmation binding.

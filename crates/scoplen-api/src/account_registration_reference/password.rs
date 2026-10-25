@@ -66,7 +66,7 @@ pub struct ReferenceAdmissionCapability {
     pub snapshot_digest: [u8; 32],
     /// Exactly five minutes after capability creation.
     pub expires_at_ms: u64,
-    /// Initial single-use state; Device-admission consumption is a separate reference slice.
+    /// Retained rows are unspent; admission consumption removes the row and its live indexes.
     pub spent: bool,
 }
 
@@ -209,7 +209,7 @@ impl PasswordState {
         }
     }
 
-    fn remove_capability(&mut self, id: &[u8; 32]) {
+    pub(super) fn remove_capability(&mut self, id: &[u8; 32]) {
         if let Some(capability) = self.capabilities.remove(id) {
             self.capability_expiry.remove(&(capability.expires_at_ms, *id));
             if let Some(ids) = self.account_capabilities.get_mut(&capability.account_id) {
@@ -221,7 +221,11 @@ impl PasswordState {
         }
     }
 
-    fn retire(&mut self, now: u64) -> Result<(), ReferencePasswordError> {
+    pub(super) fn capability(&self, id: &[u8; 32]) -> Option<ReferenceAdmissionCapability> {
+        self.capabilities.get(id).cloned()
+    }
+
+    pub(super) fn retire(&mut self, now: u64) -> Result<(), ReferencePasswordError> {
         if now < self.next_cleanup_ms {
             return Ok(());
         }
@@ -515,7 +519,10 @@ fn authenticate(
     Ok(Some(id))
 }
 
-fn current_snapshot(state: &State, account_id: Uuid) -> Result<SecretVec, ReferencePasswordError> {
+pub(super) fn current_snapshot(
+    state: &State,
+    account_id: Uuid,
+) -> Result<SecretVec, ReferencePasswordError> {
     let account =
         state.accounts.get(&account_id).ok_or(ReferencePasswordError::StorageUnavailable)?;
     let snapshot = AccountBootstrapSnapshot::from_cbor(account.bootstrap.as_bytes())
