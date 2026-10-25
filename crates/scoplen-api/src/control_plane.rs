@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Generated control-plane API types from `openapi/v1.yaml`.
+//! Control-plane resource envelopes and shared Organization authorization.
 //!
 //! The generator preserves the wire-level envelope and deliberately leaves
 //! resource-specific fields in `data` until the corresponding control-plane
@@ -9,12 +9,20 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod authorization;
+
 pub use crate::ProblemDetails;
+pub use authorization::{
+    OrganizationAuthorizationContext, OrganizationAuthorizationError, OrganizationAuthorizer,
+};
 
 /// Canonical Cedar entity/action schema for the control plane.
 pub const CEDAR_SCHEMA: &str = include_str!("../cedar/schema.cedarschema");
 
-/// Built-in role policies evaluated by the control plane.
+/// Immutable tenant guards and built-in role policies.
+///
+/// Use [`OrganizationAuthorizer`] rather than interpreting a raw Cedar decision as
+/// sufficient authorization: graph validation and evaluation errors must fail closed.
 pub const BUILT_IN_POLICIES: &str = include_str!("../cedar/built-in-policies.cedar");
 
 /// Internal gateway gRPC source contract.
@@ -157,10 +165,12 @@ mod tests {
     fn cedar_contract_contains_every_documented_action_and_role() {
         for marker in [
             "entity Account",
+            "entity Membership",
             "entity Device",
             "entity Host",
             "entity Organization",
             "action connect",
+            "action view_inventory",
             "action request_access",
             "action approve_access",
             "action manage_inventory",
@@ -314,19 +324,26 @@ mod tests {
         let principal: EntityUid = r#"Account::"alice""#.parse().expect("principal");
         let action: EntityUid = r#"Action::"manage_inventory""#.parse().expect("action");
         let resource: EntityUid = r#"Organization::"org""#.parse().expect("resource");
-        let context =
-            Context::from_json_str(r#"{"now":1}"#, Some((&schema, &action))).expect("context");
+        let context = Context::from_json_str(
+            r#"{"now":1,"organization":{"__entity":{"type":"Organization","id":"org"}},"membership":{"__entity":{"type":"Membership","id":"membership"}}}"#,
+            Some((&schema, &action)),
+        ).expect("context");
         let request =
             Request::new(principal, action, resource, context, Some(&schema)).expect("request");
         for (email, expected) in [(None, Decision::Deny), (Some("a@example.test"), Decision::Allow)]
         {
-            let mut attributes = serde_json::json!({"groups": [], "status": "active"});
+            let mut attributes = serde_json::json!({"status": "active"});
             if let Some(email) = email {
                 attributes["email"] = serde_json::json!(email);
             }
             let entities = Entities::from_json_value(serde_json::json!([
                 {"uid": {"type": "Account", "id": "alice"}, "attrs": attributes, "parents": []},
-                {"uid": {"type": "Organization", "id": "org"}, "attrs": {"name": "org"}, "parents": []}
+                {"uid": {"type": "Organization", "id": "org"}, "attrs": {"name": "org"}, "parents": []},
+                {"uid": {"type": "Membership", "id": "membership"}, "attrs": {
+                    "account": {"__entity": {"type": "Account", "id": "alice"}},
+                    "organization": {"__entity": {"type": "Organization", "id": "org"}},
+                    "status": "active", "roles": [], "groups": []
+                }, "parents": []}
             ]), Some(&schema)).expect("entities with optional email");
             let response = Authorizer::new().is_authorized(&request, &guarded, &entities);
             assert_eq!(response.decision(), expected);

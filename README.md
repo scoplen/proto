@@ -595,6 +595,23 @@ The D-99 current-account `AccountProfile` codec accepts a complete 4 KiB Resourc
 required `data.email` as a preserved bounded string or JSON null. It rejects missing email,
 duplicate names at every depth, invalid Resource metadata, and mismatched ETag or cache headers.
 The Cedar `Account.email` attribute is optional; policies reading it must use a `has` guard.
+The D-126 `OrganizationAuthorizer` binds custom policies to one Organization and combines
+them with immutable tenant guards and explicit role policies. Its trusted context selects the
+verified Account, current Membership and server time; roles come only from that Membership.
+It revalidates requests and the complete hydrated entity graph against the canonical schema,
+rejects inactive identities, foreign owners/references, wrong-device and substituted action
+context, and fails closed on every evaluation error even alongside a permissive policy.
+`view_inventory` covers Host, HostGroup, GatewayNetwork, AccessProfile, Route, TrustRecord and
+Snippet independently. Members need explicit scoped read/access policies; a global Group named
+`owner` or `member` confers no role. Direct Hosts omit `gateway_network`; optional email and
+TrustRecord Host references also use absence. Public role/action and negative-binding fixtures
+live in `crates/scoplen-api/tests/fixtures/tenant-authorization.json`.
+This is a breaking pre-Stable K-5 schema/context and role change, not a new HTTP wire contract.
+The consumer must load current trusted policies, identities and membership transactionally,
+combine inventory read permission with the operation's permission, check current enrolled
+devices, approval routing and requester eligibility, and recheck at commit and delivery.
+It must scope the graph to one Organization and hydrate every referenced entity. A returned
+Allow is for one action and supplied snapshot; it is not durable authorization evidence.
 These contracts do not authenticate the account or verify an address. The production GET route and
 email enrollment remain server work.
 
@@ -806,10 +823,11 @@ are ignored after recursive duplicate checks. Setup finish returns only `operato
 a session. Login reuses `BrowserAuthTokenResponse` and the browser refresh cookie profile.
 OpenAPI exposes the four POSTs, independent root `/.well-known/operator-jwks.json` using
 `AuthJwks`, authentication admission/recovery errors, and no-store/no-cache/no-referrer headers.
-`OperatorAccessScope` and `OperatorAccessOperation` register only `personal-invitation:issue`
-for `POST /api/v1/admin/personal-invitations`. Cedar authorizes only a current active `Operator`
-on `Deployment::"self"`; Account role policies explicitly retain organization actions without
-granting deployment authority. `vectors/operator-auth.json` and named `api_json` seeds cover
+The existing Operator scope codec retains `personal-invitation:issue` as a reserved legacy
+encoding. D-125 retires its former Personal invitation business mapping and the Cedar
+`issuePersonalInvitation` action; the Organization authorizer accepts no deployment action
+and grants no Operator rights. Consumers must not mount the retired business operation from
+that legacy registry entry. `vectors/operator-auth.json` and named `api_json` seeds cover
 the public wire independently, including malformed embedded bytes and complete-body limits.
 The shared UUID dependency is pinned to 1.28.0 to satisfy the maintained WebAuthn verifier's
 compatible UUID requirement, preserving existing canonical UUIDv7 identities and vectors.
