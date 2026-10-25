@@ -23,6 +23,9 @@ Historical whole-Account escrow exports do not implement D-126 Organization-scop
 their removal remains roadmap work.
 D-128 adds five native Account entry routes with JSON codecs, exact protected registration/admission
 and complete-bootstrap CBOR, additional Account signatures and fresh Device possession inputs.
+Registration and admission expose `decode_for_authentication` for complete structural parsing
+before transaction-bound challenge/signature checks. Its results are unauthenticated; strict
+decoders retain their existing validation, and no parser result grants admission or receipt authority.
 The public deployment probe-key helper derives stable synthetic salts, denial verifiers and
 private username admission identities with separate HMAC-SHA-256 domains and canonical context.
 D-129's Account-only retention digest uses the exact domain and raw UUID bytes, without adding

@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Expose complete registration/admission structural decoding for production transaction peers.
+  Nested malformed artifacts fail before challenge lookup; binding/signature failures remain
+  available for challenge consumption with mandatory denial audit. Strict decoders and wire
+  bytes are unchanged, and structural results grant no authority.
+
 - Add a registration-only D-128/D-129 reference peer with real Account/Device signature checks,
   exact original-key receipt confirmation, serialized one-row retention/capacity and complete
   restart images. Public fixtures cover deletion/recreation denial, racing instances, explicit

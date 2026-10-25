@@ -602,8 +602,7 @@ impl ReferenceAccountRegistrationPeer {
         body: &[u8],
         mut clock: impl FnMut() -> u64,
     ) -> Result<ReferenceRegistrationResult, ReferenceRegistrationError> {
-        let request = AccountRegistrationRequest::from_json_envelope(body)?;
-        let payload = AccountRegistrationPayload::from_cbor_structural(request.payload.as_bytes())?;
+        let (request, payload) = AccountRegistrationRequest::decode_for_authentication(body)?;
         let mut state = self.lock()?;
         let now = state.observe_time(clock());
         if state.maintenance {
