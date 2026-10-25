@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Shared input syntax for bounded K-5 JSON request codecs.
+//! Shared input syntax for bounded JSON wire codecs.
 
 use std::fmt;
 

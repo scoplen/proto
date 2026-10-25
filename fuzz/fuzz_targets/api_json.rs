@@ -8,6 +8,7 @@ use scoplen_api::account_admission::{
     AccountDeviceAdmissionRequest, AccountPasswordLoginRequest, AccountPasswordLoginResponse,
     AccountPasswordOptionsRequest, AccountPasswordOptionsResponse, AccountRegistrationPayload,
     AccountRegistrationRequest, AccountRequestChallengeRequest, AccountRequestChallengeResponse,
+    MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
 };
 use scoplen_api::account_devices::AccountDeviceStatements;
 use scoplen_api::account_profile::AccountProfile;
@@ -37,10 +38,11 @@ macro_rules! round_trip {
 }
 
 fuzz_target!(|bytes: &[u8]| {
-    if let Ok(problem) = serde_json::from_slice::<ProblemDetails>(bytes) {
+    if let Ok(problem) = ProblemDetails::from_json(bytes, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES) {
         let encoded = serde_json::to_vec(&problem).expect("validated problem encodes");
         assert_eq!(
-            serde_json::from_slice::<ProblemDetails>(&encoded).expect("canonical problem decodes"),
+            ProblemDetails::from_json(&encoded, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES)
+                .expect("canonical problem decodes"),
             problem,
         );
     }
