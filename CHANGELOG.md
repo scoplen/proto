@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add `ProblemDetails::from_json` with an explicit endpoint byte budget, complete required-field
+  validation and recursive duplicate-name rejection, including ignored extensions. Strict UTF-8,
+  no-BOM and single-object parsing preserve valid unknown codes and existing extension behavior;
+  malformed responses return content-free errors. D-128 retains its 4,096-byte budget with no new
+  global wire cap. Public regressions and the API JSON fuzz entry exercise the shared reader;
+  response metadata validation remains the consumer's responsibility.
+
 - Complete D-128 Device admission in the shared Account reference peer: transaction-current
   snapshot CAS, exact next signed bundle, new Device/certificate, consumed capability, immutable
   receipt and atomic audit/commit faults. Live capability indexes are removed on success or CAS

@@ -701,6 +701,11 @@ The control-plane and shared `ProblemDetails` Rust paths use the same validated 
 JSON/CBOR error type. The OpenAPI schema and generated TypeScript declaration require `type`,
 `title`, `status`, `detail`, `instance`, `code`, `changed`, and `retryable`; decoders accept unknown
 response fields and syntactically valid future error codes.
+`ProblemDetails::from_json` checks the caller's endpoint byte budget before parsing and rejects
+invalid UTF-8, a BOM, trailing JSON and duplicate names recursively, including ignored extension
+objects. D-128 callers use its existing 4,096-byte bound; this adds no global response-size cap.
+Consumers separately verify HTTP status, content type and required cache headers before using
+the problem's recovery flags.
 
 The six successful K-4 key-management mutation responses expose request/path-aware validators:
 vault creation, epoch publication and retirement, member addition and removal, and account-key

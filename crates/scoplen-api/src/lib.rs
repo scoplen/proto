@@ -220,6 +220,23 @@ impl TryFrom<RawProblemDetails> for ProblemDetails {
 }
 
 impl ProblemDetails {
+    /// Decode one complete JSON problem within the endpoint's encoded byte budget.
+    ///
+    /// Requires strict UTF-8 without a BOM and unique names recursively, including ignored
+    /// extensions. Unknown valid codes and extension fields retain their existing behavior.
+    /// The caller separately validates HTTP status, content type and required cache headers.
+    /// # Errors
+    /// Returns a content-free error for an exceeded budget, invalid JSON or invalid fields.
+    pub fn from_json(input: &[u8], max_bytes: usize) -> Result<Self, ApiContractError> {
+        if input.len() > max_bytes {
+            return Err(invalid_problem("JSON problem exceeds its endpoint byte budget"));
+        }
+        let fields = request_wire::decode_unique_object(input)
+            .map_err(|()| invalid_problem("invalid JSON problem"))?;
+        serde_json::from_value(serde_json::Value::Object(fields))
+            .map_err(|_| invalid_problem("invalid JSON problem fields"))
+    }
+
     /// Construct a problem with the default `about:blank` type.
     ///
     /// # Errors
