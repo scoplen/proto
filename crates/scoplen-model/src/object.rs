@@ -891,8 +891,21 @@ fn validate_credential_fields(object: &Object) -> Result<(), ModelError> {
     let kind = object.required_uint(2).map_err(|_| invalid_field(object, "kind is required"))?;
     let binding =
         object.required_uint(3).map_err(|_| invalid_field(object, "binding is required"))?;
-    if !(1..=7).contains(&kind) || !(1..=3).contains(&binding) {
+    if !(1..=8).contains(&kind) || !(1..=3).contains(&binding) {
         return Err(invalid_field(object, "kind or binding is outside the registry"));
+    }
+    if kind == 8 {
+        if binding != 3
+            || object.fields.iter().any(|(path, entry)| {
+                (4..=8).contains(&path.field_number()) && !matches!(entry.value, cbor::Value::Null)
+            })
+        {
+            return Err(invalid_field(
+                object,
+                "interactive credentials require none binding and no saved authentication fields",
+            ));
+        }
+        return Ok(());
     }
     if [3, 5, 6].contains(&kind) && binding == 1 {
         return Err(invalid_field(object, "this credential kind cannot use shared binding"));

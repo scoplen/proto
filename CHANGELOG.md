@@ -4,6 +4,16 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Take zeroizing ownership of every keyboard-interactive response before validating count or
+  size, so rejected input buffers are also cleared on drop. Public errors and bounds are unchanged.
+
+- Registered D-123 Credential kind 8 for explicit SSH keyboard-interactive login, requiring
+  none binding and no saved secret, device entry, public key, provider or certificate scope.
+  Cleared-field markers and unknown fields retain ordinary model behavior. This registry
+  extension breaks pre-Stable readers that reject the new kind; it changes no object envelope
+  or SSH message. Independent canonical vectors, parser seeds and public object/conversion tests cover the
+  model boundary. Desktop prompt handling and authentication remain consumer responsibilities.
+
 - Implemented D-121 by replacing the synchronous keyboard-interactive callback with an async responder
   accepting an owned checked request and returning `KeyboardInteractiveResponse`. This is a
   pre-Stable source and behavior break, with no synchronous wrapper or wire change. Complete
