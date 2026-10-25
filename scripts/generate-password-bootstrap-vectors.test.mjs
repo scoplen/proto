@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -68,5 +68,33 @@ test("generator detects vector drift and exact binary seeds across checkout newl
     assert.notEqual(result.status, 0);
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("generator CLI runs through a directory symlink", async () => {
+  const parent = resolve(tmpdir());
+  const owned = await mkdtemp(join(parent, "scoplen-password-link-"));
+  assert.equal(dirname(owned), parent);
+  try {
+    const physical = join(owned, "physical");
+    const linked = join(owned, "linked");
+    const script = "scripts/generate-password-bootstrap-vectors.mjs";
+    await mkdir(join(physical, "scripts"), { recursive: true });
+    await copyFile(new URL(script, new URL("../", import.meta.url)), join(physical, script));
+    await symlink(physical, linked, process.platform === "win32" ? "junction" : "dir");
+    const run = (...args) => spawnSync(process.execPath, [join(linked, script), ...args], {
+      cwd: owned, encoding: "utf8", timeout: 30_000,
+    });
+    let result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const json = join(physical, "vectors/password-bootstrap.json");
+    assert.match(await readFile(json, "utf8"), /password-bootstrap-known-answer/);
+    result = run("--check");
+    assert.equal(result.status, 0, result.stderr);
+    result = run("--unknown");
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /expected only --check/);
+  } finally {
+    await rm(owned, { recursive: true, force: true });
   }
 });

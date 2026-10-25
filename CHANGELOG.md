@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Fix the independent password-bootstrap vector generator's CLI detection through directory
+  symlinks. Temporary checkout generation now follows the same canonical entry path on all
+  supported platforms; linked-directory regressions retain drift and exact seed validation.
+
 - Added D-126's Organization-bound Cedar authorizer with immutable guards, current Membership
   roles, all seven inventory entity types and independent `view_inventory`. Canonical graph,
   identity, owner, reference, device and action-context checks and every evaluation error fail

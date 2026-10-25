@@ -4,9 +4,9 @@ import assert from "node:assert/strict";
 import {
   argon2Sync, createCipheriv, createHash, createHmac, createPrivateKey, createPublicKey,
 } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const label = (value) => Buffer.from(value, "ascii");
@@ -219,4 +219,7 @@ export async function main(args = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) await main();
+if (process.argv[1]
+  && await realpath(resolve(process.argv[1])) === await realpath(fileURLToPath(import.meta.url))) {
+  await main();
+}
