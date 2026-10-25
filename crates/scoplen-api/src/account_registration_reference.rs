@@ -4,7 +4,7 @@
 //! This slice verifies real Account and Device signatures and models atomic business state,
 //! digest retention and complete restart images. It is not HTTP transport, durable database
 //! storage, an audit chain or rate admission. Callers admit work before invoking this peer.
-//! Password options/login share this storage; Device admission remains separate reference work.
+//! Password entry and Device admission share this storage and the same Account transaction lock.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -29,7 +29,9 @@ use crate::{
     },
 };
 
+mod admission;
 mod password;
+pub use admission::{ReferenceDeviceAdmissionError, ReferenceDeviceAdmissionResult};
 pub use password::{
     ReferenceAdmissionCapability, ReferencePasswordAttempt, ReferencePasswordCredential,
     ReferencePasswordError, ReferencePasswordSummary,
@@ -37,6 +39,8 @@ pub use password::{
 
 /// The admitted default deployment-lifetime Account-id row ceiling.
 pub const DEFAULT_USED_ACCOUNT_ID_CEILING: u64 = 1_048_576;
+/// The fixed production bound, or maximum admitted owned-fixture bound, on Account receipts.
+pub const DEFAULT_ACCOUNT_RECEIPT_CEILING: u32 = 65_536;
 const MAX_CHALLENGES: usize = 16_384;
 
 /// One fault at the next eligible reference transaction.
@@ -204,8 +208,6 @@ impl fmt::Debug for ReferenceRegistrationAccountMaterial {
 struct Account {
     username: String,
     vault_id: Uuid,
-    device_id: Uuid,
-    operation_id: Uuid,
     signing_root: [u8; 32],
     kem_root: [u8; 32],
     credential: ReferencePasswordCredential,
@@ -224,12 +226,17 @@ struct State {
     vaults: BTreeMap<Uuid, Uuid>,
     devices: BTreeMap<Uuid, Uuid>,
     receipts: BTreeMap<Uuid, ReferenceRegistrationReceipt>,
+    account_devices: BTreeMap<Uuid, BTreeSet<Uuid>>,
+    account_receipts: BTreeMap<Uuid, BTreeSet<Uuid>>,
+    device_key_receipts: BTreeMap<[u8; 65], BTreeSet<Uuid>>,
+    receipt_ceiling: u32,
     challenges: BTreeMap<[u8; 32], Challenge>,
     challenge_expiry: BTreeSet<(u64, [u8; 32])>,
     next_cleanup_ms: u64,
     registration_open: bool,
     maintenance: bool,
     registrations: u64,
+    admissions: u64,
     denials: u64,
     ceiling_changes: u64,
     fault: Option<ReferenceRegistrationFault>,
@@ -297,6 +304,10 @@ pub struct ReferenceRegistrationSummary {
     pub retention_pressure: ReferenceRetentionPressure,
     /// Original business success events.
     pub registrations: u64,
+    /// Original confirmed or scripted committed Device-admission business success events.
+    pub admissions: u64,
+    /// Per-Account receipt limit retained in the complete owned fixture image.
+    pub receipt_ceiling: u32,
     /// Confirmed denial transactions.
     pub denials: u64,
     /// Confirmed explicit ceiling changes.
@@ -341,24 +352,46 @@ impl ReferenceAccountRegistrationPeer {
         origin: &str,
         ceiling: u64,
     ) -> Result<Self, ReferenceRegistrationError> {
+        Self::with_ceilings(origin, ceiling, DEFAULT_ACCOUNT_RECEIPT_CEILING)
+    }
+
+    /// Select retained Account-id and bounded receipt ceilings in an owned fixture.
+    ///
+    /// A smaller receipt ceiling exercises the exact lifetime capacity boundary through real
+    /// submissions. It does not alter wire limits or provide a production quota override.
+    /// # Errors
+    /// Rejects invalid origin/ceilings or unavailable OS randomness.
+    pub fn with_ceilings(
+        origin: &str,
+        used_id_ceiling: u64,
+        receipt_ceiling: u32,
+    ) -> Result<Self, ReferenceRegistrationError> {
         validate_server_origin(origin).map_err(|_| ReferenceRegistrationError::InvalidRequest)?;
-        validate_ceiling(ceiling)?;
+        validate_ceiling(used_id_ceiling)?;
+        if receipt_ceiling == 0 || receipt_ceiling > DEFAULT_ACCOUNT_RECEIPT_CEILING {
+            return Err(ReferenceRegistrationError::InvalidRequest);
+        }
         Ok(Self(Arc::new(Mutex::new(State {
             origin: origin.into(),
             high_water_ms: 0,
-            used_id_ceiling: ceiling,
+            used_id_ceiling,
             used_ids: BTreeSet::new(),
             accounts: BTreeMap::new(),
             usernames: BTreeMap::new(),
             vaults: BTreeMap::new(),
             devices: BTreeMap::new(),
             receipts: BTreeMap::new(),
+            account_devices: BTreeMap::new(),
+            account_receipts: BTreeMap::new(),
+            device_key_receipts: BTreeMap::new(),
+            receipt_ceiling,
             challenges: BTreeMap::new(),
             challenge_expiry: BTreeSet::new(),
             next_cleanup_ms: 0,
             registration_open: true,
             maintenance: false,
             registrations: 0,
+            admissions: 0,
             denials: 0,
             ceiling_changes: 0,
             fault: None,
@@ -411,6 +444,8 @@ impl ReferenceAccountRegistrationPeer {
             used_id_ceiling: state.used_id_ceiling,
             retention_pressure: retention_pressure(&state),
             registrations: state.registrations,
+            admissions: state.admissions,
+            receipt_ceiling: state.receipt_ceiling,
             denials: state.denials,
             ceiling_changes: state.ceiling_changes,
         })
@@ -709,15 +744,30 @@ impl ReferenceAccountRegistrationPeer {
         let Some(account) = state.accounts.remove(&account_id) else { return Ok(()) };
         state.usernames.remove(&account.username);
         state.vaults.remove(&account.vault_id);
-        state.devices.remove(&account.device_id);
-        state.receipts.remove(&account.operation_id);
+        let devices = state.account_devices.remove(&account_id).unwrap_or_default();
+        let operations = state.account_receipts.remove(&account_id).unwrap_or_default();
+        for device in &devices {
+            state.devices.remove(device);
+        }
+        for operation in &operations {
+            if let Some(receipt) = state.receipts.remove(operation) {
+                for key in [receipt.signing_key, receipt.kem_key] {
+                    if let Some(ids) = state.device_key_receipts.get_mut(&key) {
+                        ids.remove(operation);
+                        if ids.is_empty() {
+                            state.device_key_receipts.remove(&key);
+                        }
+                    }
+                }
+            }
+        }
         state.password.remove_account(account_id, &account.username);
         let challenges: Vec<_> = state
             .challenges
             .iter()
             .filter(|(_, challenge)| {
-                challenge.device_id == account.device_id
-                    || challenge.operation_id == account.operation_id
+                devices.contains(&challenge.device_id)
+                    || operations.contains(&challenge.operation_id)
             })
             .map(|(id, _)| *id)
             .collect();
@@ -889,8 +939,6 @@ fn submit_registration(
     let account = Account {
         username: payload.username.clone(),
         vault_id: payload.personal_vault_id,
-        device_id: payload.device_id,
-        operation_id: payload.operation_id,
         signing_root: payload.account_signing_public_key,
         kem_root: payload.account_kem_public_key,
         credential: ReferencePasswordCredential {
@@ -905,7 +953,12 @@ fn submit_registration(
     state.usernames.insert(payload.username, payload.account_id);
     state.vaults.insert(payload.personal_vault_id, payload.account_id);
     state.devices.insert(payload.device_id, payload.account_id);
+    state.account_devices.entry(payload.account_id).or_default().insert(payload.device_id);
+    state.account_receipts.entry(payload.account_id).or_default().insert(payload.operation_id);
     state.accounts.insert(payload.account_id, account);
+    for key in [receipt.signing_key, receipt.kem_key] {
+        state.device_key_receipts.entry(key).or_default().insert(payload.operation_id);
+    }
     state.receipts.insert(payload.operation_id, receipt);
     state.used_ids.insert(used_id);
     state.registrations = registrations;
