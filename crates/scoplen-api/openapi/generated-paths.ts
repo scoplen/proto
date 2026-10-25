@@ -11,6 +11,7 @@ export const controlPlanePaths = [
   "/auth/device",
   "/auth/operator/login/finish",
   "/auth/operator/login/options",
+  "/auth/operator/logout",
   "/auth/operator/setup/finish",
   "/auth/operator/setup/options",
   "/auth/pairings",

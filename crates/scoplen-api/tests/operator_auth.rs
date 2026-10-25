@@ -4,7 +4,7 @@ use cedar_policy::{Authorizer, Context, Decision, Entities, PolicySet, Request, 
 use scoplen_api::{
     auth::{
         DeviceAccessOperation, INITIAL_OPERATOR_ACCESS_SCOPE, OperatorAccessOperation,
-        OperatorAccessScope,
+        OperatorAccessRequirement, OperatorAccessScope,
     },
     control_plane::{BUILT_IN_POLICIES, CEDAR_SCHEMA},
     operator_auth::*,
@@ -326,7 +326,10 @@ fn operator_scope_is_independent_and_routes_fail_closed() {
         Some(operation)
     );
     assert_eq!(DeviceAccessOperation::from_route("POST", operation.route_template()), None);
-    assert_eq!(operation.required_scope(), OperatorAccessScope::PersonalInvitationIssue);
+    assert_eq!(
+        operation.requirement(),
+        OperatorAccessRequirement::Scope(OperatorAccessScope::PersonalInvitationIssue)
+    );
     for (method, path) in [
         ("GET", operation.route_template()),
         ("post", operation.route_template()),
@@ -342,7 +345,7 @@ fn operator_scope_is_independent_and_routes_fail_closed() {
         "account:read",
         "PERSONAL-INVITATION:ISSUE",
     ] {
-        assert!(!operation.required_scope().is_present_in(scope));
+        assert!(!OperatorAccessScope::PersonalInvitationIssue.is_present_in(scope));
         assert_eq!(OperatorAccessScope::from_token(scope), None);
     }
 }

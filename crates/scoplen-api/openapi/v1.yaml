@@ -3961,6 +3961,50 @@
         }
       }
     },
+    "/auth/operator/logout": {
+      "post": {
+        "operationId": "operatorLogout",
+        "security": [{"accessToken": [], "dpopProof": []}],
+        "x-scoplen-operator-requirement": "self-session-termination",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 256,
+        "x-scoplen-problem-max-bytes": 4096,
+        "description": "D-124 intrinsic authenticated self-session termination, never an invitation scope or general authorization result. HTTPS only; exactly one Authorization: DPoP access token at most 4096 ASCII bytes, using the independent unexpired spl-operator-access+jwt profile and spl-admin/1 audience. Exactly one fresh ES256 DPoP proof at most 8192 ASCII bytes requires token-bound ath, matching JKT, htm=POST, the exact trusted-origin /api/v1/auth/operator/logout URL, accepted time and durable cross-instance replay claim. No initial DPoP nonce is required. Exact trusted Origin, including its port, is mandatory; missing, null, duplicate or mismatched Origin gets 403 before identity lookup, and an authenticated non-Operator also gets 403. CORS allows only that exact origin, POST and Authorization/DPoP/Content-Type; browser credentials=omit. Cookie headers are ignored and never parsed for authentication or family selection; every response omits Set-Cookie. Require application/json, optionally charset=utf-8; reject query parameters and Idempotency-Key. The independent logout admission profile charges source quota 30 and verified-Operator quota 10 per 60-second window, source before parsing and private admission only after current token/proof/family binding; existing cooldown, bounded greatest-wait rate headers and fail-closed admission/audit precedence apply. Only verified sub/sid selects the family. Recheck active current Operator and authenticating credential, trusted-origin/RP binding, exact scope/original ceiling/JKT/identity/audience, access-token time and absolute family expiry under shared session serialization after lock waits and before commit. First revocation and mandatory deployment audit commit atomically; retain all digests and every other family/identity. Only an equally eligible already-revoked family returns the same terminal confirmation without another revocation event; it never produces general authorization evidence. Same-proof replay still fails. Expired/missing tokens, unknown/expired families, inactive credentials or binding mismatch get generic 401 changed=false, never terminal confirmation. Confirmed-only 200 clears that tab's credentials. Known rollback retains credentials; unknown commit, lost/malformed response or timeout do not claim success and permit only explicit fresh-proof retry with the retained unexpired token, never automatic refresh/replay or cookie fallback. Another login cannot confirm the old family's outcome. All responses use no-store, no-cache and no-referrer; never log tokens, cookies, digests, proofs, JKT or credential material.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "description": "Exactly one canonical trusted deployment HTTPS origin including a non-default port; null, missing, duplicate and mismatched values are denied before identity lookup.",
+            "schema": {"type": "string", "format": "uri", "minLength": 1}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Exactly an empty JSON object. Complete UTF-8 body at most 256 bytes including whitespace; reject malformed UTF-8/JSON, all members and non-object values. Canonical writer emits {}.",
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OperatorLogoutRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Complete UTF-8 body at most 256 bytes: exactly {\"revoked\":true}. Request-bound confirmation of first revocation or equally eligible already-revoked family; never general authentication evidence. No token, id or cookie.",
+            "headers": {
+              "Cache-Control": {"required": true, "schema": {"const": "no-store"}},
+              "Pragma": {"required": true, "schema": {"const": "no-cache"}},
+              "Referrer-Policy": {"required": true, "schema": {"const": "no-referrer"}}
+            },
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OperatorLogoutResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/OperatorInvalidRequest"},
+          "401": {"$ref": "#/components/responses/OperatorLogoutAuthenticationRequired"},
+          "403": {"$ref": "#/components/responses/OperatorOriginDenied"},
+          "413": {"$ref": "#/components/responses/OperatorBodyTooLarge"},
+          "415": {"$ref": "#/components/responses/OperatorContentType"},
+          "429": {"$ref": "#/components/responses/OperatorRateLimited"},
+          "503": {"$ref": "#/components/responses/OperatorLogoutStorageFailure"},
+          "default": {"$ref": "#/components/responses/OperatorProblem"}
+        }
+      }
+    },
     "/.well-known/operator-jwks.json": {
       "get": {
         "operationId": "getOperatorAuthJwks",
@@ -4575,6 +4619,24 @@
             ] }
           }
         }
+      },
+      "OperatorLogoutAuthenticationRequired": {
+        "description": "Uniform logout denial: missing/duplicate/malformed Authorization, invalid/oversized/expired Operator access, unavailable/expired family, inactive Operator/credential or current binding mismatch. changed=false and retryable=false; no revocation and no evidence whether an earlier logout committed. No cookie fallback.",
+        "headers": {
+          "Cache-Control": {"required": true, "schema": {"const": "no-store"}},
+          "Pragma": {"required": true, "schema": {"const": "no-cache"}},
+          "Referrer-Policy": {"required": true, "schema": {"const": "no-referrer"}}
+        },
+        "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/OperatorLogoutAuthenticationRequiredProblem"}}}
+      },
+      "OperatorLogoutStorageFailure": {
+        "description": "Complete RFC 9457 UTF-8 problem at most 4096 bytes. Known precommit rollback uses auth.storage_unavailable changed=false retryable=true. A revocation-and-audit COMMIT sent without confirmed outcome uses auth.commit_outcome_unknown changed=true retryable=true for this idempotent logout only. Retain eligible credentials; retry requires an explicit new request with a fresh proof/jti and retained unexpired token. Never automatically refresh/replay or fall back to a cookie. Failure-audit errors cannot downgrade an uncertain revocation to changed=false.",
+        "headers": {
+          "Cache-Control": {"required": true, "schema": {"const": "no-store"}},
+          "Pragma": {"required": true, "schema": {"const": "no-cache"}},
+          "Referrer-Policy": {"required": true, "schema": {"const": "no-referrer"}}
+        },
+        "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/OperatorLogoutStorageFailureProblem"}}}
       },
       "OperatorInvalidRequest": {
         "description": "Malformed outer request; no ceremony consumption.",
@@ -6503,6 +6565,52 @@
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
           }
         }
+      },
+      "OperatorLogoutRequest": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "OperatorLogoutResponse": {
+        "type": "object",
+        "required": ["revoked"],
+        "additionalProperties": false,
+        "properties": {"revoked": {"type": "boolean", "const": true}}
+      },
+      "OperatorLogoutAuthenticationRequiredProblem": {
+        "allOf": [
+          {"$ref": "#/components/schemas/ProblemDetails"},
+          {
+            "type": "object",
+            "properties": {
+              "status": {"const": 401},
+              "code": {"const": "auth.authentication_required"},
+              "changed": {"const": false},
+              "retryable": {"const": false}
+            }
+          }
+        ]
+      },
+      "OperatorLogoutCommitOutcomeUnknownProblem": {
+        "allOf": [
+          {"$ref": "#/components/schemas/ProblemDetails"},
+          {
+            "type": "object",
+            "properties": {
+              "status": {"const": 503},
+              "code": {"const": "auth.commit_outcome_unknown"},
+              "changed": {"const": true},
+              "retryable": {"const": true}
+            }
+          }
+        ]
+      },
+      "OperatorLogoutStorageFailureProblem": {
+        "oneOf": [
+          {"$ref": "#/components/schemas/AuthStorageUnavailableProblem"},
+          {"$ref": "#/components/schemas/OperatorLogoutCommitOutcomeUnknownProblem"}
+        ]
       },
       "OperatorInvalidRequestProblem": {
         "allOf": [

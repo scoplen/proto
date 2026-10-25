@@ -40,6 +40,10 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   lookup covers both defined opening methods, with public exact-route and DPoP method-binding
   regressions; production notification lifecycle remains consumer work. The canonical roadmap
   records each outcome.
+  D-124 adds bounded fixed logout wire and an explicit authenticated intrinsic requirement,
+  with vectors and scripted terminal/uncertain-result behavior. The reference peer supplies no
+  general authorization evidence; durable revocation, exact Origin/DPoP admission, cookie
+  isolation and browser adoption remain consumer responsibilities.
   D-113 adds bounded complete signed-statement transport and its existing-scope operation,
   with precise OpenAPI/TypeScript, public vectors and parser seeds. Account context, K-2
   signatures, completeness/freshness and current-state authorization remain consumer checks.

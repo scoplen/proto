@@ -23,6 +23,12 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Check OpenAPI generated types
         run: node crates/scoplen-api/openapi/generate.mjs --check
+      - name: Test Operator OpenAPI contract checks
+        run: node --test crates/scoplen-api/openapi/generate-operator.test.mjs
+      - name: Check Operator logout vectors and parser bounds
+        run: node scripts/generate-operator-logout-vectors.mjs --check
+      - name: Test Operator logout vector checkout boundaries
+        run: node --test scripts/generate-operator-logout-vectors.test.mjs
       - name: Check interactive credential vectors
         run: node scripts/generate-interactive-credential-vectors.mjs --check
       - name: Test
