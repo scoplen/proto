@@ -18,27 +18,23 @@ the S3 primitive boundary now includes zeroizing secret containers, operating-sy
 XChaCha20-Poly1305, HKDF-SHA-256, Argon2id, P-256 and Ed25519 signatures, and HPKE key wrapping
 for device and account recipients. The published K-2 known-answer set is exercised through the
 `scoplen-crypto` public API, including account/request-bound escrow share contexts and the
-administrator recovery verification code, CPace pairing exchange, and canonical QR pairing bindings.
-Those historical whole-Account escrow and Personal-pairing exports do not implement the current
-password/admission flow or D-126 Organization-scoped recovery; their removal remains roadmap work.
-D-114 replaces the unreleased QRv1 with a public link plus separate secret, or one native
-secret-bearing QRv2 scan. Shared application codecs bind the canonical origin, session and both
-roles, validate complete new-device/handoff maps and certificate/root/anchor bindings, and seal
-or open bounded frames only through the confirmed role-specific CPace session. The secret QR
-and plaintext encodings use zeroizing containers and redacted debug output. Acceptance helpers
-bind the exact handoff frame, certificate and full update hash through `DeviceSigner`; the new
-device can use the authenticated handoff's update hash before saving identity plus its exact
-signature. Key projection and approval fingerprints have one domain-separated implementation.
-Consumers still enforce durable one-attempt state, trusted out-of-band transfer, expected device
-metadata, opened private-key/Personal-epoch equality, checkpoints and atomic server admission.
-These exports do not establish complete pairing or two-device sync.
-The D-114 `pairing` API module provides bounded create/claim, seven-slot relay, complete-prefix
-snapshot and exact admission-approval codecs, with redacted diagnostics, canonical UUID/base64url
-syntax and complete-body limits. OpenAPI and generated TypeScript describe the same route and
-role boundaries. `pairing_reference` exercises immutable slots, current caller authorization,
-expiry/cancellation, exact completion replay and known rollback versus unknown commit outcomes;
-its callback represents independent cryptographic admission checks and it is not a production
-authentication, rate-limit, audit or transaction store.
+administrator recovery verification code and encrypted hierarchy formats.
+Historical whole-Account escrow exports do not implement D-126 Organization-scoped recovery;
+their removal remains roadmap work.
+D-128 adds five native Account entry routes with JSON codecs, exact protected registration/admission
+and complete-bootstrap CBOR, additional Account signatures and fresh Device possession inputs.
+The public deployment probe-key helper derives stable synthetic salts, denial verifiers and
+private username admission identities with separate HMAC-SHA-256 domains and canonical context.
+The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
+complete recipient equality, retained Personal epochs and exact historical confirmation binding.
+Native request metadata rejects session/cookie/header alternatives; response readers enforce
+both cache-prevention headers. A confirmation certifies
+only the exact original committed bytes; it supplies no current authorization and never
+falls through to new submission. Account password derivation and local opening remain D-127
+and consumer responsibilities; durable admission, current-state CAS, receipts and mandatory
+audit remain production consumer work. Retired Personal invitation, QR/CPace pairing and
+replacement-token APIs/proofs/fixtures are removed without aliases. Team invitation needs its
+own independent contract.
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
@@ -619,14 +615,6 @@ Allow is for one action and supplied snapshot; it is not durable authorization e
 These contracts do not authenticate the account or verify an address. The production GET route and
 email enrollment remain server work.
 
-The D-101 Personal invitation and first-device enrollment codecs bound complete JSON bodies,
-reject duplicate and unknown request fields, enforce canonical base64url and revision-one
-artifact identities in the ordinary path, and redact secret-bearing diagnostics. HTTP helpers reject prohibited
-headers and a foreign browser Origin. OpenAPI, generated TypeScript, public vectors, and parser
-fuzz seeds describe the same messages. A parsed request does not verify signatures or invitation
-state; the server must authenticate the issuing operator and atomically create the account,
-device, key bundle, and Personal vault while consuming the invitation.
-
 `scoplen-crypto` also signs and statelessly verifies D-100 enrolled-device access tokens as bounded
 Ed25519 compact JWS values. The `spl-device-access+jwt` profile uses its own trusted issuer and
 configured keyring, an exact 600-second lifetime, complete ordered organization and SSO snapshots,
@@ -750,32 +738,6 @@ identifiers, ciphertext/tag size, and certified device signature against trusted
 ids without decrypting it. `decrypt` uses the same verification path. Servers must separately
 check current device and vault write authority in their mutation transaction; this check
 does not validate the plaintext or grant permission to write.
-`PersonalEnrollmentContext` constructs D-101's exact first-device signature input
-from the trusted HTTPS origin, decoded invitation-token digest, UUIDv7 account/vault
-ids, public account keys, and hashes of the exact uploaded artifacts. It signs through
-the fallible `DeviceSigner` and verifies with the certified P-256 public key. Diagnostics
-redact the input artifacts and token digest. Public signature-input and rejection vectors
-are in `vectors/personal-enrollment-proof.json`. The consumer still verifies the K-4
-bundle and K-2 certificate signatures, uses the bounded enrollment codec, and atomically redeems
-the invitation; possession-proof verification alone does not enroll or authenticate a device.
-The D-109 replacement-token vector and re-signing regression retain the same device key,
-origin, ids, and artifacts. The consumer still authorizes invitation replacement from the
-specified fresh device-authentication denial and requires a separate explicit Join action.
-For D-104 admission, `PersonalEnrollmentRequest::from_http_json_structural` performs strict
-header, Origin, JSON, artifact, and independent bound checks before exposing the decoded token
-for digest-based admission. After admission, the consumer calls `validate` and verifies the
-signatures; the ordinary `from_http_json` continues to reject identity mismatches immediately.
-The shared `auth.rate_limited` problem uses the existing eight-field shape. A bounded
-`PersonalRateLimitHeaders` value supplies the exact public `Retry-After`, `RateLimit`, and
-`RateLimit-Policy` profile without exposing private bucket identities. Durable admission,
-failure auditing, and their `503 auth.storage_unavailable` precedence remain server duties.
-For D-105, both Personal routes distinguish a known precommit storage failure from an attempted
-commit whose outcome cannot be confirmed. The shared `auth.commit_outcome_unknown` problem uses
-`503`, `changed: true`, and `retryable: false`; it never authorizes automatic replay of either
-POST. Enrollment keeps its local identity and first tries device authentication, while an
-operator explicitly decides whether to issue another invitation when the original token may be
-unrecoverable. The shared codec preserves the existing eight-field problem representation;
-classifying database commit outcomes remains a server responsibility.
 For D-110, public JSON and independently encoded CBOR problem vectors retain
 `503 sync.storage_unavailable` for both known precommit rollback (`changed: false`,
 `retryable: true`) and an uncertain object-write or acknowledgement commit (`changed: true`,
@@ -796,7 +758,7 @@ automatic replay, local identity replacement or a newly signed plan. Storage ada
 recheck the original identity/proof-key binding and current authority inside the account
 transaction, including for exact replay; the latter makes no second business audit and does not
 reverify stored bytes against a later signing root. Signature/recipient validation, revision CAS,
-projected response bounds, audit and serialization with pairing remain consumer duties. These
+projected response bounds, audit and serialization with Account admission remain consumer duties. These
 shared codecs do not implement account-root rotation, device revocation or a transaction store.
 `AuthTokenResponse` redacts both opaque tokens in debug output while retaining token type and
 lifetimes for diagnostics.
@@ -901,11 +863,11 @@ fuzzing normalizes bounded input and checks metadata/artifact decoders without i
 
 The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`, and
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
-in `vectors/crypto.json` and `vectors/pairing-crypto.json`. The latter is generated independently
-with Node's built-in crypto and a finite canonical CBOR encoder:
-`node scripts/generate-pairing-crypto-vectors.mjs`. It retains a verified previous ECDSA signature
-for stable regeneration. Its opaque acceptance frame/update test that input boundary; complete
-K-4 parsing, key opening and account trust remain separate checks.
+in `vectors/crypto.json`. D-128 native entry/protected-map/signature vectors are in
+`vectors/account-admission.json`, independently produced by
+`node scripts/generate-account-admission-vectors.mjs [--check]`. The Node producer verifies
+and retains a prior ECDSA proof for deterministic regeneration. Ciphertext fixtures establish
+public format/signature boundaries; they do not establish successful private-key opening.
 The published K-3 auth and API problem, sync session, change-feed, and
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admission.json`,
 `vectors/auth-scopes.json`, `vectors/api-dpop.json`, `vectors/api-problem.json`,
@@ -916,7 +878,7 @@ remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admi
 `vectors/sync-vaults.json`, `vectors/sync-vault-keys.json`, `vectors/sync-vault-epochs.json`,
 `vectors/sync-vault-members.json`, `vectors/gateway.json`, `vectors/gateway-ticket-issuance.json`,
 `vectors/certificate-issuance-request.json`, `vectors/certificate-issuance-response.json`,
-`vectors/account-profile.json`, `vectors/account-devices.json` and `vectors/pairing.json`.
+`vectors/account-profile.json`, `vectors/account-devices.json` and `vectors/account-admission.json`.
 The shared loader is usable by both workstreams.
 
 ## Development
@@ -974,16 +936,13 @@ synthetic keyrings. Tracked seeds include the RFC proof, published gateway and a
 signed wrong-purpose and wrong-audience access tokens, signed duplicate header and nested claims,
 malformed signatures, truncation, a proof one byte over the 8 KiB bound, and access tokens at and
 one byte over their 4 KiB bound.
-It also parses D-114 public links, secret-bearing QRv2 and exact new-device/handoff plaintexts,
-requiring accepted values to re-encode to the same canonical bytes. Named pairing seeds include
-both valid application maps, a public link, a QRv2 and the rejected QRv1 form.
 The `api_json` target exercises the shared problem body, all seven authentication/refresh message
 types, both gateway-ticket issuance messages, the certificate issuance request and response, and
 the current-account profile and complete signed device-statement snapshot
-through public decoders, including the D-106 public JWKS document and all nine D-114 pairing
-message forms. Pairing seeds cover complete prefixes and receipts, seven slot bounds,
-canonical approval artifacts, response extensions, recursive duplicate names and malformed
-phase/capability encodings. Its seeds cover sorted and
+through public decoders, including D-106 public JWKS and every D-128 native message and protected CBOR map.
+D-128 seeds cover explicit intent/capability pairs, exact signature domains, complete-body bounds,
+protected extensions/trailing bytes and malicious declared collection lengths before allocation.
+Its seeds cover sorted and
 unordered keys, recursive duplicate members, duplicate identifiers, private `d`, malformed
 public fields, and exact and exceeded 4 KiB bodies. Authentication failure seeds preserve the
 shared problem body. Accepted messages must preserve their values across canonical encoding,
@@ -991,8 +950,7 @@ and a second encode must preserve those bytes. Gateway request checks also
 enforce rejection of an idempotency header. Seeds include the published JSON vectors, duplicate
 fields, forbidden browser refresh tokens, ambiguous edge hosts, nested response extensions,
 invalid certificate selectors and duplicate fields, signed certificate response Resource vectors,
-current-account email/null profiles and failures, the Personal rate and commit-uncertainty problems and structural
-enrollment identity mismatch, duplicate nested response fields, truncation,
+current-account email/null profiles and failures, duplicate nested response fields, truncation,
 and complete bodies at and one byte above request and response limits. This checks
 message syntax; token authentication, ticket signatures, and authorization remain consumer work.
 Fuzz-discovered mutations remain ignored; review, minimize, and name useful regression inputs

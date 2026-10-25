@@ -5,7 +5,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { generateOperatorTypes } from "./generate-operator.mjs";
 import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
-import { generatePairingTypes } from "./generate-pairing.mjs";
+import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -528,185 +528,26 @@ const accountStartIndex = finalGeneratedTypes.indexOf(accountStart);
 const accountEndIndex = finalGeneratedTypes.indexOf(accountEnd, accountStartIndex + accountStart.length);
 if (accountStartIndex < 0 || accountEndIndex < 0) throw new Error("types.ts is missing its generated account-profile section");
 const completeGeneratedTypes = `${finalGeneratedTypes.slice(0, accountStartIndex + accountStart.length)}${accountLines.join("\n")}\n${finalGeneratedTypes.slice(accountEndIndex)}`;
-const personalShapes = {
-  PersonalInvitationRequest: [],
-  PersonalInvitationResponse: ["invitation_url", "expires_at"],
-  PersonalEnrollmentRequest: ["invitation_token", "account_id", "personal_vault_id", "account_signing_public_key", "account_kem_public_key", "key_bundle_update", "device_certificate", "wrapped_personal_vault_key", "device_signature"],
-  PersonalEnrollmentResponse: ["account_id", "device_id", "personal_vault_id"],
-};
-const personalLines = [];
-for (const [name, fields] of Object.entries(personalShapes)) {
-  const schema = document.components?.schemas?.[name];
-  const isRequest = name.endsWith("Request");
-  if (schema?.type !== "object" || schema.additionalProperties !== !isRequest ||
-      JSON.stringify(schema.required) !== JSON.stringify(fields) ||
-      JSON.stringify(Object.keys(schema.properties ?? {})) !== JSON.stringify(fields)) {
-    throw new Error(`${name} differs from D-101`);
-  }
-  if (fields.length === 0) {
-    personalLines.push(`export type ${name} = Record<string, never>;`, "");
-    continue;
-  }
-  personalLines.push(`export interface ${name} {`);
-  for (const field of fields) {
-    const property = schema.properties[field];
-    if (property.type !== "string" ||
-        (["account_id", "device_id", "personal_vault_id"].includes(field) &&
-          (property.format !== "uuid" || property.pattern !== authPatterns.device_id)) ||
-        (field === "expires_at" && (property.format !== "date-time" || property.pattern !== authPatterns.server_time)) ||
-        (["invitation_token", "account_signing_public_key", "account_kem_public_key"].includes(field) &&
-          (property.minLength !== 43 || property.maxLength !== 43 || property.pattern !== "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$")) ||
-        (field === "device_signature" && (property.minLength !== 86 || property.maxLength !== 86 || property.pattern !== "^[A-Za-z0-9_-]{85}[AQgw]$")) ||
-        (["device_certificate", "wrapped_personal_vault_key"].includes(field) && property.maxLength !== 87382) ||
-        (field === "key_bundle_update" && !property.description?.includes("K-4")) ||
-        (field === "invitation_url" && (property.maxLength !== 2105 || !property.description?.includes("bearer credential")))) {
-      throw new Error(`${name}.${field} differs from D-101`);
-    }
-    personalLines.push(`  ${field}: string;`);
-  }
-  if (!isRequest) personalLines.push("  [extension: string]: unknown;");
-  personalLines.push("}", "");
-}
-for (const [path, operationId, request, response, maxRequest, maxResponse, referrer] of [
-  ["/admin/personal-invitations", "issuePersonalInvitation", "PersonalInvitationRequest", "PersonalInvitationResponse", 256, 4096, true],
-  ["/auth/personal-enroll", "enrollPersonalDevice", "PersonalEnrollmentRequest", "PersonalEnrollmentResponse", 1048576, 256, false],
-]) {
-  const operation = document.paths?.[path]?.post;
-  const success = operation?.responses?.["201"];
-  if (operation?.operationId !== operationId ||
-      (path.includes("/auth/") && JSON.stringify(operation.security) !== "[]") ||
-      !operation.description?.includes("Idempotency-Key") ||
-      (path.includes("/auth/") && !operation.description?.includes("401 auth.enrollment_denied")) ||
-      operation.requestBody?.required !== true ||
-      !operation.requestBody.description?.includes(`${maxRequest} bytes`) ||
-      operation.requestBody.content?.["application/json"]?.schema?.$ref !== `#/components/schemas/${request}` ||
-      !success?.description?.includes(`${maxResponse} bytes`) ||
-      success.content?.["application/json"]?.schema?.$ref !== `#/components/schemas/${response}` ||
-      success.headers?.["Cache-Control"]?.schema?.const !== "no-store" ||
-      success.headers?.Pragma?.schema?.const !== "no-cache" ||
-      (referrer && success.headers?.["Referrer-Policy"]?.schema?.const !== "no-referrer") ||
-      operation.responses?.["429"]?.$ref !== "#/components/responses/PersonalRateLimited" ||
-      operation.responses?.["503"]?.$ref !== "#/components/responses/PersonalStorageFailure" ||
-      !operation.description?.includes("503 auth.storage_unavailable takes precedence") ||
-      !operation.description?.includes("mandatory failure auditing") ||
-      !["400", "401", "403", "413", "415", "default"].every((status) =>
-        operation.responses?.[status]?.$ref === "#/components/responses/Problem")) {
-    throw new Error(`${path} differs from D-101/D-104/D-105`);
-  }
-}
-const personalRateHeaders = document.components?.responses?.PersonalRateLimited?.headers;
-const boundedDelay = "(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)";
-const expectedPersonalRateHeaders = {
-  "Retry-After": { required: true, schema: { type: "string", pattern: `^${boundedDelay}$` } },
-  "RateLimit-Policy": { required: true, schema: { const: '"personal";q=30;w=60' } },
-  RateLimit: { required: true, schema: { type: "string", pattern: `^"personal";r=0;t=${boundedDelay}$` }, description: "The t delay equals Retry-After." },
-  "Cache-Control": { required: true, schema: { const: "no-store" } },
-  Pragma: { required: true, schema: { const: "no-cache" } },
-  "Referrer-Policy": { required: true, schema: { const: "no-referrer" } },
-};
-const personalRateResponse = document.components?.responses?.PersonalRateLimited;
-const personalRateProblem = document.components?.schemas?.PersonalRateLimitedProblem;
-if (JSON.stringify(personalRateHeaders) !== JSON.stringify(expectedPersonalRateHeaders) ||
-    !personalRateResponse?.description?.includes("1..300 seconds") ||
-    !personalRateResponse.description.includes("draft-ietf-httpapi-ratelimit-headers-11") ||
-    personalRateResponse.content?.["application/problem+json"]?.schema?.$ref !==
-      "#/components/schemas/PersonalRateLimitedProblem" ||
-    JSON.stringify(personalRateProblem?.allOf) !== JSON.stringify([
-      { $ref: "#/components/schemas/ProblemDetails" },
-      { type: "object", properties: {
-        status: { const: 429 }, code: { const: "auth.rate_limited" },
-        changed: { const: false }, retryable: { const: true },
-      } },
-    ])) {
-  throw new Error("Personal rate-limit response differs from D-104");
-}
-personalLines.push(
-  "export interface PersonalRateLimitHeaders {",
-  "  /** Decimal 1..300 seconds; RateLimit.t equals this delay. */",
-  '  "Retry-After": string;',
-  '  "RateLimit-Policy": \'"personal";q=30;w=60\';',
-  "  RateLimit: string;",
-  '  "Cache-Control": "no-store";',
-  '  Pragma: "no-cache";',
-  '  "Referrer-Policy": "no-referrer";',
-  "}", "",
-  'export type PersonalRateLimitedProblem = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {',
-  "  status: 429;",
-  '  code: "auth.rate_limited";',
-  "  changed: false;",
-  "  retryable: true;",
-  "};", "",
-);
-const storageFailure = document.components?.responses?.PersonalStorageFailure;
-const storageFailureHeaders = {
-  "Cache-Control": { required: true, schema: { const: "no-store" } },
-  Pragma: { required: true, schema: { const: "no-cache" } },
-  "Referrer-Policy": { required: true, schema: { const: "no-referrer" } },
-};
-if (JSON.stringify(storageFailure?.headers) !== JSON.stringify(storageFailureHeaders) ||
-    !storageFailure.description?.includes("never automatically replay") ||
-    !storageFailure.description.includes("/auth/challenge and /auth/device") ||
-    !storageFailure.description.includes("operator explicitly decides") ||
-    JSON.stringify(storageFailure.content?.["application/problem+json"]?.schema?.oneOf) !==
-      JSON.stringify([
-        { $ref: "#/components/schemas/PersonalStorageUnavailableProblem" },
-        { $ref: "#/components/schemas/PersonalCommitOutcomeUnknownProblem" },
-      ])) {
-  throw new Error("Personal storage failure response differs from D-105");
-}
-for (const [name, code, changed, retryable] of [
-  ["PersonalStorageUnavailableProblem", "auth.storage_unavailable", false, true],
-  ["PersonalCommitOutcomeUnknownProblem", "auth.commit_outcome_unknown", true, false],
-]) {
-  const schema = document.components?.schemas?.[name];
-  if (JSON.stringify(schema?.allOf) !== JSON.stringify([
-    { $ref: "#/components/schemas/ProblemDetails" },
-    { type: "object", properties: {
-      status: { const: 503 }, code: { const: code },
-      changed: { const: changed }, retryable: { const: retryable },
-    } },
-  ])) {
-    throw new Error(`${name} differs from D-105`);
-  }
-  personalLines.push(
-    `export type ${name} = Omit<ProblemDetails, "status" | "code" | "changed" | "retryable"> & {`,
-    "  status: 503;",
-    `  code: "${code}";`,
-    `  changed: ${changed};`,
-    `  retryable: ${retryable};`,
-    "};", "",
-  );
-}
-personalLines.push(
-  "export type PersonalStorageFailureProblem = PersonalStorageUnavailableProblem | PersonalCommitOutcomeUnknownProblem;",
-  "",
-);
-const personalStart = "// BEGIN GENERATED PersonalEnrollment\n";
-const personalEnd = "// END GENERATED PersonalEnrollment";
-const personalStartIndex = completeGeneratedTypes.indexOf(personalStart);
-const personalEndIndex = completeGeneratedTypes.indexOf(personalEnd, personalStartIndex + personalStart.length);
-if (personalStartIndex < 0 || personalEndIndex < 0) throw new Error("types.ts is missing its generated Personal enrollment section");
-const completePersonalTypes = `${completeGeneratedTypes.slice(0, personalStartIndex + personalStart.length)}${personalLines.join("\n")}${completeGeneratedTypes.slice(personalEndIndex)}`;
 const generatedPaths = `// SPDX-License-Identifier: Apache-2.0\n// Generated by openapi/generate.mjs.\nexport const controlPlanePaths = ${JSON.stringify(paths, null, 2)} as const;\n`;
 const operatorStart = "// BEGIN GENERATED OperatorAuthentication\n";
 const operatorEnd = "// END GENERATED OperatorAuthentication";
-const operatorStartIndex = completePersonalTypes.indexOf(operatorStart);
-const operatorEndIndex = completePersonalTypes.indexOf(operatorEnd, operatorStartIndex + operatorStart.length);
+const operatorStartIndex = completeGeneratedTypes.indexOf(operatorStart);
+const operatorEndIndex = completeGeneratedTypes.indexOf(operatorEnd, operatorStartIndex + operatorStart.length);
 if (operatorStartIndex < 0 || operatorEndIndex < 0) throw new Error("types.ts is missing its generated Operator section");
-const completeOperatorTypes = `${completePersonalTypes.slice(0, operatorStartIndex + operatorStart.length)}${generateOperatorTypes(document)}${completePersonalTypes.slice(operatorEndIndex)}`;
+const completeOperatorTypes = `${completeGeneratedTypes.slice(0, operatorStartIndex + operatorStart.length)}${generateOperatorTypes(document)}${completeGeneratedTypes.slice(operatorEndIndex)}`;
 const deviceStart = "// BEGIN GENERATED AccountDeviceStatements\n";
 const deviceEnd = "// END GENERATED AccountDeviceStatements";
 const deviceStartIndex = completeOperatorTypes.indexOf(deviceStart);
 const deviceEndIndex = completeOperatorTypes.indexOf(deviceEnd, deviceStartIndex + deviceStart.length);
 if (deviceStartIndex < 0 || deviceEndIndex < 0) throw new Error("types.ts is missing its generated account-device section");
 const completeDeviceTypes = `${completeOperatorTypes.slice(0, deviceStartIndex + deviceStart.length)}${generateAccountDeviceTypes(document)}${completeOperatorTypes.slice(deviceEndIndex)}`;
-const pairingStart = "// BEGIN GENERATED Pairing\n";
-const pairingEnd = "// END GENERATED Pairing";
-const pairingStartIndex = completeDeviceTypes.indexOf(pairingStart);
-const pairingEndIndex = completeDeviceTypes.indexOf(pairingEnd, pairingStartIndex + pairingStart.length);
-if (pairingStartIndex < 0 || pairingEndIndex < 0) throw new Error("types.ts is missing its generated pairing section");
-const completePairingTypes = `${completeDeviceTypes.slice(0, pairingStartIndex + pairingStart.length)}${generatePairingTypes(document)}${completeDeviceTypes.slice(pairingEndIndex)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completePairingTypes]];
+const accountStartMarker = "// BEGIN GENERATED AccountAdmission\n";
+const accountEndMarker = "// END GENERATED AccountAdmission";
+const accountBegin = completeDeviceTypes.indexOf(accountStartMarker);
+const accountFinish = completeDeviceTypes.indexOf(accountEndMarker, accountBegin + accountStartMarker.length);
+if (accountBegin < 0 || accountFinish < 0) throw new Error("types.ts lacks AccountAdmission markers");
+const completeAccountTypes = `${completeDeviceTypes.slice(0, accountBegin + accountStartMarker.length)}${generateAccountAdmissionTypes(document)}${completeDeviceTypes.slice(accountFinish)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeAccountTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

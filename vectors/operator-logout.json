@@ -114,7 +114,7 @@
       "id": "operator-logout-invitation-v1",
       "kind": "operator.logout.operation",
       "input": "{\"method\":\"POST\",\"path\":\"/api/v1/admin/personal-invitations\"}",
-      "expected": "personal-invitation:issue"
+      "expected": "unmapped"
     },
     {
       "id": "operator-logout-method-v1",

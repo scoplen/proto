@@ -5,8 +5,8 @@
 
 #![forbid(unsafe_code)]
 
+mod account_request;
 mod certificate;
-mod cpace;
 mod device_access_token;
 mod device_auth;
 mod dpop;
@@ -18,21 +18,19 @@ mod hierarchy;
 mod hpke;
 mod keys;
 mod operator_access_token;
-mod pairing;
-mod pairing_application;
 mod password_bootstrap;
-mod personal_enrollment;
 mod primitives;
 mod recovery;
 mod secret;
 mod shamir;
 mod signature;
 
-pub use certificate::{DeviceCertificate, RevocationStatement, verify_device_list};
-pub use cpace::{
-    CPACE_CHANNEL_IDENTIFIER, PairingCode, PairingContext, PairingError, PairingInitiator,
-    PairingResponder, PairingRole, PairingSession,
+pub use account_request::{
+    AccountProbeKey, AccountRequestError, AccountRequestIntent, AccountRequestKind,
+    AccountRequestProof, AccountRequestSignatureInput, account_bootstrap_digest,
+    account_capability_digest, canonical_device_public_key,
 };
+pub use certificate::{DeviceCertificate, RevocationStatement, verify_device_list};
 pub use device_access_token::{
     DEVICE_ACCESS_TOKEN_LIFETIME_SECONDS, DeviceAccessToken, DeviceAccessTokenClaims,
     DeviceAccessTokenError, DeviceAccessTokenSigner, DeviceOrganizationSnapshot,
@@ -72,19 +70,10 @@ pub use operator_access_token::{
     OperatorAccessTokenClaims, OperatorAccessTokenError, OperatorAccessTokenSigner,
     TrustedOperatorAccessTokenKeys, VerifiedOperatorAccessToken,
 };
-pub use pairing::{PairingLink, PairingQrError, PairingQrPayload};
-pub use pairing_application::{
-    MAX_PAIRING_HANDOFF_FRAME_BYTES, MAX_PAIRING_NEW_DEVICE_FRAME_BYTES, PairingApplicationContext,
-    PairingApplicationError, PairingCompletionContext, PairingHandoff, PairingKeyProjection,
-    PairingNewDevice, pairing_approval_fingerprint, pairing_key_anchor,
-};
 pub use password_bootstrap::{
     PASSWORD_ARK_WRAP_BYTES, PASSWORD_BOOTSTRAP_PROFILE, PasswordArkWrap, PasswordBootstrap,
     PasswordBootstrapContext, PasswordBootstrapError, PasswordKdfContext, PasswordSecrets,
     PasswordVerifier, normalize_account_password,
-};
-pub use personal_enrollment::{
-    PersonalEnrollmentArtifacts, PersonalEnrollmentContext, PersonalEnrollmentError,
 };
 pub use primitives::{
     ARGON2_MEMORY_KIB, ARGON2_PARALLELISM, ARGON2_TIME_COST, Argon2idParams, PrimitiveError,

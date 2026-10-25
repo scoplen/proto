@@ -3,6 +3,12 @@
 
 use libfuzzer_sys::fuzz_target;
 use scoplen_api::ProblemDetails;
+use scoplen_api::account_admission::{
+    AccountBootstrapSnapshot, AccountCommittedConfirmation, AccountDeviceAdmissionPayload,
+    AccountDeviceAdmissionRequest, AccountPasswordLoginRequest, AccountPasswordLoginResponse,
+    AccountPasswordOptionsRequest, AccountPasswordOptionsResponse, AccountRegistrationPayload,
+    AccountRegistrationRequest, AccountRequestChallengeRequest, AccountRequestChallengeResponse,
+};
 use scoplen_api::account_devices::AccountDeviceStatements;
 use scoplen_api::account_profile::AccountProfile;
 use scoplen_api::auth::{
@@ -15,18 +21,8 @@ use scoplen_api::gateway_ticket::{
 };
 use scoplen_api::operator_auth::{
     OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
-    OperatorLogoutRequest, OperatorLogoutResponse,
-    OperatorSetupFinishRequest, OperatorSetupFinishResponse, OperatorSetupOptionsRequest,
-    OperatorSetupOptionsResponse,
-};
-use scoplen_api::pairing::{
-    PairingClaimRequest, PairingClaimResponse, PairingCompleteRequest, PairingCreateRequest,
-    PairingCreateResponse, PairingMessageAck, PairingMessageRequest, PairingReceipt,
-    PairingSnapshot,
-};
-use scoplen_api::personal_enrollment::{
-    PersonalEnrollmentRequest, PersonalEnrollmentResponse, PersonalInvitationRequest,
-    PersonalInvitationResponse,
+    OperatorLogoutRequest, OperatorLogoutResponse, OperatorSetupFinishRequest,
+    OperatorSetupFinishResponse, OperatorSetupOptionsRequest, OperatorSetupOptionsResponse,
 };
 
 macro_rules! round_trip {
@@ -50,15 +46,27 @@ fuzz_target!(|bytes: &[u8]| {
     }
     round_trip!(AccountProfile, bytes);
     round_trip!(AccountDeviceStatements, bytes);
-    round_trip!(PairingCreateRequest, bytes);
-    round_trip!(PairingCreateResponse, bytes);
-    round_trip!(PairingClaimRequest, bytes);
-    round_trip!(PairingClaimResponse, bytes);
-    round_trip!(PairingMessageRequest, bytes);
-    round_trip!(PairingMessageAck, bytes);
-    round_trip!(PairingReceipt, bytes);
-    round_trip!(PairingSnapshot, bytes);
-    round_trip!(PairingCompleteRequest, bytes);
+    round_trip!(AccountRequestChallengeRequest, bytes);
+    round_trip!(AccountRequestChallengeResponse, bytes);
+    round_trip!(AccountPasswordOptionsRequest, bytes);
+    round_trip!(AccountPasswordOptionsResponse, bytes);
+    round_trip!(AccountPasswordLoginResponse, bytes);
+    round_trip!(AccountRegistrationRequest, bytes);
+    round_trip!(AccountDeviceAdmissionRequest, bytes);
+    round_trip!(AccountCommittedConfirmation, bytes);
+    if let Ok(request) = AccountPasswordLoginRequest::from_json(bytes) {
+        let encoded = request.to_json().expect("validated secret request encodes");
+        assert_eq!(AccountPasswordLoginRequest::from_json(encoded.as_bytes()), Ok(request));
+    }
+    if let Ok(value) = AccountRegistrationPayload::from_cbor(bytes) {
+        assert_eq!(value.to_cbor().expect("validated protected registration"), bytes);
+    }
+    if let Ok(value) = AccountDeviceAdmissionPayload::from_cbor(bytes) {
+        assert_eq!(value.to_cbor().expect("validated protected admission"), bytes);
+    }
+    if let Ok(value) = AccountBootstrapSnapshot::from_cbor(bytes) {
+        assert_eq!(value.to_cbor().expect("validated complete snapshot"), bytes);
+    }
     round_trip!(AuthJwks, bytes);
     round_trip!(OperatorSetupOptionsRequest, bytes);
     round_trip!(OperatorSetupFinishRequest, bytes);
@@ -73,18 +81,6 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(CertificateIssuanceResponse, bytes);
     round_trip!(GatewayTicketRequest, bytes);
     round_trip!(GatewayTicketResponse, bytes);
-    round_trip!(PersonalInvitationResponse, bytes);
-    if let Ok(request) = PersonalEnrollmentRequest::from_json_structural(bytes) {
-        assert_eq!(
-            PersonalEnrollmentRequest::from_json(bytes),
-            request.validate().map(|()| request.clone()),
-        );
-    }
-    round_trip!(PersonalEnrollmentRequest, bytes);
-    round_trip!(PersonalEnrollmentResponse, bytes);
-    if let Ok(request) = PersonalInvitationRequest::from_json(bytes) {
-        assert_eq!(PersonalInvitationRequest::from_json(&request.to_json()), Ok(request));
-    }
     assert_eq!(
         GatewayTicketRequest::from_http_json(bytes, true),
         Err(GatewayTicketCodecError::IdempotencyKey)

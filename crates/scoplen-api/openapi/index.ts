@@ -2,6 +2,28 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  AccountRequestChallengeRequest,
+  AccountRequestChallengeResponse,
+  AccountPasswordOptionsRequest,
+  AccountPasswordOptionsResponse,
+  AccountPasswordLoginRequest,
+  AccountPasswordLoginResponse,
+  AccountRegistrationRequest,
+  AccountDeviceAdmissionRequest,
+  AccountDeviceAdmissionFields,
+  AccountCommittedConfirmation,
+  AccountEntryInvalidRequestProblem,
+  AccountEntryAuthenticationRequiredProblem,
+  AccountEntryPolicyDeniedProblem,
+  AccountEntryMediaTypeProblem,
+  AccountEntryRateLimitedProblem,
+  AccountEntryRegistrationDeniedProblem,
+  AccountEntryAdmissionConflictProblem,
+  AccountEntryBodyTooLargeProblem,
+  AccountEntryStorageUnavailableProblem,
+  AccountEntryTooLargeProblem,
+  AccountEntryStorageFailureProblem,
+  AccountEntryRateLimitHeaders,
   AccountProfile,
   AccountDeviceStatements,
   AccountProfileData,
@@ -39,9 +61,5 @@ export type {
   AuthStorageUnavailableProblem,
   AuthCommitOutcomeUnknownProblem,
   AuthStorageFailureProblem,
-  PersonalInvitationRequest,
-  PersonalInvitationResponse,
-  PersonalEnrollmentRequest,
-  PersonalEnrollmentResponse,
 } from "./types";
 export * from "./proto";

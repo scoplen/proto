@@ -93,60 +93,6 @@
       "expected": "{\"type\":\"about:blank\",\"title\":\"Certificate request too large\",\"status\":413,\"detail\":\"Reduce the request body to 16384 bytes or fewer.\",\"instance\":\"certificate-2\",\"code\":\"certificate.invalid_request\",\"changed\":false,\"retryable\":false}"
     },
     {
-      "id": "api-problem-personal-enrollment-denied-json",
-      "kind": "api.problem.json",
-      "input": "{\"type\":\"about:blank\",\"title\":\"Enrollment denied\",\"status\":401,\"detail\":\"The enrollment could not be completed. Request a new invitation.\",\"instance\":\"enroll-1\",\"code\":\"auth.enrollment_denied\",\"changed\":false,\"retryable\":false}",
-      "expected": "{\"type\":\"about:blank\",\"title\":\"Enrollment denied\",\"status\":401,\"detail\":\"The enrollment could not be completed. Request a new invitation.\",\"instance\":\"enroll-1\",\"code\":\"auth.enrollment_denied\",\"changed\":false,\"retryable\":false}"
-    },
-    {
-      "id": "api-problem-personal-storage-unavailable-json",
-      "kind": "api.problem.json",
-      "input": "{\"type\":\"about:blank\",\"title\":\"Enrollment unavailable\",\"status\":503,\"detail\":\"Storage is temporarily unavailable; retry later.\",\"instance\":\"enroll-2\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}",
-      "expected": "{\"type\":\"about:blank\",\"title\":\"Enrollment unavailable\",\"status\":503,\"detail\":\"Storage is temporarily unavailable; retry later.\",\"instance\":\"enroll-2\",\"code\":\"auth.storage_unavailable\",\"changed\":false,\"retryable\":true}"
-    },
-    {
-      "id": "api-problem-personal-rate-limited-json",
-      "kind": "api.problem.json",
-      "input": "{\"type\":\"about:blank\",\"title\":\"Personal request rate limited\",\"status\":429,\"detail\":\"The request was not completed; no data changed. Wait for the indicated delay before retrying.\",\"instance\":\"personal-rate-1\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}",
-      "expected": "{\"type\":\"about:blank\",\"title\":\"Personal request rate limited\",\"status\":429,\"detail\":\"The request was not completed; no data changed. Wait for the indicated delay before retrying.\",\"instance\":\"personal-rate-1\",\"code\":\"auth.rate_limited\",\"changed\":false,\"retryable\":true}"
-    },
-    {
-      "id": "api-problem-personal-enrollment-commit-outcome-unknown-json",
-      "kind": "api.problem.json",
-      "input": "{\"type\":\"about:blank\",\"title\":\"Enrollment outcome unknown\",\"status\":503,\"detail\":\"Enrollment may have completed. Keep the generated identity and try device authentication before deciding whether to enroll again.\",\"instance\":\"enroll-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
-      "expected": "{\"type\":\"about:blank\",\"title\":\"Enrollment outcome unknown\",\"status\":503,\"detail\":\"Enrollment may have completed. Keep the generated identity and try device authentication before deciding whether to enroll again.\",\"instance\":\"enroll-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
-    },
-    {
-      "id": "api-problem-personal-invitation-commit-outcome-unknown-json",
-      "kind": "api.problem.json",
-      "input": "{\"type\":\"about:blank\",\"title\":\"Invitation outcome unknown\",\"status\":503,\"detail\":\"An invitation may have been issued, but its one-time token cannot be recovered. The operator must decide whether to issue another invitation.\",\"instance\":\"invite-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
-      "expected": "{\"type\":\"about:blank\",\"title\":\"Invitation outcome unknown\",\"status\":503,\"detail\":\"An invitation may have been issued, but its one-time token cannot be recovered. The operator must decide whether to issue another invitation.\",\"instance\":\"invite-3\",\"code\":\"auth.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
-    },
-    {
-      "id": "api-personal-rate-headers-min",
-      "kind": "api.personal.rate_headers",
-      "input": "1",
-      "expected": "{\"Retry-After\":\"1\",\"RateLimit-Policy\":\"\\\"personal\\\";q=30;w=60\",\"RateLimit\":\"\\\"personal\\\";r=0;t=1\"}"
-    },
-    {
-      "id": "api-personal-rate-headers-max",
-      "kind": "api.personal.rate_headers",
-      "input": "300",
-      "expected": "{\"Retry-After\":\"300\",\"RateLimit-Policy\":\"\\\"personal\\\";q=30;w=60\",\"RateLimit\":\"\\\"personal\\\";r=0;t=300\"}"
-    },
-    {
-      "id": "api-personal-rate-headers-zero-reject",
-      "kind": "api.personal.rate_headers.reject",
-      "input": "0",
-      "expected": "reject"
-    },
-    {
-      "id": "api-personal-rate-headers-over-limit-reject",
-      "kind": "api.personal.rate_headers.reject",
-      "input": "301",
-      "expected": "reject"
-    },
-    {
       "id": "api-problem-sync-keys-storage-precommit-json",
       "kind": "api.problem.json",
       "input": "{\"type\":\"about:blank\",\"title\":\"Account-key storage unavailable\",\"status\":503,\"detail\":\"The account-key update did not commit; no account keys changed. Keep local keys and the exact signed request, then retry later.\",\"instance\":\"sync-keys-rollback-1\",\"code\":\"sync.storage_unavailable\",\"changed\":false,\"retryable\":true}",

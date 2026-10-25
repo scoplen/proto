@@ -7,7 +7,7 @@ pub const INITIAL_OPERATOR_ACCESS_SCOPE: &str = "personal-invitation:issue";
 /// The initial deployment Operator's registered coarse permission.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OperatorAccessScope {
-    /// Issue a one-use Personal account invitation, subject to current Operator and Cedar checks.
+    /// Reserved inert legacy claim value; no current business operation accepts it.
     PersonalInvitationIssue,
 }
 
@@ -48,23 +48,18 @@ pub enum OperatorAccessRequirement {
 /// Router-owned registry for the independent Operator profile; unmapped routes fail closed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OperatorAccessOperation {
-    /// Issue a Personal enrollment invitation.
-    PersonalInvitationIssue,
     /// Terminate only the caller's token-bound current Operator browser family.
     Logout,
 }
 
 impl OperatorAccessOperation {
     /// All registered Operator operations.
-    pub const ALL: [Self; 2] = [Self::PersonalInvitationIssue, Self::Logout];
+    pub const ALL: [Self; 1] = [Self::Logout];
 
     /// Exact authenticated requirement; neither branch supplies authentication by itself.
     #[must_use]
     pub const fn requirement(self) -> OperatorAccessRequirement {
         match self {
-            Self::PersonalInvitationIssue => {
-                OperatorAccessRequirement::Scope(OperatorAccessScope::PersonalInvitationIssue)
-            }
             Self::Logout => OperatorAccessRequirement::SelfSessionTermination,
         }
     }
@@ -79,7 +74,6 @@ impl OperatorAccessOperation {
     #[must_use]
     pub const fn route_template(self) -> &'static str {
         match self {
-            Self::PersonalInvitationIssue => "/api/v1/admin/personal-invitations",
             Self::Logout => "/api/v1/auth/operator/logout",
         }
     }

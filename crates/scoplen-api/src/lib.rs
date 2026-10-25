@@ -9,6 +9,7 @@ use scoplen_model::cbor::{self, Value};
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
+pub mod account_admission;
 pub mod account_devices;
 pub mod account_profile;
 pub mod auth;
@@ -19,9 +20,6 @@ pub mod gateway_ticket;
 pub mod internal_grpc;
 pub mod operator_auth;
 pub mod operator_logout_reference;
-pub mod pairing;
-pub mod pairing_reference;
-pub mod personal_enrollment;
 mod request_wire;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
@@ -56,6 +54,7 @@ pub const CONTRACTS: &[&str] = &["K-3", "K-4", "K-5", "K-6"];
 /// Stable error-code strings defined by the initial K-3/K-4/K-5 registry.
 pub const ERROR_CODES: &[&str] = &[
     "auth.authentication_required",
+    "auth.admission_conflict",
     "auth.client_unsupported",
     "auth.commit_outcome_unknown",
     "auth.device_revoked",
@@ -65,6 +64,8 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.pairing_conflict",
     "auth.pairing_denied",
     "auth.rate_limited",
+    "auth.quota_exceeded",
+    "auth.registration_denied",
     "auth.storage_unavailable",
     "auth.use_dpop_nonce",
     "certificate.invalid_request",

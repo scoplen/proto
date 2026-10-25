@@ -370,11 +370,10 @@ fn complete_token_limit_includes_ignored_extensions() {
 }
 
 #[test]
-fn operator_token_dpop_binds_exact_invitation_request_key_and_token_hash() {
+fn operator_token_dpop_binds_exact_logout_request_key_and_token_hash() {
     let token = signed();
     let verified = token.verify(&trusted(), IAT).expect("Operator evidence");
-    let target =
-        DpopTarget::new("POST", ISSUER, "/api/v1/admin/personal-invitations").expect("target");
+    let target = DpopTarget::new("POST", ISSUER, "/api/v1/auth/operator/logout").expect("target");
     let browser = browser_key();
     let proof = DpopProof::sign(
         &browser,

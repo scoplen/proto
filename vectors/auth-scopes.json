@@ -363,34 +363,34 @@
       "expected": "unmapped"
     },
     {
-      "id": "auth-scope-pairing-read-v1",
+      "id": "auth-scope-retired-pairing-read-v1",
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/auth/pairings/{pairing}\"}",
-      "expected": "keys:write"
+      "expected": "unmapped"
     },
     {
-      "id": "auth-scope-pairing-claim-v1",
+      "id": "auth-scope-retired-pairing-claim-v1",
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/auth/pairings/{pairing}/claim\"}",
-      "expected": "keys:write"
+      "expected": "unmapped"
     },
     {
-      "id": "auth-scope-pairing-message-v1",
+      "id": "auth-scope-retired-pairing-message-v1",
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/auth/pairings/{pairing}/messages\"}",
-      "expected": "keys:write"
+      "expected": "unmapped"
     },
     {
-      "id": "auth-scope-pairing-complete-v1",
+      "id": "auth-scope-retired-pairing-complete-v1",
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/auth/pairings/{pairing}/complete\"}",
-      "expected": "keys:write"
+      "expected": "unmapped"
     },
     {
-      "id": "auth-scope-pairing-cancel-v1",
+      "id": "auth-scope-retired-pairing-cancel-v1",
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/auth/pairings/{pairing}\"}",
-      "expected": "keys:write"
+      "expected": "unmapped"
     }
   ]
 }

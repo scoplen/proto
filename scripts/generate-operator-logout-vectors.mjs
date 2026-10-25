@@ -24,7 +24,7 @@ for (const [id, input] of [
 ]) vector(id, "response.reject", input);
 for (const [id, method, path, expected] of [
   ["route", "POST", "/api/v1/auth/operator/logout", "self-session-termination"],
-  ["invitation", "POST", "/api/v1/admin/personal-invitations", "personal-invitation:issue"],
+  ["invitation", "POST", "/api/v1/admin/personal-invitations", "unmapped"],
   ["method", "GET", "/api/v1/auth/operator/logout", "unmapped"],
   ["route-case", "post", "/api/v1/auth/operator/logout", "unmapped"],
   ["route-slash", "POST", "/api/v1/auth/operator/logout/", "unmapped"],

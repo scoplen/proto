@@ -70,7 +70,7 @@ export function generateOperatorTypes(document) {
   const jwks = document.paths["/.well-known/operator-jwks.json"]?.get;
   if (JSON.stringify(jwks?.servers) !== '[{"url":"/"}]' || JSON.stringify(jwks.security) !== "[]" ||
       jwks.responses?.["200"]?.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/AuthJwks" ||
-      document.paths["/admin/personal-invitations"].post["x-scoplen-required-operator-scope"] !== "personal-invitation:issue") throw new Error("Operator key source or scope differs from D-111");
+      document.paths["/admin/personal-invitations"]) throw new Error("Operator key source or retired-scope boundary differs from D-111/D-125");
   const problemNames = ["OperatorInvalidRequestProblem", "OperatorInvalidDpopProblem", "OperatorOriginDeniedProblem", "OperatorBodyTooLargeProblem", "OperatorContentTypeProblem"];
   for (const [name, status, code] of [[problemNames[0], 400, "auth.invalid_request"], [problemNames[1], 400, "auth.invalid_dpop_proof"], [problemNames[2], 403, "policy.denied"], [problemNames[3], 413, "auth.invalid_request"], [problemNames[4], 415, "auth.invalid_request"]]) {
     const constraint = schemas[name]?.allOf?.[1]?.properties;
