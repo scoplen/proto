@@ -57,7 +57,7 @@ const vectors = [
 const output = `${JSON.stringify({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2)}\n`;
 const destination = new URL("../vectors/interactive-credential.json", import.meta.url);
 if (process.argv.includes("--check")) {
-  if (readFileSync(destination, "utf8") !== output) throw new Error("interactive credential vectors have drifted");
+  if (readFileSync(destination, "utf8").replaceAll("\r\n", "\n") !== output) throw new Error("interactive credential vectors have drifted");
 } else {
   writeFileSync(destination, output);
 }
