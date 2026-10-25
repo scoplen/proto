@@ -436,11 +436,25 @@ The same example also passed against Dropbear 2025.88 from an Alpine 3.23 dispos
 install `dropbear`, create a `scoplen` user with a single authorized Ed25519 key, generate an
 Ed25519 host key with `dropbearkey`, run Dropbear on port 2222, pin its public key, and set
 `SCOPLEN_OPENSSH_ED25519_KEY` to the authorized private-key path. A second private key was
-rejected. Dropbear SFTP, forwarding, certificates, and other authentication paths remain unverified.
+rejected. That historical 2025.88 run does not establish its SFTP or forwarding behavior.
 `pwsh ./scripts/dropbear-interop.ps1` now runs the same session-command example against disposable
-Dropbear 2024.86 in Alpine 3.21 with password authentication, then checks wrong-password and
-wrong-host-key rejection. The CI workflow runs this test on Linux; the container is stopped after
-the run.
+Dropbear 2024.86 in Alpine 3.21 with password authentication and the pinned OpenSSH 9.9p2 SFTP
+subsystem, then checks wrong-password and wrong-host-key rejection. It also runs direct TCP and
+SOCKS4a/5 forwarding through an allowed listener and a second Dropbear listener with local
+forwarding disabled. The internal loopback echo target waits for data from both peers, returns
+every binary payload byte, and emits a fixed trailer only after receiving EOF. Direct channels
+and SOCKS4a/5 each transfer 131,087 and 196,613 bytes concurrently with that half-close proof.
+Closed-target refusal, forwarding prohibition, subsequent exact session commands, and an active
+SOCKS connection's cancellation and listener-port release are checked separately.
+
+The shared examples retain their strict OpenSSH banner check by default. The Dropbear script
+sets `SCOPLEN_OPENSSH_SFTP_PROFILE=dropbear-2024.86` for the exact pinned Dropbear banner and
+requires `SCOPLEN_DROPBEAR_FORWARD_DENIED_PORT` for its negative listener; an unknown profile
+does not select a permissive fallback. No original authentication or SFTP check is skipped.
+The existing Linux CI job runs this complete script. Successful runs remove their owned
+container; failures stop it and retain its logs for diagnosis. Caller environment variables
+are restored after either result. Certificates, other Dropbear versions and the
+remaining platform/authentication matrix remain separate acceptance work.
 The example also passed against OpenSSH 9.7p1 from a disposable Alpine 3.20 container with
 Ed25519 and RSA-SHA2-256/512 public-key authentication and a session command; an unauthorized
 RSA key was rejected. The container uses `openssh-server`, an unlocked `scoplen` test account,

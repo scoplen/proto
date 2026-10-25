@@ -4,6 +4,14 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Extend the pinned Dropbear fixture with direct TCP and SOCKS4a/5 forwarding,
+  concurrent binary transfers with an EOF-only trailer, disabled-forwarding and
+  closed-target refusal, subsequent session commands, and active-listener cancellation.
+  Existing password, SFTP and wrong-credential/host-key controls remain required;
+  fixture profiles keep distinct strict OpenSSH and Dropbear banner checks. Banner
+  checks tolerate a coalesced binary KEX packet, and cancellation still requires
+  bounded final EOF after already queued SSH bytes.
+
 - Take zeroizing ownership of every keyboard-interactive response before validating count or
   size, so rejected input buffers are also cleared on drop. Public errors and bounds are unchanged.
 

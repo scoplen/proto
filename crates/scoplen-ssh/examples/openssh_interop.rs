@@ -14,6 +14,9 @@ use scoplen_ssh::{
 use ssh_key::{Certificate, PrivateKey, PublicKey};
 use tokio::time::timeout;
 
+#[path = "support/forwarding_fixture.rs"]
+mod forwarding_fixture;
+
 const SSH_STEP_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, thiserror::Error)]
@@ -68,7 +71,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         timeout(Duration::from_secs(30), verify_sftp(&connection)).await??;
     }
     if env::var("SCOPLEN_OPENSSH_FORWARD").as_deref() == Ok("1") {
-        timeout(Duration::from_secs(10), verify_forwarding(&connection)).await??;
+        let budget = if forwarding_fixture::Peer::from_env()? == forwarding_fixture::Peer::Dropbear
+        {
+            Duration::from_secs(45)
+        } else {
+            Duration::from_secs(10)
+        };
+        timeout(budget, verify_forwarding(&connection)).await??;
     }
     timeout(SSH_STEP_TIMEOUT, connection.disconnect()).await??;
     println!("openssh interop ok");
@@ -187,21 +196,19 @@ async fn authenticate_with_signer<S: Signer + Sync>(
 async fn verify_forwarding(
     connection: &ClientConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let peer = forwarding_fixture::Peer::from_env()?;
     let mut channel = connection.open_direct_tcpip("127.0.0.1", 2222, "127.0.0.1", 0).await?;
     let mut banner = Vec::new();
     while !banner.contains(&b'\n') && banner.len() < 256 {
         match channel.next_event().await? {
             Some(ChannelEvent::Data(data)) => {
-                if banner.len().saturating_add(data.len()) > 256 {
-                    return Err("forwarded OpenSSH banner exceeded 256 bytes".into());
-                }
-                banner.extend_from_slice(&data);
+                append_forwarded_banner(&mut banner, &data)?;
             }
             other => return Err(format!("unexpected forwarding event: {other:?}").into()),
         }
     }
-    if !banner.starts_with(b"SSH-2.0-OpenSSH_") || !banner.contains(&b'\n') {
-        return Err("forwarded OpenSSH banner was missing or invalid".into());
+    if !peer.matches_banner(&banner) {
+        return Err("forwarded SSH banner did not match the selected fixture".into());
     }
     channel.close().await?;
     drop(channel);
@@ -211,9 +218,50 @@ async fn verify_forwarding(
         Ok(_) => return Err("forwarding to a closed port unexpectedly succeeded".into()),
         Err(error) => return Err(format!("unexpected forwarding failure: {error}").into()),
     }
-    let channel = connection.open_session().await?;
-    channel.close().await?;
-    println!("openssh forwarding interop ok");
+    if let Some(denied_port) = peer.denied_port()? {
+        let first = connection
+            .open_direct_tcpip("127.0.0.1", forwarding_fixture::ECHO_PORT.into(), "127.0.0.1", 0)
+            .await?;
+        let second = connection
+            .open_direct_tcpip("127.0.0.1", forwarding_fixture::ECHO_PORT.into(), "127.0.0.1", 0)
+            .await?;
+        forwarding_fixture::verify_binary_pair(first.into_stream(), second.into_stream()).await?;
+
+        let config = client_config("127.0.0.1".to_owned(), denied_port)?;
+        let mut denied = ClientConnection::connect(config).await?;
+        let username = env::var("SCOPLEN_OPENSSH_USER").unwrap_or_else(|_| "scoplen".to_owned());
+        authenticate(&mut denied, &username).await?;
+        if !matches!(
+            denied
+                .open_direct_tcpip(
+                    "127.0.0.1",
+                    forwarding_fixture::ECHO_PORT.into(),
+                    "127.0.0.1",
+                    0
+                )
+                .await,
+            Err(ClientError::ChannelOpen { code: 1, .. })
+        ) {
+            return Err("Dropbear forwarding prohibition was not enforced".into());
+        }
+        forwarding_fixture::verify_session(&denied).await?;
+        denied.disconnect().await?;
+    }
+    forwarding_fixture::verify_session(connection).await?;
+    println!("{} forwarding interop ok", peer.label());
+    Ok(())
+}
+
+fn append_forwarded_banner(
+    banner: &mut Vec<u8>,
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Dropbear can send its first binary KEX packet in the same channel fragment as its line.
+    let end = data.iter().position(|byte| *byte == b'\n').map_or(data.len(), |index| index + 1);
+    if banner.len().saturating_add(end) > 256 {
+        return Err("forwarded SSH banner exceeded 256 bytes".into());
+    }
+    banner.extend_from_slice(&data[..end]);
     Ok(())
 }
 
@@ -1406,4 +1454,28 @@ async fn verify_unsupported_sftp_extension(
         return Err("unsupported SFTP extension made the session unusable".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod forwarding_banner_tests {
+    use super::{append_forwarded_banner, forwarding_fixture::Peer};
+
+    #[test]
+    fn fragmented_banner_can_share_a_fragment_with_a_binary_kex_packet() {
+        let mut banner = Vec::new();
+        append_forwarded_banner(&mut banner, b"SSH-2.0-dropbear_").unwrap();
+        let mut fragment = b"2024.86\r\n".to_vec();
+        fragment.extend_from_slice(&[0; 1024]);
+        append_forwarded_banner(&mut banner, &fragment).unwrap();
+        assert!(Peer::Dropbear.matches_banner(&banner));
+        assert_eq!(banner, b"SSH-2.0-dropbear_2024.86\r\n");
+    }
+
+    #[test]
+    fn a_coalesced_packet_does_not_relax_the_banner_line_limit() {
+        let mut banner = b"SSH-2.0-OpenSSH_".to_vec();
+        assert!(append_forwarded_banner(&mut banner, &[b'x'; 256]).is_err());
+        assert_eq!(banner, b"SSH-2.0-OpenSSH_");
+        assert!(!Peer::OpenSsh.matches_banner(&banner));
+    }
 }
