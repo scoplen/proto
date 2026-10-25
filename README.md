@@ -26,8 +26,19 @@ and complete-bootstrap CBOR, additional Account signatures and fresh Device poss
 The public deployment probe-key helper derives stable synthetic salts, denial verifiers and
 private username admission identities with separate HMAC-SHA-256 domains and canonical context.
 D-129's Account-only retention digest uses the exact domain and raw UUID bytes, without adding
-wire fields or permanent Device, vault or operation identities. Atomic lifetime retention and
-capacity enforcement remain separate reference and production store work.
+wire fields or permanent Device, vault or operation identities.
+The `account_registration_reference` peer runs real codec/signature checks against shared
+serialized fixture storage. It models complete registration, immutable original-key receipts,
+fresh-proof confirmation, digest-only retention through deletion and consistent restart images,
+checked concurrent capacity, explicit quiesced increases and upgrade-id reservation. Its
+content-free pressure class reports the ninety-percent and exhausted thresholds; scripted
+precommit, audit, unknown-COMMIT and lost-response faults test atomic outcome behavior.
+Complete structural parsing precedes challenge lookup; a live attempt's denied binding or
+signature consumes that challenge with its denial audit, and an audit failure rolls both back.
+This peer does not supply HTTP transport, durable storage, an audit chain or rate admission.
+Maintenance controls model confirmed precommit faults; their own uncertain commits are not covered.
+Password options/login, Device admission and their current-state CAS remain separate reference
+work; production retention, migration and operator warning delivery remain consumer work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
 complete recipient equality, retained Personal epochs and exact historical confirmation binding.
 Native request metadata rejects session/cookie/header alternatives; response readers enforce
