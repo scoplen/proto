@@ -4,6 +4,49 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|bytes: &[u8]| {
+    if let Ok(wrap) = scoplen_crypto::PasswordArkWrap::decode(bytes) {
+        assert_eq!(wrap.encode().as_slice(), bytes);
+    }
+    // These entry points normalize/validate bounded inputs only; fuzzing never runs Argon2.
+    if bytes.len() <= 2049 {
+        let _ = scoplen_crypto::normalize_account_password(scoplen_crypto::SecretVec::new(
+            bytes.to_vec(),
+        ));
+    }
+    if bytes.len() >= 17
+        && let Ok(username) = std::str::from_utf8(&bytes[17..])
+    {
+        let _ = scoplen_crypto::PasswordKdfContext::new(
+            "https://control.example.com",
+            username,
+            bytes[0],
+            &bytes[1..17],
+        );
+    }
+    if bytes.len() == 161
+        && let (Ok(kdf), Ok(account), Ok(vault)) = (
+            scoplen_crypto::PasswordKdfContext::new(
+                "https://control.example.com",
+                "alice",
+                bytes[0],
+                &bytes[1..17],
+            ),
+            std::str::from_utf8(&bytes[17..53]),
+            std::str::from_utf8(&bytes[53..89]),
+        )
+        && let (Ok(account), Ok(vault)) = (account.parse(), vault.parse())
+    {
+        let generation =
+            u64::from_be_bytes(bytes[153..].try_into().expect("fixed generation width"));
+        let _ = scoplen_crypto::PasswordBootstrapContext::new(
+            kdf,
+            account,
+            vault,
+            &bytes[89..121],
+            &bytes[121..153],
+            generation,
+        );
+    }
     if let Ok(value) = scoplen_crypto::PairingNewDevice::decode(bytes) {
         assert_eq!(value.encode().expect("validated pairing device").as_bytes(), bytes);
     }
@@ -33,6 +76,9 @@ fuzz_target!(|bytes: &[u8]| {
     let _ = scoplen_crypto::RecoveryKey::parse_display(&text);
 
     if let Ok(proof_text) = std::str::from_utf8(bytes) {
+        if let Some((origin, username)) = proof_text.split_once('\n') {
+            let _ = scoplen_crypto::PasswordKdfContext::new(origin, username, 1, &[0; 16]);
+        }
         if let Ok(link) = scoplen_crypto::PairingLink::decode(proof_text) {
             assert_eq!(link.encode(), proof_text);
         }

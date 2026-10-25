@@ -8,8 +8,10 @@ under Apache-2.0.
 
 ## Status
 
-Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1), K-1 object
-model (S2), and K-2 cryptographic gate (S3) are complete. The model includes deterministic CBOR, schema-version
+Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1) and K-1 object
+model (S2) are complete. K-2 gate S3 remains Incomplete under D-125 through D-127; the password
+bootstrap implementation below does not complete the pending scoped recovery and retirement work.
+The model includes deterministic CBOR, schema-version
 handling, per-object limits, merge properties, and executable known-answer vectors. Protocol,
 cryptographic, and wire behavior is added only from the canonical specifications in `scoplen-docs`;
 the S3 primitive boundary now includes zeroizing secret containers, operating-system randomness,
@@ -17,6 +19,8 @@ XChaCha20-Poly1305, HKDF-SHA-256, Argon2id, P-256 and Ed25519 signatures, and HP
 for device and account recipients. The published K-2 known-answer set is exercised through the
 `scoplen-crypto` public API, including account/request-bound escrow share contexts and the
 administrator recovery verification code, CPace pairing exchange, and canonical QR pairing bindings.
+Those historical whole-Account escrow and Personal-pairing exports do not implement the current
+password/admission flow or D-126 Organization-scoped recovery; their removal remains roadmap work.
 D-114 replaces the unreleased QRv1 with a public link plus separate secret, or one native
 secret-bearing QRv2 scan. Shared application codecs bind the canonical origin, session and both
 roles, validate complete new-device/handoff maps and certificate/root/anchor bindings, and seal
@@ -869,6 +873,32 @@ identity, and audit storage remain owned by the server application.
 
 ## Repository shape
 
+`scoplen-crypto` implements D-127's fixed password bootstrap profile through
+`PasswordSecrets::create`, `PasswordKdfContext::derive`, `PasswordArkWrap`, and
+`PasswordBootstrapContext::derive_and_open`. New credentials generate their salt internally;
+every seal generates a new nonce. The KEK stays private to the shared crypto implementation.
+The combined opener validates artifacts before allocating Argon2's fixed 64 MiB workspace,
+authenticates the ARK, and requires both D108 Account private artifacts to reconstruct the
+expected public roots. The exact 73-byte envelope binds canonical origin/username, UUIDv7
+Account/Personal vault ids, both roots, positive credential generation, profile and salt.
+
+Application-owned raw/NFC/partial buffers, Argon2 blocks, intermediate material, explicit PRK,
+AuthSecret, KEK and temporary ARK use zeroizing storage. Unicode normalization uses the maintained
+Unicode 17 implementation; its private iterator scratch, upstream cryptographic temporaries,
+compiler/register copies and OS-managed copies are not guaranteed erased. This is a TLS
+password-equivalent authentication secret with a SHA-256 verifier, not a PAKE. A self-consistent
+bootstrap does not prove current generation or authorize device admission. Registration/login
+transport, freshness, atomic credential lifecycle and production Account login remain consumer
+work under the separate D-128 contract; this crypto boundary does not implement that transport.
+
+Synthetic normalization and intermediate/envelope known answers are independently produced in
+`vectors/password-bootstrap.json` using Node's Argon2id, HMAC and ChaCha20-Poly1305 implementations
+with a test-only HChaCha20 adapter checked against its published block answer. The producer also
+checks RFC 9106's Argon2id-v19 answer. Run
+`node scripts/generate-password-bootstrap-vectors.mjs [--check]` with Node 24.7 or later and
+Unicode 17.0 tables. The Rust build checks its Unicode version at compile time. Password parser
+fuzzing normalizes bounded input and checks metadata/artifact decoders without invoking Argon2.
+
 The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`, and
 `scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
 in `vectors/crypto.json` and `vectors/pairing-crypto.json`. The latter is generated independently
@@ -903,6 +933,8 @@ node crates/scoplen-api/openapi/generate.mjs --check
 node --test crates/scoplen-api/openapi/generate-operator.test.mjs
 node scripts/generate-operator-logout-vectors.mjs --check
 node --test scripts/generate-operator-logout-vectors.test.mjs
+node scripts/generate-password-bootstrap-vectors.mjs --check
+node --test scripts/generate-password-bootstrap-vectors.test.mjs
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in
