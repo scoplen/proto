@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use cedar_policy::{Authorizer, Context, Decision, Entities, PolicySet, Request, Schema};
+use cedar_policy::{Context, Decision, Entities, PolicySet, Request, Schema};
 use scoplen_api::{
     auth::{
         DeviceAccessOperation, INITIAL_OPERATOR_ACCESS_SCOPE, OperatorAccessOperation,
-        OperatorAccessScope,
+        OperatorAccessRequirement, OperatorAccessScope,
     },
-    control_plane::{BUILT_IN_POLICIES, CEDAR_SCHEMA},
+    control_plane::{CEDAR_SCHEMA, OrganizationAuthorizationContext, OrganizationAuthorizer},
     operator_auth::*,
 };
 use serde_json::{Value, json};
@@ -326,7 +326,10 @@ fn operator_scope_is_independent_and_routes_fail_closed() {
         Some(operation)
     );
     assert_eq!(DeviceAccessOperation::from_route("POST", operation.route_template()), None);
-    assert_eq!(operation.required_scope(), OperatorAccessScope::PersonalInvitationIssue);
+    assert_eq!(
+        operation.requirement(),
+        OperatorAccessRequirement::Scope(OperatorAccessScope::PersonalInvitationIssue)
+    );
     for (method, path) in [
         ("GET", operation.route_template()),
         ("post", operation.route_template()),
@@ -342,69 +345,72 @@ fn operator_scope_is_independent_and_routes_fail_closed() {
         "account:read",
         "PERSONAL-INVITATION:ISSUE",
     ] {
-        assert!(!operation.required_scope().is_present_in(scope));
+        assert!(!OperatorAccessScope::PersonalInvitationIssue.is_present_in(scope));
         assert_eq!(OperatorAccessScope::from_token(scope), None);
     }
 }
 
 #[test]
-fn cedar_deployment_authority_is_current_active_operator_only() {
+fn retired_invitation_action_is_not_registered_for_any_principal() {
     let schema = Schema::from_str(CEDAR_SCHEMA).unwrap();
-    let policies = PolicySet::from_str(BUILT_IN_POLICIES).unwrap();
-    for (kind, status, resource, expected) in [
-        ("Operator", "active", "self", Decision::Allow),
-        ("Operator", "revoked", "self", Decision::Deny),
-        ("Operator", "active", "other", Decision::Deny),
-        ("Account", "active", "self", Decision::Deny),
-    ] {
-        let attrs = if kind == "Account" {
-            json!({"status":status,"groups":[{"__entity":{"type":"Group","id":"owner"}},{"__entity":{"type":"Group","id":"administrator"}}]})
-        } else {
-            json!({"status":status})
-        };
-        let entities=Entities::from_json_value(json!([{"uid":{"type":kind,"id":id().to_string()},"attrs":attrs,"parents":[]},{"uid":{"type":"Deployment","id":resource},"attrs":{},"parents":[]}]),Some(&schema)).unwrap();
-        // Bypass schema request rejection so policy isolation itself is exercised for Account.
-        let request = Request::new(
-            format!("{kind}::\"{}\"", id()).parse().unwrap(),
-            "Action::\"issuePersonalInvitation\"".parse().unwrap(),
-            format!("Deployment::\"{resource}\"").parse().unwrap(),
-            Context::empty(),
-            None,
-        )
-        .unwrap();
-        let result = Authorizer::new().is_authorized(&request, &policies, &entities);
-        assert_eq!(result.decision(), expected);
-        assert_eq!(result.diagnostics().errors().count(), 0);
+    for kind in ["Operator", "Account"] {
+        assert!(
+            Request::new(
+                format!("{kind}::\"{}\"", id()).parse().unwrap(),
+                "Action::\"issuePersonalInvitation\"".parse().unwrap(),
+                "Deployment::\"self\"".parse().unwrap(),
+                Context::empty(),
+                Some(&schema),
+            )
+            .is_err()
+        );
     }
 }
 
 #[test]
-fn cedar_owner_keeps_existing_actions_without_implicit_future_deployment_rights() {
+fn tenant_owner_authority_does_not_grant_operator_or_deployment_actions() {
     let schema = Schema::from_str(CEDAR_SCHEMA).unwrap();
-    let policies = PolicySet::from_str(BUILT_IN_POLICIES).unwrap();
-    for (kind, action, resource, expected) in [
-        ("Account", "manage_inventory", "Organization", Decision::Allow),
-        ("Operator", "manage_inventory", "Organization", Decision::Deny),
-        ("Account", "futureDeploymentAction", "Deployment", Decision::Deny),
+    let organization = Uuid::from_u128(id().as_u128() + 1);
+    let membership = Uuid::from_u128(id().as_u128() + 2);
+    let entities = Entities::from_json_value(json!([
+        {"uid":{"type":"Account","id":id().to_string()},"attrs":{"status":"active"},"parents":[]},
+        {"uid":{"type":"Organization","id":organization.to_string()},"attrs":{"name":"fixture"},"parents":[]},
+        {"uid":{"type":"Membership","id":membership.to_string()},"attrs":{
+            "account":{"__entity":{"type":"Account","id":id().to_string()}},
+            "organization":{"__entity":{"type":"Organization","id":organization.to_string()}},
+            "status":"active","roles":["owner"],"groups":[]},"parents":[]}
+    ]), Some(&schema)).unwrap();
+    let context = Context::from_json_str(
+        &json!({
+            "organization":{"__entity":{"type":"Organization","id":organization.to_string()}},
+            "membership":{"__entity":{"type":"Membership","id":membership.to_string()}},
+            "now":1
+        })
+        .to_string(),
+        None,
+    )
+    .unwrap();
+    let authorizer = OrganizationAuthorizer::new(organization, &PolicySet::new()).unwrap();
+    let trusted = OrganizationAuthorizationContext::new(id(), organization, membership, 1).unwrap();
+    for (kind, action, allowed) in [
+        ("Account", "manage_inventory", true),
+        ("Operator", "manage_inventory", false),
+        ("Account", "futureDeploymentAction", false),
+        ("Account", "issuePersonalInvitation", false),
     ] {
-        let attrs = if kind == "Account" {
-            json!({"status":"active","groups":[{"__entity":{"type":"Group","id":"owner"}}]})
-        } else {
-            json!({"status":"active"})
-        };
-        let resource_attrs =
-            if resource == "Organization" { json!({"name":"organization"}) } else { json!({}) };
-        let entities=Entities::from_json_value(json!([{"uid":{"type":kind,"id":id().to_string()},"attrs":attrs,"parents":[]},{"uid":{"type":resource,"id":"self"},"attrs":resource_attrs,"parents":[]}]),Some(&schema)).unwrap();
         let request = Request::new(
             format!("{kind}::\"{}\"", id()).parse().unwrap(),
             format!("Action::\"{action}\"").parse().unwrap(),
-            format!("{resource}::\"self\"").parse().unwrap(),
-            Context::from_json_str("{\"now\":1}", None).unwrap(),
+            format!("Organization::\"{organization}\"").parse().unwrap(),
+            context.clone(),
             None,
         )
         .unwrap();
-        let result = Authorizer::new().is_authorized(&request, &policies, &entities);
-        assert_eq!(result.decision(), expected);
-        assert_eq!(result.diagnostics().errors().count(), 0);
+        assert_eq!(
+            authorizer
+                .authorize(&trusted, &request, &entities)
+                .is_ok_and(|decision| decision == Decision::Allow),
+            allowed
+        );
     }
 }

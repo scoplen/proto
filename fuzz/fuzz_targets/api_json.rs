@@ -15,6 +15,7 @@ use scoplen_api::gateway_ticket::{
 };
 use scoplen_api::operator_auth::{
     OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
+    OperatorLogoutRequest, OperatorLogoutResponse,
     OperatorSetupFinishRequest, OperatorSetupFinishResponse, OperatorSetupOptionsRequest,
     OperatorSetupOptionsResponse,
 };
@@ -66,6 +67,8 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(OperatorSetupOptionsResponse, bytes);
     round_trip!(OperatorLoginOptionsResponse, bytes);
     round_trip!(OperatorSetupFinishResponse, bytes);
+    round_trip!(OperatorLogoutRequest, bytes);
+    round_trip!(OperatorLogoutResponse, bytes);
     round_trip!(CertificateIssuanceRequest, bytes);
     round_trip!(CertificateIssuanceResponse, bytes);
     round_trip!(GatewayTicketRequest, bytes);

@@ -29,6 +29,10 @@ pub const MAX_OPERATOR_OPTIONS_RESPONSE_BYTES: usize = 4_096;
 pub const MAX_OPERATOR_SETUP_RESPONSE_BYTES: usize = 256;
 /// Complete browser login token response limit; its four-field codec is shared with refresh.
 pub const MAX_OPERATOR_LOGIN_RESPONSE_BYTES: usize = 8_192;
+/// Complete current-family logout request limit, including whitespace.
+pub const MAX_OPERATOR_LOGOUT_REQUEST_BYTES: usize = 256;
+/// Complete current-family logout confirmation limit, including whitespace.
+pub const MAX_OPERATOR_LOGOUT_RESPONSE_BYTES: usize = 256;
 /// Maximum decoded `WebAuthn` credential id.
 pub const MAX_OPERATOR_CREDENTIAL_ID_BYTES: usize = 1_023;
 /// Maximum decoded original client-data JSON.
@@ -77,6 +81,14 @@ pub struct OperatorSetupFinishRequest {
 /// Usernameless login options request; no operator id, email or credential list is submitted.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct OperatorLoginOptionsRequest;
+
+/// D-124 self-family termination request. Identity is selected only from verified credentials.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct OperatorLogoutRequest;
+
+/// Fixed route-specific confirmation, never general current-session authorization evidence.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OperatorLogoutResponse;
 
 /// Passkey assertion submission. Lexical decoding is not signature verification.
 #[derive(Clone, Eq, PartialEq)]
@@ -464,6 +476,48 @@ impl OperatorSetupFinishResponse {
             &[("operator_id", json!(self.operator_id.to_string()))],
             MAX_OPERATOR_SETUP_RESPONSE_BYTES,
         )
+    }
+}
+
+impl OperatorLogoutRequest {
+    /// Decode only the empty object within the complete encoded-body bound.
+    ///
+    /// # Errors
+    /// Rejects malformed, duplicate, nonempty, non-object or oversized input.
+    pub fn from_json(input: &[u8]) -> Result<Self, OperatorAuthCodecError> {
+        no_extra(&object(input, MAX_OPERATOR_LOGOUT_REQUEST_BYTES)?)?;
+        Ok(Self)
+    }
+
+    /// Encode exactly `{}` without a caller-selected identity or refresh credential.
+    ///
+    /// # Errors
+    /// This fixed representation cannot fail.
+    pub fn to_json(self) -> Result<Vec<u8>, OperatorAuthCodecError> {
+        Ok(b"{}".to_vec())
+    }
+}
+
+impl OperatorLogoutResponse {
+    /// Decode only the fixed true confirmation for the request that received it.
+    ///
+    /// # Errors
+    /// Rejects false, missing, duplicate, unknown, mistyped or oversized fields.
+    pub fn from_json(input: &[u8]) -> Result<Self, OperatorAuthCodecError> {
+        let mut fields = object(input, MAX_OPERATOR_LOGOUT_RESPONSE_BYTES)?;
+        if fields.remove("revoked") != Some(Value::Bool(true)) {
+            return invalid("revoked");
+        }
+        no_extra(&fields)?;
+        Ok(Self)
+    }
+
+    /// Encode only `{"revoked":true}`; it carries no token or session identity.
+    ///
+    /// # Errors
+    /// This fixed representation cannot fail.
+    pub fn to_json(self) -> Result<Vec<u8>, OperatorAuthCodecError> {
+        Ok(b"{\"revoked\":true}".to_vec())
     }
 }
 

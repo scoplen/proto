@@ -831,6 +831,22 @@ that legacy registry entry. `vectors/operator-auth.json` and named `api_json` se
 the public wire independently, including malformed embedded bytes and complete-body limits.
 The shared UUID dependency is pinned to 1.28.0 to satisfy the maintained WebAuthn verifier's
 compatible UUID requirement, preserving existing canonical UUIDv7 identities and vectors.
+
+D-124 adds strict 256-byte `OperatorLogoutRequest`/`OperatorLogoutResponse` codecs for
+`POST /api/v1/auth/operator/logout`: exactly `{}` and `{"revoked":true}`, with no identity,
+token or cookie carriage. The operation registry now returns an explicit
+`OperatorAccessRequirement`, distinguishing a scope-required business action from authenticated
+self-session termination. This replaces the pre-Stable `required_scope` API without a shim;
+the issued scope and JWT bytes are unchanged. Consumers verify the unexpired Operator token,
+token-bound DPoP, exact Origin, replay and current durable family/identity state, including an
+eligible already-revoked confirmation. They never read or change the refresh cookie here.
+The single-family `operator_logout_reference` test peer scripts current-binding denial,
+proof-id replay, known rollback, both unknown commit outcomes and lost responses. It returns
+only logout confirmation and is not production authentication, auditing or storage. Logout's
+unknown revocation commit is explicitly retryable with a fresh proof while eligible; existing
+login/refresh uncertainty remains non-retryable. Independent vectors and parser bounds are
+regenerated or checked with `node scripts/generate-operator-logout-vectors.mjs [--check]`.
+
 `SyncNotificationAuth` also redacts its token and proof in debug output. Its deterministic CBOR
 codec enforces the 4 KiB token, 8 KiB proof, and 16 KiB complete-message bounds and compact-JWS
 lexical form; it does not verify a JWT, DPoP claims, device state, proof replay, or the WebSocket
@@ -884,6 +900,9 @@ cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 node crates/scoplen-api/openapi/generate.mjs --check
+node --test crates/scoplen-api/openapi/generate-operator.test.mjs
+node scripts/generate-operator-logout-vectors.mjs --check
+node --test scripts/generate-operator-logout-vectors.test.mjs
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in

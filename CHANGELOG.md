@@ -13,6 +13,13 @@ All notable changes to the `proto` repository will be recorded here.
   Operator scope encoding is unchanged. Public role and failure vectors cover the boundary;
   current-state storage, transactional checks and consumer delivery remain separate work.
 
+- Add D-124 current Operator-family logout codecs, explicit authenticated intrinsic operation,
+  OpenAPI/TypeScript, independent vectors, parser bounds and a scripted reference peer. The
+  fixed confirmation never supplies general authorization. Replace the pre-Stable Operator
+  `required_scope` method with typed `requirement`; issued scopes and JWT bytes stay unchanged.
+  Logout's explicit fresh-proof recovery after an unknown commit leaves existing refresh and
+  login recovery unchanged. Production family revocation and console adoption remain consumer work.
+
 - Added mixed OpenSSH 9.9p2/Dropbear 2024.86 Jump acceptance at depths one through
   three with either ingress implementation. Independent hop identities, per-position
   trust/password rejection, closed targets, exact commands and binary/EOF output,
