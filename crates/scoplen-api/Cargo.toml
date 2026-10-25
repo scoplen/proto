@@ -8,6 +8,7 @@ description = "Scoplen's versioned wire contracts and generated API types."
 
 [dependencies]
 base64 = "0.22.1"
+cedar-policy = "=4.4.0"
 prost = "=0.13.5"
 prost-types = "=0.13.5"
 scoplen-model = { path = "../scoplen-model", version = "0.1.0" }
@@ -26,7 +27,6 @@ protoc-bin-vendored = "=3.2.0"
 tonic-build = "=0.13.1"
 
 [dev-dependencies]
-cedar-policy = "=4.4.0"
 scoplen-test-vectors = { path = "../scoplen-test-vectors", version = "0.1.0" }
 tokio = { version = "1.53.3", features = ["macros", "net", "rt-multi-thread"] }
 

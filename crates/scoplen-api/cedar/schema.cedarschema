@@ -3,12 +3,19 @@
 
 entity Account {
     email?: String,
-    groups: Set<Group>,
     status: String,
 };
 entity Operator { status: String };
 entity Deployment {};
+entity Membership {
+    account: Account,
+    organization: Organization,
+    status: String,
+    roles: Set<String>,
+    groups: Set<Group>,
+};
 entity Group {
+    organization: Organization,
     name: String,
     source: String,
 };
@@ -19,33 +26,49 @@ entity Device {
     enrolled_at: Long,
 };
 entity Host {
+    organization: Organization,
     labels: Set<String>,
     host_groups: Set<HostGroup>,
-    gateway_network: GatewayNetwork,
+    gateway_network?: GatewayNetwork,
 };
 entity HostGroup {
+    organization: Organization,
     name: String,
     parents: Set<HostGroup>,
 };
 entity GatewayNetwork {
+    organization: Organization,
     name: String,
 };
 entity Organization {
     name: String,
 };
+entity AccessProfile { organization: Organization, host: Host };
+entity Route { organization: Organization };
+entity Snippet { organization: Organization };
+entity TrustRecord { organization: Organization, host?: Host };
 entity AccessRequest {
+    organization: Organization,
     requester: Account,
     resource: Host,
 };
 entity Session {
+    organization: Organization,
     host: Host,
     account: Account,
 };
 
+action view_inventory appliesTo {
+    principal: Account,
+    resource: [Host, HostGroup, GatewayNetwork, AccessProfile, Route, TrustRecord, Snippet],
+    context: { organization: Organization, membership: Membership, now: Long },
+};
 action connect appliesTo {
     principal: Account,
     resource: Host,
     context: {
+        organization: Organization,
+        membership: Membership,
         remote_user: String,
         route_kind: String,
         device: Device,
@@ -54,15 +77,14 @@ action connect appliesTo {
         source_ip: String,
     },
 };
-action request_access appliesTo { principal: Account, resource: Host, context: { duration_seconds: Long, reason: String } };
-action approve_access appliesTo { principal: Account, resource: AccessRequest, context: { requester: Account, resource: Host } };
-action view_recording appliesTo { principal: Account, resource: Session, context: { host: Host, account: Account } };
-action monitor_session appliesTo { principal: Account, resource: Session, context: { host: Host, account: Account } };
-action terminate_session appliesTo { principal: Account, resource: Session, context: { host: Host, account: Account } };
-action manage_inventory appliesTo { principal: Account, resource: Organization, context: { now: Long } };
-action manage_policy appliesTo { principal: Account, resource: Organization, context: { now: Long } };
-action manage_members appliesTo { principal: Account, resource: Organization, context: { now: Long } };
-action manage_ca appliesTo { principal: Account, resource: Organization, context: { now: Long } };
-action manage_gateways appliesTo { principal: Account, resource: Organization, context: { now: Long } };
-action view_audit appliesTo { principal: Account, resource: Organization, context: { now: Long } };
-action issuePersonalInvitation appliesTo { principal: Operator, resource: Deployment, context: {} };
+action request_access appliesTo { principal: Account, resource: [Host, HostGroup], context: { organization: Organization, membership: Membership, now: Long, duration_seconds: Long, reason: String } };
+action approve_access appliesTo { principal: Account, resource: AccessRequest, context: { organization: Organization, membership: Membership, now: Long, requester: Account, resource: Host } };
+action view_recording appliesTo { principal: Account, resource: Session, context: { organization: Organization, membership: Membership, now: Long, host: Host, account: Account } };
+action monitor_session appliesTo { principal: Account, resource: Session, context: { organization: Organization, membership: Membership, now: Long, host: Host, account: Account } };
+action terminate_session appliesTo { principal: Account, resource: Session, context: { organization: Organization, membership: Membership, now: Long, host: Host, account: Account } };
+action manage_inventory appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
+action manage_policy appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
+action manage_members appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
+action manage_ca appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
+action manage_gateways appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
+action view_audit appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };

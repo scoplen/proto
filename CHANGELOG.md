@@ -4,6 +4,15 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added D-126's Organization-bound Cedar authorizer with immutable guards, current Membership
+  roles, all seven inventory entity types and independent `view_inventory`. Canonical graph,
+  identity, owner, reference, device and action-context checks and every evaluation error fail
+  closed even with a permissive custom policy. Linked custom policies survive id collisions.
+  Removed global role groups, blanket Member permits and D-125's retired Personal invitation
+  Cedar action. This breaks the pre-Stable K-5 schema/context and role representation; legacy
+  Operator scope encoding is unchanged. Public role and failure vectors cover the boundary;
+  current-state storage, transactional checks and consumer delivery remain separate work.
+
 - Add D-124 current Operator-family logout codecs, explicit authenticated intrinsic operation,
   OpenAPI/TypeScript, independent vectors, parser bounds and a scripted reference peer. The
   fixed confirmation never supplies general authorization. Replace the pre-Stable Operator

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "ids": {
+    "Account": "019a0000-0000-7000-8000-000000000001",
+    "OtherAccount": "019a0000-0000-7000-8000-000000000002",
+    "Organization": "019a0000-0000-7000-8000-000000000010",
+    "Membership": "019a0000-0000-7000-8000-000000000020",
+    "Group": "019a0000-0000-7000-8000-000000000030",
+    "HostGroup": "019a0000-0000-7000-8000-000000000040",
+    "GatewayNetwork": "019a0000-0000-7000-8000-000000000050",
+    "Host": "019a0000-0000-7000-8000-000000000060",
+    "AccessProfile": "019a0000-0000-7000-8000-000000000070",
+    "Route": "019a0000-0000-7000-8000-000000000080",
+    "TrustRecord": "019a0000-0000-7000-8000-000000000090",
+    "Snippet": "019a0000-0000-7000-8000-000000000100",
+    "AccessRequest": "019a0000-0000-7000-8000-000000000110",
+    "Session": "019a0000-0000-7000-8000-000000000120",
+    "Device": "019a0000-0000-7000-8000-000000000130"
+  },
+  "entities": [
+    {"uid":{"type":"Account","id":"019a0000-0000-7000-8000-000000000001"},"attrs":{"status":"active"},"parents":[]},
+    {"uid":{"type":"Account","id":"019a0000-0000-7000-8000-000000000002"},"attrs":{"status":"active"},"parents":[]},
+    {"uid":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"},"attrs":{"name":"Example team"},"parents":[]},
+    {"uid":{"type":"Membership","id":"019a0000-0000-7000-8000-000000000020"},"attrs":{"account":{"__entity":{"type":"Account","id":"019a0000-0000-7000-8000-000000000001"}},"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"status":"active","roles":["owner"],"groups":[{"__entity":{"type":"Group","id":"019a0000-0000-7000-8000-000000000030"}}]},"parents":[]},
+    {"uid":{"type":"Group","id":"019a0000-0000-7000-8000-000000000030"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"name":"owner","source":"local"},"parents":[]},
+    {"uid":{"type":"HostGroup","id":"019a0000-0000-7000-8000-000000000040"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"name":"Production","parents":[]},"parents":[]},
+    {"uid":{"type":"GatewayNetwork","id":"019a0000-0000-7000-8000-000000000050"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"name":"Example network"},"parents":[]},
+    {"uid":{"type":"Host","id":"019a0000-0000-7000-8000-000000000060"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"labels":["production"],"host_groups":[{"__entity":{"type":"HostGroup","id":"019a0000-0000-7000-8000-000000000040"}}]},"parents":[]},
+    {"uid":{"type":"AccessProfile","id":"019a0000-0000-7000-8000-000000000070"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"host":{"__entity":{"type":"Host","id":"019a0000-0000-7000-8000-000000000060"}}},"parents":[]},
+    {"uid":{"type":"Route","id":"019a0000-0000-7000-8000-000000000080"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}}},"parents":[]},
+    {"uid":{"type":"TrustRecord","id":"019a0000-0000-7000-8000-000000000090"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}}},"parents":[]},
+    {"uid":{"type":"Snippet","id":"019a0000-0000-7000-8000-000000000100"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}}},"parents":[]},
+    {"uid":{"type":"AccessRequest","id":"019a0000-0000-7000-8000-000000000110"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"requester":{"__entity":{"type":"Account","id":"019a0000-0000-7000-8000-000000000002"}},"resource":{"__entity":{"type":"Host","id":"019a0000-0000-7000-8000-000000000060"}}},"parents":[]},
+    {"uid":{"type":"Session","id":"019a0000-0000-7000-8000-000000000120"},"attrs":{"organization":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000010"}},"host":{"__entity":{"type":"Host","id":"019a0000-0000-7000-8000-000000000060"}},"account":{"__entity":{"type":"Account","id":"019a0000-0000-7000-8000-000000000002"}}},"parents":[]},
+    {"uid":{"type":"Device","id":"019a0000-0000-7000-8000-000000000130"},"attrs":{"account":{"__entity":{"type":"Account","id":"019a0000-0000-7000-8000-000000000001"}},"platform":"linux","hardware_backed":false,"enrolled_at":0},"parents":[]}
+  ],
+  "inventory_types": ["Host", "HostGroup", "GatewayNetwork", "AccessProfile", "Route", "TrustRecord", "Snippet"],
+  "role_actions": {
+    "owner": ["view_inventory", "connect", "request_access", "approve_access", "view_recording", "monitor_session", "terminate_session", "manage_inventory", "manage_policy", "manage_members", "manage_ca", "manage_gateways", "view_audit"],
+    "administrator": ["view_inventory", "manage_inventory", "manage_policy", "manage_members", "manage_ca", "manage_gateways"],
+    "security_auditor": ["view_inventory", "view_audit", "view_recording", "monitor_session"],
+    "approver": ["approve_access"],
+    "member": []
+  },
+  "invalid_attribute_cases": [
+    {"entity":"Account","attribute":"status","value":"suspended"},
+    {"entity":"Membership","attribute":"status","value":"inactive"},
+    {"entity":"Membership","attribute":"account","value":{"__entity":{"type":"Account","id":"019a0000-0000-7000-8000-000000000002"}}},
+    {"entity":"Membership","attribute":"organization","value":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000999"}}},
+    {"entity":"Host","attribute":"organization","value":{"__entity":{"type":"Organization","id":"019a0000-0000-7000-8000-000000000999"}}}
+  ]
+}
