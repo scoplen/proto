@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! D-111 independent deployment Operator permission ceiling.
+//! Independent deployment Operator permissions and D-124 intrinsic session termination.
 
 /// Exact initial Operator scope. It grants no Account, Device or organization authority.
 pub const INITIAL_OPERATOR_ACCESS_SCOPE: &str = "personal-invitation:issue";
@@ -36,21 +36,37 @@ impl OperatorAccessScope {
     }
 }
 
+/// Authenticated requirements are explicit; an intrinsic operation never means anonymous access.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OperatorAccessRequirement {
+    /// A business permission in addition to current Operator authentication and authorization.
+    Scope(OperatorAccessScope),
+    /// End only the verified caller's current family, subject to D-124's current-state checks.
+    SelfSessionTermination,
+}
+
 /// Router-owned registry for the independent Operator profile; unmapped routes fail closed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OperatorAccessOperation {
     /// Issue a Personal enrollment invitation.
     PersonalInvitationIssue,
+    /// Terminate only the caller's token-bound current Operator browser family.
+    Logout,
 }
 
 impl OperatorAccessOperation {
     /// All registered Operator operations.
-    pub const ALL: [Self; 1] = [Self::PersonalInvitationIssue];
+    pub const ALL: [Self; 2] = [Self::PersonalInvitationIssue, Self::Logout];
 
-    /// Required coarse permission; authentication and current authorization remain mandatory.
+    /// Exact authenticated requirement; neither branch supplies authentication by itself.
     #[must_use]
-    pub const fn required_scope(self) -> OperatorAccessScope {
-        OperatorAccessScope::PersonalInvitationIssue
+    pub const fn requirement(self) -> OperatorAccessRequirement {
+        match self {
+            Self::PersonalInvitationIssue => {
+                OperatorAccessRequirement::Scope(OperatorAccessScope::PersonalInvitationIssue)
+            }
+            Self::Logout => OperatorAccessRequirement::SelfSessionTermination,
+        }
     }
 
     /// Canonical HTTP method.
@@ -62,7 +78,10 @@ impl OperatorAccessOperation {
     /// Canonical router template, never an untrusted URL.
     #[must_use]
     pub const fn route_template(self) -> &'static str {
-        "/api/v1/admin/personal-invitations"
+        match self {
+            Self::PersonalInvitationIssue => "/api/v1/admin/personal-invitations",
+            Self::Logout => "/api/v1/auth/operator/logout",
+        }
     }
 
     /// Match only an exact router-owned method and route.

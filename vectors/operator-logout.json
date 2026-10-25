@@ -1,0 +1,162 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "operator-logout-request-v1",
+      "kind": "operator.logout.request",
+      "input": "{}",
+      "expected": "{}"
+    },
+    {
+      "id": "operator-logout-request-whitespace-v1",
+      "kind": "operator.logout.request",
+      "input": " \n { }\t",
+      "expected": "{}"
+    },
+    {
+      "id": "operator-logout-response-v1",
+      "kind": "operator.logout.response",
+      "input": "{\"revoked\":true}",
+      "expected": "{\"revoked\":true}"
+    },
+    {
+      "id": "operator-logout-response-whitespace-v1",
+      "kind": "operator.logout.response",
+      "input": "{ \"revoked\" : true }",
+      "expected": "{\"revoked\":true}"
+    },
+    {
+      "id": "operator-logout-body-null-v1",
+      "kind": "operator.logout.request.reject",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-body-array-v1",
+      "kind": "operator.logout.request.reject",
+      "input": "[]",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-body-trailing-v1",
+      "kind": "operator.logout.request.reject",
+      "input": "{}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-body-family-v1",
+      "kind": "operator.logout.request.reject",
+      "input": "{\"sid\":\"another-family\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-body-refresh-v1",
+      "kind": "operator.logout.request.reject",
+      "input": "{\"refresh_token\":\"fixture-only\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-body-duplicate-v1",
+      "kind": "operator.logout.request.reject",
+      "input": "{\"x\":{\"y\":1,\"y\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-missing-v1",
+      "kind": "operator.logout.response.reject",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-false-v1",
+      "kind": "operator.logout.response.reject",
+      "input": "{\"revoked\":false}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-number-v1",
+      "kind": "operator.logout.response.reject",
+      "input": "{\"revoked\":1}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-string-v1",
+      "kind": "operator.logout.response.reject",
+      "input": "{\"revoked\":\"true\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-duplicate-v1",
+      "kind": "operator.logout.response.reject",
+      "input": "{\"revoked\":true,\"revoked\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-escaped-duplicate-v1",
+      "kind": "operator.logout.response.reject",
+      "input": "{\"revoked\":true,\"rev\\u006fked\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-extra-v1",
+      "kind": "operator.logout.response.reject",
+      "input": "{\"revoked\":true,\"extra\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "operator-logout-route-v1",
+      "kind": "operator.logout.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/operator/logout\"}",
+      "expected": "self-session-termination"
+    },
+    {
+      "id": "operator-logout-invitation-v1",
+      "kind": "operator.logout.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/admin/personal-invitations\"}",
+      "expected": "personal-invitation:issue"
+    },
+    {
+      "id": "operator-logout-method-v1",
+      "kind": "operator.logout.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/auth/operator/logout\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "operator-logout-route-case-v1",
+      "kind": "operator.logout.operation",
+      "input": "{\"method\":\"post\",\"path\":\"/api/v1/auth/operator/logout\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "operator-logout-route-slash-v1",
+      "kind": "operator.logout.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/operator/logout/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "operator-logout-route-query-v1",
+      "kind": "operator.logout.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/operator/logout?sid=other\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "operator-logout-known-rollback-v1",
+      "kind": "operator.logout.problem",
+      "input": "known-rollback",
+      "expected": "{\"changed\":false,\"code\":\"auth.storage_unavailable\",\"retryable\":true,\"status\":503}"
+    },
+    {
+      "id": "operator-logout-unknown-commit-v1",
+      "kind": "operator.logout.problem",
+      "input": "unknown-commit",
+      "expected": "{\"changed\":true,\"code\":\"auth.commit_outcome_unknown\",\"retryable\":true,\"status\":503}"
+    },
+    {
+      "id": "operator-logout-authentication-required-v1",
+      "kind": "operator.logout.problem",
+      "input": "authentication-required",
+      "expected": "{\"changed\":false,\"code\":\"auth.authentication_required\",\"retryable\":false,\"status\":401}"
+    }
+  ]
+}
