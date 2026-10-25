@@ -112,7 +112,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_required_scope() 
             );
         }
     }
-    assert_eq!(routes.len(), 22);
+    assert_eq!(routes.len(), 17);
 }
 
 #[test]

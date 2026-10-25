@@ -71,16 +71,6 @@ pub enum DeviceAccessOperation {
     AccountKeysRead,
     /// Update account keys.
     AccountKeysWrite,
-    /// Read an old-role pairing snapshot.
-    PairingRead,
-    /// Bind this enrolled device as pairing initiator.
-    PairingClaim,
-    /// Relay an initiator-owned immutable pairing slot.
-    PairingMessage,
-    /// Atomically admit a second device and publish its full key bundle.
-    PairingComplete,
-    /// Cancel this initiator's pending pairing.
-    PairingCancel,
     /// Start a sync session and discover authorized vaults.
     SyncSession,
     /// Read a vault's encrypted key records.
@@ -111,16 +101,11 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 17] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
-        Self::PairingRead,
-        Self::PairingClaim,
-        Self::PairingMessage,
-        Self::PairingComplete,
-        Self::PairingCancel,
         Self::SyncSession,
         Self::VaultKeysRead,
         Self::VaultChangesRead,
@@ -142,12 +127,7 @@ impl DeviceAccessOperation {
         match self {
             Self::AccountProfileRead | Self::AccountDevicesRead => DeviceAccessScope::AccountRead,
             Self::AccountKeysRead => DeviceAccessScope::KeysRead,
-            Self::AccountKeysWrite
-            | Self::PairingRead
-            | Self::PairingClaim
-            | Self::PairingMessage
-            | Self::PairingComplete
-            | Self::PairingCancel => DeviceAccessScope::KeysWrite,
+            Self::AccountKeysWrite => DeviceAccessScope::KeysWrite,
             Self::SyncSession
             | Self::VaultKeysRead
             | Self::VaultChangesRead
@@ -173,18 +153,14 @@ impl DeviceAccessOperation {
             Self::AccountProfileRead
             | Self::AccountDevicesRead
             | Self::AccountKeysRead
-            | Self::PairingRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
             | Self::ObjectVersionsRead
             | Self::Notifications => "GET",
             Self::AccountKeysWrite => "PUT",
-            Self::VaultMemberRemove | Self::PairingCancel => "DELETE",
+            Self::VaultMemberRemove => "DELETE",
             Self::SyncSession
-            | Self::PairingClaim
-            | Self::PairingMessage
-            | Self::PairingComplete
             | Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
@@ -201,10 +177,6 @@ impl DeviceAccessOperation {
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
-            Self::PairingRead | Self::PairingCancel => "/api/v1/auth/pairings/{pairing}",
-            Self::PairingClaim => "/api/v1/auth/pairings/{pairing}/claim",
-            Self::PairingMessage => "/api/v1/auth/pairings/{pairing}/messages",
-            Self::PairingComplete => "/api/v1/auth/pairings/{pairing}/complete",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",
             Self::VaultChangesRead => "/sync/v1/vaults/{vault}/changes",

@@ -195,7 +195,10 @@ impl fmt::Debug for PasswordKdfContext {
     }
 }
 
-fn validate_identity(origin: &str, username: &str) -> Result<(), PasswordBootstrapError> {
+pub(crate) fn validate_identity(
+    origin: &str,
+    username: &str,
+) -> Result<(), PasswordBootstrapError> {
     validate_server_origin(origin).map_err(|_| PasswordBootstrapError::InvalidContext)?;
     if !(3..=64).contains(&username.len())
         || (!username.as_bytes()[0].is_ascii_lowercase()

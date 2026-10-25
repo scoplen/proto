@@ -5,30 +5,17 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
-`pairing-crypto.json` contains D-114 public links/QRv2, canonical new-device and handoff CBOR,
-five-field key projection hashes, new-device acceptance inputs/signature verification and exact
-approval fingerprints. The producer `node scripts/generate-pairing-crypto-vectors.mjs` uses only
-Node's built-in crypto and an independent finite CBOR encoder, with existing synthetic public
-artifacts. Link/QR inputs expect their canonical text or `reject`; application maps use exact
-hexadecimal CBOR or `reject`; key-anchor input is JSON with hexadecimal artifacts. Acceptance
-input is JSON containing origin/ids and hexadecimal frame/certificate/update/public key, and
-expects `signature-input-hex|signature-hex`. Its frame/update are opaque synthetic boundary
-inputs, not evidence of valid encrypted-channel or K-4 messages. Approval input is
-`certificate-hex|update-hex|signature-hex`, expecting the exact domain-separated hash.
-The producer verifies and retains an existing valid ECDSA signature for stable regeneration;
-other output is deterministic. Negative maps cover changed root/anchor/device, revision zero,
-unknown fields, bad keys and trailing bytes. Public tests additionally exercise real confirmed
-CPace frames, key opening, substituted contexts and every relevant size boundary.
-
-`pairing.json` contains D-114 create/claim, seven relay slots, acknowledgement, receipt, snapshot
-and completion JSON vectors. Accepted cases round-trip to exact contract field order; rejected
-cases identify redacted syntax/field/state errors. Capabilities, frames and signatures are public
-synthetic boundary values. The approval includes canonical K-2/K-4 artifacts for syntax checks,
-without asserting signature validity or admission. Exact matching `api_json` corpus seeds are
-replayed through the public codecs; tests additionally exercise every decoded frame boundary,
-full-body whitespace limits, HTTP metadata, roles, expiry, immutable retransmission, cancellation,
-known rollback and receipt recovery after an unknown commit. The reference peer delegates
-cryptographic/current-revision/capacity checks to an explicit external verifier.
+`account-admission.json` contains independently generated D-128 native JSON, protected canonical
+CBOR and exact Account/fresh Device proof inputs for both kinds and submit/confirm intents.
+Its `account.admission.probe` known answers independently derive all three deployment-key HMAC
+domains, including different keys/origins and the canonical username length boundaries.
+Run `node scripts/generate-account-admission-vectors.mjs [--check]`. The Node producer uses
+built-in crypto and its own CBOR encoder, verifies both signatures and preserves an already
+verified ECDSA proof for stable regeneration. Synthetic ciphertexts test public structure and
+signature binding; they do not establish successful local wrap opening. Failure vectors/seeds
+cover canonical username/origin/UUID/base64url/time, duplicate/unknown fields, protected version
+and trailing bytes, illegal intent/token pairs, full-body bounds and hostile declared CBOR
+counts. Production authorization, durable receipt state and current-snapshot CAS remain consumers.
 
 `account-devices.json` contains D-113 complete signed-statement snapshot JSON vectors. Valid
 inputs round-trip to exact canonical JSON; failure vectors identify redacted field or JSON
@@ -131,14 +118,6 @@ and response JSON vectors. The browser response has no `refresh_token`; its rota
 travels in an HttpOnly cookie managed by the server. `api-problem.json` includes refresh failure
 examples as canonical JSON with the registered codes and `changed`/`retryable` fields; its older
 CBOR vectors remain valid. All token strings are synthetic public test data.
-The D-104 `auth.rate_limited` JSON problem keeps those eight fields and does not identify a
-private admission bucket. `api.personal.rate_headers` vectors use a decimal 1..300-second input
-and a JSON map of exact `Retry-After`, `RateLimit-Policy`, and `RateLimit` values; `.reject`
-vectors require rejection of out-of-range delays. No header is part of the problem body.
-The D-105 `auth.commit_outcome_unknown` vectors cover both Personal POSTs with `changed: true`
-and `retryable: false`; callers must not automatically replay either operation. They retain the
-same eight-field JSON shape as the known precommit `auth.storage_unavailable` vector, whose
-`changed: false` guarantees no business-state mutation from the failed operation.
 The D-115 `api-problem-sync-keys-storage-*` JSON and CBOR vectors use
 `503 sync.storage_unavailable` for both confirmed unchanged account-key PUT failure
 (`changed: false`, `retryable: true`) and uncertain new-update commit (`changed: true`,
@@ -250,15 +229,8 @@ recovery display and safety-number outputs are written as text.
 | `crypto.escrow-account-open`                          | account UUID, administrator UUID, recipient private key, encapsulated key, ciphertext                                                         | serialized authenticated Shamir share                                                                            |
 | `crypto.escrow-device-open`                           | account UUID, request UUID, device signing public key, recipient private key, encapsulated key, ciphertext                                    | serialized authenticated Shamir share                                                                            |
 | `crypto.escrow-verification`                          | account UUID, administrator UUID, request UUID, device signing and KEM public keys                                                            | grouped 80-bit verification code and account/device contexts                                                     |
-| `crypto.qr-pairing`                                   | pairing UUIDv7, P-256 KEM public key, P-256 signing public key                                                                                | canonical `splpair1:` QR text                                                                                    |
-| `crypto.cpace-pairing`                                | pairing UUIDv7, initiator and responder UUIDv7, code, initiator and responder RNG bytes, nonce, plaintext                                     | initiator share, responder share, 64-byte CPace session id, both confirmations, and nonce-prefixed XChaCha frame |
 
-The `crypto.cpace-pairing` expected fields are lowercase hexadecimal and are
-separated by `|` in this order: initiator share, responder share, session id,
-initiator confirmation, responder confirmation, and the frame (`nonce ||
-ciphertext || tag`). Its fixed context and role ordering are the K-3
-typed-code contract from `06-identity-and-authentication.md` §2; the RNG fields
-make the published shares reproducible without exposing production secrets.
+
 
 The HPKE seal operations use fresh randomness, so their published known answers exercise opening
 fixed ciphertexts. The test suite separately exercises sealing and tamper rejection. The local

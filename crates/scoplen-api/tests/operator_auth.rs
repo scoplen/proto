@@ -320,21 +320,19 @@ fn options_readers_allow_extensions_but_require_saved_policy() {
 #[test]
 fn operator_scope_is_independent_and_routes_fail_closed() {
     assert_eq!(INITIAL_OPERATOR_ACCESS_SCOPE, "personal-invitation:issue");
-    let operation = OperatorAccessOperation::PersonalInvitationIssue;
+    let operation = OperatorAccessOperation::Logout;
     assert_eq!(
         OperatorAccessOperation::from_route("POST", operation.route_template()),
         Some(operation)
     );
     assert_eq!(DeviceAccessOperation::from_route("POST", operation.route_template()), None);
-    assert_eq!(
-        operation.requirement(),
-        OperatorAccessRequirement::Scope(OperatorAccessScope::PersonalInvitationIssue)
-    );
+    assert_eq!(operation.requirement(), OperatorAccessRequirement::SelfSessionTermination);
     for (method, path) in [
         ("GET", operation.route_template()),
         ("post", operation.route_template()),
         ("POST", "/api/v1/accounts/me"),
         ("POST", "/api/v1/admin/personal-invitations/"),
+        ("POST", "/api/v1/admin/personal-invitations"),
     ] {
         assert_eq!(OperatorAccessOperation::from_route(method, path), None);
     }

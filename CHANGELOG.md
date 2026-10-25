@@ -12,6 +12,17 @@ All notable changes to the `proto` repository will be recorded here.
   symlinks. Temporary checkout generation now follows the same canonical entry path on all
   supported platforms; linked-directory regressions retain drift and exact seed validation.
 
+- Added D-128's five native Account entry routes and JSON codecs, exact protected registration, admission and
+  complete bootstrap CBOR, additional Account signatures, fresh Device proofs, cache validation,
+  OpenAPI/TypeScript, independent vectors and bounded parser seeds. Public checks bind complete
+  recipient/epoch state, original signed K-4 bytes and every historical confirmation field.
+  A redacting deployment probe-key API provides the exact synthetic salt/verifier and private
+  username bucket derivations with separate HMAC-SHA-256 domains and validated canonical context.
+  Transient password input and rejected parsed secret fields use zeroizing custody. Removed
+  retired Personal invitation, pairing and replacement contracts, CPace, their generated types,
+  reference peer and fixtures without aliases. Durable admission, transaction CAS, receipts,
+  local key opening and production authorization remain separate consumer work.
+
 - Added D-126's Organization-bound Cedar authorizer with immutable guards, current Membership
   roles, all seven inventory entity types and independent `view_inventory`. Canonical graph,
   identity, owner, reference, device and action-context checks and every evaluation error fail

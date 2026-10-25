@@ -28,6 +28,10 @@ jobs:
         run: node crates/scoplen-api/openapi/generate.mjs --check
       - name: Test Operator OpenAPI contract checks
         run: node --test crates/scoplen-api/openapi/generate-operator.test.mjs
+      - name: Test Account entry OpenAPI contract checks
+        run: node --test crates/scoplen-api/openapi/generate-account-admission.test.mjs
+      - name: Check Account entry vectors and parser bounds
+        run: node scripts/generate-account-admission-vectors.mjs --check
       - name: Check Operator logout vectors and parser bounds
         run: node scripts/generate-operator-logout-vectors.mjs --check
       - name: Test Operator logout vector checkout boundaries

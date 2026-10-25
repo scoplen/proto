@@ -1,1 +1,0 @@
-{"type":"about:blank","title":"Enrollment outcome unknown","status":503,"detail":"Enrollment may have completed. Keep the generated identity and try device authentication before deciding whether to enroll again.","instance":"enroll-3","code":"auth.commit_outcome_unknown","changed":true,"retryable":false}

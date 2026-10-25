@@ -4,6 +4,7 @@
 use std::fmt;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
+use scoplen_crypto::SecretVec;
 use serde::{
     Deserialize, Deserializer,
     de::{self, MapAccess, SeqAccess, Visitor},
@@ -48,14 +49,48 @@ pub(crate) fn valid_raw_ssh_public_key(value: &str) -> bool {
 }
 
 pub(crate) fn decode_unique_object(input: &[u8]) -> Result<Map<String, Value>, ()> {
-    let UniqueValue(value) = serde_json::from_slice(input).map_err(|_| ())?;
-    let Value::Object(fields) = value else {
-        return Err(());
-    };
-    Ok(fields)
+    let value = serde_json::from_slice::<UniqueValue>(input).map_err(|_| ())?.into_inner();
+    match value {
+        Value::Object(fields) => Ok(fields),
+        value => {
+            clear_json_value(value);
+            Err(())
+        }
+    }
 }
 
 struct UniqueValue(Value);
+
+impl UniqueValue {
+    fn into_inner(mut self) -> Value {
+        std::mem::replace(&mut self.0, Value::Null)
+    }
+}
+
+impl Drop for UniqueValue {
+    fn drop(&mut self) {
+        clear_json_value(std::mem::replace(&mut self.0, Value::Null));
+    }
+}
+
+// Parsed authentication fields can contain secrets even when a later field or duplicate fails.
+pub(crate) fn clear_json_value(value: Value) {
+    match value {
+        Value::String(value) => drop(SecretVec::new(value.into_bytes())),
+        Value::Array(values) => {
+            for value in values {
+                clear_json_value(value);
+            }
+        }
+        Value::Object(fields) => {
+            for (key, value) in fields {
+                drop(SecretVec::new(key.into_bytes()));
+                clear_json_value(value);
+            }
+        }
+        _ => {}
+    }
+}
 
 impl<'de> Deserialize<'de> for UniqueValue {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -99,21 +134,27 @@ impl<'de> Visitor<'de> for UniqueVisitor {
         Ok(UniqueValue(Value::Null))
     }
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Self::Value, A::Error> {
-        let mut values = Vec::new();
-        while let Some(UniqueValue(value)) = sequence.next_element()? {
-            values.push(value);
+        let mut guarded = UniqueValue(Value::Array(Vec::new()));
+        let Value::Array(values) = &mut guarded.0 else {
+            unreachable!();
+        };
+        while let Some(value) = sequence.next_element::<UniqueValue>()? {
+            values.push(value.into_inner());
         }
-        Ok(UniqueValue(Value::Array(values)))
+        Ok(guarded)
     }
     fn visit_map<A: MapAccess<'de>>(self, mut access: A) -> Result<Self::Value, A::Error> {
-        let mut values = Map::new();
+        let mut guarded = UniqueValue(Value::Object(Map::new()));
+        let Value::Object(values) = &mut guarded.0 else {
+            unreachable!();
+        };
         while let Some(key) = access.next_key::<String>()? {
             if values.contains_key(&key) {
                 return Err(de::Error::custom("duplicate JSON key"));
             }
-            let UniqueValue(value) = access.next_value()?;
-            values.insert(key, value);
+            let value: UniqueValue = access.next_value()?;
+            values.insert(key, value.into_inner());
         }
-        Ok(UniqueValue(Value::Object(values)))
+        Ok(guarded)
     }
 }

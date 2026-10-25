@@ -159,10 +159,6 @@ fn authentication_rate_headers_have_an_independent_bounded_profile() {
         assert_eq!(headers.retry_after_seconds(), delay);
         assert_eq!(headers.rate_limit(), format!("\"authentication\";r=0;t={delay}"));
         assert_eq!(headers.rate_limit_policy(), AUTH_RATE_LIMIT_POLICY);
-        assert_ne!(
-            headers.rate_limit_policy(),
-            scoplen_api::personal_enrollment::PERSONAL_RATE_LIMIT_POLICY
-        );
     }
     for invalid in [0, 301, u16::MAX] {
         assert!(AuthRateLimitHeaders::new(invalid).is_err());

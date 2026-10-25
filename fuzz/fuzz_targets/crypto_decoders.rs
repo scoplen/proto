@@ -47,12 +47,6 @@ fuzz_target!(|bytes: &[u8]| {
             generation,
         );
     }
-    if let Ok(value) = scoplen_crypto::PairingNewDevice::decode(bytes) {
-        assert_eq!(value.encode().expect("validated pairing device").as_bytes(), bytes);
-    }
-    if let Ok(value) = scoplen_crypto::PairingHandoff::decode(bytes) {
-        assert_eq!(value.encode().expect("validated pairing handoff").as_bytes(), bytes);
-    }
     if let Ok(wrap) = scoplen_crypto::DeviceArkWrap::decode(bytes) {
         assert_eq!(wrap.encode().as_slice(), bytes);
     }
@@ -78,12 +72,11 @@ fuzz_target!(|bytes: &[u8]| {
     if let Ok(proof_text) = std::str::from_utf8(bytes) {
         if let Some((origin, username)) = proof_text.split_once('\n') {
             let _ = scoplen_crypto::PasswordKdfContext::new(origin, username, 1, &[0; 16]);
-        }
-        if let Ok(link) = scoplen_crypto::PairingLink::decode(proof_text) {
-            assert_eq!(link.encode(), proof_text);
-        }
-        if let Ok(qr) = scoplen_crypto::PairingQrPayload::decode(proof_text) {
-            assert_eq!(qr.encode().as_bytes(), bytes);
+            let probe = scoplen_crypto::AccountProbeKey::new(&[0x44; 32])
+                .expect("fixed synthetic deployment probe key");
+            let _ = probe.synthetic_salt(origin, username);
+            let _ = probe.synthetic_verifier(origin, username);
+            let _ = probe.username_admission_identity(origin, username);
         }
         let _ = scoplen_crypto::GatewayProof::parse(proof_text);
         if let Ok(proof) = scoplen_crypto::DpopProof::parse(proof_text) {

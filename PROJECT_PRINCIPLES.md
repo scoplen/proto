@@ -25,8 +25,8 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
 - The S1 baseline and S2 object-model gate are complete, including schema handling, model limits
   and merge laws. S3 remains Incomplete under D-125 through D-127: shared key hierarchy,
   certificates, encrypted envelopes and password bootstrap are implemented, while scoped recovery
-  and retirement work remains open. Historical whole-Account escrow and Personal-pairing exports
-  do not implement the current recovery/admission flow. D-127 adds fixed Unicode 17 NFC,
+  and retirement of historical recovery exports remain open. Historical whole-Account escrow exports
+  do not implement the current recovery flow. D-127 adds fixed Unicode 17 NFC,
   Argon2id-v19, separate authentication/KEK outputs, the exact ARK envelope and reconstruction of
   both Account roots, with independent vectors, failure tests and bounded parser fuzz targets.
   Transport, freshness and credential lifecycle remain consumer work under D-128.
@@ -52,13 +52,10 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   D-113 adds bounded complete signed-statement transport and its existing-scope operation,
   with precise OpenAPI/TypeScript, public vectors and parser seeds. Account context, K-2
   signatures, completeness/freshness and current-state authorization remain consumer checks.
-  D-114 adds strict QRv2/public-link, authenticated application/frame, key-anchor and exact
-  acceptance/approval helpers with independent vectors and parser seeds. Its bounded API codecs,
-  exact route scopes, OpenAPI/TypeScript and reference relay cover role-owned immutable slots,
-  complete snapshots, expiry, replay and lost-commit recovery with explicit external admission
-  verification. Durable one-attempt
-  state, private-key/epoch equality, client checkpoints and server admission remain consumer work;
-  these shared exports do not establish complete second-device pairing.
+  D-128 adds bounded native Account entry/protected bootstrap codecs and exact Account/Device
+  proof inputs with independent vectors, generated contracts and parser seeds. Retired Personal
+  invitation/pairing/replacement public surfaces and fixtures are removed. Local key opening,
+  durable admission/receipts/current-state CAS and production consumers remain separate work.
   S5 and S7 have no completed gate evidence.
 - D-121 uses an asynchronous bounded interactive responder with connection termination after
   dispatched interruption and local refusal of later operations. Public encrypted-peer tests and
