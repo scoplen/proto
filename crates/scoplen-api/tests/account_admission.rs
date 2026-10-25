@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use scoplen_api::account_admission::*;
 use scoplen_crypto::{AccountRequestSignatureInput, SecretBytes};
 use scoplen_model::cbor::{self, Value as Cbor};
@@ -26,6 +27,110 @@ fn fixture(kind: &str) -> Vec<u8> {
         unhex(&v.input)
     } else {
         v.input.as_bytes().to_vec()
+    }
+}
+
+fn mutate_protected(kind: &str, mutate: impl FnOnce(&mut Cbor)) -> Vec<u8> {
+    let mut body: Value = serde_json::from_slice(&fixture(&format!("{kind}.request"))).unwrap();
+    let raw = URL_SAFE_NO_PAD.decode(body["payload"].as_str().unwrap()).unwrap();
+    let mut payload = cbor::decode(&raw).unwrap();
+    mutate(&mut payload);
+    body["payload"] = URL_SAFE_NO_PAD.encode(cbor::encode(&payload).unwrap()).into();
+    serde_json::to_vec(&body).unwrap()
+}
+
+fn protected_field<'a>(payload: &'a mut Cbor, key: &str) -> &'a mut Cbor {
+    let Cbor::Map(fields) = payload else { panic!("protected map") };
+    &mut fields.iter_mut().find(|(name, _)| name == &Cbor::Text(key.into())).unwrap().1
+}
+
+#[test]
+fn public_authentication_decoding_preserves_exact_valid_requests() {
+    let raw = fixture("register.request");
+    let (request, payload) = AccountRegistrationRequest::decode_for_authentication(&raw).unwrap();
+    assert_eq!(AccountRegistrationRequest::from_json(&raw).unwrap(), request);
+    assert_eq!(payload.to_cbor().unwrap(), request.payload.as_bytes());
+    let raw = fixture("admit.request");
+    let (request, payload) =
+        AccountDeviceAdmissionRequest::decode_for_authentication(&raw).unwrap();
+    assert_eq!(AccountDeviceAdmissionRequest::from_json(&raw).unwrap(), request);
+    assert_eq!(payload.to_cbor().unwrap(), request.payload.as_bytes());
+}
+
+#[test]
+fn public_authentication_decoding_does_not_authenticate_inner_signatures() {
+    let raw = mutate_protected("register", |payload| {
+        let Cbor::Bytes(bytes) = protected_field(payload, "device_certificate") else {
+            panic!("certificate bytes")
+        };
+        let mut certificate = scoplen_crypto::DeviceCertificate::decode(bytes).unwrap();
+        certificate.signature[0] ^= 1;
+        *bytes = certificate.encode().unwrap();
+    });
+    assert_eq!(
+        AccountRegistrationRequest::from_json(&raw),
+        Err(AccountAdmissionCodecError::Binding)
+    );
+    let (request, payload) = AccountRegistrationRequest::decode_for_authentication(&raw).unwrap();
+    assert_eq!(payload.validate(), Err(AccountAdmissionCodecError::Binding));
+    assert_eq!(request.verify_proof(&payload.origin), Err(AccountAdmissionCodecError::Binding));
+}
+
+#[test]
+fn public_authentication_decoding_defers_both_certificate_identity_bindings() {
+    for kind in ["register", "admit"] {
+        let raw = mutate_protected(kind, |payload| {
+            let Cbor::Bytes(bytes) = protected_field(payload, "device_certificate") else {
+                panic!("certificate bytes")
+            };
+            let mut certificate = scoplen_crypto::DeviceCertificate::decode(bytes).unwrap();
+            certificate.account_id = uuid::Uuid::now_v7();
+            certificate.device_id = uuid::Uuid::now_v7();
+            *bytes = certificate.encode().unwrap();
+        });
+        if kind == "register" {
+            assert_eq!(
+                AccountRegistrationRequest::from_json(&raw),
+                Err(AccountAdmissionCodecError::Binding)
+            );
+            let (_, payload) = AccountRegistrationRequest::decode_for_authentication(&raw).unwrap();
+            assert_eq!(payload.validate(), Err(AccountAdmissionCodecError::Binding));
+        } else {
+            assert_eq!(
+                AccountDeviceAdmissionRequest::from_json(&raw),
+                Err(AccountAdmissionCodecError::Binding)
+            );
+            let (_, payload) =
+                AccountDeviceAdmissionRequest::decode_for_authentication(&raw).unwrap();
+            assert_eq!(payload.validate(), Err(AccountAdmissionCodecError::Binding));
+        }
+    }
+}
+
+#[test]
+fn public_authentication_decoding_finishes_nested_structure_before_any_signature_denial() {
+    for kind in ["register", "admit"] {
+        let raw = mutate_protected(kind, |payload| {
+            let Cbor::Bytes(bytes) = protected_field(payload, "device_certificate") else {
+                panic!("certificate bytes")
+            };
+            let mut certificate = scoplen_crypto::DeviceCertificate::decode(bytes).unwrap();
+            certificate.signature[0] ^= 1;
+            *bytes = certificate.encode().unwrap();
+            let Cbor::Bytes(bytes) = protected_field(payload, "key_bundle") else {
+                panic!("bundle bytes")
+            };
+            let mut bundle =
+                scoplen_api::sync::SyncAccountKeyBundleUpdate::from_cbor(bytes).unwrap();
+            bundle.recovery_blob = vec![0];
+            *bytes = bundle.to_cbor().unwrap();
+        });
+        let error = if kind == "register" {
+            AccountRegistrationRequest::decode_for_authentication(&raw).unwrap_err()
+        } else {
+            AccountDeviceAdmissionRequest::decode_for_authentication(&raw).unwrap_err()
+        };
+        assert_eq!(error, AccountAdmissionCodecError::InvalidProtected);
     }
 }
 

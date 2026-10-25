@@ -568,6 +568,26 @@ impl AccountDeviceAdmissionPayload {
     /// # Errors
     /// Rejects malformed, oversized, unknown or noncanonical protected fields.
     pub fn from_cbor(input: &[u8]) -> Result<Self, Error> {
+        let value = Self::decode_fields(input)?;
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub(crate) fn from_cbor_structural(input: &[u8]) -> Result<Self, Error> {
+        let value = Self::decode_fields(input)?;
+        validate_origin_username(&value.origin, &value.username)?;
+        if value.credential_generation == 0 {
+            return Err(Error::InvalidProtected);
+        }
+        let cert = certificate_structure(&value.device_certificate)?;
+        for key in [&cert.signing_public_key, &cert.kem_public_key] {
+            canonical_device_public_key(key).map_err(|_| Error::InvalidProtected)?;
+        }
+        bundle_artifacts(&bundle_structure(&value.key_bundle)?)?;
+        Ok(value)
+    }
+
+    fn decode_fields(input: &[u8]) -> Result<Self, Error> {
         let mut f = decode(input, super::MAX_ACCOUNT_ADMISSION_PAYLOAD_BYTES)?;
         one(&mut f, "version")?;
         let value = Self {
@@ -584,7 +604,6 @@ impl AccountDeviceAdmissionPayload {
             key_bundle: blob(&mut f, "key_bundle", 4_194_304)?,
         };
         empty(&f)?;
-        value.validate()?;
         Ok(value)
     }
 }

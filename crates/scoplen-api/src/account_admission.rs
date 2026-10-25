@@ -421,9 +421,22 @@ impl AccountRegistrationRequest {
         Ok(value)
     }
 
-    // Transaction peers must finish structural decoding before authenticating and consuming
-    // a matched challenge. The public decoder retains its complete strict validation.
-    pub(crate) fn from_json_envelope(input: &[u8]) -> Result<Self, AccountAdmissionCodecError> {
+    /// Decode every nested artifact's structure before transaction-bound authentication.
+    ///
+    /// The returned request and payload are unauthenticated. After matching a live challenge,
+    /// verify bindings and signatures inside the transaction; commit any matching denial
+    /// with challenge consumption and mandatory audit. Never use this result as admission.
+    /// # Errors
+    /// Rejects malformed, noncanonical or oversized outer and nested artifacts.
+    pub fn decode_for_authentication(
+        input: &[u8],
+    ) -> Result<(Self, AccountRegistrationPayload), AccountAdmissionCodecError> {
+        let request = Self::from_json_envelope(input)?;
+        let payload = AccountRegistrationPayload::from_cbor_structural(request.payload.as_bytes())?;
+        Ok((request, payload))
+    }
+
+    fn from_json_envelope(input: &[u8]) -> Result<Self, AccountAdmissionCodecError> {
         let mut f = object(input, 524_288)?;
         let value = Self {
             intent: take_intent(&mut f)?,
@@ -523,6 +536,28 @@ impl AccountDeviceAdmissionRequest {
     /// # Errors
     /// Rejects unknown/duplicate fields, malformed protected bytes or illegal token/intent pairs.
     pub fn from_json(input: &[u8]) -> Result<Self, AccountAdmissionCodecError> {
+        let value = Self::from_json_envelope(input)?;
+        AccountDeviceAdmissionPayload::from_cbor(value.payload.as_bytes())?;
+        Ok(value)
+    }
+
+    /// Decode complete structure without authenticating a capability, challenge or receipt.
+    ///
+    /// The consumer must match its live challenge and authenticate bindings/signatures in
+    /// one transaction, consuming a matching denial only with its mandatory audit. Current
+    /// snapshot/CAS and exact historical receipt validation remain required for admission.
+    /// # Errors
+    /// Rejects malformed nested artifacts, bounds or illegal intent/token combinations.
+    pub fn decode_for_authentication(
+        input: &[u8],
+    ) -> Result<(Self, AccountDeviceAdmissionPayload), AccountAdmissionCodecError> {
+        let request = Self::from_json_envelope(input)?;
+        let payload =
+            AccountDeviceAdmissionPayload::from_cbor_structural(request.payload.as_bytes())?;
+        Ok((request, payload))
+    }
+
+    fn from_json_envelope(input: &[u8]) -> Result<Self, AccountAdmissionCodecError> {
         let mut f = object(input, 6_291_456)?;
         let intent = take_intent(&mut f)?;
         let token = match (intent, f.get("admission_token")) {
@@ -549,7 +584,6 @@ impl AccountDeviceAdmissionRequest {
             admission_token: token,
         };
         no_extensions(&f)?;
-        AccountDeviceAdmissionPayload::from_cbor(value.payload.as_bytes())?;
         Ok(value)
     }
     /// Encode exact retained business material and the correctly typed capability field.
