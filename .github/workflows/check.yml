@@ -32,6 +32,8 @@ jobs:
         run: node --test crates/scoplen-api/openapi/generate-account-admission.test.mjs
       - name: Check Account entry vectors and parser bounds
         run: node scripts/generate-account-admission-vectors.mjs --check
+      - name: Check used Account-id digest vectors
+        run: node scripts/generate-account-used-id-vectors.mjs --check
       - name: Check Operator logout vectors and parser bounds
         run: node scripts/generate-operator-logout-vectors.mjs --check
       - name: Test Operator logout vector checkout boundaries

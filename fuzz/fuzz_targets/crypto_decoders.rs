@@ -70,6 +70,9 @@ fuzz_target!(|bytes: &[u8]| {
     let _ = scoplen_crypto::RecoveryKey::parse_display(&text);
 
     if let Ok(proof_text) = std::str::from_utf8(bytes) {
+        if let Ok(account_id) = proof_text.parse() {
+            let _ = scoplen_crypto::account_used_id_digest(account_id);
+        }
         if let Some((origin, username)) = proof_text.split_once('\n') {
             let _ = scoplen_crypto::PasswordKdfContext::new(origin, username, 1, &[0; 16]);
             let probe = scoplen_crypto::AccountProbeKey::new(&[0x44; 32])

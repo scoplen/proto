@@ -28,7 +28,7 @@ mod signature;
 pub use account_request::{
     AccountProbeKey, AccountRequestError, AccountRequestIntent, AccountRequestKind,
     AccountRequestProof, AccountRequestSignatureInput, account_bootstrap_digest,
-    account_capability_digest, canonical_device_public_key,
+    account_capability_digest, account_used_id_digest, canonical_device_public_key,
 };
 pub use certificate::{DeviceCertificate, RevocationStatement, verify_device_list};
 pub use device_access_token::{
