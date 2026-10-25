@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Added mixed OpenSSH 9.9p2/Dropbear 2024.86 Jump acceptance at depths one through
+  three with either ingress implementation. Independent hop identities, per-position
+  trust/password rejection, closed targets, exact commands and binary/EOF output,
+  canceled nested handshakes and complete reverse teardown exercise existing public
+  APIs. The fixed-version fixture runs in CI without changing wire formats or dependencies.
+
 - Extend the pinned Dropbear fixture with direct TCP and SOCKS4a/5 forwarding,
   concurrent binary transfers with an EOF-only trailer, disabled-forwarding and
   closed-target refusal, subsequent session commands, and active-listener cancellation.

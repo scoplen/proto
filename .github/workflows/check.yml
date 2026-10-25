@@ -65,6 +65,9 @@ jobs:
       - name: Password, rejected password, and host-key pin
         shell: pwsh
         run: ./scripts/dropbear-interop.ps1
+      - name: Mixed OpenSSH and Dropbear Jump depths one through three
+        shell: pwsh
+        run: ./scripts/ssh-mixed-jump-interop.ps1
 
   openssh-interop:
     name: OpenSSH client interoperability
