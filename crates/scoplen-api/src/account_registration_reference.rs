@@ -3,12 +3,14 @@
 //!
 //! This slice verifies real Account and Device signatures and models atomic business state,
 //! digest retention and complete restart images. It is not HTTP transport, durable database
-//! storage, an audit chain or rate admission. Callers admit work before invoking this peer.
+//! storage or an audit chain. Low-level operations require prior caller admission;
+//! `challenge_with_admission` connects only challenge issuance to the separate rate peer.
 //! Password entry and Device admission share this storage and the same Account transaction lock.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
+    net::IpAddr,
     sync::{Arc, Mutex, MutexGuard},
 };
 
@@ -23,9 +25,13 @@ use crate::{
     ApiContractError, ErrorCode, ProblemDetails,
     account_admission::{
         ACCOUNT_ATTEMPT_LIFETIME_MS, AccountAdmissionCodecError, AccountBootstrapSnapshot,
-        AccountCommittedConfirmation, AccountPersonalBootstrap, AccountPersonalEpoch,
-        AccountRegistrationPayload, AccountRegistrationRequest, AccountRequestChallengeRequest,
-        AccountRequestChallengeResponse, AccountRequestIntent, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
+        AccountCommittedConfirmation, AccountEntryOperation, AccountPersonalBootstrap,
+        AccountPersonalEpoch, AccountRegistrationPayload, AccountRegistrationRequest,
+        AccountRequestChallengeRequest, AccountRequestChallengeResponse, AccountRequestIntent,
+        MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
+    },
+    account_rate_reference::{
+        ReferenceAccountRateError, ReferenceAccountRatePeer, ReferenceAccountRateSubject,
     },
 };
 
@@ -145,6 +151,18 @@ impl From<AccountAdmissionCodecError> for ReferenceRegistrationError {
             _ => Self::InvalidRequest,
         }
     }
+}
+
+/// Admission or existing challenge-transaction failure at the connected reference entry.
+/// No new HTTP status, wire problem or business outcome is introduced.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum ReferenceChallengeAdmissionError {
+    /// Source/private admission failed; rate rejection retains the common bounded headers.
+    #[error(transparent)]
+    Admission(#[from] ReferenceAccountRateError),
+    /// Body collection, strict structural decoding or the original challenge transaction failed.
+    #[error(transparent)]
+    Challenge(#[from] ReferenceRegistrationError),
 }
 
 /// One route-specific confirmation, with submit's 201 or confirmation's 200 status.
@@ -587,7 +605,38 @@ impl ReferenceAccountRegistrationPeer {
         Ok(())
     }
 
-    /// Exercise one-use challenge issuance with OS randomness and bounded expiry maintenance.
+    /// Connect source admission, lazy body collection and decoded Device admission to the
+    /// existing challenge transaction. The loader runs exactly once after source admission;
+    /// strict structural decoding precedes Device admission and nonce generation.
+    ///
+    /// Earlier counts are never refunded. Issuance does not clear authentication streaks.
+    /// The two peers and their checkpoint images remain separate; this entry does not supply
+    /// atomic admission/business restore, HTTP transport or admission for the other four POSTs.
+    /// # Errors
+    /// Returns the existing source/private admission or body/challenge error without a nonce.
+    pub fn challenge_with_admission(
+        &self,
+        rates: &ReferenceAccountRatePeer,
+        actual_peer: IpAddr,
+        load_body: impl FnOnce() -> Result<Vec<u8>, ReferenceRegistrationError>,
+        mut clock: impl FnMut() -> u64,
+    ) -> Result<AccountRequestChallengeResponse, ReferenceChallengeAdmissionError> {
+        let mut admission =
+            rates.begin(AccountEntryOperation::RequestChallenge, actual_peer, &mut clock)?;
+        let body = load_body()?;
+        let decoded = AccountRequestChallengeRequest::from_json(&body)
+            .map_err(ReferenceRegistrationError::from)?;
+        admission.admit_private(
+            ReferenceAccountRateSubject::DecodedDevice {
+                device_id: decoded.device_id,
+                intent: decoded.intent,
+            },
+            &mut clock,
+        )?;
+        self.challenge(&body, clock).map_err(ReferenceChallengeAdmissionError::from)
+    }
+
+    /// Exercise admitted-only one-use challenge issuance with OS randomness and bounded expiry maintenance.
     ///
     /// The supplied clock is read after acquiring storage and again before committing.
     /// # Errors
