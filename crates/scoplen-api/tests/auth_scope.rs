@@ -6,8 +6,8 @@ use scoplen_api::{
     auth::{DeviceAccessOperation, DeviceAccessScope, INITIAL_DEVICE_ACCESS_SCOPE},
 };
 use scoplen_crypto::{
-    DeviceAccessToken, DeviceAccessTokenClaims, Ed25519SigningKey, P256SigningKey,
-    TrustedDeviceAccessTokenKeys, dpop_jwk_thumbprint,
+    DeviceAccessToken, DeviceAccessTokenClaims, DpopError, DpopProof, DpopTarget, DpopToken,
+    Ed25519SigningKey, P256SigningKey, TrustedDeviceAccessTokenKeys, dpop_jwk_thumbprint,
 };
 use scoplen_test_vectors::VectorDocument;
 use serde::Deserialize;
@@ -95,6 +95,7 @@ fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
             "keys:write",
             "orgs:create",
             "orgs:read",
+            "orgs:write",
             "sync:read",
             "sync:write"
         ]
@@ -123,7 +124,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_required_scope() 
             );
         }
     }
-    assert_eq!(routes.len(), 20);
+    assert_eq!(routes.len(), 21);
 }
 
 #[test]
@@ -232,4 +233,37 @@ fn authored_openapi_uses_the_shared_scope_ceiling_and_account_requirement() {
         document["paths"]["/accounts/me/devices"]["get"]["x-scoplen-required-device-scope"],
         DeviceAccessOperation::AccountDevicesRead.required_scope().as_str()
     );
+}
+
+#[test]
+fn organization_update_proof_binds_actual_patch_and_exact_organization() {
+    let operation = DeviceAccessOperation::OrganizationUpdate;
+    let key = P256SigningKey::from_bytes(&[0x24; 32]).unwrap();
+    let jkt = dpop_jwk_thumbprint(&key.public_key_sec1()).unwrap();
+    let path = "/api/v1/orgs/019bdad6-b800-7000-8000-000000000001";
+    let target =
+        DpopTarget::new(operation.http_method(), "https://control.example.com", path).unwrap();
+    let proof = DpopProof::sign(
+        &key,
+        &key.public_key_sec1(),
+        &target,
+        DpopToken::Protected("fixture.access"),
+        1000,
+        None,
+    )
+    .unwrap();
+    assert!(
+        proof.verify(&target, DpopToken::Protected("fixture.access"), &jkt, 1000, None).is_ok()
+    );
+    for (method, path) in [
+        ("GET", path),
+        ("POST", path),
+        ("PATCH", "/api/v1/orgs/019bdad6-b800-7000-8000-000000000002"),
+    ] {
+        let other = DpopTarget::new(method, "https://control.example.com", path).unwrap();
+        assert_eq!(
+            proof.verify(&other, DpopToken::Protected("fixture.access"), &jkt, 1000, None),
+            Err(DpopError::InvalidProof)
+        );
+    }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! D-130 bounded team creation and current Account membership discovery.
+//! D-130/D-134 bounded team creation, settings and current Account membership discovery.
 //!
 //! These codecs validate syntax and response bindings, not current membership or authority.
 
@@ -17,6 +17,8 @@ use crate::{
 
 /// Complete UTF-8 creation request bound, including whitespace.
 pub const MAX_ORGANIZATION_CREATE_BYTES: usize = 1_024;
+/// Complete UTF-8 name-update request bound, including whitespace.
+pub const MAX_ORGANIZATION_UPDATE_BYTES: usize = 1_024;
 /// Complete Resource bound, including extensions and whitespace inside a page item.
 pub const MAX_ORGANIZATION_RESOURCE_BYTES: usize = 4_096;
 /// Complete membership Page bound.
@@ -112,6 +114,91 @@ impl OrganizationCreateRequest {
         self.validate()?;
         encode(&Wire { data: Data { name: &self.name } }, MAX_ORGANIZATION_CREATE_BYTES)
     }
+}
+
+/// The complete accepted team settings patch; only the name is mutable.
+#[derive(Clone, Eq, PartialEq)]
+pub struct OrganizationUpdateRequest {
+    /// Display name, preserved without normalization.
+    pub name: String,
+}
+
+impl fmt::Debug for OrganizationUpdateRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OrganizationUpdateRequest").finish_non_exhaustive()
+    }
+}
+
+impl OrganizationUpdateRequest {
+    /// Construct a bounded name update.
+    /// # Errors
+    /// Rejects invalid name syntax.
+    pub fn new(name: impl Into<String>) -> Result<Self, OrganizationCodecError> {
+        let value = Self { name: name.into() };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Recheck mutable public fields.
+    /// # Errors
+    /// Rejects invalid name syntax.
+    pub fn validate(&self) -> Result<(), OrganizationCodecError> {
+        validate_name(&self.name)
+    }
+
+    /// Parse the strict name-only patch, rejecting duplicate and unknown fields recursively.
+    /// # Errors
+    /// Rejects malformed, oversized or invalid fields.
+    pub fn from_json(input: &[u8]) -> Result<Self, OrganizationCodecError> {
+        let mut fields = object(input, MAX_ORGANIZATION_UPDATE_BYTES)?;
+        let mut data = take_object(&mut fields, "data")?;
+        let name = take_string(&mut data, "name")?;
+        if !fields.is_empty() || !data.is_empty() {
+            return Err(OrganizationCodecError::InvalidField("request members"));
+        }
+        Self::new(name)
+    }
+
+    /// Emit the name-only canonical JSON patch.
+    /// # Errors
+    /// Rejects invalid mutable fields or complete body overflow.
+    pub fn to_json(&self) -> Result<Vec<u8>, OrganizationCodecError> {
+        #[derive(Serialize)]
+        struct Data<'a> {
+            name: &'a str,
+        }
+        #[derive(Serialize)]
+        struct Wire<'a> {
+            data: Data<'a>,
+        }
+        self.validate()?;
+        encode(&Wire { data: Data { name: &self.name } }, MAX_ORGANIZATION_UPDATE_BYTES)
+    }
+}
+
+/// Syntax classification for the required name-update precondition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum OrganizationPreconditionError {
+    /// No `If-Match` was supplied; maps to HTTP 428.
+    #[error("organization precondition required")]
+    Required,
+    /// The supplied value is not exactly one bounded strong entity tag; maps to HTTP 400.
+    #[error("invalid organization precondition")]
+    Invalid,
+}
+
+/// Parse one required strong `If-Match` value without comparing protected resource state.
+/// Header multiplicity is a router duty; compare only after current policy authorization.
+/// # Errors
+/// Distinguishes an absent precondition from weak, wildcard, multiple or malformed tags.
+pub fn parse_organization_if_match(
+    value: Option<&str>,
+) -> Result<&str, OrganizationPreconditionError> {
+    let value = value.ok_or(OrganizationPreconditionError::Required)?;
+    if !valid_strong_etag(value) {
+        return Err(OrganizationPreconditionError::Invalid);
+    }
+    Ok(value)
 }
 
 /// The caller's own active Organization membership, never a member directory.

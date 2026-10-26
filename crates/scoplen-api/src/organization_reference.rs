@@ -1,19 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Narrow D-130 test peer: current membership, creation receipt and scripted commit outcomes.
+//! Narrow D-130/D-134 test peer: current membership, settings and scripted commit outcomes.
 //!
 //! Signature/DPoP verification, replay admission, durable storage and audit chains remain
 //! production consumer duties. Fixture setters supply trusted current state, never HTTP input.
 
 use std::collections::BTreeMap;
 
+use cedar_policy::{Context, Decision, Entities, PolicySet, Request};
 use scoplen_crypto::DeviceAccessTokenClaims;
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     auth::DeviceAccessScope,
+    control_plane::{OrganizationAuthorizationContext, OrganizationAuthorizer},
     organization::{
         ORGANIZATION_CREATION_RECEIPT_SECONDS, OrganizationCreateRequest, OrganizationListQuery,
-        OrganizationMembership, OrganizationPage, OrganizationResource,
+        OrganizationMembership, OrganizationPage, OrganizationPreconditionError,
+        OrganizationResource, OrganizationUpdateRequest, parse_organization_if_match,
     },
 };
 
@@ -48,19 +52,28 @@ pub enum OrganizationReferenceError {
     /// The same Account/key was used with another canonical creation payload.
     #[error("organization creation conflict")]
     Conflict,
+    /// The required update precondition is absent.
+    #[error("organization precondition required")]
+    PreconditionRequired,
+    /// An authorized caller supplied a stale current-projection validator.
+    #[error("organization precondition failed")]
+    PreconditionFailed,
     /// Confirmed rollback.
     #[error("organization storage unavailable")]
     StorageUnavailable,
     /// No confirmed commit outcome.
     #[error("organization commit outcome unknown")]
     CommitOutcomeUnknown,
+    /// A name update may have committed; refresh before making another decision.
+    #[error("organization update commit outcome unknown")]
+    UpdateCommitOutcomeUnknown,
     /// No response arrived.
     #[error("organization response lost")]
     ResponseLost,
 }
 
 impl OrganizationReferenceError {
-    /// Render the exact D-130 problem classification, or no problem for a lost response.
+    /// Render the exact operation-specific problem classification, or no problem for a lost response.
     /// # Errors
     /// Rejects an invalid request instance through the shared problem validator.
     pub fn problem(
@@ -109,6 +122,27 @@ impl OrganizationReferenceError {
                 false,
                 true,
                 "The team operation rolled back. No team data changed. Retry with a fresh proof and the original creation key and payload when applicable.",
+            ),
+            Self::PreconditionRequired => (
+                428,
+                "organization.precondition_required",
+                false,
+                false,
+                "The team update requires its current entity tag. No team data changed. Refresh the team before editing.",
+            ),
+            Self::PreconditionFailed => (
+                412,
+                "organization.precondition_failed",
+                false,
+                false,
+                "The team changed since it was loaded. No team data changed. Refresh and review the current name before editing again.",
+            ),
+            Self::UpdateCommitOutcomeUnknown => (
+                503,
+                "organization.commit_outcome_unknown",
+                true,
+                false,
+                "The team update could not be confirmed and may have changed data. Refresh and review the current team before deciding whether to submit another update.",
             ),
             Self::CommitOutcomeUnknown => (
                 503,
@@ -183,7 +217,7 @@ impl OrganizationReferencePeer {
         );
     }
 
-    /// Script one eligible creation's transaction/response failure.
+    /// Script one eligible creation or name update transaction/response failure.
     pub fn set_fault(&mut self, fault: OrganizationReferenceFault) {
         self.fault = Some(fault);
     }
@@ -195,7 +229,27 @@ impl OrganizationReferencePeer {
         }
     }
 
-    /// Count synthetic successful creation audit records.
+    /// Install trusted current role metadata and its projection update time.
+    /// # Errors
+    /// Rejects invalid roles/timestamps or a missing fixture team.
+    pub fn set_membership_roles(
+        &mut self,
+        organization: Uuid,
+        roles: Vec<String>,
+        timestamp: &str,
+    ) -> Result<(), OrganizationReferenceError> {
+        let team = self.teams.get_mut(&organization).ok_or(OrganizationReferenceError::NotFound)?;
+        let mut resource = team.resource.clone();
+        resource.membership.roles = roles;
+        resource.updated_at = timestamp.into();
+        resource.to_json().map_err(|_| OrganizationReferenceError::InvalidRequest)?;
+        resource.updated_at = later_timestamp(&team.resource.updated_at, timestamp).into();
+        resource.etag = format!("\"{}\"", Uuid::now_v7());
+        team.resource = resource;
+        Ok(())
+    }
+
+    /// Count synthetic successful creation and name-update audit records.
     #[must_use]
     pub const fn audit_events(&self) -> u64 {
         self.audit_events
@@ -280,6 +334,62 @@ impl OrganizationReferencePeer {
         self.read_authorized(claims.sub, organization)
     }
 
+    /// Update a name using current Cedar policy and the caller's complete projection validator.
+    ///
+    /// HTTP metadata, actual `DPoP` method/URL and replay admission remain consumer duties.
+    /// This operation has no receipt and never retries an uncertain commit.
+    /// # Errors
+    /// Rejects malformed input, current authorization failures and missing/stale preconditions,
+    /// or returns the scripted atomic fault.
+    pub fn update(
+        &mut self,
+        claims: &DeviceAccessTokenClaims,
+        organization: Uuid,
+        if_match: Option<&str>,
+        body: &[u8],
+        now: u64,
+        timestamp: &str,
+    ) -> Result<OrganizationResource, OrganizationReferenceError> {
+        use OrganizationReferenceError as Error;
+        let request =
+            OrganizationUpdateRequest::from_json(body).map_err(|_| Error::InvalidRequest)?;
+        let if_match = parse_organization_if_match(if_match).map_err(|error| match error {
+            OrganizationPreconditionError::Required => Error::PreconditionRequired,
+            OrganizationPreconditionError::Invalid => Error::InvalidRequest,
+        })?;
+        self.authorize(claims, DeviceAccessScope::OrganizationWrite, now)?;
+        let mut resource = self.read_authorized(claims.sub, organization)?;
+        authorize_settings(&resource, now)?;
+        if if_match != resource.etag {
+            return Err(Error::PreconditionFailed);
+        }
+        if request.name == resource.name {
+            return Ok(resource);
+        }
+        let previous_updated_at = resource.updated_at.clone();
+        resource.name = request.name;
+        resource.updated_at = timestamp.into();
+        resource.to_json().map_err(|_| Error::InvalidRequest)?;
+        resource.updated_at = later_timestamp(&previous_updated_at, timestamp).into();
+        resource.etag = format!("\"{}\"", Uuid::now_v7());
+        let fault = self.fault.take();
+        if fault == Some(OrganizationReferenceFault::Rollback) {
+            return Err(Error::StorageUnavailable);
+        }
+        if fault == Some(OrganizationReferenceFault::UnknownRollback) {
+            return Err(Error::UpdateCommitOutcomeUnknown);
+        }
+        self.teams.get_mut(&organization).ok_or(Error::NotFound)?.resource = resource.clone();
+        self.audit_events += 1;
+        match fault {
+            Some(OrganizationReferenceFault::UnknownCommitted) => {
+                Err(Error::UpdateCommitOutcomeUnknown)
+            }
+            Some(OrganizationReferenceFault::LostResponse) => Err(Error::ResponseLost),
+            _ => Ok(resource),
+        }
+    }
+
     /// Discover only the current caller's active teams, independent of its JWT `org` snapshot.
     /// # Errors
     /// Rejects stale principal, absent scope or invalid query.
@@ -342,4 +452,71 @@ impl OrganizationReferencePeer {
         }
         Ok(())
     }
+}
+
+fn later_timestamp<'a>(left: &'a str, right: &'a str) -> &'a str {
+    let key = |text: &'a str| {
+        let fraction = text[19..].strip_prefix('.').unwrap_or("").trim_end_matches('Z');
+        (&text[..19], fraction.trim_end_matches('0'))
+    };
+    if key(left) >= key(right) { left } else { right }
+}
+
+fn authorize_settings(
+    resource: &OrganizationResource,
+    now: u64,
+) -> Result<(), OrganizationReferenceError> {
+    use OrganizationReferenceError as Error;
+    let reference =
+        |kind: &str, id: Uuid| json!({"__entity": {"type": kind, "id": id.to_string()}});
+    let entity = |kind: &str, id: Uuid, attrs: serde_json::Value| json!({"uid": {"type": kind, "id": id.to_string()}, "attrs": attrs, "parents": []});
+    let account = resource.membership.account_id;
+    let membership = resource.membership.id;
+    let now = i64::try_from(now).map_err(|_| Error::InvalidRequest)?;
+    let entities = Entities::from_json_value(
+        json!([
+            entity("Account", account, json!({"status": "active"})),
+            entity("Organization", resource.id, json!({"name": resource.name})),
+            entity(
+                "Membership",
+                membership,
+                json!({
+                    "account": reference("Account", account),
+                    "organization": reference("Organization", resource.id),
+                    "status": "active", "roles": resource.membership.roles, "groups": [],
+                })
+            ),
+        ]),
+        None,
+    )
+    .map_err(|_| Error::InvalidRequest)?;
+    let context = Context::from_json_value(
+        json!({
+            "organization": reference("Organization", resource.id),
+            "membership": reference("Membership", membership), "now": now,
+        }),
+        None,
+    )
+    .map_err(|_| Error::InvalidRequest)?;
+    let uid = |kind: &str, id: Uuid| {
+        format!("{kind}::\"{id}\"").parse().map_err(|_| Error::InvalidRequest)
+    };
+    let request = Request::new(
+        uid("Account", account)?,
+        "Action::\"manage_organization\"".parse().map_err(|_| Error::InvalidRequest)?,
+        uid("Organization", resource.id)?,
+        context,
+        None,
+    )
+    .map_err(|_| Error::InvalidRequest)?;
+    let trusted = OrganizationAuthorizationContext::new(account, resource.id, membership, now)
+        .map_err(|_| Error::InvalidRequest)?;
+    let authorizer = OrganizationAuthorizer::new(resource.id, &PolicySet::new())
+        .map_err(|_| Error::InvalidRequest)?;
+    if authorizer.authorize(&trusted, &request, &entities).map_err(|_| Error::Denied)?
+        != Decision::Allow
+    {
+        return Err(Error::Denied);
+    }
+    Ok(())
 }

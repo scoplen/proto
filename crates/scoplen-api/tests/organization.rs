@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use scoplen_api::organization::{
     MAX_ORGANIZATION_CREATE_BYTES, MAX_ORGANIZATION_PAGE_BYTES, MAX_ORGANIZATION_RESOURCE_BYTES,
-    OrganizationCodecError as Error, OrganizationCreateRequest, OrganizationListQuery,
-    OrganizationMembership, OrganizationPage, OrganizationResource,
-    parse_organization_idempotency_key,
+    MAX_ORGANIZATION_UPDATE_BYTES, OrganizationCodecError as Error, OrganizationCreateRequest,
+    OrganizationListQuery, OrganizationMembership, OrganizationPage, OrganizationPreconditionError,
+    OrganizationResource, OrganizationUpdateRequest, parse_organization_idempotency_key,
+    parse_organization_if_match,
 };
 use scoplen_test_vectors::VectorDocument;
 use serde_json::{Value, json};
@@ -31,12 +32,37 @@ fn resource() -> OrganizationResource {
 fn published_independent_vectors_use_public_codecs() {
     let vectors =
         VectorDocument::parse_str(include_str!("../../../vectors/organizations.json")).unwrap();
-    assert_eq!(vectors.vectors.len(), 45);
+    assert_eq!(vectors.vectors.len(), 79);
     for vector in vectors.vectors {
         let input = vector.input.as_bytes();
         let canonical = match vector.kind.as_str() {
             "organization.create" => {
                 Some(OrganizationCreateRequest::from_json(input).unwrap().to_json().unwrap())
+            }
+            "organization.update" => {
+                Some(OrganizationUpdateRequest::from_json(input).unwrap().to_json().unwrap())
+            }
+            "organization.update.reject" => {
+                assert!(OrganizationUpdateRequest::from_json(input).is_err(), "{}", vector.id);
+                None
+            }
+            "organization.if-match" => {
+                let value: Option<String> = serde_json::from_slice(input).unwrap();
+                let actual = parse_organization_if_match(value.as_deref());
+                match vector.expected.as_str() {
+                    "required" => assert_eq!(actual, Err(OrganizationPreconditionError::Required)),
+                    "rejected" => assert_eq!(actual, Err(OrganizationPreconditionError::Invalid)),
+                    expected => assert_eq!(actual, Ok(expected)),
+                }
+                None
+            }
+            "organization.problem" => {
+                let problem = scoplen_api::ProblemDetails::from_json(input, 4096).unwrap();
+                assert_eq!(
+                    serde_json::to_value(problem).unwrap(),
+                    serde_json::from_str::<Value>(&vector.expected).unwrap()
+                );
+                None
             }
             "organization.resource" => {
                 Some(OrganizationResource::from_json(input).unwrap().to_json().unwrap())
@@ -79,6 +105,7 @@ fn published_independent_vectors_use_public_codecs() {
                 let body = format!("{}{base}", " ".repeat(bytes - base.len()));
                 let accepted = match recipe["kind"].as_str().unwrap() {
                     "create" => OrganizationCreateRequest::from_json(body.as_bytes()).is_ok(),
+                    "update" => OrganizationUpdateRequest::from_json(body.as_bytes()).is_ok(),
                     "resource" => OrganizationResource::from_json(body.as_bytes()).is_ok(),
                     "page" => OrganizationPage::from_json(body.as_bytes()).is_ok(),
                     other => panic!("unknown bound {other}"),
@@ -92,6 +119,36 @@ fn published_independent_vectors_use_public_codecs() {
             assert_eq!(bytes, vector.expected.as_bytes(), "{}", vector.id);
         }
     }
+}
+
+#[test]
+fn name_update_has_distinct_strict_public_codec_and_required_strong_precondition() {
+    let mut update = OrganizationUpdateRequest::new("Cafe\u{301}").unwrap();
+    assert_eq!(update.name, "Cafe\u{301}");
+    assert_eq!(
+        OrganizationUpdateRequest::from_json(&update.to_json().unwrap()),
+        Ok(update.clone())
+    );
+    assert!(!format!("{update:?}").contains("Cafe"));
+    update.name = " team".into();
+    assert!(update.to_json().is_err());
+    assert_eq!(parse_organization_if_match(None), Err(OrganizationPreconditionError::Required));
+    for invalid in ["", "*", "W/\"1\"", "\"1\",\"2\"", " \"1\"", "\"1\" ", "\"a\n\"", "\"é\""] {
+        assert_eq!(
+            parse_organization_if_match(Some(invalid)),
+            Err(OrganizationPreconditionError::Invalid)
+        );
+    }
+    let exact = format!("\"{}\"", "x".repeat(254));
+    assert_eq!(parse_organization_if_match(Some(&exact)), Ok(exact.as_str()));
+    let over = format!("\"{}\"", "x".repeat(255));
+    assert!(parse_organization_if_match(Some(&over)).is_err());
+    assert_eq!(
+        OrganizationUpdateRequest::from_json(&vec![b' '; MAX_ORGANIZATION_UPDATE_BYTES + 1]),
+        Err(Error::TooLarge)
+    );
+    assert!(OrganizationUpdateRequest::new("é".repeat(64)).is_ok());
+    assert!(OrganizationUpdateRequest::new("é".repeat(65)).is_err());
 }
 
 #[test]

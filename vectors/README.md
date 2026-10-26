@@ -248,6 +248,14 @@ is the deterministic CBOR body in lowercase hexadecimal. The `scoplen-api` tests
 public JSON and CBOR contract, including
 unknown error-code preservation and malformed-body rejection.
 
+`organizations.json` is independently produced by `scripts/generate-organization-vectors.mjs`.
+It covers D-130 creation/discovery and D-134 name-only updates, recursive duplicate/unknown-field
+rejection, complete UTF-8 body bounds, strong `If-Match`, and distinct creation/update uncertain
+commit retry classifications. `--check` compares the checked-in vectors and exact parser seeds;
+the public codec tests consume every vector. `auth-scopes.json` includes `orgs:write`, the exact
+PATCH route and older-family/read-only scope denials. These fixtures supply no production
+authentication, durable transaction or HTTP acceptance evidence.
+
 `api-auth.json` contains the K-3 JSON and signature-input vectors. Challenge requests contain
 only a canonical UUIDv7 device id and have a 256-byte encoded-body limit. The signature-input
 vector encodes `spl-auth-v1 || UTF-8 canonical HTTPS origin || raw nonce || raw UUIDv7` in lowercase

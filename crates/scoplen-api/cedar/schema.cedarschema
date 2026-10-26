@@ -82,6 +82,7 @@ action approve_access appliesTo { principal: Account, resource: AccessRequest, c
 action view_recording appliesTo { principal: Account, resource: Session, context: { organization: Organization, membership: Membership, now: Long, host: Host, account: Account } };
 action monitor_session appliesTo { principal: Account, resource: Session, context: { organization: Organization, membership: Membership, now: Long, host: Host, account: Account } };
 action terminate_session appliesTo { principal: Account, resource: Session, context: { organization: Organization, membership: Membership, now: Long, host: Host, account: Account } };
+action manage_organization appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
 action manage_inventory appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
 action manage_policy appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };
 action manage_members appliesTo { principal: Account, resource: Organization, context: { organization: Organization, membership: Membership, now: Long } };

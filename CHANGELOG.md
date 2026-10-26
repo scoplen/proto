@@ -4,6 +4,14 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-134 strict team name-update JSON and strong `If-Match` parsing, exact `orgs:write`
+  scope/operation and the guarded Cedar `manage_organization` action. OpenAPI/TypeScript,
+  independent vectors, parser seeds and reference faults cover no-op, stale projection,
+  role denial and atomic name/time/audit outcomes. Unknown updates require refresh/review
+  (`retryable=false`); creation uncertainty retains its receipt-backed retry. This breaking
+  pre-Stable initial scope-set change requires independent consumer adoption and fresh Device
+  authentication for older refresh families, whose ceilings never expand.
+
 - Allow a validated user-certificate principal to differ from the SSH login username, as required
   for scoped Organization principals. Exact caller-supplied principal validation, consumer-owned
   CA trust, subject-key matching and session-bound signing remain in place. Real SSH and pinned

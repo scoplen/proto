@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// D-130 exact team creation and caller-membership discovery contract.
+// D-130/D-134 exact team creation, settings and caller-membership discovery contract.
 import { isDeepStrictEqual } from "node:util";
 
 const uuid = { type: "string", format: "uuid", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" };
@@ -21,8 +21,9 @@ const resourceResponse = (schema, individual) => ({
 export function organizationDefinitions() {
   const schemas = {
     OrganizationCreateRequest: object({ data: object({ name }, true) }, true),
+    OrganizationUpdateRequest: object({ data: object({ name }, true) }, true),
     OrganizationMembership: object({ id: uuid, account_id: uuid, roles: { type: "array", minItems: 1, maxItems: 32, uniqueItems: true, items: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" }, description: "Writer sorts bytewise; reader accepts distinct order. Unknown identifiers remain display metadata and grant no authority." } }),
-    OrganizationResource: { ...object({ id: uuid, etag, created_at: timestamp, updated_at: timestamp, data: object({ name, membership: { $ref: "#/components/schemas/OrganizationMembership" } }) }), "x-scoplen-max-bytes": 4096 },
+    OrganizationResource: { ...object({ id: uuid, etag: { ...etag, description: "Strong opaque validator binding the complete current caller-specific projection." }, created_at: timestamp, updated_at: { ...timestamp, description: "A valid UTC timestamp: the later current Organization and caller Membership update time." }, data: object({ name, membership: { $ref: "#/components/schemas/OrganizationMembership" } }) }), "x-scoplen-max-bytes": 4096 },
     OrganizationPage: { ...object({ items: { type: "array", maxItems: 500, items: { $ref: "#/components/schemas/OrganizationResource" }, description: "Distinct ascending Organization ids beyond the requested cursor; only caller's active memberships." }, next_cursor: { anyOf: [uuid, { type: "null" }], description: "Non-null only when more eligible items exist, equal to the nonempty page's final id." } }), "x-scoplen-max-bytes": 2097152 },
   };
   const responses = {};
@@ -33,8 +34,11 @@ export function organizationDefinitions() {
     ["Denied", 403, "policy.denied", false, false],
     ["NotFound", 404, "organization.not_found", false, false],
     ["Conflict", 409, "organization.conflict", false, false],
+    ["PreconditionFailed", 412, "organization.precondition_failed", false, false],
+    ["PreconditionRequired", 428, "organization.precondition_required", false, false],
     ["StorageUnavailable", 503, "organization.storage_unavailable", false, true],
     ["CommitOutcomeUnknown", 503, "organization.commit_outcome_unknown", true, true],
+    ["UpdateCommitOutcomeUnknown", 503, "organization.commit_outcome_unknown", true, false],
   ]) {
     const problemName = `Organization${suffix}Problem`;
     schemas[problemName] = { allOf: [{ $ref: "#/components/schemas/ProblemDetails" }, { type: "object", properties: { status: { const: status }, code: { const: code }, changed: { const: changed }, retryable: { const: retryable } } }] };
@@ -64,6 +68,12 @@ export function organizationDefinitions() {
       description: "Current Account own active membership projection. Reject bodies, every query, If-Match and Idempotency-Key; require current Device/Account/DPoP/replay authorization. Absent/foreign/inactive share one static 404 with no existence signal. No refresh cookie authentication or mutation.",
       parameters: [{ name: "org", in: "path", required: true, schema: uuid }],
       responses: { "200": resourceResponse("OrganizationResource", true), ...failures(false), "404": problem("NotFound") },
+    }, patch: {
+      operationId: "updateOrganization", "x-scoplen-required-device-scope": "orgs:write", "x-scoplen-cedar-action": "manage_organization", "x-scoplen-request-max-bytes": 1024, "x-scoplen-response-max-bytes": 4096,
+      description: "Name-only settings update under current Device/Account binding, exact active Membership, actual PATCH DPoP URL/method/replay and Cedar manage_organization. Owner and Administrator permit; other built-in roles deny. Reject every query and Idempotency-Key. Authorize before comparing the caller-specific current Resource ETag: absent If-Match is 428, weak/wildcard/multiple/malformed is 400, authorized stale tag is 412. Exact same-name updates preserve time, ETag and audit. Otherwise atomically update name, Organization time and attributable audit. All projections use later Organization/Membership update time and an ETag binding the full caller projection. Creation time/receipts stay unchanged. Unknown COMMIT is changed=true/retryable=false: refresh and review; no replay or new receipt. No refresh cookie authentication/mutation or Set-Cookie.",
+      parameters: [{ name: "org", in: "path", required: true, schema: uuid }, { name: "If-Match", in: "header", required: true, description: "Exactly one current caller-specific strong ETag; no wildcard, weak or multiple values.", schema: etag }],
+      requestBody: { required: true, description: "Complete UTF-8 JSON <=1024 bytes; reject unknown/duplicate fields recursively.", content: { "application/json": { schema: { $ref: "#/components/schemas/OrganizationUpdateRequest" } } } },
+      responses: { "200": resourceResponse("OrganizationResource", true), ...failures(false), "404": problem("NotFound"), "412": problem("PreconditionFailed"), "415": problem("ContentType"), "428": problem("PreconditionRequired"), "503": { description: "Confirmed rollback is retryable. Unknown name-update COMMIT requires explicit refresh/review; changed=true/retryable=false; never replay automatically.", headers, content: { "application/problem+json": { schema: { oneOf: [{ $ref: "#/components/schemas/OrganizationStorageUnavailableProblem" }, { $ref: "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem" }] } } } } },
     } },
   };
   return { schemas, responses, paths };
@@ -79,6 +89,7 @@ export function generateOrganizationTypes(document) {
   }
   const lines = [
     "export interface OrganizationCreateRequest { data: { name: string }; }",
+    "export interface OrganizationUpdateRequest { data: { name: string }; }",
     "export interface OrganizationMembership {",
     "  id: string;", "  account_id: string;", "  roles: string[];", "  [extension: string]: unknown;", "}",
     "export interface OrganizationResource {",

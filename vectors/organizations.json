@@ -87,6 +87,198 @@
       "expected": "rejected"
     },
     {
+      "id": "organization-update-v1",
+      "kind": "organization.update",
+      "input": "{\"data\":{\"name\":\"Operations\"}}",
+      "expected": "{\"data\":{\"name\":\"Operations\"}}"
+    },
+    {
+      "id": "organization-update-whitespace-v1",
+      "kind": "organization.update",
+      "input": " { \"data\" : { \"name\" : \"Operations\" } }",
+      "expected": "{\"data\":{\"name\":\"Operations\"}}"
+    },
+    {
+      "id": "organization-update-unicode-v1",
+      "kind": "organization.update",
+      "input": "{\"data\":{\"name\":\"团队\"}}",
+      "expected": "{\"data\":{\"name\":\"团队\"}}"
+    },
+    {
+      "id": "organization-update-unknown-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Operations\",\"owner\":\"other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-account-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Operations\"},\"account_id\":\"other\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-duplicate-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Operations\",\"name\":\"Other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-escaped-duplicate-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Operations\",\"n\\u0061me\":\"Other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-empty-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-edge-space-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\" Operations\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-control-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Ops\\n\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-missing-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-null-v1",
+      "kind": "organization.update.reject",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-trailing-v1",
+      "kind": "organization.update.reject",
+      "input": "{}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-bom-v1",
+      "kind": "organization.update.reject",
+      "input": "﻿{\"data\":{\"name\":\"Operations\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-readonly-field-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Operations\",\"membership\":{}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-unknown-nested-duplicate-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Operations\"},\"extra\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-byte-name-bound-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-unicode-space-v1",
+      "kind": "organization.update.reject",
+      "input": "{\"data\":{\"name\":\"Operations　\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-if-match-strong-v1",
+      "kind": "organization.if-match",
+      "input": "\"\\\"current\\\"\"",
+      "expected": "\"current\""
+    },
+    {
+      "id": "organization-if-match-empty-opaque-v1",
+      "kind": "organization.if-match",
+      "input": "\"\\\"\\\"\"",
+      "expected": "\"\""
+    },
+    {
+      "id": "organization-if-match-missing-v1",
+      "kind": "organization.if-match",
+      "input": "null",
+      "expected": "required"
+    },
+    {
+      "id": "organization-if-match-weak-v1",
+      "kind": "organization.if-match",
+      "input": "\"W/\\\"current\\\"\"",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-if-match-wildcard-v1",
+      "kind": "organization.if-match",
+      "input": "\"*\"",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-if-match-multiple-v1",
+      "kind": "organization.if-match",
+      "input": "\"\\\"a\\\", \\\"b\\\"\"",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-if-match-unquoted-v1",
+      "kind": "organization.if-match",
+      "input": "\"current\"",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-if-match-space-v1",
+      "kind": "organization.if-match",
+      "input": "\" \\\"current\\\"\"",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-if-match-bound-v1",
+      "kind": "organization.if-match",
+      "input": "\"\\\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\\"\"",
+      "expected": "\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+    },
+    {
+      "id": "organization-if-match-over-v1",
+      "kind": "organization.if-match",
+      "input": "\"\\\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\\"\"",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-problem-required-v1",
+      "kind": "organization.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":428,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.precondition_required\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":428,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.precondition_required\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "organization-problem-stale-v1",
+      "kind": "organization.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":412,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.precondition_failed\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":412,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.precondition_failed\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "organization-problem-update-unknown-v1",
+      "kind": "organization.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":503,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":503,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.commit_outcome_unknown\",\"changed\":true,\"retryable\":false}"
+    },
+    {
+      "id": "organization-problem-create-unknown-v1",
+      "kind": "organization.problem",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":503,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.commit_outcome_unknown\",\"changed\":true,\"retryable\":true}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Team operation not confirmed\",\"status\":503,\"detail\":\"Refresh and review the team before deciding what to do next.\",\"instance\":\"fixture-request\",\"code\":\"organization.commit_outcome_unknown\",\"changed\":true,\"retryable\":true}"
+    },
+    {
       "id": "organization-resource-v1",
       "kind": "organization.resource",
       "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}",
@@ -246,6 +438,18 @@
       "id": "organization-create-bound-1-v1",
       "kind": "organization.bound",
       "input": "{\"kind\":\"create\",\"base\":\"{\\\"data\\\":{\\\"name\\\":\\\"Operations\\\"}}\",\"bytes\":1025}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-update-bound-0-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"update\",\"base\":\"{\\\"data\\\":{\\\"name\\\":\\\"Operations\\\"}}\",\"bytes\":1024}",
+      "expected": "accepted"
+    },
+    {
+      "id": "organization-update-bound-1-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"update\",\"base\":\"{\\\"data\\\":{\\\"name\\\":\\\"Operations\\\"}}\",\"bytes\":1025}",
       "expected": "rejected"
     },
     {

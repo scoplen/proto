@@ -12,7 +12,7 @@
       "id": "auth-scope-initial-v1",
       "kind": "auth.scope.initial",
       "input": "first-party-device",
-      "expected": "account:read keys:read keys:write orgs:create orgs:read sync:read sync:write"
+      "expected": "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write"
     },
     {
       "id": "auth-scope-token-account-read-v1",
@@ -421,6 +421,36 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}\"}",
       "expected": "orgs:read"
+    },
+    {
+      "id": "auth-scope-token-orgs-write-v1",
+      "kind": "auth.scope.token",
+      "input": "orgs:write",
+      "expected": "orgs:write"
+    },
+    {
+      "id": "auth-scope-operation-organization-update-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}\"}",
+      "expected": "orgs:write"
+    },
+    {
+      "id": "auth-scope-organization-old-family-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read sync:read sync:write\",\"required\":\"orgs:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-organization-read-no-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"orgs:read\",\"required\":\"orgs:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-organization-write-no-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"orgs:write\",\"required\":\"orgs:read\"}",
+      "expected": "missing"
     }
   ]
 }

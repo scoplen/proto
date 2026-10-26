@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Independent D-130 JSON examples and parser-bound recipes; no Rust codec is called.
+// Independent D-130/D-134 JSON examples and parser-bound recipes; no Rust codec is called.
 import { readFile, writeFile } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const vectors = [];
@@ -20,6 +20,32 @@ for (const [suffix, input] of [
   ["control", '{"data":{"name":"Ops\\n"}}'], ["missing", '{"data":{}}'],
   ["null", 'null'], ["trailing", '{}{}'], ["bom", '\ufeff{"data":{"name":"Operations"}}'],
 ]) add(`create-${suffix}`, "create.reject", input);
+for (const vector of [...vectors]) {
+  add(vector.id.replace(/^organization-create/, "update").replace(/-v1$/, ""), vector.kind.replace("organization.create", "update"), vector.input, vector.expected);
+}
+for (const [suffix, input] of [
+  ["readonly-field", '{"data":{"name":"Operations","membership":{}}}'],
+  ["unknown-nested-duplicate", '{"data":{"name":"Operations"},"extra":{"x":1,"x":2}}'],
+  ["byte-name-bound", JSON.stringify({data:{name:"é".repeat(65)}})],
+  ["unicode-space", JSON.stringify({data:{name:"Operations\u3000"}})],
+]) add(`update-${suffix}`, "update.reject", input);
+for (const [suffix, value, expected] of [
+  ["strong", '"current"', '"current"'], ["empty-opaque", '""', '""'],
+  ["missing", null, "required"], ["weak", 'W/"current"', "rejected"],
+  ["wildcard", "*", "rejected"], ["multiple", '"a", "b"', "rejected"],
+  ["unquoted", "current", "rejected"], ["space", ' "current"', "rejected"],
+  ["bound", '"' + "x".repeat(254) + '"', '"' + "x".repeat(254) + '"'],
+  ["over", '"' + "x".repeat(255) + '"', "rejected"],
+]) add(`if-match-${suffix}`, "if-match", JSON.stringify(value), expected);
+for (const [suffix, status, code, changed, retryable] of [
+  ["required", 428, "organization.precondition_required", false, false],
+  ["stale", 412, "organization.precondition_failed", false, false],
+  ["update-unknown", 503, "organization.commit_outcome_unknown", true, false],
+  ["create-unknown", 503, "organization.commit_outcome_unknown", true, true],
+]) {
+  const problem = JSON.stringify({type:"about:blank",title:"Team operation not confirmed",status,detail:"Refresh and review the team before deciding what to do next.",instance:"fixture-request",code,changed,retryable});
+  add(`problem-${suffix}`, "problem", problem, problem);
+}
 add("resource", "resource", canonical, canonical);
 const unordered = structuredClone(resource); unordered.data.membership.roles = ["security_auditor", "future_reader", "administrator"];
 const ordered = structuredClone(unordered); ordered.data.membership.roles.sort();
@@ -52,13 +78,17 @@ for (const [suffix, parameters, expected] of [
   ["zero", [["limit", "0"]], null], ["over", [["limit", "501"]], null],
   ["repeat", [["limit", "1"], ["limit", "2"]], null], ["unknown", [["filter", "all"]], null],
 ]) add(`query-${suffix}`, "query", JSON.stringify(parameters), expected ? JSON.stringify(expected) : "rejected");
-for (const [kind, base, bound] of [["create", JSON.stringify(request), 1024], ["resource", canonical, 4096], ["page", '{"items":[],"next_cursor":null}', 2097152]]) {
+for (const [kind, base, bound] of [["create", JSON.stringify(request), 1024], ["update", JSON.stringify(request), 1024], ["resource", canonical, 4096], ["page", '{"items":[],"next_cursor":null}', 2097152]]) {
   for (const extra of [0, 1]) add(`${kind}-bound-${extra}`, "bound", JSON.stringify({ kind, base, bytes: bound + extra }), extra ? "rejected" : "accepted");
 }
 const outputs = [["vectors/organizations.json", JSON.stringify({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2) + "\n"]];
 if (new Set(vectors.map(vector => vector.id)).size !== vectors.length) throw new Error("duplicate D-130 vector id");
-for (const vector of vectors.filter(v => ["create", "resource", "page", "create.reject", "resource.reject", "page.reject"].includes(v.kind.slice("organization.".length)))) outputs.push([`fuzz/corpus/api_json/seed-${vector.id}`, vector.input]);
-for (const [kind, base, bound] of [["create", JSON.stringify(request), 1024], ["resource", canonical, 4096]]) {
+for (const vector of vectors.filter(v => ["create", "update", "resource", "page", "problem", "create.reject", "update.reject", "resource.reject", "page.reject"].includes(v.kind.slice("organization.".length)))) outputs.push([`fuzz/corpus/api_json/seed-${vector.id}`, vector.input]);
+for (const vector of vectors.filter(v => v.kind === "organization.if-match")) {
+  const header = JSON.parse(vector.input);
+  if (header !== null) outputs.push([`fuzz/corpus/api_json/seed-${vector.id}`, header]);
+}
+for (const [kind, base, bound] of [["create", JSON.stringify(request), 1024], ["update", JSON.stringify(request), 1024], ["resource", canonical, 4096]]) {
   for (const extra of [0, 1]) outputs.push([`fuzz/corpus/api_json/seed-organization-${kind}-bound-${extra}`, " ".repeat(bound + extra - Buffer.byteLength(base)) + base]);
 }
 for (const [path, expected] of outputs) {
