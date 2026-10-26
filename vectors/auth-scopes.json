@@ -12,7 +12,7 @@
       "id": "auth-scope-initial-v1",
       "kind": "auth.scope.initial",
       "input": "first-party-device",
-      "expected": "account:read keys:read keys:write sync:read sync:write"
+      "expected": "account:read keys:read keys:write orgs:create orgs:read sync:read sync:write"
     },
     {
       "id": "auth-scope-token-account-read-v1",
@@ -391,6 +391,36 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/auth/pairings/{pairing}\"}",
       "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-token-orgs-create-v1",
+      "kind": "auth.scope.token",
+      "input": "orgs:create",
+      "expected": "orgs:create"
+    },
+    {
+      "id": "auth-scope-token-orgs-read-v1",
+      "kind": "auth.scope.token",
+      "input": "orgs:read",
+      "expected": "orgs:read"
+    },
+    {
+      "id": "auth-scope-organization-post-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs\"}",
+      "expected": "orgs:create"
+    },
+    {
+      "id": "auth-scope-organization-get-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs\"}",
+      "expected": "orgs:read"
+    },
+    {
+      "id": "auth-scope-organization-get-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}\"}",
+      "expected": "orgs:read"
     }
   ]
 }

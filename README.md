@@ -77,6 +77,19 @@ and consumer responsibilities; durable admission, current-state CAS, receipts an
 audit remain production consumer work. Retired Personal invitation, QR/CPace pairing and
 replacement-token APIs/proofs/fixtures are removed without aliases. Team invitation needs its
 own independent contract.
+
+D-130's `organization` module supplies bounded team creation, caller-specific Resource/Page
+and decoded-query codecs. It registers `orgs:create`/`orgs:read` and three exact Device operations;
+existing refresh families retain their previous ceiling. The resource contains only the team's
+name and current caller membership, with context validation against the authenticated Account.
+Unknown role identifiers remain display metadata. Page readers enforce each original item's
+4,096-byte bound as well as the 2 MiB complete-page limit. Public independent vectors and
+parser seeds cover syntax and bounds. `organization_reference` models policy, current caller
+binding, caller-only discovery and atomic creation/owner/audit/24-hour receipt outcomes with
+scripted rollback, unknown commit and lost response. It supplies no token/proof verification,
+durable database, HTTP route or audit chain. Production team creation, native interaction,
+invitations, dissolution and asset permissions remain separate consumer outcomes.
+
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
@@ -944,6 +957,9 @@ node scripts/generate-operator-logout-vectors.mjs --check
 node --test scripts/generate-operator-logout-vectors.test.mjs
 node scripts/generate-password-bootstrap-vectors.mjs --check
 node --test scripts/generate-password-bootstrap-vectors.test.mjs
+node scripts/generate-organization-vectors.mjs --check
+node --test scripts/generate-organization-vectors.test.mjs
+node --test crates/scoplen-api/openapi/generate-organizations.test.mjs
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in

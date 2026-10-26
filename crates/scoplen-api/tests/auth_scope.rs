@@ -87,7 +87,18 @@ fn published_scope_vectors_use_the_public_registry() {
 fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
     let tokens: Vec<_> =
         DeviceAccessScope::ALL.into_iter().map(DeviceAccessScope::as_str).collect();
-    assert_eq!(tokens, ["account:read", "keys:read", "keys:write", "sync:read", "sync:write"]);
+    assert_eq!(
+        tokens,
+        [
+            "account:read",
+            "keys:read",
+            "keys:write",
+            "orgs:create",
+            "orgs:read",
+            "sync:read",
+            "sync:write"
+        ]
+    );
     assert_eq!(tokens.join(" "), INITIAL_DEVICE_ACCESS_SCOPE);
     assert!(tokens.windows(2).all(|pair| pair[0].as_bytes() < pair[1].as_bytes()));
     for scope in DeviceAccessScope::ALL {
@@ -112,7 +123,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_required_scope() 
             );
         }
     }
-    assert_eq!(routes.len(), 17);
+    assert_eq!(routes.len(), 20);
 }
 
 #[test]

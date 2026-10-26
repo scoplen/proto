@@ -25,6 +25,9 @@ use scoplen_api::operator_auth::{
     OperatorLogoutRequest, OperatorLogoutResponse, OperatorSetupFinishRequest,
     OperatorSetupFinishResponse, OperatorSetupOptionsRequest, OperatorSetupOptionsResponse,
 };
+use scoplen_api::organization::{
+    OrganizationCreateRequest, OrganizationPage, OrganizationResource,
+};
 
 macro_rules! round_trip {
     ($message:ty, $input:expr) => {
@@ -47,6 +50,9 @@ fuzz_target!(|bytes: &[u8]| {
         );
     }
     round_trip!(AccountProfile, bytes);
+    round_trip!(OrganizationCreateRequest, bytes);
+    round_trip!(OrganizationResource, bytes);
+    round_trip!(OrganizationPage, bytes);
     round_trip!(AccountDeviceStatements, bytes);
     round_trip!(AccountRequestChallengeRequest, bytes);
     round_trip!(AccountRequestChallengeResponse, bytes);

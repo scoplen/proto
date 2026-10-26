@@ -19,6 +19,7 @@ export const controlPlanePaths = [
   "/auth/operator/setup/finish",
   "/auth/operator/setup/options",
   "/auth/refresh",
+  "/orgs",
   "/orgs/{org}",
   "/orgs/{org}/access-profiles",
   "/orgs/{org}/access-profiles/{id}",
