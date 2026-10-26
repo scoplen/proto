@@ -68,7 +68,7 @@ built-in agent signer runs its complete serialized exchange on Tokio's blocking 
 authentication future does not interrupt that exchange: the task retains the channel until I/O
 completes or its existing deadline fails. Other synchronous signer implementations use the hook's
 default and must override it if their signing I/O can block.
-The concrete `russh` client adapter now owns TCP and caller-supplied stream
+The concrete client adapter uses released `russh` 0.65.0 and owns TCP and caller-supplied stream
 handshakes, validates host keys and certificates before the trust callback, supports password
 authentication, and exposes opaque session and `direct-tcpip` channels with PTY, shell, exec,
 window-change, bounded data, EOF, close, and peer-event operations. `ClientChannelStream` adapts a
@@ -130,11 +130,15 @@ or an uncertain exchange, fencing later authentication, channel and forwarding c
 Complete peer rejection disarms the guard even when `partial_success` is false, allowing another
 factor without opening channels prematurely. There is no synchronous compatibility wrapper.
 The caller owns the user-input timeout/cancel action and creates a fresh connection after
-interruption. In russh 0.64.1, a pending interactive response can defer socket reads, so peer EOF
+interruption. A pending interactive response can defer socket reads, so peer EOF
 alone may remain unobserved until the reply or consumer cancellation; no immediate EOF detection
 is promised. Observed engine shutdown cancels the pending responder. This connection lifetime
 rule is separate from the D-116 agent signer's serialized blocking exchange described above.
 The SSH wire format and existing authentication vectors are unchanged.
+After a server accepts a public-key or user-certificate offer, a provider signing refusal returns
+the original local error and leaves the connection available for another authentication method.
+Enabled keepalive timers are re-armed while awaiting authentication, avoiding an idle busy loop;
+keepalive probes start only after authentication succeeds.
 `EcdsaSshSigner` accepts only
 OpenSSH ECDSA private keys and selects NIST P-256, P-384, or P-521 from the key; the existing
 `P256SshSigner` still wraps Scoplen's P-256 key type. `RsaSshSigner` accepts only RSA

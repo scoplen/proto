@@ -16,7 +16,7 @@ SSH connection. All waits have a 15-second deadline, and the stall probe samples
 
 The guards are 4 MiB for client-to-server and 6 MiB for server-to-client. They are regression
 limits for this fixture, not a product memory budget. The server uses a 2 MiB receive window and
-an eight-message channel queue in the first case. The client uses `russh` 0.64.1's default 2 MiB
+an eight-message channel queue in the first case. The client uses the engine's default 2 MiB
 window, 32 KiB maximum packet, and 100-message channel queue in the second. The client wrapper
 splits caller data into chunks of at most 64 KiB and awaits each engine send. These finite queues
 and the peer window explain why an 8 MiB transfer cannot be accepted while its consumer is paused.

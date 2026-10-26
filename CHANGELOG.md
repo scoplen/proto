@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Upgrade the concrete SSH engine to released russh 0.65.0. Enabled keepalive timers no longer
+  busy-poll while waiting for authentication. A signing provider refusal after a server accepts
+  a public-key or user-certificate offer preserves the original error and permits password
+  authentication on the same connection. Public real-SSH regressions cover these paths.
+  The existing native Pageant patch is retained; this does not adopt the separate upstream
+  agent session-binding API or establish fixes for the patched Pageant stream implementation.
+
 - Connect D-128 password-options source admission before lazy body collection and keyed
   username admission before the existing salt/attempt transaction. Existing, unknown, inactive
   and retired usernames share the same shape and quotas; failures preserve prior counts and

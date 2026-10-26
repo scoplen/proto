@@ -31,13 +31,17 @@ mod windows {
         async fn auth_publickey(
             &mut self,
             user: &str,
-            key: &PublicKey,
+            key: russh::server::VerifiedPublicKey<'_>,
         ) -> Result<russh::server::Auth, Self::Error> {
-            Ok(if user == "scoplen" && key.to_bytes().is_ok_and(|blob| blob == self.expected_key) {
-                russh::server::Auth::Accept
-            } else {
-                russh::server::Auth::reject()
-            })
+            Ok(
+                if user == "scoplen"
+                    && key.public_key.to_bytes().is_ok_and(|blob| blob == self.expected_key)
+                {
+                    russh::server::Auth::Accept
+                } else {
+                    russh::server::Auth::reject()
+                },
+            )
         }
 
         async fn channel_open_session(
