@@ -4,8 +4,8 @@
 //! Source admission precedes body collection. The adapter supplies decoded Device ids, the
 //! original password-attempt binding and a verification callback before an Account bucket can
 //! be selected. That callback is trusted fixture code, not cryptographic verification supplied
-//! by this module. This peer is not connected to the Account registration peer, HTTP, durable
-//! storage or a production audit chain. Its complete image covers admission state only.
+//! by this module. This peer shares no Account business transaction, HTTP transport, durable
+//! storage or production audit chain. Its complete image covers admission state only.
 
 use std::{
     collections::{BTreeMap, BTreeSet},

@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Connect the D-128 request-challenge reference entry to source admission before lazy body
+  collection, strict structural decoding and Device admission before real nonce issuance.
+  Rejections and challenge failures preserve earlier counts; returned nonces remain usable
+  by real signed registration fixtures. The peers retain separate non-atomic checkpoint
+  images, and the other four Account POSTs retain their admitted-only reference boundary.
+
 - Add an independent D-128 admission reference with explicit source, decoded/attempt-bound
   private and trusted Account-verification stages. Fixed endpoint windows, cooldowns, common
   retry headers, no-refund admission, the 131,072-row bound and indexed expiry survive complete

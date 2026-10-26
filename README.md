@@ -38,7 +38,8 @@ content-free pressure class reports the ninety-percent and exhausted thresholds;
 precommit, audit, unknown-COMMIT and lost-response faults test atomic outcome behavior.
 Complete structural parsing precedes challenge lookup; a live attempt's denied binding or
 signature consumes that challenge with its denial audit, and an audit failure rolls both back.
-This peer does not supply HTTP transport, durable storage, an audit chain or rate admission.
+This peer does not supply HTTP transport, durable storage or an audit chain. Its low-level
+operations require prior admission; the connected challenge entry is described below.
 Maintenance controls model confirmed precommit faults; their own uncertain commits are not covered.
 Password options/login now share the registration peer's complete image and Account lock.
 Options use one retained deployment probe key, fixed shapes and stable synthetic salts. Login
@@ -75,8 +76,18 @@ It uses an actual peer address, normalizes IPv4-mapped IPv6 and accepts no forwa
 An Account bucket is selected only after a fixture-supplied verification callback succeeds.
 That callback is trusted adapter code: this module supplies no password/signature verification,
 capability/nonce consumption, HTTP transport, durable storage or production audit chain. It is
-not integrated with the registration peer's business transactions or complete Account image;
-such integration, proof-job concurrency and coordinated probe-key replacement remain separate.
+not part of the registration peer's business transactions or complete Account image;
+full Account-entry integration, proof-job concurrency and coordinated probe-key replacement
+remain separate.
+`ReferenceAccountRegistrationPeer::challenge_with_admission` connects only request-challenge
+issuance: source admission precedes lazy body collection, strict structural decoding precedes
+Device admission, and only admitted requests reach the existing real nonce/expiry transaction.
+Earlier counts remain charged after malformed input, private rejection or challenge failure;
+issuing a challenge does not clear authentication streaks. Returned nonces work with the existing
+signed registration peer. The rate and business peers still have separate checkpoint images,
+with no atomic combined restore. Registration, password options/login and Device admission still
+require caller admission through their original low-level reference APIs. No native HTTP or
+production authentication integration is supplied by this reference entry.
 Production retention, migration and operator warning delivery remain consumer work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
 complete recipient equality, retained Personal epochs and exact historical confirmation binding.
