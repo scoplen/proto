@@ -542,6 +542,7 @@ export interface AccountEntryRateLimitHeaders {
 
 // BEGIN GENERATED Organizations
 export interface OrganizationCreateRequest { data: { name: string }; }
+export interface OrganizationUpdateRequest { data: { name: string }; }
 export interface OrganizationMembership {
   id: string;
   account_id: string;
@@ -574,7 +575,13 @@ export type OrganizationNotFoundProblem = ProblemDetails & { status: 404; code: 
 
 export type OrganizationConflictProblem = ProblemDetails & { status: 409; code: "organization.conflict"; changed: false; retryable: false; };
 
+export type OrganizationPreconditionFailedProblem = ProblemDetails & { status: 412; code: "organization.precondition_failed"; changed: false; retryable: false; };
+
+export type OrganizationPreconditionRequiredProblem = ProblemDetails & { status: 428; code: "organization.precondition_required"; changed: false; retryable: false; };
+
 export type OrganizationStorageUnavailableProblem = ProblemDetails & { status: 503; code: "organization.storage_unavailable"; changed: false; retryable: true; };
 
 export type OrganizationCommitOutcomeUnknownProblem = ProblemDetails & { status: 503; code: "organization.commit_outcome_unknown"; changed: true; retryable: true; };
+
+export type OrganizationUpdateCommitOutcomeUnknownProblem = ProblemDetails & { status: 503; code: "organization.commit_outcome_unknown"; changed: true; retryable: false; };
 // END GENERATED Organizations

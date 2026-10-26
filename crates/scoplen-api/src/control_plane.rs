@@ -173,6 +173,7 @@ mod tests {
             "action view_inventory",
             "action request_access",
             "action approve_access",
+            "action manage_organization",
             "action manage_inventory",
             "action view_audit",
         ] {

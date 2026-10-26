@@ -6,7 +6,7 @@
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
 pub const INITIAL_DEVICE_ACCESS_SCOPE: &str =
-    "account:read keys:read keys:write orgs:create orgs:read sync:read sync:write";
+    "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,6 +21,8 @@ pub enum DeviceAccessScope {
     OrganizationCreate,
     /// Discover the current Account's own active team memberships.
     OrganizationRead,
+    /// Update Organization settings under current membership and policy authorization.
+    OrganizationWrite,
     /// Read authorized vault data and establish authorized notification subscriptions.
     SyncRead,
     /// Mutate authorized vault state, subject to each operation's additional checks.
@@ -29,12 +31,13 @@ pub enum DeviceAccessScope {
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::AccountRead,
         Self::KeysRead,
         Self::KeysWrite,
         Self::OrganizationCreate,
         Self::OrganizationRead,
+        Self::OrganizationWrite,
         Self::SyncRead,
         Self::SyncWrite,
     ];
@@ -48,6 +51,7 @@ impl DeviceAccessScope {
             Self::KeysWrite => "keys:write",
             Self::OrganizationCreate => "orgs:create",
             Self::OrganizationRead => "orgs:read",
+            Self::OrganizationWrite => "orgs:write",
             Self::SyncRead => "sync:read",
             Self::SyncWrite => "sync:write",
         }
@@ -86,6 +90,8 @@ pub enum DeviceAccessOperation {
     OrganizationList,
     /// Read the current Account's own Organization membership projection.
     OrganizationRead,
+    /// Update only an Organization's name under the current projection's precondition.
+    OrganizationUpdate,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -120,12 +126,13 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 21] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
         Self::OrganizationList,
         Self::OrganizationRead,
+        Self::OrganizationUpdate,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -150,6 +157,7 @@ impl DeviceAccessOperation {
             Self::AccountProfileRead | Self::AccountDevicesRead => DeviceAccessScope::AccountRead,
             Self::OrganizationCreate => DeviceAccessScope::OrganizationCreate,
             Self::OrganizationList | Self::OrganizationRead => DeviceAccessScope::OrganizationRead,
+            Self::OrganizationUpdate => DeviceAccessScope::OrganizationWrite,
             Self::AccountKeysRead => DeviceAccessScope::KeysRead,
             Self::AccountKeysWrite => DeviceAccessScope::KeysWrite,
             Self::SyncSession
@@ -185,6 +193,7 @@ impl DeviceAccessOperation {
             | Self::ObjectVersionsRead
             | Self::Notifications => "GET",
             Self::AccountKeysWrite => "PUT",
+            Self::OrganizationUpdate => "PATCH",
             Self::VaultMemberRemove => "DELETE",
             Self::SyncSession
             | Self::OrganizationCreate
@@ -204,7 +213,7 @@ impl DeviceAccessOperation {
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
             Self::OrganizationCreate | Self::OrganizationList => "/api/v1/orgs",
-            Self::OrganizationRead => "/api/v1/orgs/{org}",
+            Self::OrganizationRead | Self::OrganizationUpdate => "/api/v1/orgs/{org}",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",

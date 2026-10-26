@@ -131,7 +131,7 @@ if (document.paths["/auth/device"].post.responses?.["401"]?.$ref !== "#/componen
   throw new Error("/auth/device must describe authentication failure");
 }
 const refresh = document.paths?.["/auth/refresh"]?.post;
-const initialDeviceScope = "account:read keys:read keys:write orgs:create orgs:read sync:read sync:write";
+const initialDeviceScope = "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write";
 const deviceAuthentication = document.paths["/auth/device"].post;
 if (deviceAuthentication["x-scoplen-initial-device-scope"] !== initialDeviceScope ||
     !deviceAuthentication.responses["200"].description.includes(`exactly ${initialDeviceScope}`) ||

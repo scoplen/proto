@@ -26,7 +26,8 @@ use scoplen_api::operator_auth::{
     OperatorSetupFinishResponse, OperatorSetupOptionsRequest, OperatorSetupOptionsResponse,
 };
 use scoplen_api::organization::{
-    OrganizationCreateRequest, OrganizationPage, OrganizationResource,
+    OrganizationCreateRequest, OrganizationPage, OrganizationResource, OrganizationUpdateRequest,
+    parse_organization_if_match,
 };
 
 macro_rules! round_trip {
@@ -51,6 +52,7 @@ fuzz_target!(|bytes: &[u8]| {
     }
     round_trip!(AccountProfile, bytes);
     round_trip!(OrganizationCreateRequest, bytes);
+    round_trip!(OrganizationUpdateRequest, bytes);
     round_trip!(OrganizationResource, bytes);
     round_trip!(OrganizationPage, bytes);
     round_trip!(AccountDeviceStatements, bytes);
@@ -99,6 +101,10 @@ fuzz_target!(|bytes: &[u8]| {
     );
 
     if let Ok(text) = std::str::from_utf8(bytes) {
+        if let Ok(tag) = parse_organization_if_match(Some(text)) {
+            assert_eq!(tag, text);
+            assert_eq!(parse_organization_if_match(Some(tag)), Ok(tag));
+        }
         round_trip!(AuthChallengeRequest, text);
         round_trip!(AuthChallengeResponse, text);
         round_trip!(AuthDeviceRequest, text);

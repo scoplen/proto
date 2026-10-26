@@ -17,11 +17,13 @@ test("D-130 producer independently preserves canonical examples and byte bounds"
     const vectorPath = join(root, "vectors/organizations.json");
     const text = await readFile(vectorPath, "utf8");
     const { vectors } = JSON.parse(text);
-    assert.equal(vectors.length, 45);
+    assert.equal(vectors.length, 79);
     assert.equal(new Set(vectors.map(vector => vector.id)).size, vectors.length);
     const roles = vectors.find(vector => vector.id === "organization-resource-roles-order-v1");
     assert.deepEqual(JSON.parse(roles.expected).data.membership.roles, ["administrator", "future_reader", "security_auditor"]);
-    for (const [kind, bytes] of [["create", 1024], ["resource", 4096]]) {
+    assert.equal(await readFile(join(root, "fuzz/corpus/api_json/seed-organization-if-match-strong-v1"), "utf8"), '"current"');
+    assert.equal(await readFile(join(root, "fuzz/corpus/api_json/seed-organization-if-match-multiple-v1"), "utf8"), '"a", "b"');
+    for (const [kind, bytes] of [["create", 1024], ["update", 1024], ["resource", 4096]]) {
       for (const extra of [0, 1]) assert.equal((await readFile(join(root, `fuzz/corpus/api_json/seed-organization-${kind}-bound-${extra}`))).byteLength, bytes + extra);
     }
     await writeFile(vectorPath, text.replaceAll("\n", "\r\n"));

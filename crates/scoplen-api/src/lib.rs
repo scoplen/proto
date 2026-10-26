@@ -78,6 +78,8 @@ pub const ERROR_CODES: &[&str] = &[
     "organization.conflict",
     "organization.invalid_request",
     "organization.not_found",
+    "organization.precondition_failed",
+    "organization.precondition_required",
     "organization.storage_unavailable",
     "policy.denied",
     "sync.client_unsupported",

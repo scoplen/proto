@@ -32,15 +32,15 @@ when { context.host != resource.host || context.account != resource.account };
 permit(principal is Account,
        action in [Action::"view_inventory", Action::"connect", Action::"request_access", Action::"approve_access",
                   Action::"view_recording", Action::"monitor_session", Action::"terminate_session",
-                  Action::"manage_inventory", Action::"manage_policy", Action::"manage_members",
+                  Action::"manage_organization", Action::"manage_inventory", Action::"manage_policy", Action::"manage_members",
                   Action::"manage_ca", Action::"manage_gateways", Action::"view_audit"], resource)
 when { context.membership.roles.contains("owner") };
 
-// Administrator: inventory, policy, membership, CA, and gateway administration.
+// Administrator: organization settings, inventory, policy, membership, CA, and gateways.
 permit(principal is Account, action, resource)
 when {
     context.membership.roles.contains("administrator") &&
-    [Action::"view_inventory", Action::"manage_inventory", Action::"manage_policy", Action::"manage_members",
+    [Action::"view_inventory", Action::"manage_organization", Action::"manage_inventory", Action::"manage_policy", Action::"manage_members",
      Action::"manage_ca", Action::"manage_gateways"].contains(action)
 };
 

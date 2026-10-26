@@ -146,7 +146,7 @@ fn public_fixture_covers_every_role_action_and_inventory_type() {
     let base = Fixture::new();
     assert_eq!(base.0["version"], 1);
     let actions = base.0["role_actions"]["owner"].as_array().expect("owner actions");
-    assert_eq!(actions.len(), 13);
+    assert_eq!(actions.len(), 14);
     for (role, allowed) in base.0["role_actions"].as_object().expect("roles") {
         let mut fixture = base.clone();
         fixture.role(role);
@@ -235,7 +235,26 @@ fn public_negative_vectors_cannot_be_overridden_by_permit_all() {
         let attribute = case["attribute"].as_str().expect("attribute");
         fixture.entity_mut(kind)["attrs"][attribute] = case["value"].clone();
         assert!(fixture.decide(PERMIT_ALL, "view_inventory", "Host").is_err(), "{case}");
+        assert!(
+            fixture.decide(PERMIT_ALL, "manage_organization", "Organization").is_err(),
+            "{case}"
+        );
     }
+}
+
+#[test]
+fn organization_settings_action_cannot_target_a_foreign_organization() {
+    let fixture = Fixture::new();
+    let authorizer = fixture.authorizer(PERMIT_ALL);
+    let request = Request::new(
+        fixture.uid("Account"),
+        "Action::\"manage_organization\"".parse().unwrap(),
+        format!("Organization::\"{FOREIGN_ID}\"").parse::<EntityUid>().unwrap(),
+        Context::from_json_value(fixture.context("manage_organization"), None).unwrap(),
+        None,
+    )
+    .unwrap();
+    assert!(authorizer.authorize(&fixture.trusted(1), &request, &fixture.entities()).is_err());
 }
 
 #[test]

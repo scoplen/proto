@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use scoplen_api::{
     auth::INITIAL_DEVICE_ACCESS_SCOPE,
-    organization::{OrganizationCreateRequest, OrganizationListQuery},
+    organization::{OrganizationCreateRequest, OrganizationListQuery, OrganizationUpdateRequest},
     organization_reference::{
         OrganizationReferenceError as Error, OrganizationReferenceFault as Fault,
         OrganizationReferencePeer,
@@ -162,4 +162,181 @@ fn paging_is_account_filtered_and_live() {
     assert_eq!(second.items.len(), 1);
     assert!(second.next_cursor.is_none());
     assert!(second.items[0].id > first.items[1].id);
+}
+
+fn renamed_body() -> Vec<u8> {
+    OrganizationUpdateRequest::new("Platform").unwrap().to_json().unwrap()
+}
+
+#[test]
+fn update_noop_stale_projection_and_creation_confirmation_preserve_exact_outcomes() {
+    let caller = claims(1);
+    let mut peer = peer(&caller);
+    peer.set_allow_creation(true);
+    let original = peer.create(&caller, id(10), &body(), 101, TIME).unwrap();
+    let renamed = peer
+        .update(
+            &caller,
+            original.id,
+            Some(&original.etag),
+            &renamed_body(),
+            102,
+            "2026-10-26T00:01:00Z",
+        )
+        .unwrap();
+    assert_eq!(renamed.name, "Platform");
+    assert_eq!(renamed.created_at, original.created_at);
+    assert_eq!(renamed.updated_at, "2026-10-26T00:01:00Z");
+    assert_ne!(renamed.etag, original.etag);
+    assert_eq!(peer.audit_events(), 2);
+    assert_eq!(
+        peer.update(
+            &caller,
+            original.id,
+            Some(&renamed.etag),
+            &renamed_body(),
+            103,
+            "2026-10-26T00:02:00Z"
+        ),
+        Ok(renamed.clone())
+    );
+    assert_eq!(peer.audit_events(), 2);
+    assert_eq!(
+        peer.update(&caller, original.id, Some(&original.etag), &renamed_body(), 103, TIME),
+        Err(Error::PreconditionFailed)
+    );
+    assert_eq!(peer.create(&caller, id(10), &body(), 104, TIME), Ok(renamed.clone()));
+    assert_eq!(peer.read(&caller, original.id, 104), Ok(renamed.clone()));
+    assert_eq!(peer.list(&caller, OrganizationListQuery::default(), 104).unwrap().items, [renamed]);
+    assert_eq!(peer.audit_events(), 2);
+}
+
+#[test]
+fn current_policy_and_scope_precede_protected_etag_comparison() {
+    let caller = claims(1);
+    let mut peer = peer(&caller);
+    peer.set_allow_creation(true);
+    let original = peer.create(&caller, id(10), &body(), 101, TIME).unwrap();
+    for role in
+        ["owner", "administrator", "member", "approver", "security_auditor", "future_reader"]
+    {
+        peer.set_membership_roles(original.id, vec![role.into()], TIME).unwrap();
+        let current = peer.read(&caller, original.id, 102).unwrap();
+        assert_ne!(current.etag, original.etag);
+        let expected = if ["owner", "administrator"].contains(&role) {
+            Error::PreconditionFailed
+        } else {
+            Error::Denied
+        };
+        assert_eq!(
+            peer.update(&caller, original.id, Some(&original.etag), &renamed_body(), 102, TIME),
+            Err(expected),
+            "{role}"
+        );
+        if expected == Error::PreconditionFailed {
+            assert!(
+                peer.update(&caller, original.id, Some(&current.etag), &body(), 102, TIME).is_ok()
+            );
+        }
+    }
+    let mut old = caller.clone();
+    old.scope =
+        "account:read keys:read keys:write orgs:create orgs:read sync:read sync:write".into();
+    assert!(peer.read(&old, original.id, 103).is_ok());
+    assert_eq!(
+        peer.update(&old, original.id, Some(&original.etag), &body(), 103, TIME),
+        Err(Error::Denied)
+    );
+    let foreign = claims(20);
+    peer.set_principal(&foreign, true);
+    assert_eq!(
+        peer.update(&foreign, original.id, Some(&original.etag), &body(), 103, TIME),
+        Err(Error::NotFound)
+    );
+    peer.set_membership_active(original.id, false);
+    assert_eq!(
+        peer.update(&caller, original.id, Some(&original.etag), &body(), 103, TIME),
+        Err(Error::NotFound)
+    );
+    peer.set_principal(&caller, false);
+    assert_eq!(
+        peer.update(&caller, original.id, Some(&original.etag), &body(), 103, TIME),
+        Err(Error::AuthenticationRequired)
+    );
+}
+
+#[test]
+fn update_faults_have_no_receipts_and_unknown_commit_requires_refresh() {
+    for (fault, error, changed) in [
+        (Fault::Rollback, Error::StorageUnavailable, false),
+        (Fault::UnknownRollback, Error::UpdateCommitOutcomeUnknown, false),
+        (Fault::UnknownCommitted, Error::UpdateCommitOutcomeUnknown, true),
+        (Fault::LostResponse, Error::ResponseLost, true),
+    ] {
+        let caller = claims(1);
+        let mut peer = peer(&caller);
+        peer.set_allow_creation(true);
+        let original = peer.create(&caller, id(10), &body(), 101, TIME).unwrap();
+        peer.set_fault(fault);
+        assert_eq!(
+            peer.update(
+                &caller,
+                original.id,
+                Some(&original.etag),
+                &renamed_body(),
+                102,
+                "2026-10-26T00:01:00Z"
+            ),
+            Err(error)
+        );
+        let reopened = peer.clone();
+        let current = reopened.read(&caller, original.id, 103).unwrap();
+        assert_eq!(current.name == "Platform", changed);
+        assert_eq!(reopened.audit_events(), if changed { 2 } else { 1 });
+        if let Some(problem) = error.problem("fixture-request").unwrap() {
+            assert_eq!(problem.changed, error == Error::UpdateCommitOutcomeUnknown);
+            assert_eq!(problem.retryable, error == Error::StorageUnavailable);
+        }
+    }
+    for (error, status, code) in [
+        (Error::PreconditionRequired, 428, "organization.precondition_required"),
+        (Error::PreconditionFailed, 412, "organization.precondition_failed"),
+    ] {
+        let problem = error.problem("fixture-request").unwrap().unwrap();
+        assert_eq!(problem.status, status);
+        assert_eq!(problem.code.as_str(), code);
+        assert!(!problem.changed && !problem.retryable);
+    }
+}
+
+#[test]
+fn caller_projection_tracks_later_membership_time_in_every_read_surface() {
+    let caller = claims(1);
+    let mut peer = peer(&caller);
+    peer.set_allow_creation(true);
+    let original = peer.create(&caller, id(10), &body(), 101, TIME).unwrap();
+    peer.set_membership_roles(original.id, vec!["administrator".into()], "2026-10-26T00:02:00.12Z")
+        .unwrap();
+    let membership = peer.read(&caller, original.id, 102).unwrap();
+    let renamed = peer
+        .update(
+            &caller,
+            original.id,
+            Some(&membership.etag),
+            &renamed_body(),
+            103,
+            "2026-10-26T00:02:00.1Z",
+        )
+        .unwrap();
+    assert_eq!(renamed.updated_at, "2026-10-26T00:02:00.12Z");
+    assert_eq!(peer.create(&caller, id(10), &body(), 104, TIME), Ok(renamed.clone()));
+    assert_eq!(peer.list(&caller, OrganizationListQuery::default(), 104).unwrap().items, [renamed]);
+    assert_eq!(
+        peer.update(&caller, original.id, None, &body(), 105, TIME),
+        Err(Error::PreconditionRequired)
+    );
+    assert_eq!(
+        peer.update(&caller, original.id, Some("*"), &body(), 105, TIME),
+        Err(Error::InvalidRequest)
+    );
 }

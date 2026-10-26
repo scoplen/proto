@@ -117,6 +117,18 @@ scripted rollback, unknown commit and lost response. It supplies no token/proof 
 durable database, HTTP route or audit chain. Production team creation, native interaction,
 invitations, dissolution and asset permissions remain separate consumer outcomes.
 
+D-134 adds a distinct strict `OrganizationUpdateRequest` codec, required bounded strong
+`If-Match` parsing and the exact `orgs:write`/`PATCH /api/v1/orgs/{org}` operation. The
+`manage_organization` Cedar action permits the built-in Owner and Administrator roles while
+retaining the current Account/Membership and tenant guards. The reference peer exercises
+policy before stale-tag comparison, successful same-name no-ops, atomic name/time/audit changes,
+caller-projection updates and separate unknown-update outcomes that require refresh rather than
+replay. Existing creation uncertainty remains retryable with its original receipt key/payload.
+This is a breaking pre-Stable scope-ceiling extension: consumers upgrade their shared pin and
+require fresh Device authentication for old refresh families; refresh must never widen a ceiling.
+Native settings interaction, HTTP authorization, durable transactions and audit chains remain
+consumer responsibilities.
+
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
