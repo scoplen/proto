@@ -3,6 +3,18 @@
 
 export interface components {
   schemas: {
+    OrganizationCreateRequest: OrganizationCreateRequest;
+    OrganizationResource: OrganizationResource;
+    OrganizationMembership: OrganizationMembership;
+    OrganizationPage: OrganizationPage;
+    OrganizationInvalidRequestProblem: OrganizationInvalidRequestProblem;
+    OrganizationContentTypeProblem: OrganizationContentTypeProblem;
+    OrganizationAuthenticationRequiredProblem: OrganizationAuthenticationRequiredProblem;
+    OrganizationDeniedProblem: OrganizationDeniedProblem;
+    OrganizationNotFoundProblem: OrganizationNotFoundProblem;
+    OrganizationConflictProblem: OrganizationConflictProblem;
+    OrganizationStorageUnavailableProblem: OrganizationStorageUnavailableProblem;
+    OrganizationCommitOutcomeUnknownProblem: OrganizationCommitOutcomeUnknownProblem;
     Resource: Resource;
     ResourcePage: ResourcePage;
     ProblemDetails: ProblemDetails;
@@ -527,3 +539,42 @@ export interface AccountEntryRateLimitHeaders {
 }
 
 // END GENERATED AccountAdmission
+
+// BEGIN GENERATED Organizations
+export interface OrganizationCreateRequest { data: { name: string }; }
+export interface OrganizationMembership {
+  id: string;
+  account_id: string;
+  roles: string[];
+  [extension: string]: unknown;
+}
+export interface OrganizationResource {
+  id: string;
+  etag: string;
+  created_at: string;
+  updated_at: string;
+  data: { name: string; membership: OrganizationMembership; [extension: string]: unknown };
+  [extension: string]: unknown;
+}
+export interface OrganizationPage {
+  items: OrganizationResource[];
+  next_cursor: string | null;
+  [extension: string]: unknown;
+}
+
+export type OrganizationInvalidRequestProblem = ProblemDetails & { status: 400; code: "organization.invalid_request"; changed: false; retryable: false; };
+
+export type OrganizationContentTypeProblem = ProblemDetails & { status: 415; code: "organization.invalid_request"; changed: false; retryable: false; };
+
+export type OrganizationAuthenticationRequiredProblem = ProblemDetails & { status: 401; code: "auth.authentication_required"; changed: false; retryable: false; };
+
+export type OrganizationDeniedProblem = ProblemDetails & { status: 403; code: "policy.denied"; changed: false; retryable: false; };
+
+export type OrganizationNotFoundProblem = ProblemDetails & { status: 404; code: "organization.not_found"; changed: false; retryable: false; };
+
+export type OrganizationConflictProblem = ProblemDetails & { status: 409; code: "organization.conflict"; changed: false; retryable: false; };
+
+export type OrganizationStorageUnavailableProblem = ProblemDetails & { status: 503; code: "organization.storage_unavailable"; changed: false; retryable: true; };
+
+export type OrganizationCommitOutcomeUnknownProblem = ProblemDetails & { status: 503; code: "organization.commit_outcome_unknown"; changed: true; retryable: true; };
+// END GENERATED Organizations

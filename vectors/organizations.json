@@ -1,0 +1,276 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "organization-create-v1",
+      "kind": "organization.create",
+      "input": "{\"data\":{\"name\":\"Operations\"}}",
+      "expected": "{\"data\":{\"name\":\"Operations\"}}"
+    },
+    {
+      "id": "organization-create-whitespace-v1",
+      "kind": "organization.create",
+      "input": " { \"data\" : { \"name\" : \"Operations\" } }",
+      "expected": "{\"data\":{\"name\":\"Operations\"}}"
+    },
+    {
+      "id": "organization-create-unicode-v1",
+      "kind": "organization.create",
+      "input": "{\"data\":{\"name\":\"团队\"}}",
+      "expected": "{\"data\":{\"name\":\"团队\"}}"
+    },
+    {
+      "id": "organization-create-unknown-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{\"name\":\"Operations\",\"owner\":\"other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-account-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{\"name\":\"Operations\"},\"account_id\":\"other\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-duplicate-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{\"name\":\"Operations\",\"name\":\"Other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-escaped-duplicate-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{\"name\":\"Operations\",\"n\\u0061me\":\"Other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-empty-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{\"name\":\"\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-edge-space-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{\"name\":\" Operations\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-control-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{\"name\":\"Ops\\n\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-missing-v1",
+      "kind": "organization.create.reject",
+      "input": "{\"data\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-null-v1",
+      "kind": "organization.create.reject",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-trailing-v1",
+      "kind": "organization.create.reject",
+      "input": "{}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-bom-v1",
+      "kind": "organization.create.reject",
+      "input": "﻿{\"data\":{\"name\":\"Operations\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-v1",
+      "kind": "organization.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}"
+    },
+    {
+      "id": "organization-resource-roles-order-v1",
+      "kind": "organization.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"security_auditor\",\"future_reader\",\"administrator\"]}}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"administrator\",\"future_reader\",\"security_auditor\"]}}}"
+    },
+    {
+      "id": "organization-resource-extensions-v1",
+      "kind": "organization.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"],\"extension\":[]}},\"extra\":{\"metadata\":true}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}"
+    },
+    {
+      "id": "organization-resource-account-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019BDAD6-B800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-roles-empty-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[]}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-roles-duplicate-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\",\"owner\"]}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-roles-invalid-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"Owner\"]}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-missing-member-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-weak-etag-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"W/\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-calendar-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-02-30T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-nested-duplicate-v1",
+      "kind": "organization.resource.reject",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}},\"extra\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-page-v1",
+      "kind": "organization.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}],\"next_cursor\":null}",
+      "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}],\"next_cursor\":null}"
+    },
+    {
+      "id": "organization-empty-page-v1",
+      "kind": "organization.page",
+      "input": "{\"items\":[],\"next_cursor\":null}",
+      "expected": "{\"items\":[],\"next_cursor\":null}"
+    },
+    {
+      "id": "organization-page-next-v1",
+      "kind": "organization.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000001\"}",
+      "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000001\"}"
+    },
+    {
+      "id": "organization-page-duplicate-v1",
+      "kind": "organization.page.reject",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}},{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}],\"next_cursor\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-page-next-mismatch-v1",
+      "kind": "organization.page.reject",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000001\",\"etag\":\"\\\"1\\\"\",\"created_at\":\"2026-10-26T00:00:00Z\",\"updated_at\":\"2026-10-26T00:00:00Z\",\"data\":{\"name\":\"Operations\",\"membership\":{\"id\":\"019bdad6-b800-7000-8000-000000000002\",\"account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"roles\":[\"owner\"]}}}],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000002\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-page-empty-next-v1",
+      "kind": "organization.page.reject",
+      "input": "{\"items\":[],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000001\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-page-missing-next-v1",
+      "kind": "organization.page.reject",
+      "input": "{\"items\":[]}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-query-default-v1",
+      "kind": "organization.query",
+      "input": "[]",
+      "expected": "{\"limit\":50,\"cursor\":null}"
+    },
+    {
+      "id": "organization-query-max-v1",
+      "kind": "organization.query",
+      "input": "[[\"limit\",\"500\"]]",
+      "expected": "{\"limit\":500,\"cursor\":null}"
+    },
+    {
+      "id": "organization-query-cursor-v1",
+      "kind": "organization.query",
+      "input": "[[\"cursor\",\"019bdad6-b800-7000-8000-000000000001\"],[\"limit\",\"1\"]]",
+      "expected": "{\"limit\":1,\"cursor\":\"019bdad6-b800-7000-8000-000000000001\"}"
+    },
+    {
+      "id": "organization-query-zero-v1",
+      "kind": "organization.query",
+      "input": "[[\"limit\",\"0\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-query-over-v1",
+      "kind": "organization.query",
+      "input": "[[\"limit\",\"501\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-query-repeat-v1",
+      "kind": "organization.query",
+      "input": "[[\"limit\",\"1\"],[\"limit\",\"2\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-query-unknown-v1",
+      "kind": "organization.query",
+      "input": "[[\"filter\",\"all\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-create-bound-0-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"create\",\"base\":\"{\\\"data\\\":{\\\"name\\\":\\\"Operations\\\"}}\",\"bytes\":1024}",
+      "expected": "accepted"
+    },
+    {
+      "id": "organization-create-bound-1-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"create\",\"base\":\"{\\\"data\\\":{\\\"name\\\":\\\"Operations\\\"}}\",\"bytes\":1025}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-resource-bound-0-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"resource\",\"base\":\"{\\\"id\\\":\\\"019bdad6-b800-7000-8000-000000000001\\\",\\\"etag\\\":\\\"\\\\\\\"1\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00Z\\\",\\\"data\\\":{\\\"name\\\":\\\"Operations\\\",\\\"membership\\\":{\\\"id\\\":\\\"019bdad6-b800-7000-8000-000000000002\\\",\\\"account_id\\\":\\\"019bdad6-b800-7000-8000-000000000003\\\",\\\"roles\\\":[\\\"owner\\\"]}}}\",\"bytes\":4096}",
+      "expected": "accepted"
+    },
+    {
+      "id": "organization-resource-bound-1-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"resource\",\"base\":\"{\\\"id\\\":\\\"019bdad6-b800-7000-8000-000000000001\\\",\\\"etag\\\":\\\"\\\\\\\"1\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00Z\\\",\\\"data\\\":{\\\"name\\\":\\\"Operations\\\",\\\"membership\\\":{\\\"id\\\":\\\"019bdad6-b800-7000-8000-000000000002\\\",\\\"account_id\\\":\\\"019bdad6-b800-7000-8000-000000000003\\\",\\\"roles\\\":[\\\"owner\\\"]}}}\",\"bytes\":4097}",
+      "expected": "rejected"
+    },
+    {
+      "id": "organization-page-bound-0-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"page\",\"base\":\"{\\\"items\\\":[],\\\"next_cursor\\\":null}\",\"bytes\":2097152}",
+      "expected": "accepted"
+    },
+    {
+      "id": "organization-page-bound-1-v1",
+      "kind": "organization.bound",
+      "input": "{\"kind\":\"page\",\"base\":\"{\\\"items\\\":[],\\\"next_cursor\\\":null}\",\"bytes\":2097153}",
+      "expected": "rejected"
+    }
+  ]
+}

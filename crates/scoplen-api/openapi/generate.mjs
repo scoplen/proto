@@ -6,6 +6,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { generateOperatorTypes } from "./generate-operator.mjs";
 import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
 import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs";
+import { generateOrganizationTypes } from "./generate-organizations.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -130,7 +131,7 @@ if (document.paths["/auth/device"].post.responses?.["401"]?.$ref !== "#/componen
   throw new Error("/auth/device must describe authentication failure");
 }
 const refresh = document.paths?.["/auth/refresh"]?.post;
-const initialDeviceScope = "account:read keys:read keys:write sync:read sync:write";
+const initialDeviceScope = "account:read keys:read keys:write orgs:create orgs:read sync:read sync:write";
 const deviceAuthentication = document.paths["/auth/device"].post;
 if (deviceAuthentication["x-scoplen-initial-device-scope"] !== initialDeviceScope ||
     !deviceAuthentication.responses["200"].description.includes(`exactly ${initialDeviceScope}`) ||
@@ -547,7 +548,13 @@ const accountBegin = completeDeviceTypes.indexOf(accountStartMarker);
 const accountFinish = completeDeviceTypes.indexOf(accountEndMarker, accountBegin + accountStartMarker.length);
 if (accountBegin < 0 || accountFinish < 0) throw new Error("types.ts lacks AccountAdmission markers");
 const completeAccountTypes = `${completeDeviceTypes.slice(0, accountBegin + accountStartMarker.length)}${generateAccountAdmissionTypes(document)}${completeDeviceTypes.slice(accountFinish)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeAccountTypes]];
+const orgStart = "// BEGIN GENERATED Organizations\n";
+const orgEnd = "// END GENERATED Organizations";
+const orgBegin = completeAccountTypes.indexOf(orgStart);
+const orgFinish = completeAccountTypes.indexOf(orgEnd, orgBegin + orgStart.length);
+if (orgBegin < 0 || orgFinish < 0) throw new Error("types.ts lacks Organizations markers");
+const completeOrganizationTypes = `${completeAccountTypes.slice(0, orgBegin + orgStart.length)}${generateOrganizationTypes(document)}${completeAccountTypes.slice(orgFinish)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeOrganizationTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

@@ -2,6 +2,18 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  OrganizationCreateRequest,
+  OrganizationResource,
+  OrganizationMembership,
+  OrganizationPage,
+  OrganizationInvalidRequestProblem,
+  OrganizationContentTypeProblem,
+  OrganizationAuthenticationRequiredProblem,
+  OrganizationDeniedProblem,
+  OrganizationNotFoundProblem,
+  OrganizationConflictProblem,
+  OrganizationStorageUnavailableProblem,
+  OrganizationCommitOutcomeUnknownProblem,
   AccountRequestChallengeRequest,
   AccountRequestChallengeResponse,
   AccountPasswordOptionsRequest,

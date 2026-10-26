@@ -21,6 +21,8 @@ pub mod gateway_ticket;
 pub mod internal_grpc;
 pub mod operator_auth;
 pub mod operator_logout_reference;
+pub mod organization;
+pub mod organization_reference;
 mod request_wire;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
@@ -71,6 +73,11 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.use_dpop_nonce",
     "certificate.invalid_request",
     "gateway.invalid_request",
+    "organization.commit_outcome_unknown",
+    "organization.conflict",
+    "organization.invalid_request",
+    "organization.not_found",
+    "organization.storage_unavailable",
     "policy.denied",
     "sync.client_unsupported",
     "sync.conflict",

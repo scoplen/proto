@@ -6,7 +6,7 @@
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
 pub const INITIAL_DEVICE_ACCESS_SCOPE: &str =
-    "account:read keys:read keys:write sync:read sync:write";
+    "account:read keys:read keys:write orgs:create orgs:read sync:read sync:write";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -17,6 +17,10 @@ pub enum DeviceAccessScope {
     KeysRead,
     /// Update that account's encrypted K-4 key bundle with the required signatures and wraps.
     KeysWrite,
+    /// Create a team under the deployment's current creation policy.
+    OrganizationCreate,
+    /// Discover the current Account's own active team memberships.
+    OrganizationRead,
     /// Read authorized vault data and establish authorized notification subscriptions.
     SyncRead,
     /// Mutate authorized vault state, subject to each operation's additional checks.
@@ -25,8 +29,15 @@ pub enum DeviceAccessScope {
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 5] =
-        [Self::AccountRead, Self::KeysRead, Self::KeysWrite, Self::SyncRead, Self::SyncWrite];
+    pub const ALL: [Self; 7] = [
+        Self::AccountRead,
+        Self::KeysRead,
+        Self::KeysWrite,
+        Self::OrganizationCreate,
+        Self::OrganizationRead,
+        Self::SyncRead,
+        Self::SyncWrite,
+    ];
 
     /// Exact case-sensitive ASCII scope token.
     #[must_use]
@@ -35,6 +46,8 @@ impl DeviceAccessScope {
             Self::AccountRead => "account:read",
             Self::KeysRead => "keys:read",
             Self::KeysWrite => "keys:write",
+            Self::OrganizationCreate => "orgs:create",
+            Self::OrganizationRead => "orgs:read",
             Self::SyncRead => "sync:read",
             Self::SyncWrite => "sync:write",
         }
@@ -67,6 +80,12 @@ pub enum DeviceAccessOperation {
     AccountProfileRead,
     /// Read the complete current-account signed device-statement snapshot.
     AccountDevicesRead,
+    /// Create an Organization with the current Account as its initial owner.
+    OrganizationCreate,
+    /// List the current Account's own active Organization memberships.
+    OrganizationList,
+    /// Read the current Account's own Organization membership projection.
+    OrganizationRead,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -101,9 +120,12 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 20] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
+        Self::OrganizationCreate,
+        Self::OrganizationList,
+        Self::OrganizationRead,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -126,6 +148,8 @@ impl DeviceAccessOperation {
     pub const fn required_scope(self) -> DeviceAccessScope {
         match self {
             Self::AccountProfileRead | Self::AccountDevicesRead => DeviceAccessScope::AccountRead,
+            Self::OrganizationCreate => DeviceAccessScope::OrganizationCreate,
+            Self::OrganizationList | Self::OrganizationRead => DeviceAccessScope::OrganizationRead,
             Self::AccountKeysRead => DeviceAccessScope::KeysRead,
             Self::AccountKeysWrite => DeviceAccessScope::KeysWrite,
             Self::SyncSession
@@ -152,6 +176,8 @@ impl DeviceAccessOperation {
         match self {
             Self::AccountProfileRead
             | Self::AccountDevicesRead
+            | Self::OrganizationList
+            | Self::OrganizationRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
@@ -161,6 +187,7 @@ impl DeviceAccessOperation {
             Self::AccountKeysWrite => "PUT",
             Self::VaultMemberRemove => "DELETE",
             Self::SyncSession
+            | Self::OrganizationCreate
             | Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
@@ -176,6 +203,8 @@ impl DeviceAccessOperation {
         match self {
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
+            Self::OrganizationCreate | Self::OrganizationList => "/api/v1/orgs",
+            Self::OrganizationRead => "/api/v1/orgs/{org}",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",

@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-130 bounded team-creation and current-membership discovery codecs, exact Device scopes
+  and operations, OpenAPI/TypeScript, independent vectors and parser seeds. A narrow reference
+  peer covers caller-only discovery and atomic owner/audit/24-hour receipt confirmation under
+  rollback, unknown commit and response loss. Production authentication, storage, HTTP, native
+  team UI, invitations and asset permissions remain consumer work.
+
 - Add `ProblemDetails::from_json` with an explicit endpoint byte budget, complete required-field
   validation and recursive duplicate-name rejection, including ignored extensions. Strict UTF-8,
   no-BOM and single-object parsing preserve valid unknown codes and existing extension behavior;
