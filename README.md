@@ -191,7 +191,11 @@ order and echo flags; counts, field sizes and UTF-8 responses are validated befo
 to the SSH engine. Waiting for an OTP or PAM prompt leaves the executor and independent SSH
 connections available. This replaces the pre-Stable synchronous callback without a wrapper.
 It also authenticates with validated OpenSSH user certificates through the
-shared signer boundary, checking the requested principal and subject key before dispatch. RSA
+shared signer boundary, checking the requested principal and subject key before dispatch.
+The caller supplies the exact expected certificate principal when constructing `UserCertificate`
+and separately establishes CA trust. A scoped principal may differ from the SSH login username;
+the server authorizes that mapping, for example through OpenSSH's `AuthorizedPrincipalsFile`.
+The signature still binds the exact username, complete certificate, subject key and session. RSA
 certificates retain their legacy blob type while selecting the requested SHA-2 certificate
 algorithm; signing binds the complete certificate and selected hash. `EcdsaSshSigner` selects the
 NIST curve from an imported OpenSSH private key, while `P256SshSigner` remains available for
@@ -581,6 +585,9 @@ remaining interoperability matrix.
 For a user certificate, also set `SCOPLEN_OPENSSH_USER_CERT` to its OpenSSH certificate
 file and `SCOPLEN_OPENSSH_USER_CA_KEY` to the pinned CA public-key file. The example checks the
 certificate signature, principal, validity, critical options, and CA pin before sending it.
+Set `SCOPLEN_OPENSSH_USER_PRINCIPAL` when the expected principal differs from the login username.
+The OpenSSH 9.9/10.6 fixture includes a scoped-only certificate mapped to a distinct local
+username, plus wrong expected principal, subject, local CA pin and local-user mapping refusals.
 A disposable `linuxserver/openssh-server` container with `TrustedUserCAKeys` configured accepted
 the certificate; a certificate from another CA was rejected by OpenSSH. The automated Alpine
 fixture covers Ed25519, ECDSA P-256/P-384/P-521, and both RSA-SHA2 variants, plus server-side KRL
