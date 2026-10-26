@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Allow a validated user-certificate principal to differ from the SSH login username, as required
+  for scoped Organization principals. Exact caller-supplied principal validation, consumer-owned
+  CA trust, subject-key matching and session-bound signing remain in place. Real SSH and pinned
+  OpenSSH principal-mapping regressions cover the corrected boundary; this does not implement
+  Organization certificate issuance or native client credential custody.
+
 - Upgrade the concrete SSH engine to released russh 0.65.0. Enabled keepalive timers no longer
   busy-poll while waiting for authentication. A signing provider refusal after a server accepts
   a public-key or user-certificate offer preserves the original error and permits password

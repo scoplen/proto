@@ -174,9 +174,11 @@ async fn authenticate_with_signer<S: Signer + Sync>(
             .map_err(|_| "user certificate requires a pinned CA public-key path")?;
         let certificate = Certificate::read_file(Path::new(certificate_path))?;
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let principal =
+            env::var("SCOPLEN_OPENSSH_USER_PRINCIPAL").unwrap_or_else(|_| username.to_owned());
         let certificate = UserCertificate::parse_and_validate(
             &certificate.to_bytes()?,
-            &CertificateValidationPolicy::user(username, now),
+            &CertificateValidationPolicy::user(&principal, now),
         )?;
         let pinned_ca = PublicKey::read_openssh_file(ca_path)?.to_bytes()?;
         if certificate.certificate().ca_public_key_blob() != pinned_ca {

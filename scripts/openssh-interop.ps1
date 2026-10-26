@@ -16,14 +16,14 @@ $serverProfile = $serverProfiles[$ServerVersion]
 $authVariables = @(
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH',
     'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY', 'SCOPLEN_OPENSSH_ECDSA_KEY',
-    'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY'
+    'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY', 'SCOPLEN_OPENSSH_USER_PRINCIPAL'
 )
 $testVariables = @(
     'SCOPLEN_OPENSSH_HOST', 'SCOPLEN_OPENSSH_PORT', 'SCOPLEN_OPENSSH_USER',
     'SCOPLEN_OPENSSH_PASSWORD', 'SCOPLEN_OPENSSH_HOST_KEY', 'SCOPLEN_OPENSSH_HOST_CA_KEY',
     'SCOPLEN_OPENSSH_RSA_KEY', 'SCOPLEN_OPENSSH_RSA_HASH',
     'SCOPLEN_OPENSSH_ED25519_KEY', 'SCOPLEN_OPENSSH_P256_KEY', 'SCOPLEN_OPENSSH_ECDSA_KEY',
-    'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY',
+    'SCOPLEN_OPENSSH_USER_CERT', 'SCOPLEN_OPENSSH_USER_CA_KEY', 'SCOPLEN_OPENSSH_USER_PRINCIPAL',
     'SCOPLEN_OPENSSH_SFTP', 'SCOPLEN_OPENSSH_SFTP_PROFILE', 'SCOPLEN_OPENSSH_FORWARD',
     'SCOPLEN_OPENSSH_SHARED_CONNECTION',
     'SCOPLEN_OPENSSH_JUMP_TARGET_PORT'
@@ -71,6 +71,8 @@ set -eu
 apk add --no-cache __OPENSSH_PACKAGE__
 adduser -D scoplen
 printf 'scoplen:scoplen-test-password\n' | chpasswd
+adduser -D other
+printf 'other:scoplen-test-password\n' | chpasswd
 ssh-keygen -q -t ed25519 -N '' -f /tmp/host_key
 ssh-keygen -q -t ed25519 -N '' -f /tmp/user_ed
 ssh-keygen -q -t ecdsa -b 256 -N '' -f /tmp/user_p256
@@ -85,6 +87,8 @@ ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_other
 ssh-keygen -q -t ed25519 -N '' -f /tmp/ca_krl
 ssh-keygen -q -s /tmp/ca_trusted -I ed25519 -n scoplen -V -1m:+10m /tmp/user_ed.pub
 mv /tmp/user_ed-cert.pub /tmp/user_ed_good-cert.pub
+ssh-keygen -q -s /tmp/ca_trusted -I ed25519-scoped -n spl:interop:h:target:scoplen -V -1m:+10m /tmp/user_ed.pub
+mv /tmp/user_ed-cert.pub /tmp/user_ed_scoped-cert.pub
 ssh-keygen -q -s /tmp/ca_trusted -I p256 -n scoplen -V -1m:+10m /tmp/user_p256.pub
 for curve in p384 p521; do
     ssh-keygen -q -s /tmp/ca_trusted -I "${curve}-valid" -n scoplen -V -1m:+10m "/tmp/user_${curve}.pub"
@@ -111,6 +115,9 @@ id: krl-id-revoked
 KRL
 ssh-keygen -q -k -f /tmp/revoked.krl -s /tmp/ca_krl.pub /tmp/krl_spec
 mkdir -p /home/scoplen/.ssh /run/sshd
+mkdir -p /etc/ssh/principals
+printf 'scoplen\nspl:interop:h:target:scoplen\n' > /etc/ssh/principals/scoplen
+printf 'spl:interop:h:other:other\n' > /etc/ssh/principals/other
 cat /tmp/user_ed.pub /tmp/user_p256.pub /tmp/user_p384.pub /tmp/user_p521.pub /tmp/user_rsa.pub > /home/scoplen/.ssh/authorized_keys
 cat /tmp/ca_trusted.pub /tmp/ca_krl.pub > /tmp/trusted_user_cas.pub
 chown -R scoplen:scoplen /home/scoplen/.ssh
@@ -123,6 +130,7 @@ HostKey /tmp/host_key
 PasswordAuthentication yes
 PubkeyAuthentication yes
 TrustedUserCAKeys /tmp/trusted_user_cas.pub
+AuthorizedPrincipalsFile /etc/ssh/principals/%u
 RevokedKeys /tmp/revoked.krl
 # Avoid source penalties from intentional auth failures blocking later control connections.
 PerSourcePenalties no
@@ -176,7 +184,7 @@ exec /usr/sbin/sshd -D -e -f /tmp/sshd_config
     $fixtureFiles = @(
         'user_ed', 'user_p256', 'user_p384', 'user_p521', 'user_rsa', 'wrong_ed', 'wrong_p384', 'wrong_p521',
         'ca_trusted.pub', 'ca_other.pub', 'ca_krl.pub',
-        'user_ed_good-cert.pub', 'user_p256-cert.pub', 'user_p384-cert.pub', 'user_p521-cert.pub', 'user_rsa-cert.pub',
+        'user_ed_good-cert.pub', 'user_ed_scoped-cert.pub', 'user_p256-cert.pub', 'user_p384-cert.pub', 'user_p521-cert.pub', 'user_rsa-cert.pub',
         'user_p384_wrong-principal-cert.pub', 'user_p521_wrong-principal-cert.pub',
         'wrong_p384-cert.pub', 'wrong_p521-cert.pub',
         'user_ed_wrong-principal-cert.pub', 'user_ed_untrusted-cert.pub',
@@ -319,6 +327,28 @@ done
         $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
         Invoke-AuthExample "$($case.Name) user certificate"
     }
+
+    Clear-AuthMode
+    $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'user_ed'
+    $env:SCOPLEN_OPENSSH_USER_CERT = Join-Path $tempRoot 'user_ed_scoped-cert.pub'
+    $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
+    $env:SCOPLEN_OPENSSH_USER_PRINCIPAL = 'spl:interop:h:target:scoplen'
+    Invoke-AuthExample 'scoped user-certificate mapped to local username'
+
+    $env:SCOPLEN_OPENSSH_USER_PRINCIPAL = 'spl:interop:h:other:scoplen'
+    Invoke-AuthExample 'wrong expected scoped principal' 'PrincipalMismatch'
+    $env:SCOPLEN_OPENSSH_USER_PRINCIPAL = 'spl:interop:h:target:scoplen'
+    $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'wrong_ed'
+    Invoke-AuthExample 'scoped certificate wrong subject' 'KeyMismatch'
+    $env:SCOPLEN_OPENSSH_ED25519_KEY = Join-Path $tempRoot 'user_ed'
+    $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_other.pub'
+    Invoke-AuthExample 'scoped certificate wrong local CA pin' 'UntrustedUserCa'
+    $env:SCOPLEN_OPENSSH_USER_CA_KEY = Join-Path $tempRoot 'ca_trusted.pub'
+    $env:SCOPLEN_OPENSSH_USER = 'other'
+    Invoke-AuthExample 'scoped principal not mapped to requested local user' 'AuthenticationRejected'
+    $env:SCOPLEN_OPENSSH_USER = 'scoplen'
+    Invoke-AuthExample 'scoped certificate remains usable after refusals'
+    Clear-AuthMode
 
     foreach ($curve in @('p384', 'p521')) {
         Clear-AuthMode
