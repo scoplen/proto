@@ -4,7 +4,7 @@
 //! This slice verifies real Account and Device signatures and models atomic business state,
 //! digest retention and complete restart images. It is not HTTP transport, durable database
 //! storage or an audit chain. Low-level operations require prior caller admission;
-//! `challenge_with_admission` connects only challenge issuance to the separate rate peer.
+//! The connected challenge and password-options entries use the separate rate peer.
 //! Password entry and Device admission share this storage and the same Account transaction lock.
 
 use std::{
@@ -40,7 +40,7 @@ mod password;
 pub use admission::{ReferenceDeviceAdmissionError, ReferenceDeviceAdmissionResult};
 pub use password::{
     ReferenceAdmissionCapability, ReferencePasswordAttempt, ReferencePasswordCredential,
-    ReferencePasswordError, ReferencePasswordSummary,
+    ReferencePasswordError, ReferencePasswordOptionsAdmissionError, ReferencePasswordSummary,
 };
 
 /// The admitted default deployment-lifetime Account-id row ceiling.
@@ -611,7 +611,8 @@ impl ReferenceAccountRegistrationPeer {
     ///
     /// Earlier counts are never refunded. Issuance does not clear authentication streaks.
     /// The two peers and their checkpoint images remain separate; this entry does not supply
-    /// atomic admission/business restore, HTTP transport or admission for the other four POSTs.
+    /// atomic admission/business restore or HTTP transport. Registration, password login and
+    /// Device admission still require prior caller admission.
     /// # Errors
     /// Returns the existing source/private admission or body/challenge error without a nonce.
     pub fn challenge_with_admission(

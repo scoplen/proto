@@ -710,3 +710,336 @@ fn maintenance_and_problems_remain_content_free_and_never_claim_business_change(
     assert!(Error::StorageUnavailable.problem(&"\0".repeat(700)).is_err());
     assert!(Error::ResponseLost.problem("/sign-in").unwrap().is_none());
 }
+
+mod options_admission {
+    use std::{
+        cell::Cell,
+        collections::BTreeSet,
+        net::{IpAddr, Ipv4Addr},
+    };
+
+    use scoplen_api::{
+        account_rate_reference::{
+            ReferenceAccountRateError as RateError, ReferenceAccountRateFault as RateFault,
+            ReferenceAccountRatePeer as Rates,
+        },
+        account_registration_reference::ReferencePasswordOptionsAdmissionError as OptionsError,
+    };
+
+    use super::*;
+
+    const NOW: u64 = 1_800_000_000_000;
+
+    fn fixture() -> (Peer, Rates) {
+        (Peer::new(ORIGIN).unwrap(), Rates::new(ORIGIN, &[7; 32]).unwrap())
+    }
+
+    fn source(index: u32) -> IpAddr {
+        IpAddr::V4(Ipv4Addr::from(index))
+    }
+
+    fn body(username: &str) -> Vec<u8> {
+        AccountPasswordOptionsRequest { username: username.into() }.to_json().unwrap()
+    }
+
+    fn admitted_options(
+        peer: &Peer,
+        rates: &Rates,
+        address: u32,
+        username: &str,
+        now: u64,
+    ) -> Result<AccountPasswordOptionsResponse, OptionsError> {
+        peer.password_options_with_admission(rates, source(address), || Ok(body(username)), || now)
+    }
+
+    fn delay(error: OptionsError) -> u16 {
+        let OptionsError::Admission(RateError::RateLimited(headers)) = error else {
+            panic!("expected common rate denial: {error:?}");
+        };
+        assert_eq!(headers.rate_limit_policy(), "\"authentication\";q=30;w=60");
+        assert_eq!(
+            headers.rate_limit(),
+            format!("\"authentication\";r=0;t={}", headers.retry_after_seconds())
+        );
+        headers.retry_after_seconds()
+    }
+
+    #[test]
+    fn source_rejection_precedes_lazy_body_collection_and_attempt_creation() {
+        let (peer, rates) = fixture();
+        let calls = Cell::new(0);
+        for _ in 0..30 {
+            assert_eq!(
+                peer.password_options_with_admission(
+                    &rates,
+                    source(1),
+                    || {
+                        calls.set(calls.get() + 1);
+                        Ok(b"{".to_vec())
+                    },
+                    || NOW,
+                ),
+                Err(OptionsError::Options(Error::InvalidRequest))
+            );
+        }
+        assert_eq!(
+            delay(
+                peer.password_options_with_admission(
+                    &rates,
+                    source(1),
+                    || {
+                        calls.set(calls.get() + 1);
+                        Ok(body("missing.user"))
+                    },
+                    || NOW,
+                )
+                .unwrap_err()
+            ),
+            60
+        );
+        assert_eq!(calls.get(), 30);
+        assert_eq!(peer.password_summary().unwrap().attempts, 0);
+        assert_eq!(rates.summary().unwrap().rows, 1);
+    }
+
+    #[test]
+    fn complete_strict_structure_precedes_username_admission() {
+        let (peer, rates) = fixture();
+        let mut oversized = body("missing.user");
+        oversized.resize(257, b' ');
+        for (index, (input, expected)) in [
+            (b"{}".to_vec(), Error::InvalidRequest),
+            (
+                b"{\"username\":\"missing.user\",\"username\":\"missing.user\"}".to_vec(),
+                Error::InvalidRequest,
+            ),
+            (b"{\"username\":\"MISSING.user\"}".to_vec(), Error::InvalidRequest),
+            (b"{\"username\":\"missing.user\",\"extra\":true}".to_vec(), Error::InvalidRequest),
+            (oversized, Error::TooLarge),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(
+                peer.password_options_with_admission(
+                    &rates,
+                    source(u32::try_from(index).unwrap()),
+                    || Ok(input),
+                    || NOW,
+                ),
+                Err(OptionsError::Options(expected))
+            );
+        }
+        assert_eq!(peer.password_summary().unwrap().attempts, 0);
+        assert_eq!(rates.summary().unwrap().rows, 5);
+        for address in 100..110 {
+            admitted_options(&peer, &rates, address, "missing.user", NOW).unwrap();
+        }
+        assert_eq!(
+            delay(admitted_options(&peer, &rates, 200, "missing.user", NOW).unwrap_err()),
+            60
+        );
+        assert_eq!(peer.password_summary().unwrap().attempts, 10);
+    }
+
+    #[test]
+    fn active_unknown_inactive_and_retired_usernames_share_shape_and_private_quota() {
+        for case in ["active", "unknown", "inactive", "retired"] {
+            let (peer, rates) = fixture();
+            let payload = register(&peer);
+            if case == "inactive" {
+                peer.set_account_active(payload.account_id, false).unwrap();
+            } else if case == "retired" {
+                peer.delete_account(payload.account_id).unwrap();
+            }
+            let username = if case == "unknown" { "missing.user" } else { &payload.username };
+            let mut salt = None;
+            let mut attempts = BTreeSet::new();
+            for address in 1..=10 {
+                let response =
+                    admitted_options(&peer.clone(), &rates.clone(), address, username, NOW)
+                        .unwrap();
+                assert_eq!(response.expires_at_ms, NOW + 120_000);
+                assert_eq!(*salt.get_or_insert(response.salt), response.salt);
+                assert!(attempts.insert(account_capability_digest(response.attempt_id.as_bytes())));
+                let value: serde_json::Value =
+                    serde_json::from_slice(&response.to_json().unwrap()).unwrap();
+                let fields = value.as_object().unwrap();
+                assert_eq!(fields.len(), 4);
+                assert_eq!(fields["profile"], 1);
+                assert_eq!(
+                    AccountPasswordOptionsResponse::from_json(&response.to_json().unwrap())
+                        .unwrap(),
+                    response
+                );
+            }
+            if case == "active" {
+                assert_eq!(salt.unwrap(), payload.password_salt);
+            }
+            let before = peer.password_summary().unwrap();
+            assert_eq!(delay(admitted_options(&peer, &rates, 11, username, NOW).unwrap_err()), 60);
+            assert_eq!(before.attempts, 10);
+            assert_eq!(peer.password_summary().unwrap(), before);
+            // Ten sources, one keyed username and the rejected request's already charged source.
+            assert_eq!(rates.summary().unwrap().rows, 12);
+        }
+    }
+
+    #[test]
+    fn private_rejection_and_body_failure_do_not_refund_source_or_create_attempts() {
+        let (peer, rates) = fixture();
+        for _ in 0..10 {
+            admitted_options(&peer, &rates, 1, "missing.user", NOW).unwrap();
+        }
+        let before = peer.password_summary().unwrap();
+        assert_eq!(delay(admitted_options(&peer, &rates, 2, "missing.user", NOW).unwrap_err()), 60);
+        assert_eq!(
+            peer.password_options_with_admission(
+                &rates,
+                source(2),
+                || Err(Error::StorageUnavailable),
+                || NOW,
+            ),
+            Err(OptionsError::Options(Error::StorageUnavailable))
+        );
+        for _ in 0..28 {
+            assert_eq!(
+                peer.password_options_with_admission(
+                    &rates,
+                    source(2),
+                    || Ok(b"{".to_vec()),
+                    || NOW,
+                ),
+                Err(OptionsError::Options(Error::InvalidRequest))
+            );
+        }
+        let called = Cell::new(false);
+        assert_eq!(
+            delay(
+                peer.password_options_with_admission(
+                    &rates,
+                    source(2),
+                    || {
+                        called.set(true);
+                        Ok(body("different.user"))
+                    },
+                    || NOW,
+                )
+                .unwrap_err()
+            ),
+            60
+        );
+        assert!(!called.get());
+        assert_eq!(peer.password_summary().unwrap(), before);
+    }
+
+    #[test]
+    fn returned_options_complete_existing_real_password_and_signed_snapshot_verification() {
+        let (peer, rates) = fixture();
+        let payload = register(&peer);
+        let business = peer.summary().unwrap();
+        let options = admitted_options(&peer, &rates, 1, &payload.username, NOW).unwrap();
+        assert_eq!(options.salt, payload.password_salt);
+        // Login remains the explicitly admitted-only reference operation in this outcome.
+        let response = peer.password_login(login_body(&options, 0x12), || NOW).unwrap();
+        let snapshot = AccountBootstrapSnapshot::from_cbor(response.snapshot.as_bytes()).unwrap();
+        assert_eq!(snapshot.account_id, payload.account_id);
+        assert_eq!(snapshot.key_bundle, payload.key_bundle);
+        assert_eq!(response.expires_at_ms, NOW + 300_000);
+        assert_eq!(
+            response.snapshot,
+            peer.account_material(payload.account_id).unwrap().unwrap().bootstrap
+        );
+        assert_eq!(peer.summary().unwrap(), business);
+        let summary = peer.password_summary().unwrap();
+        assert_eq!((summary.attempts, summary.capabilities, summary.successes), (0, 1, 1));
+        assert_eq!(rates.summary().unwrap().rows, 2);
+        assert_eq!(
+            peer.password_login(login_body(&options, 0x12), || NOW),
+            Err(Error::AuthenticationRequired)
+        );
+    }
+
+    #[test]
+    fn source_private_storage_and_private_capacity_failures_return_no_attempt() {
+        let (peer, rates) = fixture();
+        rates.set_fault(RateFault::BeforeCommit).unwrap();
+        let called = Cell::new(false);
+        assert_eq!(
+            peer.password_options_with_admission(
+                &rates,
+                source(1),
+                || {
+                    called.set(true);
+                    Ok(body("missing.user"))
+                },
+                || NOW,
+            ),
+            Err(OptionsError::Admission(RateError::StorageUnavailable))
+        );
+        assert!(!called.get());
+        assert_eq!(rates.summary().unwrap().rows, 0);
+        assert_eq!(
+            peer.password_options_with_admission(
+                &rates,
+                source(1),
+                || {
+                    rates.set_fault(RateFault::BeforeCommit).unwrap();
+                    Ok(body("missing.user"))
+                },
+                || NOW,
+            ),
+            Err(OptionsError::Admission(RateError::StorageUnavailable))
+        );
+        assert_eq!(rates.summary().unwrap().rows, 1);
+        assert_eq!(peer.password_summary().unwrap().attempts, 0);
+
+        let rates = Rates::with_ceiling(ORIGIN, &[7; 32], 1).unwrap();
+        assert_eq!(delay(admitted_options(&peer, &rates, 1, "missing.user", NOW).unwrap_err()), 1);
+        assert_eq!(rates.summary().unwrap().rows, 1);
+        assert_eq!(peer.password_summary().unwrap().attempts, 0);
+    }
+
+    #[test]
+    fn confirmed_options_failures_preserve_private_debt_without_an_attempt() {
+        let (peer, rates) = fixture();
+        for index in 0..10 {
+            peer.set_fault(if index % 2 == 0 { Fault::BeforeCommit } else { Fault::Audit })
+                .unwrap();
+            assert_eq!(
+                admitted_options(&peer, &rates, 1, "missing.user", NOW),
+                Err(OptionsError::Options(Error::StorageUnavailable))
+            );
+        }
+        assert_eq!(peer.password_summary().unwrap().attempts, 0);
+        assert_eq!(delay(admitted_options(&peer, &rates, 1, "missing.user", NOW).unwrap_err()), 60);
+        assert_eq!(rates.summary().unwrap().rows, 2);
+    }
+
+    #[test]
+    fn independent_quiescent_images_preserve_username_debt_attempts_and_synthetic_salt() {
+        let (peer, rates) = fixture();
+        let first = admitted_options(&peer, &rates, 1, "missing.user", NOW).unwrap();
+        for address in 2..=10 {
+            admitted_options(&peer, &rates, address, "missing.user", NOW).unwrap();
+        }
+        // These images are captured only while the fixture is quiescent. No atomic combined
+        // checkpoint or shared admission/business restoration is supplied by the new entry.
+        let business_image = peer.checkpoint().unwrap();
+        let rate_image = rates.checkpoint().unwrap();
+        let peer = Peer::restore(business_image, ORIGIN, DEFAULT_USED_ACCOUNT_ID_CEILING).unwrap();
+        let rates = Rates::restore(rate_image);
+        assert_eq!(peer.password_summary().unwrap().attempts, 10);
+        assert_eq!(
+            delay(admitted_options(&peer, &rates, 100, "missing.user", NOW - 1).unwrap_err()),
+            60
+        );
+        assert_eq!(peer.password_summary().unwrap().attempts, 10);
+        assert_eq!(rates.summary().unwrap().high_water_ms, NOW);
+        let next = admitted_options(&peer, &rates, 100, "missing.user", NOW + 60_000).unwrap();
+        assert_eq!(next.salt, first.salt);
+        assert_ne!(next.attempt_id, first.attempt_id);
+        assert_eq!(next.expires_at_ms, NOW + 180_000);
+        assert_eq!(peer.password_summary().unwrap().attempts, 11);
+    }
+}

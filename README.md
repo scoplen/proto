@@ -85,9 +85,14 @@ Device admission, and only admitted requests reach the existing real nonce/expir
 Earlier counts remain charged after malformed input, private rejection or challenge failure;
 issuing a challenge does not clear authentication streaks. Returned nonces work with the existing
 signed registration peer. The rate and business peers still have separate checkpoint images,
-with no atomic combined restore. Registration, password options/login and Device admission still
-require caller admission through their original low-level reference APIs. No native HTTP or
-production authentication integration is supplied by this reference entry.
+with no atomic combined restore.
+`password_options_with_admission` likewise charges the source before lazy body collection,
+strictly decodes the username before keyed private admission, then reuses the existing current
+salt/synthetic-salt and one-use attempt transaction. Existing, unknown, inactive and retired
+usernames share the same shape and quotas; neither issuance entry clears failure streaks.
+Registration, password login and Device admission still require caller admission through their
+original low-level reference APIs. These entries supply no native HTTP or production
+authentication integration.
 Production retention, migration and operator warning delivery remain consumer work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
 complete recipient equality, retained Personal epochs and exact historical confirmation binding.
