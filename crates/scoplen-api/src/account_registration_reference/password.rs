@@ -4,6 +4,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
+    net::IpAddr,
     sync::Arc,
 };
 
@@ -19,8 +20,12 @@ use super::{
 };
 use crate::account_admission::{
     ACCOUNT_ADMISSION_LIFETIME_MS, ACCOUNT_ATTEMPT_LIFETIME_MS, AccountAdmissionCodecError,
-    AccountBootstrapSnapshot, AccountPasswordLoginRequest, AccountPasswordLoginResponse,
-    AccountPasswordOptionsRequest, AccountPasswordOptionsResponse, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
+    AccountBootstrapSnapshot, AccountEntryOperation, AccountPasswordLoginRequest,
+    AccountPasswordLoginResponse, AccountPasswordOptionsRequest, AccountPasswordOptionsResponse,
+    MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
+};
+use crate::account_rate_reference::{
+    ReferenceAccountRateError, ReferenceAccountRatePeer, ReferenceAccountRateSubject,
 };
 
 const MAX_ATTEMPTS: usize = 16_384;
@@ -159,6 +164,18 @@ impl From<AccountAdmissionCodecError> for ReferencePasswordError {
     }
 }
 
+/// Admission or existing password-options failure at the connected reference entry.
+/// No new HTTP status, wire problem or business outcome is introduced.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum ReferencePasswordOptionsAdmissionError {
+    /// Source/private admission failed; rate rejection retains the common bounded headers.
+    #[error(transparent)]
+    Admission(#[from] ReferenceAccountRateError),
+    /// Body collection, strict decoding or the original password-options transaction failed.
+    #[error(transparent)]
+    Options(#[from] ReferencePasswordError),
+}
+
 /// Fixed counters for owned fixture inspection, without any identity or credential value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReferencePasswordSummary {
@@ -265,6 +282,33 @@ impl PasswordState {
 }
 
 impl ReferenceAccountRegistrationPeer {
+    /// Connect source admission, lazy body collection and keyed username admission to the
+    /// existing options transaction. Complete strict decoding precedes username admission;
+    /// only admitted requests reach Account lookup, salt derivation or attempt creation.
+    ///
+    /// Earlier counts are never refunded. Issuance does not clear authentication streaks.
+    /// The two peers retain separate checkpoint images without atomic combined restoration.
+    /// # Errors
+    /// Returns the existing source/private admission or body/options error without an attempt.
+    pub fn password_options_with_admission(
+        &self,
+        rates: &ReferenceAccountRatePeer,
+        actual_peer: IpAddr,
+        load_body: impl FnOnce() -> Result<Vec<u8>, ReferencePasswordError>,
+        mut clock: impl FnMut() -> u64,
+    ) -> Result<AccountPasswordOptionsResponse, ReferencePasswordOptionsAdmissionError> {
+        let mut admission =
+            rates.begin(AccountEntryOperation::PasswordOptions, actual_peer, &mut clock)?;
+        let body = load_body()?;
+        let decoded = AccountPasswordOptionsRequest::from_json(&body)
+            .map_err(ReferencePasswordError::from)?;
+        admission.admit_private(
+            ReferenceAccountRateSubject::OptionsUsername(&decoded.username),
+            &mut clock,
+        )?;
+        self.password_options(&body, clock).map_err(ReferencePasswordOptionsAdmissionError::from)
+    }
+
     /// Issue indistinguishable fixed-profile options using current or stable synthetic salts.
     ///
     /// Caller-owned source/username admission precedes this reference transaction.

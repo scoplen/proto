@@ -4,11 +4,17 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Connect D-128 password-options source admission before lazy body collection and keyed
+  username admission before the existing salt/attempt transaction. Existing, unknown, inactive
+  and retired usernames share the same shape and quotas; failures preserve prior counts and
+  return no new attempt. The reference peers retain independent checkpoint images, while
+  registration, password login and Device admission remain admitted-only operations.
+
 - Connect the D-128 request-challenge reference entry to source admission before lazy body
   collection, strict structural decoding and Device admission before real nonce issuance.
   Rejections and challenge failures preserve earlier counts; returned nonces remain usable
   by real signed registration fixtures. The peers retain separate non-atomic checkpoint
-  images, and the other four Account POSTs retain their admitted-only reference boundary.
+  images; registration, password login and Device admission retain their admitted-only boundary.
 
 - Add an independent D-128 admission reference with explicit source, decoded/attempt-bound
   private and trusted Account-verification stages. Fixed endpoint windows, cooldowns, common
