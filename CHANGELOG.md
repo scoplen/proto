@@ -4,6 +4,14 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add an independent D-128 admission reference with explicit source, decoded/attempt-bound
+  private and trusted Account-verification stages. Fixed endpoint windows, cooldowns, common
+  retry headers, no-refund admission, the 131,072-row bound and indexed expiry survive complete
+  admission-only restart images. Scripted admission/denial-audit faults preserve earlier counts.
+  This algorithm peer does not verify credentials, consume business challenges/capabilities or
+  integrate with Account transactions, HTTP, durable storage or a production audit chain;
+  coordinated probe-key replacement remains separate work.
+
 - Add D-130 bounded team-creation and current-membership discovery codecs, exact Device scopes
   and operations, OpenAPI/TypeScript, independent vectors and parser seeds. A narrow reference
   peer covers caller-only discovery and atomic owner/audit/24-hour receipt confirmation under

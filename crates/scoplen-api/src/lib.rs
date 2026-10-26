@@ -12,6 +12,7 @@ use thiserror::Error;
 pub mod account_admission;
 pub mod account_devices;
 pub mod account_profile;
+pub mod account_rate_reference;
 pub mod account_registration_reference;
 pub mod auth;
 pub mod certificate;
