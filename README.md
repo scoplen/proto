@@ -66,6 +66,17 @@ authority and can never fall through to submission after deletion. Audit/commit 
 images cover both business publication and receipt-only challenge consumption.
 Durable rate admission, coordinated probe-key replacement and production HTTP/database/KMS
 integration remain separate work.
+The independent `account_rate_reference` peer models D-128's fixed source/private windows,
+bounded exponential cooldowns, common retry headers and combined 131,072-row ceiling. Admission
+has explicit source, decoded/attempt-bound subject and trusted Account-verification stages;
+earlier counts survive later rejection. Its complete admission-only image preserves keyed
+username identities, time high-water, cooldown debt and the bounded expiry index across restart.
+It uses an actual peer address, normalizes IPv4-mapped IPv6 and accepts no forwarding headers.
+An Account bucket is selected only after a fixture-supplied verification callback succeeds.
+That callback is trusted adapter code: this module supplies no password/signature verification,
+capability/nonce consumption, HTTP transport, durable storage or production audit chain. It is
+not integrated with the registration peer's business transactions or complete Account image;
+such integration, proof-job concurrency and coordinated probe-key replacement remain separate.
 Production retention, migration and operator warning delivery remain consumer work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
 complete recipient equality, retained Personal epochs and exact historical confirmation binding.
