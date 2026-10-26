@@ -6,18 +6,39 @@ use std::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use russh::keys::{Algorithm, HashAlg, PrivateKey};
 use scoplen_crypto::Ed25519SigningKey;
 use scoplen_ssh::{
-    ClientConfig, ClientConnection, ClientError, Ed25519SshSigner, HostKey, ServerRsaSha2Selection,
-    Signer,
+    CertificateValidationPolicy, ClientConfig, ClientConnection, ClientError, Ed25519SshSigner,
+    HostKey, PublicKeyAuthError, ServerRsaSha2Selection, SignatureAlgorithm, Signer, SignerError,
+    UserCertificate,
 };
 use tokio::{net::TcpListener, time::timeout};
 
 const DEADLINE: Duration = Duration::from_secs(5);
+
+struct RefusingSigner {
+    identity: Ed25519SshSigner,
+    requests: AtomicUsize,
+}
+
+impl Signer for RefusingSigner {
+    fn algorithm(&self) -> SignatureAlgorithm {
+        self.identity.algorithm()
+    }
+
+    fn public_key_blob(&self) -> Result<Vec<u8>, SignerError> {
+        self.identity.public_key_blob()
+    }
+
+    fn sign(&self, _message: &[u8]) -> Result<Vec<u8>, SignerError> {
+        self.requests.fetch_add(1, Ordering::SeqCst);
+        Err(SignerError::Signing("test signing refusal".to_owned()))
+    }
+}
 
 struct PasswordServer {
     auth_requests: Arc<AtomicUsize>,
@@ -36,10 +57,12 @@ impl russh::server::Handler for PasswordServer {
     async fn auth_publickey(
         &mut self,
         user: &str,
-        key: &ssh_key::PublicKey,
+        key: russh::server::VerifiedPublicKey<'_>,
     ) -> Result<russh::server::Auth, Self::Error> {
         self.auth_requests.fetch_add(1, Ordering::SeqCst);
-        if user != "alice" || key.to_bytes().ok().as_ref() != self.expected_public_key.as_ref() {
+        if user != "alice"
+            || key.public_key.to_bytes().ok().as_ref() != self.expected_public_key.as_ref()
+        {
             return Ok(russh::server::Auth::reject());
         }
         self.publickey_verified = true;
@@ -190,4 +213,73 @@ async fn discovery_between_publickey_and_password_factors_preserves_mfa() {
     connection.open_session().await.expect("session after MFA");
     connection.disconnect().await.expect("disconnect");
     timeout(DEADLINE, server).await.expect("server deadline").expect("server task");
+}
+
+async fn signer_refusal_preserves_password_authentication(use_certificate: bool) {
+    let signer = RefusingSigner {
+        identity: Ed25519SshSigner::new(
+            Ed25519SigningKey::from_bytes(&[9; 32]).expect("signer key"),
+        ),
+        requests: AtomicUsize::new(0),
+    };
+    let (mut connection, auth_requests, server) = connect(vec![Algorithm::Ed25519], None).await;
+    let error = if use_certificate {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("system clock").as_secs();
+        let subject =
+            ssh_key::PublicKey::from_bytes(&signer.public_key_blob().expect("public key"))
+                .expect("subject key");
+        let mut builder =
+            ssh_key::certificate::Builder::new(vec![8; 16], subject, now - 60, now + 60)
+                .expect("certificate builder");
+        builder.cert_type(ssh_key::certificate::CertType::User).expect("user certificate");
+        builder.valid_principal("alice").expect("certificate principal");
+        let ca = PrivateKey::random(
+            &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
+            Algorithm::Ed25519,
+        )
+        .expect("disposable CA");
+        let certificate = UserCertificate::parse_and_validate(
+            &builder.sign(&ca).expect("signed certificate").to_bytes().expect("certificate bytes"),
+            &CertificateValidationPolicy::user("alice", now),
+        )
+        .expect("validated certificate");
+        timeout(DEADLINE, connection.authenticate_certificate("alice", &certificate, &signer))
+            .await
+            .expect("certificate signing deadline")
+            .expect_err("provider refuses certificate signing")
+    } else {
+        timeout(DEADLINE, connection.authenticate_publickey("alice", &signer))
+            .await
+            .expect("public-key signing deadline")
+            .expect_err("provider refuses public-key signing")
+    };
+    assert!(
+        matches!(
+            &error,
+            ClientError::PublicKey(PublicKeyAuthError::Signer(SignerError::Signing(message)))
+                if message == "test signing refusal"
+        ),
+        "unexpected signing result: {error:?}"
+    );
+    assert_eq!(signer.requests.load(Ordering::SeqCst), 1);
+    assert_eq!(auth_requests.load(Ordering::SeqCst), 0);
+    assert!(matches!(connection.open_session().await, Err(ClientError::NotAuthenticated)));
+    timeout(DEADLINE, connection.authenticate_password("alice", b"test-password"))
+        .await
+        .expect("password fallback deadline")
+        .expect("password after signer refusal");
+    assert_eq!(auth_requests.load(Ordering::SeqCst), 1);
+    connection.open_session().await.expect("authenticated channel after signer refusal");
+    connection.disconnect().await.expect("disconnect");
+    timeout(DEADLINE, server).await.expect("server deadline").expect("server task");
+}
+
+#[tokio::test]
+async fn publickey_signer_refusal_allows_password_on_the_same_connection() {
+    signer_refusal_preserves_password_authentication(false).await;
+}
+
+#[tokio::test]
+async fn certificate_signer_refusal_allows_password_on_the_same_connection() {
+    signer_refusal_preserves_password_authentication(true).await;
 }

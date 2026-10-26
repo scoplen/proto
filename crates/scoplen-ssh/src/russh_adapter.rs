@@ -3152,9 +3152,10 @@ mod tests {
         async fn auth_publickey(
             &mut self,
             _user: &str,
-            key: &ssh_key::PublicKey,
+            key: russh::server::VerifiedPublicKey<'_>,
         ) -> Result<russh::server::Auth, Self::Error> {
-            let accepted = key.to_bytes().is_ok_and(|encoded| encoded == self.expected_key);
+            let accepted =
+                key.public_key.to_bytes().is_ok_and(|encoded| encoded == self.expected_key);
             Ok(if accepted { russh::server::Auth::Accept } else { russh::server::Auth::reject() })
         }
 

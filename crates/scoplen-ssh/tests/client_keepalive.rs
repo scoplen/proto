@@ -3,10 +3,12 @@
 use std::{
     io,
     net::SocketAddr,
+    pin::Pin,
     sync::{
         Arc,
         atomic::{AtomicU8, AtomicUsize, Ordering},
     },
+    task::{Context, Poll},
     time::Duration,
 };
 
@@ -17,8 +19,8 @@ use scoplen_ssh::{
 };
 use ssh_key::Algorithm;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    net::TcpListener,
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
+    net::{TcpListener, TcpStream},
     task::JoinHandle,
     time::{sleep, timeout},
 };
@@ -28,6 +30,40 @@ const DEADLINE: Duration = Duration::from_secs(3);
 const FORWARD: u8 = 0;
 const OBSERVE: u8 = 1;
 const BLACKHOLE: u8 = 2;
+
+struct CountedStream {
+    inner: TcpStream,
+    reads: Arc<AtomicUsize>,
+}
+
+impl AsyncRead for CountedStream {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        self.reads.fetch_add(1, Ordering::Relaxed);
+        Pin::new(&mut self.inner).poll_read(cx, buffer)
+    }
+}
+
+impl AsyncWrite for CountedStream {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.inner).poll_write(cx, buffer)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+}
 
 #[derive(Clone)]
 struct EchoServer {
@@ -291,6 +327,40 @@ async fn configured_keepalive_accepts_peer_replies_and_preserves_channel() {
     assert!(fixture.client_bytes.load(Ordering::SeqCst) > 0, "idle client sent keepalive data");
     echo(&mut channel, b"after").await;
     connection.disconnect().await.expect("disconnect live client");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn keepalive_waiting_for_authentication_does_not_busy_poll() {
+    let fixture = start_fixture().await;
+    let config = ClientConfig::new(
+        "127.0.0.1",
+        fixture.address.port(),
+        |_host: &str, _key: &HostKey| Ok(()),
+    )
+    .expect("client config")
+    .with_keepalive(Some(INTERVAL), 2)
+    .expect("enabled keepalive");
+    let reads = Arc::new(AtomicUsize::new(0));
+    let stream = CountedStream {
+        inner: TcpStream::connect(fixture.address).await.expect("connect relay"),
+        reads: Arc::clone(&reads),
+    };
+    let mut connection = timeout(DEADLINE, ClientConnection::connect_stream(config, stream))
+        .await
+        .expect("handshake deadline")
+        .expect("SSH handshake");
+    let before = reads.load(Ordering::Relaxed);
+    sleep(INTERVAL * 5).await;
+    let waiting_reads = reads.load(Ordering::Relaxed) - before;
+
+    timeout(DEADLINE, connection.authenticate_password("user", b"test-password"))
+        .await
+        .expect("authentication after waiting deadline")
+        .expect("authenticate after keepalive timer elapsed");
+    let mut channel = connection.open_session().await.expect("open authenticated session");
+    echo(&mut channel, b"authenticated after waiting").await;
+    connection.disconnect().await.expect("disconnect client");
+    assert!(waiting_reads < 200, "idle authentication performed {waiting_reads} socket polls");
 }
 
 #[tokio::test]

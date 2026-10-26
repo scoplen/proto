@@ -76,7 +76,7 @@ wait "$echo_server" "$allowed" "$denied"
     $started = $true
 
     $hostKey = $null
-    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
         docker exec $container sh -c 'test -f /tmp/forward-echo-ready && test "$(pidof dropbear | wc -w)" -eq 2' 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) { Start-Sleep -Seconds 1; continue }
         $lines = docker exec $container dropbearkey -y -f /tmp/host_key 2>$null
@@ -86,7 +86,7 @@ wait "$echo_server" "$allowed" "$denied"
         }
         Start-Sleep -Seconds 1
     }
-    if (-not $hostKey) { throw 'Dropbear did not become ready within 60 seconds' }
+    if (-not $hostKey) { throw 'Dropbear did not become ready within 120 seconds' }
 
     $packages = docker exec $container apk info -v
     if ($LASTEXITCODE -ne 0 -or $packages -notcontains 'dropbear-2024.86-r0' -or

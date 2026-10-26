@@ -170,9 +170,11 @@ impl russh::server::Handler for Server {
     async fn auth_publickey(
         &mut self,
         user: &str,
-        key: &ssh_key::PublicKey,
+        key: russh::server::VerifiedPublicKey<'_>,
     ) -> Result<russh::server::Auth, Self::Error> {
-        if user == "scoplen" && key.to_bytes().is_ok_and(|blob| blob == self.expected_key) {
+        if user == "scoplen"
+            && key.public_key.to_bytes().is_ok_and(|blob| blob == self.expected_key)
+        {
             self.authenticated.fetch_add(1, Ordering::SeqCst);
             Ok(russh::server::Auth::Accept)
         } else {

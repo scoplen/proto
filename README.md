@@ -203,7 +203,9 @@ choice. It never selects SHA-1 or sends an authentication probe. The complete qu
 two-second deadline; success, timeout, engine failure, and cancellation are terminal cached
 outcomes. Callers may explicitly try an existing SHA-2 signer when the result is undetermined.
 A complete peer rejection, with either value of `partial_success`, leaves the connection usable
-for another factor. Dropping keyboard-interactive authentication after dispatch, a responder
+for another factor. A signing provider refusal after a server-accepted public-key or user-certificate
+offer returns the original signing error and permits password authentication on the same connection.
+Dropping keyboard-interactive authentication after dispatch, a responder
 failure, an invalid answer, or an uncertain engine exchange closes that authentication connection;
 later authentication, channels and forwarding return `ConnectionClosed` locally. A late reply
 cannot be reused by another attempt. The consumer owns timeouts/cancellation and creates a fresh
@@ -270,7 +272,7 @@ channels with a configurable simultaneous-channel cap; channel or stream drop re
 Host; `with_rekey_read_limit` configures the incoming payload threshold independently. Byte limits
 are between one byte and one GiB, inclusive; the engine defaults remain one GiB in either direction
 and one hour. Counters exclude packet lengths, padding, and authentication tags. The released
-`russh` 0.64.1 engine initiates rekey after either threshold or the elapsed deadline, including
+`russh` 0.65.0 engine initiates rekey after either threshold or the elapsed deadline, including
 while authenticated connections are idle. Completed exchanges reset counters and the deadline;
 the event loop owns the timer and stops on disconnect, transport failure, or connection drop.
 Retained channel handles and streams cannot keep a dropped connection alive. Explicit disconnect
@@ -295,8 +297,9 @@ disable the timeout. Received traffic resets the configured inactivity timer.
 returns a typed configuration result. Probes are disabled by default, with a missed-reply count
 of three. Enabled intervals must be positive and representable as an event-loop deadline, and
 the count must be greater than zero and less than `usize::MAX`. `None` disables probes regardless
-of the count. Responsive peers preserve the channel; a silent peer expires the configured
-connection. This does not implement the separate `ping@openssh.com` extension.
+of the count. While awaiting authentication, elapsed keepalive timers are re-armed without busy
+polling; probes begin after authentication. Responsive peers preserve the channel; a silent peer
+expires the configured connection. This does not implement the separate `ping@openssh.com` extension.
 The adapter keeps the engine types out of the public API. A bounded SOCKS4a/SOCKS5 dynamic
 listener now composes the handshake with `direct-tcpip`, including cancellation, concurrency
 limits, bidirectional forwarding, EOF/close propagation, and protocol failure mapping.
