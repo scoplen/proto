@@ -797,7 +797,7 @@ pub(super) fn validate_origin_username(
         .map_err(|_| AccountAdmissionCodecError::InvalidProtected)?;
     validate_username(username)
 }
-fn validate_username(v: &str) -> Result<(), AccountAdmissionCodecError> {
+pub(super) fn validate_username(v: &str) -> Result<(), AccountAdmissionCodecError> {
     if !(3..=64).contains(&v.len())
         || !v.as_bytes()[0].is_ascii_lowercase() && !v.as_bytes()[0].is_ascii_digit()
         || !v.bytes().all(|b| {

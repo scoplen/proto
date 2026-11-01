@@ -7,6 +7,7 @@ import { generateOperatorTypes } from "./generate-operator.mjs";
 import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
 import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs";
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
+import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -131,7 +132,7 @@ if (document.paths["/auth/device"].post.responses?.["401"]?.$ref !== "#/componen
   throw new Error("/auth/device must describe authentication failure");
 }
 const refresh = document.paths?.["/auth/refresh"]?.post;
-const initialDeviceScope = "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write";
+const initialDeviceScope = initialTeamDeviceScope;
 const deviceAuthentication = document.paths["/auth/device"].post;
 if (deviceAuthentication["x-scoplen-initial-device-scope"] !== initialDeviceScope ||
     !deviceAuthentication.responses["200"].description.includes(`exactly ${initialDeviceScope}`) ||
@@ -554,7 +555,13 @@ const orgBegin = completeAccountTypes.indexOf(orgStart);
 const orgFinish = completeAccountTypes.indexOf(orgEnd, orgBegin + orgStart.length);
 if (orgBegin < 0 || orgFinish < 0) throw new Error("types.ts lacks Organizations markers");
 const completeOrganizationTypes = `${completeAccountTypes.slice(0, orgBegin + orgStart.length)}${generateOrganizationTypes(document)}${completeAccountTypes.slice(orgFinish)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeOrganizationTypes]];
+const teamStart = "// BEGIN GENERATED TeamMembership\n";
+const teamEnd = "// END GENERATED TeamMembership";
+const teamBegin = completeOrganizationTypes.indexOf(teamStart);
+const teamFinish = completeOrganizationTypes.indexOf(teamEnd, teamBegin + teamStart.length);
+if (teamBegin < 0 || teamFinish < 0) throw new Error("types.ts lacks TeamMembership markers");
+const completeTeamTypes = `${completeOrganizationTypes.slice(0, teamBegin + teamStart.length)}${generateTeamTypes(document)}${completeOrganizationTypes.slice(teamFinish)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeTeamTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

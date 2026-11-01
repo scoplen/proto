@@ -47,6 +47,7 @@ pub mod proto {
     }
 }
 pub mod sync;
+pub mod team;
 
 /// `FileDescriptorSet` for the internal protobuf contracts.
 pub const INTERNAL_PROTO_DESCRIPTOR: &[u8] =
@@ -77,6 +78,7 @@ pub const ERROR_CODES: &[&str] = &[
     "organization.commit_outcome_unknown",
     "organization.conflict",
     "organization.invalid_request",
+    "organization.invitation_denied",
     "organization.not_found",
     "organization.precondition_failed",
     "organization.precondition_required",

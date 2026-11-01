@@ -49,8 +49,11 @@ pub enum OrganizationReferenceError {
     /// Missing Organization or current caller membership, deliberately indistinguishable.
     #[error("organization not found")]
     NotFound,
-    /// The same Account/key was used with another canonical creation payload.
-    #[error("organization creation conflict")]
+    /// Common denial for an ineligible named recipient or unavailable invitation/password.
+    #[error("team invitation denied")]
+    InvitationDenied,
+    /// A changed receipt payload or incompatible current team state prevents the operation.
+    #[error("organization operation conflict")]
     Conflict,
     /// The required update precondition is absent.
     #[error("organization precondition required")]
@@ -114,7 +117,14 @@ impl OrganizationReferenceError {
                 "organization.conflict",
                 false,
                 false,
-                "The creation key belongs to another payload. No team data changed. Preserve the original operation.",
+                "The operation conflicts with its original payload or current team state. No team data changed. Preserve the original operation and review the team.",
+            ),
+            Self::InvitationDenied => (
+                409,
+                "organization.invitation_denied",
+                false,
+                false,
+                "The invitation is unavailable. Review the invitation or ask its issuer for a new one.",
             ),
             Self::StorageUnavailable => (
                 503,
@@ -149,7 +159,7 @@ impl OrganizationReferenceError {
                 "organization.commit_outcome_unknown",
                 true,
                 true,
-                "Team creation could not be confirmed and may have changed data. Preserve and retry only the original key and payload with a fresh proof within the original 24-hour window.",
+                "The team operation could not be confirmed and may have changed data. Preserve and retry only the original key and payload with a fresh proof within the original 24-hour window.",
             ),
             Self::ResponseLost => return Ok(None),
         };
@@ -466,6 +476,15 @@ fn authorize_settings(
     resource: &OrganizationResource,
     now: u64,
 ) -> Result<(), OrganizationReferenceError> {
+    authorize_organization_action(resource, "manage_organization", &PolicySet::new(), now)
+}
+
+pub(super) fn authorize_organization_action(
+    resource: &OrganizationResource,
+    action: &str,
+    policies: &PolicySet,
+    now: u64,
+) -> Result<(), OrganizationReferenceError> {
     use OrganizationReferenceError as Error;
     let reference =
         |kind: &str, id: Uuid| json!({"__entity": {"type": kind, "id": id.to_string()}});
@@ -503,7 +522,7 @@ fn authorize_settings(
     };
     let request = Request::new(
         uid("Account", account)?,
-        "Action::\"manage_organization\"".parse().map_err(|_| Error::InvalidRequest)?,
+        format!("Action::\"{action}\"").parse().map_err(|_| Error::InvalidRequest)?,
         uid("Organization", resource.id)?,
         context,
         None,
@@ -511,8 +530,8 @@ fn authorize_settings(
     .map_err(|_| Error::InvalidRequest)?;
     let trusted = OrganizationAuthorizationContext::new(account, resource.id, membership, now)
         .map_err(|_| Error::InvalidRequest)?;
-    let authorizer = OrganizationAuthorizer::new(resource.id, &PolicySet::new())
-        .map_err(|_| Error::InvalidRequest)?;
+    let authorizer =
+        OrganizationAuthorizer::new(resource.id, policies).map_err(|_| Error::InvalidRequest)?;
     if authorizer.authorize(&trusted, &request, &entities).map_err(|_| Error::Denied)?
         != Decision::Allow
     {

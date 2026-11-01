@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-136 named-Account team invitation, member administration and dissolution JSON codecs,
+  public links, independent vectors, parser seeds and exact OpenAPI/TypeScript contracts.
+  The zeroizing K-2 invitation helper generates the eight-symbol password and context-bound
+  verifier. Initial Device scopes add `teams:join` and `teams:manage`; the operation registry
+  replaces the singular scope getter with explicit any-of alternatives. Consumers must adopt
+  the new shared pin and require fresh authentication for an expanded scope ceiling.
+
 - Add D-134 strict team name-update JSON and strong `If-Match` parsing, exact `orgs:write`
   scope/operation and the guarded Cedar `manage_organization` action. OpenAPI/TypeScript,
   independent vectors, parser seeds and reference faults cover no-op, stale projection,

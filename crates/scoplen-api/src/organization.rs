@@ -599,7 +599,7 @@ pub fn validate_cache_headers(
     Ok(())
 }
 
-fn validate_name(name: &str) -> Result<(), OrganizationCodecError> {
+pub(super) fn validate_name(name: &str) -> Result<(), OrganizationCodecError> {
     if name.is_empty()
         || name.len() > MAX_ORGANIZATION_NAME_BYTES
         || name.trim() != name
@@ -609,10 +609,10 @@ fn validate_name(name: &str) -> Result<(), OrganizationCodecError> {
     }
     Ok(())
 }
-fn valid_uuid(id: Uuid, field: &'static str) -> Result<(), OrganizationCodecError> {
+pub(super) fn valid_uuid(id: Uuid, field: &'static str) -> Result<(), OrganizationCodecError> {
     validate_uuid_v7(id).map_err(|_| OrganizationCodecError::InvalidField(field))
 }
-fn parse_uuid(text: &str, field: &'static str) -> Result<Uuid, OrganizationCodecError> {
+pub(super) fn parse_uuid(text: &str, field: &'static str) -> Result<Uuid, OrganizationCodecError> {
     let id = Uuid::parse_str(text).map_err(|_| OrganizationCodecError::InvalidField(field))?;
     if id.to_string() != text {
         return Err(OrganizationCodecError::InvalidField(field));
@@ -620,13 +620,16 @@ fn parse_uuid(text: &str, field: &'static str) -> Result<Uuid, OrganizationCodec
     valid_uuid(id, field)?;
     Ok(id)
 }
-fn object(input: &[u8], bound: usize) -> Result<Map<String, Value>, OrganizationCodecError> {
+pub(super) fn object(
+    input: &[u8],
+    bound: usize,
+) -> Result<Map<String, Value>, OrganizationCodecError> {
     if input.len() > bound {
         return Err(OrganizationCodecError::TooLarge);
     }
     request_wire::decode_unique_object(input).map_err(|()| OrganizationCodecError::InvalidJson)
 }
-fn take_string(
+pub(super) fn take_string(
     fields: &mut Map<String, Value>,
     name: &'static str,
 ) -> Result<String, OrganizationCodecError> {
@@ -635,13 +638,13 @@ fn take_string(
         _ => Err(OrganizationCodecError::InvalidField(name)),
     }
 }
-fn take_uuid(
+pub(super) fn take_uuid(
     fields: &mut Map<String, Value>,
     name: &'static str,
 ) -> Result<Uuid, OrganizationCodecError> {
     parse_uuid(&take_string(fields, name)?, name)
 }
-fn take_object(
+pub(super) fn take_object(
     fields: &mut Map<String, Value>,
     name: &'static str,
 ) -> Result<Map<String, Value>, OrganizationCodecError> {
@@ -650,7 +653,10 @@ fn take_object(
         _ => Err(OrganizationCodecError::InvalidField(name)),
     }
 }
-fn encode(value: &impl Serialize, bound: usize) -> Result<Vec<u8>, OrganizationCodecError> {
+pub(super) fn encode(
+    value: &impl Serialize,
+    bound: usize,
+) -> Result<Vec<u8>, OrganizationCodecError> {
     let bytes = serde_json::to_vec(value).map_err(|_| OrganizationCodecError::InvalidJson)?;
     if bytes.len() > bound {
         return Err(OrganizationCodecError::TooLarge);

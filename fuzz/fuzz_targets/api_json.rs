@@ -29,6 +29,12 @@ use scoplen_api::organization::{
     OrganizationCreateRequest, OrganizationPage, OrganizationResource, OrganizationUpdateRequest,
     parse_organization_if_match,
 };
+use scoplen_api::team::{
+    TeamAcceptanceReceipt, TeamDissolutionReceipt, TeamDissolveRequest,
+    TeamInvitationAcceptRequest, TeamInvitationCreateRequest, TeamInvitationLink,
+    TeamInvitationPage, TeamInvitationResource, TeamMemberPage, TeamMemberResource,
+    TeamMemberUpdateRequest,
+};
 
 macro_rules! round_trip {
     ($message:ty, $input:expr) => {
@@ -55,6 +61,22 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(OrganizationUpdateRequest, bytes);
     round_trip!(OrganizationResource, bytes);
     round_trip!(OrganizationPage, bytes);
+    round_trip!(TeamInvitationResource, bytes);
+    round_trip!(TeamMemberResource, bytes);
+    round_trip!(TeamMemberUpdateRequest, bytes);
+    round_trip!(TeamAcceptanceReceipt, bytes);
+    round_trip!(TeamDissolveRequest, bytes);
+    round_trip!(TeamDissolutionReceipt, bytes);
+    round_trip!(TeamInvitationPage, bytes);
+    round_trip!(TeamMemberPage, bytes);
+    if let Ok(value) = TeamInvitationCreateRequest::from_json(bytes) {
+        let encoded = value.to_json().expect("validated secret request encodes");
+        assert_eq!(TeamInvitationCreateRequest::from_json(encoded.as_bytes()), Ok(value));
+    }
+    if let Ok(value) = TeamInvitationAcceptRequest::from_json(bytes) {
+        let encoded = value.to_json().expect("validated secret request encodes");
+        assert_eq!(TeamInvitationAcceptRequest::from_json(encoded.as_bytes()), Ok(value));
+    }
     round_trip!(AccountDeviceStatements, bytes);
     round_trip!(AccountRequestChallengeRequest, bytes);
     round_trip!(AccountRequestChallengeResponse, bytes);
@@ -101,6 +123,9 @@ fuzz_target!(|bytes: &[u8]| {
     );
 
     if let Ok(text) = std::str::from_utf8(bytes) {
+        if let Ok(value) = TeamInvitationLink::parse(text) {
+            assert_eq!(value.to_url().expect("validated link encodes"), text);
+        }
         if let Ok(tag) = parse_organization_if_match(Some(text)) {
             assert_eq!(tag, text);
             assert_eq!(parse_organization_if_match(Some(tag)), Ok(tag));
