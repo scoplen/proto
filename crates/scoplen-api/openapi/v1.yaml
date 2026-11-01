@@ -119,7 +119,7 @@
     "/auth/device": {
       "post": {
         "operationId": "authenticateDevice",
-        "x-scoplen-initial-device-scope": "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write",
+        "x-scoplen-initial-device-scope": "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage",
         "security": [],
         "requestBody": {
           "required": true,
@@ -134,7 +134,7 @@
         },
         "responses": {
           "200": {
-            "description": "DPoP-bound access and refresh tokens. The server issues exactly account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write after checking the current active account, enrolled device, and certificate. Request bodies cannot propose scopes. The refresh family records this initial permission ceiling. Scopes do not grant operator, browser, or service-principal rights and do not replace current-state or resource authorization.",
+            "description": "DPoP-bound access and refresh tokens. The server issues exactly account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage after checking the current active account, enrolled device, and certificate. Request bodies cannot propose scopes. The refresh family records this initial permission ceiling. Scopes do not grant operator, browser, or service-principal rights and do not replace current-state or resource authorization.",
             "content": {
               "application/json": {
                 "schema": {
@@ -895,206 +895,550 @@
     },
     "/orgs/{org}/members": {
       "get": {
-        "operationId": "listMembers",
+        "operationId": "listTeamMembers",
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-response-max-bytes": 2097152,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Require current active membership and manage_members. Return only this team's ascending Member Resources, never email, Devices, Personal data or keys. Reject body, unknown/duplicate query names, If-Match and Idempotency-Key. There is no direct member-create operation; named invitation acceptance is required.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            }
           },
           {
-            "$ref": "#/components/parameters/cursor"
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Page"
+            "description": "Complete JSON body <=2097152 bytes; response extensions are ignored within this bound.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMemberPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "description": "Storage failure is changed=false/retryable=true; no partial success body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
-      },
-      "post": {
-        "operationId": "createMembers",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/org"
-          },
-          {
-            "$ref": "#/components/parameters/idempotency"
-          }
-        ],
-        "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
         },
-        "responses": {
-          "201": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      }
-    },
-    "/orgs/{org}/members/{id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/org"
-        },
-        {
-          "$ref": "#/components/parameters/id"
-        }
-      ],
-      "get": {
-        "operationId": "getMembers",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "patch": {
-        "operationId": "updateMembers",
-        "parameters": [
+        "security": [
           {
-            "$ref": "#/components/parameters/ifMatch"
+            "accessToken": [],
+            "dpopProof": []
           }
-        ],
-        "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteMembers",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ifMatch"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Deleted"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
+        ]
       }
     },
     "/orgs/{org}/invitations": {
       "get": {
-        "operationId": "listInvitations",
+        "operationId": "listTeamInvitations",
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-response-max-bytes": 2097152,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Require current active membership and manage_members. Return ascending Invitation Resources without password, verifier or failure count. Reject body, unknown/duplicate query names, If-Match and Idempotency-Key.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            }
           },
           {
-            "$ref": "#/components/parameters/cursor"
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Page"
+            "description": "Complete JSON body <=2097152 bytes; response extensions are ignored within this bound.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInvitationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "description": "Storage failure is changed=false/retryable=true; no partial success body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
       },
       "post": {
-        "operationId": "createInvitations",
+        "operationId": "createTeamInvitation",
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-request-max-bytes": 4096,
+        "x-scoplen-response-max-bytes": 4096,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Independent durable team admission charges 30 source and 10 authenticated-Account attempts per mutation operation per 60 seconds, sharing the bounded existing admission storage. A required audit failure rolls back business mutation. One original UUIDv7 key and canonical payload bind the authenticated Account and actual method/path for 24 hours. Changed payload under the same key conflicts. Unconfirmed COMMIT preserves the exact original operation; explicit confirmation uses fresh DPoP only within that original window. Never automatically replace an expired key. Resolve recipient_username to one existing eligible Account and bind its id permanently. Active members are ineligible; suspended membership is restored only by authorized member update. Owner grants require current Owner; other built-in roles require manage_members. Persist issuer, roles, verifier, 24-hour expiry, invitation and audit atomically. Exact replay still requires current administrative authority and returns the current Resource without renewing expiry. Reject query and If-Match; ids cannot be reused.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/idempotency"
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
+          "required": true,
+          "description": "Complete UTF-8 JSON <=4096 bytes; reject unknown fields and recursive duplicate names before mutation.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamInvitationCreateRequest"
+              }
+            }
+          }
         },
         "responses": {
           "201": {
-            "$ref": "#/components/responses/Resource"
+            "description": "Complete JSON body <=4096 bytes; response extensions are ignored within this bound. HTTP ETag exactly equals body etag.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "description": "Strong validator exactly equal to body etag.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[!#-~]*\"$",
+                  "minLength": 2,
+                  "maxLength": 256
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInvitationResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "description": "Changed payload/id conflict or static invitation denial for unknown/ineligible recipient.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationConflictProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TeamInvitationDeniedProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TeamBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "429": {
+            "$ref": "#/components/responses/TeamRateLimited"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is changed=true/retryable=true and permits only explicit original-operation confirmation within 24 hours.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
-      }
-    },
-    "/orgs/{org}/invitations/{id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/org"
         },
-        {
-          "$ref": "#/components/parameters/id"
-        }
-      ],
-      "get": {
-        "operationId": "getInvitations",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "patch": {
-        "operationId": "updateInvitations",
-        "parameters": [
+        "security": [
           {
-            "$ref": "#/components/parameters/ifMatch"
+            "accessToken": [],
+            "dpopProof": []
           }
-        ],
-        "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteInvitations",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ifMatch"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Deleted"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
+        ]
       }
     },
     "/orgs/{org}/groups": {
@@ -5056,6 +5400,1305 @@
           }
         }
       }
+    },
+    "/orgs/{org}/invitations/{invitation}": {
+      "get": {
+        "operationId": "getTeamInvitation",
+        "x-scoplen-accepted-device-scopes": [
+          "teams:join",
+          "teams:manage"
+        ],
+        "x-scoplen-response-max-bytes": 4096,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Either teams:manage plus current manage_members, or teams:join plus the fixed recipient Account. Recipient preview includes the team name but no password/verifier/counter. A different Account receives the same static 404 as absence and consumes no attempt. Reject body, every query, If-Match and Idempotency-Key.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete JSON body <=4096 bytes; response extensions are ignored within this bound. HTTP ETag exactly equals body etag.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "description": "Strong validator exactly equal to body etag.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[!#-~]*\"$",
+                  "minLength": 2,
+                  "maxLength": 256
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInvitationResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "description": "Storage failure is changed=false/retryable=true; no partial success body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "revokeTeamInvitation",
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_members",
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Independent durable team admission charges 30 source and 10 authenticated-Account attempts per mutation operation per 60 seconds, sharing the bounded existing admission storage. A required audit failure rolls back business mutation. Authorize before comparing the original Invitation ETag. Pending or locked becomes revoked with one audit; already revoked with matching current ETag is a no-op. Accepted/expired conflicts. This never removes membership. Reject body, every query and Idempotency-Key.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Exactly one original strong ETag; no weak tag, wildcard, multiple values or silent refresh/replay.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked or matching already-revoked no-op; no body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/TeamRateLimited"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is changed=true/retryable=false; refresh and review, never automatically resubmit.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      }
+    },
+    "/orgs/{org}/invitations/{invitation}/accept": {
+      "post": {
+        "operationId": "acceptTeamInvitation",
+        "x-scoplen-required-device-scope": "teams:join",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 1024,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Independent durable team admission charges 30 source and 10 authenticated-Account attempts per mutation operation per 60 seconds, sharing the bounded existing admission storage. A required audit failure rolls back business mutation. One original UUIDv7 key and canonical payload bind the authenticated Account and actual method/path for 24 hours. Changed payload under the same key conflicts. Unconfirmed COMMIT preserves the exact original operation; explicit confirmation uses fresh DPoP only within that original window. Never automatically replace an expired key. Only the fixed recipient Account may submit the separate password. After transaction locks require pending/unexpired invitation, no active recipient membership and current issuer/role-grant authority; compare the shared context-bound verifier in constant time. Five incorrect recipient submissions lock it; foreign Accounts return static 404 and never charge that counter. Atomically create one membership, consume invitation, revoke derived access as required and audit. Exact accepted-receipt replay follows current Account/Device plus key/payload binding before team/pending/password/issuer checks; it confirms history only and cannot reactivate removed membership. Reject query and If-Match. No Account/Device enrollment, Personal key delivery or Shared vault.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON <=256 bytes; reject unknown fields and recursive duplicate names before mutation.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamInvitationAcceptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete JSON body <=1024 bytes; response extensions are ignored within this bound.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamAcceptanceReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "description": "Changed receipt binding conflicts; static invitation denial covers invalid password, unavailable/expired/locked invitation or lost issuer authority.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationConflictProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TeamInvitationDeniedProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TeamBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "429": {
+            "$ref": "#/components/responses/TeamRateLimited"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is changed=true/retryable=true and permits only explicit original-operation confirmation within 24 hours.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      }
+    },
+    "/orgs/{org}/members/{membership}": {
+      "get": {
+        "operationId": "getTeamMember",
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-response-max-bytes": 4096,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Require current active membership and manage_members; target belongs to path Organization. Reject body, every query, If-Match and Idempotency-Key.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "membership",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete JSON body <=4096 bytes; response extensions are ignored within this bound. HTTP ETag exactly equals body etag.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "description": "Strong validator exactly equal to body etag.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[!#-~]*\"$",
+                  "minLength": 2,
+                  "maxLength": 256
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMemberResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "description": "Storage failure is changed=false/retryable=true; no partial success body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateTeamMember",
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-request-max-bytes": 1024,
+        "x-scoplen-response-max-bytes": 4096,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Independent durable team admission charges 30 source and 10 authenticated-Account attempts per mutation operation per 60 seconds, sharing the bounded existing admission storage. A required audit failure rolls back business mutation. Require current manage_members before comparing the original Member ETag. Only a current Owner may grant owner or edit/suspend a current Owner. Preserve at least one active Owner, even under custom permit-all policy. Removed members cannot reactivate by PATCH; suspended members can. Equal matching update is a no-op. Atomic mutation updates authority/view revision, revokes required derived access and audits. Reject every query and Idempotency-Key. Unknown COMMIT requires refresh/review with no automatic replay.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "membership",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Exactly one original strong ETag; no weak tag, wildcard, multiple values or silent refresh/replay.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON <=1024 bytes; reject unknown fields and recursive duplicate names before mutation.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamMemberUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete JSON body <=4096 bytes; response extensions are ignored within this bound. HTTP ETag exactly equals body etag.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "description": "Strong validator exactly equal to body etag.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[!#-~]*\"$",
+                  "minLength": 2,
+                  "maxLength": 256
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMemberResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "413": {
+            "$ref": "#/components/responses/TeamBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/TeamRateLimited"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is changed=true/retryable=false; refresh and review, never automatically resubmit.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "removeTeamMember",
+        "x-scoplen-accepted-device-scopes": [
+          "teams:join",
+          "teams:manage"
+        ],
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Independent durable team admission charges 30 source and 10 authenticated-Account attempts per mutation operation per 60 seconds, sharing the bounded existing admission storage. A required audit failure rolls back business mutation. Either teams:manage plus current manage_members, or teams:join for exactly the caller's membership (self-leave). Only a current Owner may remove a current Owner; always preserve an active Owner. Self-leave may use the original current caller-membership projection ETag from section 2.9 instead of the administrator-only Member ETag; compare that same projection. A matching already-removed state is a no-op only with current caller authority. Revoke team-derived access and invalidate only this team's work; retain Personal and other teams. Reject body, every query and Idempotency-Key. Direct certificates retain their actual expiry/KRL limits; no unmanaged SSH termination claim.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "membership",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Exactly one original strong ETag; no weak tag, wildcard, multiple values or silent refresh/replay.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed or authorized matching already-removed no-op; no body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/TeamRateLimited"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is changed=true/retryable=false; refresh and review, never automatically resubmit.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      }
+    },
+    "/orgs/{org}/dissolve": {
+      "post": {
+        "operationId": "dissolveTeam",
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 512,
+        "description": "Require current Account/Device authentication, actual-method/trusted-URL DPoP and durable replay protection. JWT org snapshots and submitted roles are not current authority. No refresh cookie is read or changed. Independent durable team admission charges 30 source and 10 authenticated-Account attempts per mutation operation per 60 seconds, sharing the bounded existing admission storage. A required audit failure rolls back business mutation. One original UUIDv7 key and canonical payload bind the authenticated Account and actual method/path for 24 hours. Changed payload under the same key conflicts. Unconfirmed COMMIT preserves the exact original operation; explicit confirmation uses fresh DPoP only within that original window. Never automatically replace an expired key. Require current active Owner and manage_organization, exact current Organization ETag and echoed Organization id. Atomically disable this team, revoke memberships/invitations/grants/derived access, withdraw inventory from serving and commit final team audit plus receipt; keep Accounts, Personal data and other teams. Installed host trust is removed separately. Bind the receipt to the original strong If-Match as well as body; explicit retry preserves it. Exact receipt confirmation occurs before active-team/Owner/current-ETag lookup, never grants retained-data access or proves current authority. Without an exact receipt all normal checks apply. Reject every query.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Exactly one original strong ETag; no weak tag, wildcard, multiple values or silent refresh/replay.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Complete UTF-8 JSON <=256 bytes; reject unknown fields and recursive duplicate names before mutation.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamDissolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete JSON body <=512 bytes; response extensions are ignored within this bound.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDissolutionReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "413": {
+            "$ref": "#/components/responses/TeamBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/TeamRateLimited"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is changed=true/retryable=true and permits only explicit original-operation confirmation within 24 hours.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -6519,6 +8162,126 @@
           "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+            }
+          }
+        }
+      },
+      "TeamInvitationDenied": {
+        "description": "409 organization.invitation_denied; changed=false; retryable=false. Complete problem <=4096 bytes. Static detail does not distinguish recipient eligibility, password, expiry, lock or current issuer failure.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/TeamInvitationDeniedProblem"
+            }
+          }
+        }
+      },
+      "TeamBodyTooLarge": {
+        "description": "413 organization.invalid_request; changed=false; retryable=false. Complete problem <=4096 bytes.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/TeamBodyTooLargeProblem"
+            }
+          }
+        }
+      },
+      "TeamRateLimited": {
+        "description": "Durable team-operation admission denied; changed=false/retryable=true. Retry-After is the greatest applicable wait rounded to 1..300 seconds, not an admission guarantee. Existing bounded authentication rate headers expose no private bucket or invitation counter.",
+        "headers": {
+          "Retry-After": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            }
+          },
+          "RateLimit-Policy": {
+            "required": true,
+            "schema": {
+              "const": "\"authentication\";q=30;w=60"
+            }
+          },
+          "RateLimit": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"authentication\";r=0;t=(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300)$"
+            },
+            "description": "The t delay equals Retry-After."
+          },
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthRateLimitedProblem"
             }
           }
         }
@@ -9096,6 +10859,532 @@
               },
               "changed": {
                 "const": true
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "TeamRole": {
+        "type": "string",
+        "enum": [
+          "administrator",
+          "approver",
+          "member",
+          "owner",
+          "security_auditor"
+        ]
+      },
+      "TeamInvitationStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "accepted",
+          "revoked",
+          "expired",
+          "locked"
+        ]
+      },
+      "TeamMemberStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "suspended",
+          "removed"
+        ]
+      },
+      "TeamInvitationCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "invitation_id",
+          "recipient_username",
+          "roles",
+          "password_verifier"
+        ],
+        "properties": {
+          "invitation_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "recipient_username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/TeamRole"
+            },
+            "description": "Distinct built-in roles; encoders sort bytewise, readers accept distinct order. No role value grants authority without current server checks."
+          },
+          "password_verifier": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url of the exact 32-byte shared K-2 context-bound verifier; never the password. Server storage retains only this verifier."
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "TeamInvitationAcceptRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "pattern": "^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{8}$",
+            "writeOnly": true,
+            "description": "Separate transient invitation password, exactly eight uppercase ASCII symbols with no aliases, case folding, spaces or separators. Never an Account password or key."
+          }
+        },
+        "x-scoplen-max-bytes": 256
+      },
+      "TeamInvitationResource": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "etag",
+          "created_at",
+          "updated_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "etag": {
+            "type": "string",
+            "pattern": "^\"[!#-~]*\"$",
+            "minLength": 2,
+            "maxLength": 256
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "organization_id",
+              "organization_name",
+              "recipient_account_id",
+              "recipient_username",
+              "roles",
+              "issuer_account_id",
+              "expires_at",
+              "status",
+              "membership_id"
+            ],
+            "properties": {
+              "organization_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "organization_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "x-scoplen-max-utf8-bytes": 128,
+                "description": "1..128 UTF-8 bytes, no Unicode control or leading/trailing Unicode whitespace; preserve without normalization."
+              },
+              "recipient_account_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "recipient_username": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9._-]*$"
+              },
+              "roles": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/components/schemas/TeamRole"
+                },
+                "description": "Distinct built-in roles; encoders sort bytewise, readers accept distinct order. No role value grants authority without current server checks."
+              },
+              "issuer_account_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+                "description": "A valid UTC calendar timestamp."
+              },
+              "status": {
+                "$ref": "#/components/schemas/TeamInvitationStatus"
+              },
+              "membership_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "accepted"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "membership_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "membership_id": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "TeamInvitationPage": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/TeamInvitationResource"
+            },
+            "description": "Distinct ascending ids beyond the requested cursor; each original item including extensions/whitespace is at most 4096 bytes."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Non-null only when more eligible items exist; equals the nonempty Page's final id."
+          }
+        },
+        "x-scoplen-max-bytes": 2097152
+      },
+      "TeamMemberUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roles",
+          "status"
+        ],
+        "properties": {
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/TeamRole"
+            },
+            "description": "Distinct built-in roles; encoders sort bytewise, readers accept distinct order. No role value grants authority without current server checks."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended"
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 1024
+      },
+      "TeamMemberResource": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "etag",
+          "created_at",
+          "updated_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "etag": {
+            "type": "string",
+            "pattern": "^\"[!#-~]*\"$",
+            "minLength": 2,
+            "maxLength": 256
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "organization_id",
+              "account_id",
+              "username",
+              "roles",
+              "status"
+            ],
+            "properties": {
+              "organization_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "account_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "username": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9._-]*$"
+              },
+              "roles": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/components/schemas/TeamRole"
+                },
+                "description": "Distinct built-in roles; encoders sort bytewise, readers accept distinct order. No role value grants authority without current server checks."
+              },
+              "status": {
+                "$ref": "#/components/schemas/TeamMemberStatus"
+              }
+            }
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "TeamMemberPage": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/TeamMemberResource"
+            },
+            "description": "Distinct ascending ids beyond the requested cursor; each original item including extensions/whitespace is at most 4096 bytes."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Non-null only when more eligible items exist; equals the nonempty Page's final id."
+          }
+        },
+        "x-scoplen-max-bytes": 2097152
+      },
+      "TeamAcceptanceReceipt": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "invitation_id",
+          "organization_id",
+          "account_id",
+          "membership_id",
+          "accepted_at"
+        ],
+        "properties": {
+          "invitation_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp."
+          }
+        },
+        "x-scoplen-max-bytes": 1024,
+        "description": "Immutable historical acceptance confirmation; bind every echoed id to the captured request. It never proves current membership or recreates removed authority."
+      },
+      "TeamDissolveRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "organization_id"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-scoplen-max-bytes": 256
+      },
+      "TeamDissolutionReceipt": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "organization_id",
+          "dissolved_at"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "dissolved_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp."
+          }
+        },
+        "x-scoplen-max-bytes": 512,
+        "description": "Historical dissolution confirmation only; bind the Organization to the original request. It grants no retained team-data access."
+      },
+      "TeamInvitationDeniedProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "code": {
+                "const": "organization.invitation_denied"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "TeamBodyTooLargeProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 413
+              },
+              "code": {
+                "const": "organization.invalid_request"
+              },
+              "changed": {
+                "const": false
               },
               "retryable": {
                 "const": false
