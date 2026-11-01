@@ -25,6 +25,7 @@ pub mod operator_logout_reference;
 pub mod organization;
 pub mod organization_reference;
 mod request_wire;
+pub mod team_reference;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
 pub mod proto {
@@ -47,6 +48,7 @@ pub mod proto {
     }
 }
 pub mod sync;
+pub mod team;
 
 /// `FileDescriptorSet` for the internal protobuf contracts.
 pub const INTERNAL_PROTO_DESCRIPTOR: &[u8] =
@@ -77,6 +79,7 @@ pub const ERROR_CODES: &[&str] = &[
     "organization.commit_outcome_unknown",
     "organization.conflict",
     "organization.invalid_request",
+    "organization.invitation_denied",
     "organization.not_found",
     "organization.precondition_failed",
     "organization.precondition_required",

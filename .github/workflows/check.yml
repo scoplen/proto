@@ -38,6 +38,14 @@ jobs:
         run: node scripts/generate-organization-vectors.mjs --check
       - name: Test independent team vector producer and checkout bounds
         run: node --test scripts/generate-organization-vectors.test.mjs
+      - name: Test team membership OpenAPI contract checks
+        run: node --test crates/scoplen-api/openapi/generate-team.test.mjs
+      - name: Check team invitation cryptographic and API vectors
+        run: |
+          node scripts/generate-team-invitation-vectors.mjs --check
+          node scripts/generate-team-vectors.mjs --check
+      - name: Test independent team invitation vector producers
+        run: node --test scripts/generate-team-invitation-vectors.test.mjs scripts/generate-team-vectors.test.mjs
       - name: Check used Account-id digest vectors
         run: node scripts/generate-account-used-id-vectors.mjs --check
       - name: Check Operator logout vectors and parser bounds

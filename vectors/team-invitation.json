@@ -1,0 +1,210 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "team-invitation-base",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "bf7751b115c944bfbcac179f523262f2d9a342c954029957e952d30c0cf9f6c4"
+    },
+    {
+      "id": "team-invitation-other-origin",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://other.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "12eca337f79039d9f300412d75247b0c8bc0119f6e13458e8fbbeeee6beb26da"
+    },
+    {
+      "id": "team-invitation-origin-port",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com:8443\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "b192e070cb0574cd604e36d20334434c1939b4dc2be0b704fa2357fe524e0d35"
+    },
+    {
+      "id": "team-invitation-origin-ipv4",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://127.0.0.1:8443\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "bd2a3260ba7b51421c1907d95d0f4e012451027c69df927577c62a60dac7dab7"
+    },
+    {
+      "id": "team-invitation-origin-ipv6",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://[2001:db8::1]:8443\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "fe68c872048bb2534cfc247600e546bf3e5eabe527ed3f49ba575664d33f6bff"
+    },
+    {
+      "id": "team-invitation-maximum-dns-origin",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "8f49f688dddcd56ce9e6c6ef726eceab437619b20099fbb62bae7ba4092bf757"
+    },
+    {
+      "id": "team-invitation-other-organization",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000003\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "ad280300c7c62a12e97a28fbee315311ce142d9e0a5bcfb97fb3ad10c49c1a27"
+    },
+    {
+      "id": "team-invitation-other-invitation",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000004\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "66754f2a2df576875b52ec8c4f3533e091953b4dfec540968566790ddf1d2289"
+    },
+    {
+      "id": "team-invitation-other-password",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"3031323357585930\"}",
+      "expected": "f7c66cff4167794e64e11769da478ba3e34e8eac8ced0b8c30fa179e34e6a352"
+    },
+    {
+      "id": "team-invitation-swapped-identifiers",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000002\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000001\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "a2b129ff0c16f8eaf254e3afcda3be54014e2b00d708b5dac5ad7bed7de40982"
+    },
+    {
+      "id": "team-invitation-maximum-identifiers",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"ffffffff-ffff-7fff-bfff-ffffffffffff\",\"invitation_id\":\"ffffffff-ffff-7fff-bfff-fffffffffffe\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "80519aee5fa4bf45137fb9b1a8159b3c631b1542254e914c9078e23cc8797395"
+    },
+    {
+      "id": "team-invitation-http-origin",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"http://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-uppercase-origin",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://CONTROL.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-trailing-slash",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com/\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-default-port",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com:443\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-nil-organization",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"00000000-0000-0000-0000-000000000000\",\"invitation_id\":\"019c8a50-1000-7000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-v4-invitation",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-4000-8000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-wrong-variant",
+      "kind": "crypto.team-invitation.verifier",
+      "input": "{\"origin\":\"https://control.example.com\",\"organization_id\":\"019c8a50-1000-7000-8000-000000000001\",\"invitation_id\":\"019c8a50-1000-7000-7000-000000000002\",\"password_hex\":\"303132335758595a\"}",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-digits",
+      "kind": "crypto.team-invitation.password",
+      "input": "3031323334353637",
+      "expected": "accept"
+    },
+    {
+      "id": "team-invitation-password-letters",
+      "kind": "crypto.team-invitation.password",
+      "input": "4142434445464748",
+      "expected": "accept"
+    },
+    {
+      "id": "team-invitation-password-middle",
+      "kind": "crypto.team-invitation.password",
+      "input": "4a4b4d4e50515253",
+      "expected": "accept"
+    },
+    {
+      "id": "team-invitation-password-last",
+      "kind": "crypto.team-invitation.password",
+      "input": "54565758595a3031",
+      "expected": "accept"
+    },
+    {
+      "id": "team-invitation-password-short",
+      "kind": "crypto.team-invitation.password",
+      "input": "30313233343536",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-long",
+      "kind": "crypto.team-invitation.password",
+      "input": "303132333435363738",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-lowercase",
+      "kind": "crypto.team-invitation.password",
+      "input": "6162636465666730",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-alias-i",
+      "kind": "crypto.team-invitation.password",
+      "input": "4931323334353637",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-alias-l",
+      "kind": "crypto.team-invitation.password",
+      "input": "4c31323334353637",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-alias-o",
+      "kind": "crypto.team-invitation.password",
+      "input": "4f31323334353637",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-alias-u",
+      "kind": "crypto.team-invitation.password",
+      "input": "5531323334353637",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-space",
+      "kind": "crypto.team-invitation.password",
+      "input": "2031323334353637",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-separator",
+      "kind": "crypto.team-invitation.password",
+      "input": "3031322d34353637",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-newline",
+      "kind": "crypto.team-invitation.password",
+      "input": "303132333435360a",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-nul",
+      "kind": "crypto.team-invitation.password",
+      "input": "3031323334353600",
+      "expected": "reject"
+    },
+    {
+      "id": "team-invitation-password-unicode",
+      "kind": "crypto.team-invitation.password",
+      "input": "303132333435c3a9",
+      "expected": "reject"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Invitation not accepted","status":409,"detail":"The invitation is unavailable. Review the invitation or ask its issuer for a new one.","instance":"fixture-request","code":"organization.invitation_denied","changed":false,"retryable":false}

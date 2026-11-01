@@ -24,6 +24,7 @@ mod recovery;
 mod secret;
 mod shamir;
 mod signature;
+mod team_invitation;
 
 pub use account_request::{
     AccountProbeKey, AccountRequestError, AccountRequestIntent, AccountRequestKind,
@@ -88,6 +89,7 @@ pub use signature::{
     DeviceSigner, Ed25519SigningKey, P256SigningKey, ed25519_verify, generate_ed25519_signing_key,
     generate_p256_signing_key, p256_verify,
 };
+pub use team_invitation::{TeamInvitationError, TeamInvitationPassword, TeamInvitationVerifier};
 
 /// The contract identifier implemented by this crate.
 pub const CONTRACT: &str = "K-2";

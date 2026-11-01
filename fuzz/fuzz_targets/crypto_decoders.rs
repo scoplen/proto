@@ -4,6 +4,18 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|bytes: &[u8]| {
+    if let Ok(password) = scoplen_crypto::TeamInvitationPassword::parse(bytes) {
+        assert_eq!(password.as_bytes().as_slice(), bytes);
+    }
+    if let Some((candidate, context)) = bytes.split_at_checked(8)
+        && let Ok(password) = scoplen_crypto::TeamInvitationPassword::parse(candidate)
+        && let Ok(context) = std::str::from_utf8(context)
+        && let Some((origin, identifiers)) = context.split_once('\n')
+        && let Some((organization, invitation)) = identifiers.split_once('\n')
+        && let (Ok(organization), Ok(invitation)) = (organization.parse(), invitation.parse())
+    {
+        let _ = password.verifier(origin, &organization, &invitation);
+    }
     if let Ok(wrap) = scoplen_crypto::PasswordArkWrap::decode(bytes) {
         assert_eq!(wrap.encode().as_slice(), bytes);
     }
