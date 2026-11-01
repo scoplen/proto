@@ -25,6 +25,7 @@ pub mod operator_logout_reference;
 pub mod organization;
 pub mod organization_reference;
 mod request_wire;
+pub mod team_reference;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
 pub mod proto {

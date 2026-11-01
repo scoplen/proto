@@ -2698,6 +2698,7 @@ dependencies = [
  "scoplen-model",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "ssh-key",
  "thiserror",
  "tokio-stream",
