@@ -1070,8 +1070,9 @@ resource profiles exercise the bounded session, read, write, and version-history
 Their synthetic seeds derive from published K-4 vectors and include malformed key updates,
 truncated CBOR, and the exact and exceeded session, query, and acknowledgement input bounds.
 The Linux change check replays every target's corpus, and
-the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
-Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
+the daily five-minute fuzz run starts from the same seeds. Both use `nightly-2026-10-26` and
+`cargo-fuzz` 0.13.2. On Linux, replay one target with
+`cargo +nightly-2026-10-26 fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
 9449 context and signed gateway tickets and D-100 device access tokens against separate fixed
 synthetic keyrings. Tracked seeds include the RFC proof, published gateway and access tokens,

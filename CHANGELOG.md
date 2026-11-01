@@ -4,6 +4,9 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Pin corpus replay and scheduled fuzzing to the previously successful nightly Rust and
+  cargo-fuzz versions, avoiding a compiler query-cycle regression in the rolling nightly.
+
 - Add D-137 Organization session ownership/revision, complete current-view query/page codecs,
   revision-bound acknowledgements and content-free team notification hints, with independent
   CBOR vectors and parser seeds. Public source/query validators and explicit read budgets
