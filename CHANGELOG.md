@@ -4,6 +4,16 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Pin corpus replay and scheduled fuzzing to the previously successful nightly Rust and
+  cargo-fuzz versions, avoiding a compiler query-cycle regression in the rolling nightly.
+
+- Add D-137 Organization session ownership/revision, complete current-view query/page codecs,
+  revision-bound acknowledgements and content-free team notification hints, with independent
+  CBOR vectors and parser seeds. Public source/query validators and explicit read budgets
+  preserve Personal/Shared wire bytes. The new descriptor context and notification variants
+  are source-breaking before Stable; production authorization, revision transactions and
+  client reconciliation remain consumer work.
+
 - Add D-136 named-Account team invitation, member administration and dissolution JSON codecs,
   public links, independent vectors, parser seeds and exact OpenAPI/TypeScript contracts.
   The zeroizing K-2 invitation helper generates the eight-symbol password and context-bound

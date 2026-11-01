@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FUZZ_TOOLCHAIN: nightly-2026-10-26
+
 jobs:
   fuzz:
     name: Fuzz ${{ matrix.target }}
@@ -31,10 +34,10 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install nightly Rust and cargo-fuzz
         run: |
-          rustup toolchain install nightly --profile minimal --component rust-src
-          cargo +nightly install cargo-fuzz --locked
+          rustup toolchain install "$FUZZ_TOOLCHAIN" --profile minimal --component rust-src
+          cargo +"$FUZZ_TOOLCHAIN" install cargo-fuzz --version 0.13.2 --locked
       - name: Fuzz parser boundary
-        run: cargo +nightly fuzz run ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=300 -timeout=30
+        run: cargo +"$FUZZ_TOOLCHAIN" fuzz run ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=300 -timeout=30
       - name: Check fuzz dependency lockfile
         run: git diff --exit-code -- fuzz/Cargo.lock
       - name: Save crash input

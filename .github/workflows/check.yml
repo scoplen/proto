@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FUZZ_TOOLCHAIN: nightly-2026-10-26
+
 jobs:
   rust:
     name: Rust (${{ matrix.os }})
@@ -46,6 +49,10 @@ jobs:
           node scripts/generate-team-vectors.mjs --check
       - name: Test independent team invitation vector producers
         run: node --test scripts/generate-team-invitation-vectors.test.mjs scripts/generate-team-vectors.test.mjs
+      - name: Check Organization view vectors and parser seeds
+        run: node scripts/generate-organization-view-vectors.mjs --check
+      - name: Test independent Organization view vector producer
+        run: node --test scripts/generate-organization-view-vectors.test.mjs
       - name: Check used Account-id digest vectors
         run: node scripts/generate-account-used-id-vectors.mjs --check
       - name: Check Operator logout vectors and parser bounds
@@ -65,11 +72,11 @@ jobs:
       - name: Build and replay fuzz corpus
         if: runner.os == 'Linux'
         run: |
-          rustup toolchain install nightly --profile minimal --component rust-src
-          cargo +nightly install cargo-fuzz --locked
+          rustup toolchain install "$FUZZ_TOOLCHAIN" --profile minimal --component rust-src
+          cargo +"$FUZZ_TOOLCHAIN" install cargo-fuzz --version 0.13.2 --locked
           for target in vector_loader object_decoder crypto_decoders agent_decoder sftp_decoder ssh_protocol sync_notification sync_control sync_data api_json; do
             test -n "$(find "fuzz/corpus/$target" -maxdepth 1 -type f -name 'seed-*' -print -quit)"
-            cargo +nightly fuzz run "$target" "fuzz/corpus/$target" -- -runs=0 -timeout=10
+            cargo +"$FUZZ_TOOLCHAIN" fuzz run "$target" "fuzz/corpus/$target" -- -runs=0 -timeout=10
           done
 
   dependency-audit:

@@ -95,6 +95,7 @@ pub const ERROR_CODES: &[&str] = &[
     "sync.rate_limited",
     "sync.read_only",
     "sync.storage_unavailable",
+    "sync.view_changed",
 ];
 
 /// Errors returned while constructing or validating API contract values.

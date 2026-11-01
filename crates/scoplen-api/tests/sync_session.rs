@@ -36,6 +36,7 @@ fn response() -> SyncSessionResponse {
             seq: 0,
             key_epoch: 1,
             rotation_pending: false,
+            organization: None,
         }],
     }
 }
@@ -197,6 +198,7 @@ fn response_from_json(input: &str) -> SyncSessionResponse {
                 seq: number(vault, "seq"),
                 key_epoch: number(vault, "key_epoch"),
                 rotation_pending: vault["rotation_pending"].as_bool().expect("boolean"),
+                organization: None,
             })
             .collect(),
     }
