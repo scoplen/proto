@@ -50,9 +50,17 @@ fn published_scope_vectors_use_the_public_registry() {
             "auth.scope.operation" => {
                 routes += 1;
                 let input: RouteInput = serde_json::from_str(&vector.input).expect(&vector.id);
-                DeviceAccessOperation::from_route(&input.method, &input.route_template)
-                    .map_or("unmapped", |operation| operation.required_scope().as_str())
-                    .to_owned()
+                DeviceAccessOperation::from_route(&input.method, &input.route_template).map_or_else(
+                    || "unmapped".to_owned(),
+                    |operation| {
+                        operation
+                            .accepted_scopes()
+                            .iter()
+                            .map(|scope| scope.as_str())
+                            .collect::<Vec<_>>()
+                            .join("|")
+                    },
+                )
             }
             "auth.scope.contains" => {
                 contains += 1;
@@ -97,7 +105,9 @@ fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
             "orgs:read",
             "orgs:write",
             "sync:read",
-            "sync:write"
+            "sync:write",
+            "teams:join",
+            "teams:manage"
         ]
     );
     assert_eq!(tokens.join(" "), INITIAL_DEVICE_ACCESS_SCOPE);
@@ -109,7 +119,7 @@ fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
 }
 
 #[test]
-fn every_registered_operation_has_a_unique_canonical_route_and_required_scope() {
+fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternatives() {
     let mut routes = HashSet::new();
     for operation in DeviceAccessOperation::ALL {
         assert!(routes.insert((operation.http_method(), operation.route_template())));
@@ -119,12 +129,23 @@ fn every_registered_operation_has_a_unique_canonical_route_and_required_scope() 
         );
         for scope in DeviceAccessScope::ALL {
             assert_eq!(
-                operation.required_scope().is_present_in(scope.as_str()),
-                scope == operation.required_scope()
+                operation.has_accepted_scope(scope.as_str()),
+                operation.accepted_scopes().contains(&scope)
             );
         }
     }
-    assert_eq!(routes.len(), 21);
+    assert_eq!(routes.len(), 31);
+    for operation in
+        [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
+    {
+        assert_eq!(
+            operation.accepted_scopes(),
+            &[DeviceAccessScope::TeamsJoin, DeviceAccessScope::TeamsManage]
+        );
+        assert!(!operation.has_accepted_scope("teams:* orgs:write owner"));
+        assert!(operation.has_accepted_scope("teams:join"));
+        assert!(operation.has_accepted_scope("teams:manage"));
+    }
 }
 
 #[test]
@@ -133,10 +154,10 @@ fn notification_routes_accept_both_defined_opening_methods_with_exact_read_scope
         let operation = DeviceAccessOperation::from_route(method, "/sync/v1/notify")
             .expect("registered notification handshake");
         assert_eq!(operation, DeviceAccessOperation::Notifications);
-        assert_eq!(operation.required_scope(), DeviceAccessScope::SyncRead);
+        assert_eq!(operation.accepted_scopes(), &[DeviceAccessScope::SyncRead]);
         for scope in DeviceAccessScope::ALL {
             assert_eq!(
-                operation.required_scope().is_present_in(scope.as_str()),
+                operation.has_accepted_scope(scope.as_str()),
                 scope == DeviceAccessScope::SyncRead
             );
         }
@@ -210,7 +231,7 @@ fn unknown_valid_scope_claims_remain_verifiable_and_grant_no_registered_rights()
         assert_eq!(verified.claims().scope, scope);
         for operation in DeviceAccessOperation::ALL {
             assert_eq!(
-                operation.required_scope().is_present_in(&verified.claims().scope),
+                operation.has_accepted_scope(&verified.claims().scope),
                 scope == INITIAL_DEVICE_ACCESS_SCOPE
             );
         }
@@ -227,11 +248,11 @@ fn authored_openapi_uses_the_shared_scope_ceiling_and_account_requirement() {
     );
     assert_eq!(
         document["paths"]["/accounts/me"]["get"]["x-scoplen-required-device-scope"],
-        DeviceAccessOperation::AccountProfileRead.required_scope().as_str()
+        DeviceAccessScope::AccountRead.as_str()
     );
     assert_eq!(
         document["paths"]["/accounts/me/devices"]["get"]["x-scoplen-required-device-scope"],
-        DeviceAccessOperation::AccountDevicesRead.required_scope().as_str()
+        DeviceAccessScope::AccountRead.as_str()
     );
 }
 

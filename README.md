@@ -129,6 +129,15 @@ require fresh Device authentication for old refresh families; refresh must never
 Native settings interaction, HTTP authorization, durable transactions and audit chains remain
 consumer responsibilities.
 
+D-136's `team` module adds bounded named-Account invitation, member and dissolution messages,
+exact public invitation links and captured-response binding. Creation and acceptance bodies
+retain secret fields in redacting zeroizing ownership. The independent K-2 invitation helper
+generates eight uniform Crockford symbols and derives the exact origin/team/invitation-bound
+verifier; it is neither an Account login password nor an encrypted-vault key exchange.
+OpenAPI/TypeScript, independent vectors and parser seeds describe all ten operations.
+Production HTTP authentication, current authorization, durable admission/transactions and
+native interaction remain consumer responsibilities; these contracts alone do not enable teams.
+
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
@@ -729,9 +738,12 @@ response continues to treat the token as opaque.
 
 `scoplen-api::auth` publishes D-107's `DeviceAccessScope`, `INITIAL_DEVICE_ACCESS_SCOPE`,
 and `DeviceAccessOperation`. Initial first-party device issuance uses exactly
-`account:read keys:read keys:write sync:read sync:write`; refresh may preserve or narrow its
+`account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage`; refresh may preserve or narrow its
 recorded ceiling, never widen it. The operation registry requires router-owned canonical
 methods and route templates. Unknown protected routes fail closed for this device profile.
+`accepted_scopes()` exposes exact any-of scope alternatives and `has_accepted_scope()` checks
+their presence. Invitation read accepts team administration or recipient scope; member removal
+accepts administration or self-leave scope. Current role/recipient/self checks remain mandatory.
 Notification route lookup accepts both the classic `GET` and HTTP/2 extended `CONNECT` at
 exactly `/sync/v1/notify`, each requiring `sync:read`. Its canonical `http_method()` remains
 `GET`; consumers bind the DPoP target to the actual opening method reported in the context,

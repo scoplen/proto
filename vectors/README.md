@@ -256,6 +256,16 @@ the public codec tests consume every vector. `auth-scopes.json` includes `orgs:w
 PATCH route and older-family/read-only scope denials. These fixtures supply no production
 authentication, durable transaction or HTTP acceptance evidence.
 
+`team-membership.json` is independently produced by `scripts/generate-team-vectors.mjs`.
+Its 109 examples cover every D-136 request, Resource, Page and historical receipt, the exact
+secret-free public link, role sorting, strict request/recursive duplicate rejection, response
+extensions, state-dependent membership ids and complete encoded byte limits. Public Rust
+tests consume every example; `--check` also verifies 105 exact parser seeds. Scope vectors
+include all ten routes and the two explicit any-of requirements.
+`team-invitation.json` independently checks K-2's password grammar and domain-separated
+origin/Organization/invitation verifier with Node SHA-256, including context substitutions.
+These fixtures do not establish production authorization or native interaction.
+
 `api-auth.json` contains the K-3 JSON and signature-input vectors. Challenge requests contain
 only a canonical UUIDv7 device id and have a 256-byte encoded-body limit. The signature-input
 vector encodes `spl-auth-v1 || UTF-8 canonical HTTPS origin || raw nonce || raw UUIDv7` in lowercase

@@ -5,8 +5,7 @@
 ///
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
-pub const INITIAL_DEVICE_ACCESS_SCOPE: &str =
-    "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write";
+pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,11 +26,15 @@ pub enum DeviceAccessScope {
     SyncRead,
     /// Mutate authorized vault state, subject to each operation's additional checks.
     SyncWrite,
+    /// Preview and accept a designated invitation, or leave the caller's own team membership.
+    TeamsJoin,
+    /// Manage invitations, members and Owner-authorized team dissolution.
+    TeamsManage,
 }
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 10] = [
         Self::AccountRead,
         Self::KeysRead,
         Self::KeysWrite,
@@ -40,6 +43,8 @@ impl DeviceAccessScope {
         Self::OrganizationWrite,
         Self::SyncRead,
         Self::SyncWrite,
+        Self::TeamsJoin,
+        Self::TeamsManage,
     ];
 
     /// Exact case-sensitive ASCII scope token.
@@ -54,6 +59,8 @@ impl DeviceAccessScope {
             Self::OrganizationWrite => "orgs:write",
             Self::SyncRead => "sync:read",
             Self::SyncWrite => "sync:write",
+            Self::TeamsJoin => "teams:join",
+            Self::TeamsManage => "teams:manage",
         }
     }
 
@@ -92,6 +99,26 @@ pub enum DeviceAccessOperation {
     OrganizationRead,
     /// Update only an Organization's name under the current projection's precondition.
     OrganizationUpdate,
+    /// Create an invitation bound to one existing Account.
+    TeamInvitationCreate,
+    /// List a team's invitations under current administrative authority.
+    TeamInvitationList,
+    /// Read an invitation as an authorized administrator or its fixed recipient.
+    TeamInvitationRead,
+    /// Accept an invitation as its fixed recipient.
+    TeamInvitationAccept,
+    /// Revoke a pending or locked invitation.
+    TeamInvitationRevoke,
+    /// List team memberships under current administrative authority.
+    TeamMemberList,
+    /// Read one membership under current administrative authority.
+    TeamMemberRead,
+    /// Update membership roles and active/suspended status.
+    TeamMemberUpdate,
+    /// Remove a membership administratively or leave the caller's own membership.
+    TeamMemberRemove,
+    /// Dissolve a team as a current Owner.
+    TeamDissolve,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -126,13 +153,23 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 31] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
         Self::OrganizationList,
         Self::OrganizationRead,
         Self::OrganizationUpdate,
+        Self::TeamInvitationCreate,
+        Self::TeamInvitationList,
+        Self::TeamInvitationRead,
+        Self::TeamInvitationAccept,
+        Self::TeamInvitationRevoke,
+        Self::TeamMemberList,
+        Self::TeamMemberRead,
+        Self::TeamMemberUpdate,
+        Self::TeamMemberRemove,
+        Self::TeamDissolve,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -150,30 +187,54 @@ impl DeviceAccessOperation {
         Self::VaultMemberRemove,
     ];
 
-    /// Exact coarse scope required in addition to the operation's other authorization checks.
+    /// Exact alternative coarse scopes; one must be present before current authorization.
+    ///
+    /// The matching scope does not select a role or establish authority. For example, the
+    /// `teams:join` read path still requires the invitation's fixed recipient Account.
     #[must_use]
-    pub const fn required_scope(self) -> DeviceAccessScope {
+    pub const fn accepted_scopes(self) -> &'static [DeviceAccessScope] {
         match self {
-            Self::AccountProfileRead | Self::AccountDevicesRead => DeviceAccessScope::AccountRead,
-            Self::OrganizationCreate => DeviceAccessScope::OrganizationCreate,
-            Self::OrganizationList | Self::OrganizationRead => DeviceAccessScope::OrganizationRead,
-            Self::OrganizationUpdate => DeviceAccessScope::OrganizationWrite,
-            Self::AccountKeysRead => DeviceAccessScope::KeysRead,
-            Self::AccountKeysWrite => DeviceAccessScope::KeysWrite,
+            Self::AccountProfileRead | Self::AccountDevicesRead => {
+                &[DeviceAccessScope::AccountRead]
+            }
+            Self::OrganizationCreate => &[DeviceAccessScope::OrganizationCreate],
+            Self::OrganizationList | Self::OrganizationRead => {
+                &[DeviceAccessScope::OrganizationRead]
+            }
+            Self::OrganizationUpdate => &[DeviceAccessScope::OrganizationWrite],
+            Self::TeamInvitationRead | Self::TeamMemberRemove => {
+                &[DeviceAccessScope::TeamsJoin, DeviceAccessScope::TeamsManage]
+            }
+            Self::TeamInvitationAccept => &[DeviceAccessScope::TeamsJoin],
+            Self::TeamInvitationCreate
+            | Self::TeamInvitationList
+            | Self::TeamInvitationRevoke
+            | Self::TeamMemberList
+            | Self::TeamMemberRead
+            | Self::TeamMemberUpdate
+            | Self::TeamDissolve => &[DeviceAccessScope::TeamsManage],
+            Self::AccountKeysRead => &[DeviceAccessScope::KeysRead],
+            Self::AccountKeysWrite => &[DeviceAccessScope::KeysWrite],
             Self::SyncSession
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
             | Self::ObjectVersionsRead
-            | Self::Notifications => DeviceAccessScope::SyncRead,
+            | Self::Notifications => &[DeviceAccessScope::SyncRead],
             Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
             | Self::VaultEpochPublish
             | Self::VaultMemberAdd
             | Self::VaultEpochRetire
-            | Self::VaultMemberRemove => DeviceAccessScope::SyncWrite,
+            | Self::VaultMemberRemove => &[DeviceAccessScope::SyncWrite],
         }
+    }
+
+    /// Check this operation's any-of scope ceiling in an already verified scope claim.
+    #[must_use]
+    pub fn has_accepted_scope(self, verified_scope: &str) -> bool {
+        self.accepted_scopes().iter().any(|scope| scope.is_present_in(verified_scope))
     }
 
     /// The router's canonical method for this operation.
@@ -186,6 +247,10 @@ impl DeviceAccessOperation {
             | Self::AccountDevicesRead
             | Self::OrganizationList
             | Self::OrganizationRead
+            | Self::TeamInvitationList
+            | Self::TeamInvitationRead
+            | Self::TeamMemberList
+            | Self::TeamMemberRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
@@ -193,10 +258,15 @@ impl DeviceAccessOperation {
             | Self::ObjectVersionsRead
             | Self::Notifications => "GET",
             Self::AccountKeysWrite => "PUT",
-            Self::OrganizationUpdate => "PATCH",
-            Self::VaultMemberRemove => "DELETE",
+            Self::OrganizationUpdate | Self::TeamMemberUpdate => "PATCH",
+            Self::VaultMemberRemove | Self::TeamInvitationRevoke | Self::TeamMemberRemove => {
+                "DELETE"
+            }
             Self::SyncSession
             | Self::OrganizationCreate
+            | Self::TeamInvitationCreate
+            | Self::TeamInvitationAccept
+            | Self::TeamDissolve
             | Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
@@ -214,6 +284,18 @@ impl DeviceAccessOperation {
             Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
             Self::OrganizationCreate | Self::OrganizationList => "/api/v1/orgs",
             Self::OrganizationRead | Self::OrganizationUpdate => "/api/v1/orgs/{org}",
+            Self::TeamInvitationCreate | Self::TeamInvitationList => {
+                "/api/v1/orgs/{org}/invitations"
+            }
+            Self::TeamInvitationRead | Self::TeamInvitationRevoke => {
+                "/api/v1/orgs/{org}/invitations/{invitation}"
+            }
+            Self::TeamInvitationAccept => "/api/v1/orgs/{org}/invitations/{invitation}/accept",
+            Self::TeamMemberList => "/api/v1/orgs/{org}/members",
+            Self::TeamMemberRead | Self::TeamMemberUpdate | Self::TeamMemberRemove => {
+                "/api/v1/orgs/{org}/members/{membership}"
+            }
+            Self::TeamDissolve => "/api/v1/orgs/{org}/dissolve",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",
