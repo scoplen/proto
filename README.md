@@ -138,6 +138,14 @@ OpenAPI/TypeScript, independent vectors and parser seeds describe all ten operat
 Production HTTP authentication, current authorization, durable admission/transactions and
 native interaction remain consumer responsibilities; these contracts alone do not enable teams.
 
+`TeamReferencePeer` is a bounded independent D-136 fixture using the real codecs, K-2 verifier
+and Cedar authorizer. It models designated-recipient attempts/lockout, current issuer and
+Owner restrictions, member suspension/removal/re-invitation, self-leave, dissolution and exact
+24-hour receipts, including rollback, unknown commit and lost responses. Public tests check
+team isolation, no-op audits and historical confirmation without restoring access. Trusted
+fixture setters supply current identity and clock state; the peer provides no HTTP, token/DPoP
+verification, durable admission/storage or production audit chain.
+
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
