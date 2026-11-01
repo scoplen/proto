@@ -523,6 +523,12 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/dissolve\"}",
       "expected": "teams:manage"
+    },
+    {
+      "id": "auth-scope-operation-organization-view-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/view\"}",
+      "expected": "sync:read"
     }
   ]
 }

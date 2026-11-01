@@ -1,3 +1,6 @@
 *.sh text eol=lf
 fuzz/corpus/crypto_decoders/seed-password-* -text
 fuzz/corpus/crypto_decoders/seed-team-invitation-* -text
+fuzz/corpus/sync_control/seed-organization-view-* -text
+fuzz/corpus/sync_data/seed-organization-view-* -text
+fuzz/corpus/sync_notification/seed-organization-view-* -text

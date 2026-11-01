@@ -46,6 +46,10 @@ jobs:
           node scripts/generate-team-vectors.mjs --check
       - name: Test independent team invitation vector producers
         run: node --test scripts/generate-team-invitation-vectors.test.mjs scripts/generate-team-vectors.test.mjs
+      - name: Check Organization view vectors and parser seeds
+        run: node scripts/generate-organization-view-vectors.mjs --check
+      - name: Test independent Organization view vector producer
+        run: node --test scripts/generate-organization-view-vectors.test.mjs
       - name: Check used Account-id digest vectors
         run: node scripts/generate-account-used-id-vectors.mjs --check
       - name: Check Operator logout vectors and parser bounds

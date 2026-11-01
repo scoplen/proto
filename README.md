@@ -808,6 +808,16 @@ response budget from local policy, not the advertised vault quota. A rejected re
 replace the consumer's current vault list, and HTTP consumers must also bound decompressed bytes
 while collecting the response.
 
+D-137 Organization descriptors require `organization: Some(OrganizationVaultContext)` with
+the durable owner and a positive `view_revision`; other kinds use `None` and retain their bytes.
+`SyncOrganizationViewQuery` and `SyncOrganizationViewResponse` implement the complete `/view`
+page with explicit read budgets, live K-1 payload/id checks and source/revision/query correlation.
+`SyncOrganizationAckRequest`/`Response` carry the separate revision-bound progress. Notification
+events add `OrganizationViewChanged` and an id-free `MembershipsChanged`; their known fields are
+rejected in other protocol states. These codecs do not authorize requests, stage/publish local
+views or implement server revision transactions. Consumers own those behaviors and the required
+periodic full refresh. Personal/Shared session, notification and acknowledgement bytes stay unchanged.
+
 Change-feed, snapshot, and version-history responses accept an explicit `SyncReadLimits` profile
 through their `*_with_limits` methods, including query/path-aware validators. The independent
 default read budgets are 260 KiB per opaque payload and 266,295,039 bytes for the complete CBOR
