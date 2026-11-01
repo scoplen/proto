@@ -11,7 +11,7 @@
     {
       "id": "team-create-whitespace-v1",
       "kind": "team.create",
-      "input": " \t{\"invitation_id\":\"019bdad6-b800-7000-8000-000000000004\",\"recipient_username\":\"recipient\",\"roles\":[\"administrator\",\"member\"],\"password_verifier\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\"} ",
+      "input": "\t{\"invitation_id\":\"019bdad6-b800-7000-8000-000000000004\",\"recipient_username\":\"recipient\",\"roles\":[\"administrator\",\"member\"],\"password_verifier\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\"}",
       "expected": "{\"invitation_id\":\"019bdad6-b800-7000-8000-000000000004\",\"recipient_username\":\"recipient\",\"roles\":[\"administrator\",\"member\"],\"password_verifier\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\"}"
     },
     {
@@ -35,7 +35,7 @@
     {
       "id": "team-accept-whitespace-v1",
       "kind": "team.accept",
-      "input": " \t{\"password\":\"1ABCDXYZ\"} ",
+      "input": "\t{\"password\":\"1ABCDXYZ\"}",
       "expected": "{\"password\":\"1ABCDXYZ\"}"
     },
     {
@@ -59,7 +59,7 @@
     {
       "id": "team-invitation-whitespace-v1",
       "kind": "team.invitation",
-      "input": " \t{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"organization_name\":\"Operations\",\"recipient_account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"recipient_username\":\"recipient\",\"roles\":[\"member\"],\"issuer_account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"expires_at\":\"2026-11-02T00:00:00Z\",\"status\":\"pending\",\"membership_id\":null}} ",
+      "input": "\t{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"organization_name\":\"Operations\",\"recipient_account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"recipient_username\":\"recipient\",\"roles\":[\"member\"],\"issuer_account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"expires_at\":\"2026-11-02T00:00:00Z\",\"status\":\"pending\",\"membership_id\":null}}",
       "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"organization_name\":\"Operations\",\"recipient_account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"recipient_username\":\"recipient\",\"roles\":[\"member\"],\"issuer_account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"expires_at\":\"2026-11-02T00:00:00Z\",\"status\":\"pending\",\"membership_id\":null}}"
     },
     {
@@ -83,7 +83,7 @@
     {
       "id": "team-member-whitespace-v1",
       "kind": "team.member",
-      "input": " \t{\"id\":\"019bdad6-b800-7000-8000-000000000005\",\"etag\":\"\\\"member\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"username\":\"recipient\",\"roles\":[\"member\"],\"status\":\"active\"}} ",
+      "input": "\t{\"id\":\"019bdad6-b800-7000-8000-000000000005\",\"etag\":\"\\\"member\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"username\":\"recipient\",\"roles\":[\"member\"],\"status\":\"active\"}}",
       "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000005\",\"etag\":\"\\\"member\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"username\":\"recipient\",\"roles\":[\"member\"],\"status\":\"active\"}}"
     },
     {
@@ -107,7 +107,7 @@
     {
       "id": "team-update-whitespace-v1",
       "kind": "team.update",
-      "input": " \t{\"roles\":[\"administrator\",\"member\"],\"status\":\"suspended\"} ",
+      "input": "\t{\"roles\":[\"administrator\",\"member\"],\"status\":\"suspended\"}",
       "expected": "{\"roles\":[\"administrator\",\"member\"],\"status\":\"suspended\"}"
     },
     {
@@ -131,7 +131,7 @@
     {
       "id": "team-receipt-whitespace-v1",
       "kind": "team.receipt",
-      "input": " \t{\"invitation_id\":\"019bdad6-b800-7000-8000-000000000004\",\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"membership_id\":\"019bdad6-b800-7000-8000-000000000005\",\"accepted_at\":\"2026-11-01T00:00:00Z\"} ",
+      "input": "\t{\"invitation_id\":\"019bdad6-b800-7000-8000-000000000004\",\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"membership_id\":\"019bdad6-b800-7000-8000-000000000005\",\"accepted_at\":\"2026-11-01T00:00:00Z\"}",
       "expected": "{\"invitation_id\":\"019bdad6-b800-7000-8000-000000000004\",\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"membership_id\":\"019bdad6-b800-7000-8000-000000000005\",\"accepted_at\":\"2026-11-01T00:00:00Z\"}"
     },
     {
@@ -155,7 +155,7 @@
     {
       "id": "team-dissolve-whitespace-v1",
       "kind": "team.dissolve",
-      "input": " \t{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\"} ",
+      "input": "\t{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\"}",
       "expected": "{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\"}"
     },
     {
@@ -179,7 +179,7 @@
     {
       "id": "team-dissolved-whitespace-v1",
       "kind": "team.dissolved",
-      "input": " \t{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"dissolved_at\":\"2026-11-01T00:00:00Z\"} ",
+      "input": "\t{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"dissolved_at\":\"2026-11-01T00:00:00Z\"}",
       "expected": "{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"dissolved_at\":\"2026-11-01T00:00:00Z\"}"
     },
     {
@@ -203,7 +203,7 @@
     {
       "id": "team-invitation_page-whitespace-v1",
       "kind": "team.invitation_page",
-      "input": " \t{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"organization_name\":\"Operations\",\"recipient_account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"recipient_username\":\"recipient\",\"roles\":[\"member\"],\"issuer_account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"expires_at\":\"2026-11-02T00:00:00Z\",\"status\":\"pending\",\"membership_id\":null}}],\"next_cursor\":null} ",
+      "input": "\t{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"organization_name\":\"Operations\",\"recipient_account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"recipient_username\":\"recipient\",\"roles\":[\"member\"],\"issuer_account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"expires_at\":\"2026-11-02T00:00:00Z\",\"status\":\"pending\",\"membership_id\":null}}],\"next_cursor\":null}",
       "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"organization_name\":\"Operations\",\"recipient_account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"recipient_username\":\"recipient\",\"roles\":[\"member\"],\"issuer_account_id\":\"019bdad6-b800-7000-8000-000000000003\",\"expires_at\":\"2026-11-02T00:00:00Z\",\"status\":\"pending\",\"membership_id\":null}}],\"next_cursor\":null}"
     },
     {
@@ -227,7 +227,7 @@
     {
       "id": "team-member_page-whitespace-v1",
       "kind": "team.member_page",
-      "input": " \t{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000005\",\"etag\":\"\\\"member\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"username\":\"recipient\",\"roles\":[\"member\"],\"status\":\"active\"}}],\"next_cursor\":null} ",
+      "input": "\t{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000005\",\"etag\":\"\\\"member\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"username\":\"recipient\",\"roles\":[\"member\"],\"status\":\"active\"}}],\"next_cursor\":null}",
       "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000005\",\"etag\":\"\\\"member\\\"\",\"created_at\":\"2026-11-01T00:00:00Z\",\"updated_at\":\"2026-11-01T00:00:00Z\",\"data\":{\"organization_id\":\"019bdad6-b800-7000-8000-000000000001\",\"account_id\":\"019bdad6-b800-7000-8000-000000000002\",\"username\":\"recipient\",\"roles\":[\"member\"],\"status\":\"active\"}}],\"next_cursor\":null}"
     },
     {

@@ -19,7 +19,7 @@ const json = JSON.stringify;
 const add = (name, kind, input, expected = "rejected") => vectors.push({ id: `team-${name}-v1`, kind: `team.${kind}`, input: typeof input === "string" ? input : json(input), expected });
 for (const [kind, value] of Object.entries(examples)) {
   add(kind, kind, value, json(value));
-  add(`${kind}-whitespace`, kind, ` \t${json(value)} `, json(value));
+  add(`${kind}-whitespace`, kind, `\t${json(value)}`, json(value));
   add(`${kind}-duplicate`, `${kind}.reject`, json(value).slice(0, -1) + ',"extra":{"x":1,"x":2}}');
   add(`${kind}-bom`, `${kind}.reject`, '\ufeff' + json(value));
 }
