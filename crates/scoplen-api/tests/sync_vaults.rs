@@ -24,6 +24,7 @@ fn response() -> SyncCreateVaultResponse {
             seq: 0,
             key_epoch: 1,
             rotation_pending: false,
+            organization: None,
         },
     }
 }

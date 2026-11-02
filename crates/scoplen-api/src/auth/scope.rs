@@ -229,6 +229,8 @@ pub enum DeviceAccessOperation {
     VaultChangesRead,
     /// Read a vault snapshot.
     VaultSnapshotRead,
+    /// Read a complete revision-bound Organization view.
+    OrganizationViewRead,
     /// Read an object's retained versions.
     ObjectVersionsRead,
     /// Authenticate notifications and recheck authorized subscriptions and delivery.
@@ -251,7 +253,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 66] = [
+    pub const ALL: [Self; 67] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
@@ -309,6 +311,7 @@ impl DeviceAccessOperation {
         Self::VaultKeysRead,
         Self::VaultChangesRead,
         Self::VaultSnapshotRead,
+        Self::OrganizationViewRead,
         Self::ObjectVersionsRead,
         Self::Notifications,
         Self::VaultCreate,
@@ -387,6 +390,7 @@ impl DeviceAccessOperation {
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
+            | Self::OrganizationViewRead
             | Self::ObjectVersionsRead
             | Self::Notifications => &[DeviceAccessScope::SyncRead],
             Self::VaultCreate
@@ -423,6 +427,7 @@ impl DeviceAccessOperation {
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
+            | Self::OrganizationViewRead
             | Self::ObjectVersionsRead
             | Self::InventoryHostList
             | Self::InventoryHostRead
@@ -542,6 +547,7 @@ impl DeviceAccessOperation {
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",
             Self::VaultChangesRead => "/sync/v1/vaults/{vault}/changes",
             Self::VaultSnapshotRead => "/sync/v1/vaults/{vault}/snapshot",
+            Self::OrganizationViewRead => "/sync/v1/vaults/{vault}/view",
             Self::ObjectVersionsRead => "/sync/v1/vaults/{vault}/objects/{object}/versions",
             Self::Notifications => "/sync/v1/notify",
             Self::VaultCreate => "/sync/v1/vaults",

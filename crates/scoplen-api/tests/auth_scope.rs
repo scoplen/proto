@@ -141,7 +141,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 66);
+    assert_eq!(routes.len(), 67);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {

@@ -817,6 +817,12 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/gateway-networks/{id}\"}",
       "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-organization-view-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/view\"}",
+      "expected": "sync:read"
     }
   ]
 }

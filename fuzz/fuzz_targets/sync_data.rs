@@ -9,6 +9,8 @@ use scoplen_api::sync::{
     SyncChangesQuery, SyncChangesResponse, SyncConflictProblem, SyncReadLimits,
     SyncSnapshotResponse, SyncVersionsResponse, SyncWriteBatch, SyncWriteBatchResponse,
     SyncWriteLimits,
+    SyncOrganizationViewQuery, SyncOrganizationViewResponse,
+    SyncOrganizationAckRequest, SyncOrganizationAckResponse,
 };
 
 macro_rules! round_trip {
@@ -68,7 +70,7 @@ fuzz_target!(|bytes: &[u8]| {
     let Some((&selector, input)) = bytes.split_first() else {
         return;
     };
-    match selector % 17 {
+    match selector % 22 {
         0 => {
             if let Ok(text) = std::str::from_utf8(input)
                 && let Ok(query) = SyncChangesQuery::from_query(text)
@@ -102,10 +104,25 @@ fuzz_target!(|bytes: &[u8]| {
             }
         }
         16 => round_trip!(ProblemDetails, input),
+        17 => {
+            if let Ok(text) = std::str::from_utf8(input)
+                && let Ok(query) = SyncOrganizationViewQuery::from_query(text) {
+                let encoded = query.to_query().expect("validated Organization query formats");
+                assert_eq!(SyncOrganizationViewQuery::from_query(&encoded), Ok(query));
+            }
+        }
+        18 => round_trip!(SyncOrganizationViewResponse, input),
+        19 => round_trip!(SyncOrganizationAckRequest, input),
+        20 => round_trip!(SyncOrganizationAckResponse, input),
+        21 => {
+            let profile = input.first().copied().unwrap_or_default();
+            let input = input.get(1..).unwrap_or_default();
+            round_trip_with_limits!(SyncOrganizationViewResponse, input, read_limits(profile));
+        }
         9..=15 => {
             let profile = input.first().copied().unwrap_or_default();
             let input = input.get(1..).unwrap_or_default();
-            match selector % 17 {
+            match selector % 22 {
                 9 => round_trip_with_limits!(SyncChangesResponse, input, read_limits(profile)),
                 10 => round_trip_with_limits!(SyncWriteBatch, input, write_limits(profile)),
                 11 => round_trip_with_limits!(SyncWriteBatchResponse, input, write_limits(profile)),

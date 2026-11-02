@@ -17,6 +17,13 @@ Matching `api_json` seeds are raw accepted/rejected JSON. `auth-scopes.json` inc
 thirty-five inventory operations and rejects the superseded PATCH form. Production current
 authority, same-team reference resolution and atomic publication remain consumer checks.
 
+`organization-view.json` contains D-137's independent Organization descriptor, complete view,
+query, acknowledgement and notification CBOR known answers and malformed inputs. The Node
+producer uses its own deterministic CBOR writer and generates exact-byte seeds for the existing
+sync targets. Run `node scripts/generate-organization-view-vectors.mjs [--check]`. Public Rust
+tests consume all vectors; production current-state authorization and complete-view publication
+remain consumer work.
+
 `account-used-id.json` contains D-129's independently computed Account-only SHA-256 digests over
 the exact domain label and raw UUID bytes, plus rejected UUID versions and variants. The future
 timestamp fixture remains valid without a clock window. Run

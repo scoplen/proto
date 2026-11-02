@@ -831,6 +831,16 @@ response budget from local policy, not the advertised vault quota. A rejected re
 replace the consumer's current vault list, and HTTP consumers must also bound decompressed bytes
 while collecting the response.
 
+D-137 Organization descriptors require `organization: Some(OrganizationVaultContext)` with
+the durable owner and a positive `view_revision`; other kinds use `None` and retain their bytes.
+`SyncOrganizationViewQuery` and `SyncOrganizationViewResponse` implement the complete `/view`
+page with explicit read budgets, live K-1 payload/id checks and source/revision/query correlation.
+`SyncOrganizationAckRequest`/`Response` carry the separate revision-bound progress. Notification
+events add `OrganizationViewChanged` and an id-free `MembershipsChanged`; their known fields are
+rejected in other protocol states. These codecs do not authorize requests, stage/publish local
+views or implement server revision transactions. Consumers own those behaviors and the required
+periodic full refresh. Personal/Shared session, notification and acknowledgement bytes stay unchanged.
+
 Change-feed, snapshot, and version-history responses accept an explicit `SyncReadLimits` profile
 through their `*_with_limits` methods, including query/path-aware validators. The independent
 default read budgets are 260 KiB per opaque payload and 266,295,039 bytes for the complete CBOR
@@ -1078,8 +1088,9 @@ resource profiles exercise the bounded session, read, write, and version-history
 Their synthetic seeds derive from published K-4 vectors and include malformed key updates,
 truncated CBOR, and the exact and exceeded session, query, and acknowledgement input bounds.
 The Linux change check replays every target's corpus, and
-the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
-Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
+the daily five-minute fuzz run starts from the same seeds. Both use `nightly-2026-10-26` and
+`cargo-fuzz` 0.13.2. On Linux, replay one target with
+`cargo +nightly-2026-10-26 fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
 9449 context and signed gateway tickets and D-100 device access tokens against separate fixed
 synthetic keyrings. Tracked seeds include the RFC proof, published gateway and access tokens,
