@@ -8,6 +8,7 @@ import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
 import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs";
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
 import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
+import { generateInventoryTypes } from "./generate-inventory.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -17,7 +18,7 @@ if (paths.length < 30) throw new Error(`control-plane contract has only ${paths.
 for (const path of paths) {
   if (!path.startsWith("/")) throw new Error(`invalid path: ${path}`);
   const operations = document.paths[path];
-  if (!Object.keys(operations).some((method) => ["get", "post", "patch", "delete"].includes(method))) {
+  if (!Object.keys(operations).some((method) => ["get", "post", "put", "patch", "delete"].includes(method))) {
     throw new Error(`path has no HTTP operation: ${path}`);
   }
 }
@@ -561,7 +562,14 @@ const teamBegin = completeOrganizationTypes.indexOf(teamStart);
 const teamFinish = completeOrganizationTypes.indexOf(teamEnd, teamBegin + teamStart.length);
 if (teamBegin < 0 || teamFinish < 0) throw new Error("types.ts lacks TeamMembership markers");
 const completeTeamTypes = `${completeOrganizationTypes.slice(0, teamBegin + teamStart.length)}${generateTeamTypes(document)}${completeOrganizationTypes.slice(teamFinish)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeTeamTypes]];
+const inventoryStart = "// BEGIN GENERATED OrganizationInventory\n";
+const inventoryEnd = "// END GENERATED OrganizationInventory";
+const inventoryBegin = completeTeamTypes.indexOf(inventoryStart);
+const inventoryFinish = completeTeamTypes.indexOf(inventoryEnd, inventoryBegin + inventoryStart.length);
+if (inventoryBegin < 0 || inventoryFinish < 0) throw new Error("types.ts lacks OrganizationInventory markers");
+const completeInventoryTypes = completeTeamTypes.slice(0, inventoryBegin + inventoryStart.length) +
+  generateInventoryTypes(document) + completeTeamTypes.slice(inventoryFinish);
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeInventoryTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

@@ -1,0 +1,1 @@
+{"name":"Command","kind":4,"command":"ssh -W %h:%p relay"}

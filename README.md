@@ -146,6 +146,21 @@ team isolation, no-op audits and historical confirmation without restoring acces
 fixture setters supply current identity and clock state; the peer provides no HTTP, token/DPoP
 verification, durable admission/storage or production audit chain.
 
+D-137's `inventory` module provides strict, bounded named-field create/replacement, Resource
+and Page codecs for the seven ordinary Organization inventory types. It maps to canonical K-1
+with server-supplied clocks and Device origins, exposes typed reference locators, and rechecks
+the complete 256-KiB object budget at conversion. TrustRecord attribution is server-assigned;
+Organization Credentials, Personal credential references, proxy secrets and stored Snippet
+secret defaults are unavailable. Readers preserve response-envelope extension tolerance while
+rejecting unsupported schemas or unknown typed fields as writable replacements.
+
+The fourteen inventory paths register thirty-five exact read/create/replace/delete operations
+and concrete OpenAPI/TypeScript declarations. Initial Device authentication uses D-137's exact
+seventeen-scope ceiling; existing refresh families never gain scopes. These shared codecs do
+not implement durable authorization, reference resolution, current-view publication or team
+SSH. Independent vectors include all seven known-answer K-1 mappings, integer and attribution
+boundaries, strict parser failures and encoded-size recipes.
+
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
@@ -1029,6 +1044,9 @@ node --test scripts/generate-password-bootstrap-vectors.test.mjs
 node scripts/generate-organization-vectors.mjs --check
 node --test scripts/generate-organization-vectors.test.mjs
 node --test crates/scoplen-api/openapi/generate-organizations.test.mjs
+node scripts/generate-inventory-vectors.mjs --check
+node --test scripts/generate-inventory-vectors.test.mjs
+node --test crates/scoplen-api/openapi/generate-inventory.test.mjs
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in

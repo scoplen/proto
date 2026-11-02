@@ -1,0 +1,1 @@
+{"name":"Bastion","address":null,"port":22,"tags":{"zone":"west","env":"prod"},"groups":{"019bdad6-b800-7000-8000-000000000030":true},"favorite":false,"notes":" Café ","default_profile":"019bdad6-b800-7000-8000-000000000020","ssh_options":{"Compression":"yes"},"mosh":{"predict":"adaptive"}}

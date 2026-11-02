@@ -2,7 +2,7 @@
 // D-136 exact named-Account invitation and membership lifecycle contract.
 import { isDeepStrictEqual } from "node:util";
 
-export const initialTeamDeviceScope = "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage";
+export const initialTeamDeviceScope = "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
 const uuid = { type: "string", format: "uuid", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" };
 const ref = name => ({ $ref: `#/components/schemas/${name}` });
 const object = (properties, request = false) => ({ type: "object", additionalProperties: !request, required: Object.keys(properties), properties });
