@@ -157,6 +157,10 @@ impl OrganizationAuthorizer {
         )?;
         match request.action().map(|action| action.id().unescaped()) {
             Some("connect") => {
+                if matches!(context.get("sso_age_seconds"), Some(EvalResult::Long(age)) if age < 0)
+                {
+                    return Err(OrganizationAuthorizationError::InvalidRequest);
+                }
                 let device = context_reference(&request, "device")?;
                 if reference(get_entity(&entities, &device)?, "account")? != account {
                     return Err(OrganizationAuthorizationError::BoundaryViolation);

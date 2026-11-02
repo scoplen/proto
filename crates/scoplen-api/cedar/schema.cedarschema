@@ -72,7 +72,7 @@ action connect appliesTo {
         remote_user: String,
         route_kind: String,
         device: Device,
-        sso_age_seconds: Long,
+        sso_age_seconds?: Long,
         now: Long,
         source_ip: String,
     },

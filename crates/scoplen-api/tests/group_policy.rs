@@ -234,6 +234,44 @@ fn policy_codecs_preserve_source_and_inspection_does_not_require_explicit_owner_
     assert!(PolicyPage::from_http_json(&page.to_json().unwrap(), None, Some("no-cache")).is_err());
 }
 
+#[test]
+fn optional_sso_policy_reads_require_presence_guards() {
+    for source in [
+        r#"permit(principal, action == Action::"connect", resource) when { context has sso_age_seconds && context.sso_age_seconds <= 300 };"#,
+        r#"forbid(principal, action == Action::"connect", resource) unless { context has sso_age_seconds && context.sso_age_seconds <= 300 };"#,
+        r#"permit(principal, action == Action::"connect", resource) when { !(context has sso_age_seconds) };"#,
+    ] {
+        parse_policy_source(source).unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        let request = PolicyCreateRequest {
+            id: id(5),
+            fields: PolicyFields {
+                name: "Connection rule".into(),
+                source: source.into(),
+                enabled: true,
+            },
+        };
+        assert_eq!(PolicyCreateRequest::from_json(&request.to_json().unwrap()).unwrap(), request);
+    }
+    for source in [
+        r#"permit(principal, action == Action::"connect", resource) when { context.sso_age_seconds <= 300 };"#,
+        r#"forbid(principal, action == Action::"connect", resource) when { context["sso_age_seconds"] > 300 };"#,
+    ] {
+        assert!(parse_policy_source(source).is_err(), "unguarded SSO source: {source}");
+        assert!(
+            PolicyCreateRequest {
+                id: id(5),
+                fields: PolicyFields {
+                    name: "Connection rule".into(),
+                    source: source.into(),
+                    enabled: true
+                },
+            }
+            .to_json()
+            .is_err()
+        );
+    }
+}
+
 fn simple(rule: SimpleRule) -> SimpleRuleInput {
     SimpleRuleInput { organization: id(1), subject: SimpleRuleSubject::Membership(id(2)), rule }
 }
@@ -320,7 +358,7 @@ fn decide(fixture: &Value, source: &str, action: &str, resource: &str, user: &st
     let reference = |name| json!({"__entity":{"type":name,"id":fixture["ids"][name]}});
     let mut context = json!({"organization":reference("Organization"), "membership":reference("Membership"), "now":1});
     if action == "connect" {
-        context.as_object_mut().unwrap().extend(json!({"device":reference("Device"), "remote_user":user,"route_kind":"direct","sso_age_seconds":0,"source_ip":"192.0.2.1"}).as_object().unwrap().clone());
+        context.as_object_mut().unwrap().extend(json!({"device":reference("Device"), "remote_user":user,"route_kind":"direct","source_ip":"192.0.2.1"}).as_object().unwrap().clone());
     }
     let request = Request::new(
         fixture_uid(fixture, "Account"),
