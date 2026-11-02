@@ -9,7 +9,7 @@ const document = JSON.parse(await readFile(new URL("v1.yaml", import.meta.url), 
 test("authored user-CA contracts are exported through the public package", async () => {
   const generated = generateUserCaTypes(document);
   const index = await readFile(new URL("index.ts", import.meta.url), "utf8");
-  const types = await readFile(new URL("types.ts", import.meta.url), "utf8");
+  const types = (await readFile(new URL("types.ts", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
   for (const name of Object.keys(userCaDefinitions().schemas)) {
     assert.match(index, new RegExp(`^  ${name},$`, "m"));
     assert.match(types, new RegExp(`^    ${name}: ${name};$`, "m"));
