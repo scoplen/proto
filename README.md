@@ -1040,6 +1040,10 @@ The shared loader is usable by both workstreams.
 Rust 1.99.0 is pinned in `rust-toolchain.toml` and is the minimum supported version, aligned with
 the other implementation repositories. The Pageant dependency remains patched locally for its
 bounded native WM_COPYDATA mapping and current-thread query names required by K-7.
+The `ssh-key` dependency uses the runtime source in `vendor/ssh-key` to accept valid short
+ECDSA private scalars in OpenSSH files. Its provenance, narrow patch and removal condition are
+recorded in [vendor/ssh-key/PATCHES.md](vendor/ssh-key/PATCHES.md). A consumer using these crates
+must apply the same `ssh-key` patch in its own Cargo workspace; dependency patches do not propagate.
 
 ```text
 cargo fmt --all -- --check

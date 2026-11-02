@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Accept valid short ECDSA private scalars in OpenSSH files through a narrowly patched
+  `ssh-key` 0.7.0-rc.11 runtime dependency. Deterministic public import/signing regressions
+  cover the short P-256 scalar that could make random OpenSSH interoperability keys fail.
+  Consumers must apply the same dependency patch in their own Cargo workspace.
+
 - Add D-137 typed Organization inventory JSON, strict named-field replacement and canonical
   K-1 conversion for Hosts, AccessProfiles, Routes, HostGroups, TrustRecords, Snippets and
   GatewayNetworks. Exact Device operations, OpenAPI/TypeScript, independent vectors and parser
