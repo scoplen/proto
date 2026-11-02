@@ -237,6 +237,14 @@ pub enum DeviceAccessOperation {
     OrganizationPolicyReplace,
     /// Delete one current Organization's custom policy.
     OrganizationPolicyDelete,
+    /// List public user-CA metadata under current Organization membership.
+    UserCaList,
+    /// Read one current Organization's public user CA.
+    UserCaRead,
+    /// Provision the initial local user CA under current policy authority.
+    UserCaCreate,
+    /// Issue a scoped user certificate under current target authority.
+    UserCertificateIssue,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -273,7 +281,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 77] = [
+    pub const ALL: [Self; 81] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
@@ -335,6 +343,10 @@ impl DeviceAccessOperation {
         Self::OrganizationPolicyRead,
         Self::OrganizationPolicyReplace,
         Self::OrganizationPolicyDelete,
+        Self::UserCaList,
+        Self::UserCaRead,
+        Self::UserCaCreate,
+        Self::UserCertificateIssue,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -424,6 +436,9 @@ impl DeviceAccessOperation {
             | Self::InventoryGatewayNetworkCreate
             | Self::InventoryGatewayNetworkReplace
             | Self::InventoryGatewayNetworkDelete => &[DeviceAccessScope::InventoryWrite],
+            Self::UserCaList | Self::UserCaRead => &[DeviceAccessScope::CaRead],
+            Self::UserCaCreate => &[DeviceAccessScope::CaWrite],
+            Self::UserCertificateIssue => &[DeviceAccessScope::CertificatesIssue],
             Self::AccountKeysRead => &[DeviceAccessScope::KeysRead],
             Self::AccountKeysWrite => &[DeviceAccessScope::KeysWrite],
             Self::SyncSession
@@ -487,6 +502,8 @@ impl DeviceAccessOperation {
             | Self::OrganizationGroupRead
             | Self::OrganizationPolicyList
             | Self::OrganizationPolicyRead
+            | Self::UserCaList
+            | Self::UserCaRead
             | Self::Notifications => "GET",
             Self::AccountKeysWrite
             | Self::OrganizationGroupReplace
@@ -516,6 +533,8 @@ impl DeviceAccessOperation {
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
             | Self::TeamDissolve
+            | Self::UserCaCreate
+            | Self::UserCertificateIssue
             | Self::OrganizationGroupCreate
             | Self::OrganizationPolicyCreate
             | Self::InventoryHostCreate
@@ -604,6 +623,9 @@ impl DeviceAccessOperation {
             Self::OrganizationPolicyRead
             | Self::OrganizationPolicyReplace
             | Self::OrganizationPolicyDelete => "/api/v1/orgs/{org}/policies/{id}",
+            Self::UserCaList | Self::UserCaCreate => "/api/v1/orgs/{org}/certificate-authorities",
+            Self::UserCaRead => "/api/v1/orgs/{org}/certificate-authorities/{id}",
+            Self::UserCertificateIssue => "/api/v1/orgs/{org}/certificates",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",

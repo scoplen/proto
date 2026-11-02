@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Team operation not confirmed","status":400,"detail":"Retain the original operation and review current authorization.","instance":"fixture-request","code":"organization.invalid_request","changed":false,"retryable":false}

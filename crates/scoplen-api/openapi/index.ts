@@ -2,6 +2,9 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  UserCaCreateRequest,
+  UserCaResource,
+  UserCaPage,
   GroupSource,
   GroupFields,
   GroupCreateRequest,

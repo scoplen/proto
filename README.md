@@ -138,6 +138,17 @@ OpenAPI/TypeScript, independent vectors and parser seeds describe all ten operat
 Production HTTP authentication, current authorization, durable admission/transactions and
 native interaction remain consumer responsibilities; these contracts alone do not enable teams.
 
+D-137's `user_ca` module provides strict initial local-user-CA creation and bounded public
+Resource/Page codecs. It validates the canonical raw Ed25519 key and its exact OpenSSH blob
+fingerprint; response id/query and HTTP cache/ETag helpers preserve captured request bindings.
+Authenticated transport retains Organization provenance because the wire has no Organization
+field. Concrete OpenAPI/TypeScript definitions replace the generic CA mutation placeholders.
+The three CA operations and existing D-88/D-90 issuance have explicit scope mappings; issuance
+requires current target authority even on exact original-key receipt confirmation. The initial
+Device ceiling contains the seventeen frozen D-137 scopes; old refresh families need fresh
+authentication rather than a widened refresh. These shared contracts neither hold a private
+CA seed nor implement production provisioning, signing, durable receipts or native team SSH.
+
 `TeamReferencePeer` is a bounded independent D-136 fixture using the real codecs, K-2 verifier
 and Cedar authorizer. It models designated-recipient attempts/lockout, current issuer and
 Owner restrictions, member suspension/removal/re-invitation, self-leave, dissolution and exact

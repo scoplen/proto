@@ -3,6 +3,9 @@
 
 export interface components {
   schemas: {
+    UserCaCreateRequest: UserCaCreateRequest;
+    UserCaResource: UserCaResource;
+    UserCaPage: UserCaPage;
     GroupSource: GroupSource;
     GroupFields: GroupFields;
     GroupCreateRequest: GroupCreateRequest;
@@ -169,7 +172,6 @@ export interface components {
     Grant: Resource;
     AccessRequest: Resource;
     AccessDecision: Resource;
-    CertificateAuthority: Resource;
     Certificate: Resource;
     Gateway: Resource;
     JoinToken: Resource;
@@ -682,6 +684,17 @@ export type TeamInvitationDeniedProblem = ProblemDetails & { status: 409; code: 
 
 export type TeamBodyTooLargeProblem = ProblemDetails & { status: 413; code: "organization.invalid_request"; changed: false; retryable: false; };
 // END GENERATED TeamMembership
+
+// BEGIN GENERATED UserCa
+export interface UserCaCreateRequest { id: string; data: { kind: "user"; backend: "local" }; }
+/** Authenticated request provenance supplies Organization ownership; parsing alone never establishes CA trust. */
+export interface UserCaResource {
+  id: string; etag: string; created_at: string; updated_at: string;
+  data: { kind: "user"; backend: "local"; state: "active"; public_key: string; fingerprint: string; [extension: string]: unknown };
+  [extension: string]: unknown;
+}
+export interface UserCaPage { items: UserCaResource[]; next_cursor: string | null; [extension: string]: unknown; }
+// END GENERATED UserCa
 // BEGIN GENERATED GroupPolicy
 export type GroupSource = "local" | "IdP";
 export interface GroupFields { name: string; members: string[]; }

@@ -5,6 +5,13 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`user-ca.json` contains D-137's independent initial local-user-CA creation, public metadata,
+Page and shared problem vectors. Node computes the fingerprint from the complete decoded
+OpenSSH Ed25519 blob and emits exact JSON parser seeds, including original per-item bounds.
+Run `node scripts/generate-user-ca-vectors.mjs [--check]`. Public Rust tests consume the full
+set; no fixture establishes authenticated Organization ownership or possession of a CA seed.
+`auth-scopes.json` records the seventeen-scope ceiling, three CA operations and existing
+certificate issuance; unsupported CA mutations and certificate listing remain unmapped.
 `organization-inventory.json` contains independently produced D-137 named-field JSON for all
 seven ordinary Organization inventory types, with exact K-1 CBOR known answers and bounded
 size recipes. Requests reject clocks, unknown/duplicate keys, optional nulls, unsupported
@@ -91,7 +98,7 @@ continues to carry the compact proof; this fixture does not establish replay pre
 and `limit`; expected values are the canonical query string. Response inputs are JSON objects with
 `changes`, `next_cursor`, and `more`; payloads are lowercase hexadecimal and a missing signer is
 represented by JSON `null`. Response expected values are deterministic CBOR. Each response change
-entry uses integer map keys 1 through 5, as defined by `07-sync-protocol.md` §4.
+entry uses integer map keys 1 through 5, as defined by `07-sync-protocol.md` Â§4.
 The shared query codec also serves snapshot reads. Its maximum canonical query is 37 bytes;
 `sync.changes.query.reject` uses a raw query string and expects `reject` above that bound.
 
@@ -108,7 +115,7 @@ hexadecimal. `sync.ack.request.reject` uses raw CBOR hex and expects `reject` fo
 beyond the 17-byte exact-map maximum. Conflict responses use `sync.writes.conflict` with a complete
 RFC 9457 `problem` and a `conflicts` array in request order. Each conflict names an `object_id`
 and carries a current change entry or JSON `null` for an absent object. Default codecs bound the
-array to 1–500 unique ids and each current payload to 260 KiB; explicit exchange limits may raise
+array to 1â€“500 unique ids and each current payload to 260 KiB; explicit exchange limits may raise
 or lower these defaults. The encoded conflict problem body remains capped at 128 MiB.
 
 `sync-write-limits.json` applies explicit profiles to exact write-request, assignment, and
@@ -190,7 +197,7 @@ body reaches `total_bytes`, then require `accept:<bytes>` or `reject:<bytes>`. T
 exercise the 4,096/4,097-byte boundary without large literal bodies. The codec establishes syntax
 and bounds, not authenticated account ownership or email verification.
 
-`sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` §8.1 and
+`sync-keys.json` contains the K-4 account key-bundle vectors from `07-sync-protocol.md` Â§8.1 and
 D-50. The GET response uses opaque non-empty artifact hex strings and lexicographically sorted
 certificate and revocation arrays. The PUT request uses one sorted device wrap per device, a
 synthetic fixed-width 64-byte signature, and the same deterministic map encoding for the exact
@@ -198,7 +205,7 @@ replay vector. The signature-input vector covers the `spl-sync-keys-v1` domain p
 map bytes. The successful PUT response is `{revision}`. These vectors exercise transport encoding
 only; key authenticity is owned by `scoplen-crypto`.
 
-`sync-keys-failures.json` publishes the §8.1 negative PUT fixtures. Every `expected` value is
+`sync-keys-failures.json` publishes the Â§8.1 negative PUT fixtures. Every `expected` value is
 `reject`. For `sync.keys.put.decode-reject`, `input` is lowercase hexadecimal deterministic CBOR;
 the public request decoder must reject it. For `sync.keys.put.next-revision-reject`, `input` is
 `current|cbor_hex`; the decoder must accept the request, then the next-revision check must reject

@@ -141,7 +141,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 77);
+    assert_eq!(routes.len(), 81);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {
@@ -409,4 +409,32 @@ fn inventory_registry_matches_each_authored_method_route_and_scope() {
         count += 1;
     }
     assert_eq!(count, 35);
+}
+
+#[test]
+fn public_user_ca_and_issuance_routes_match_the_authored_scope_contract() {
+    let document: serde_json::Value =
+        serde_json::from_str(include_str!("../openapi/v1.yaml")).unwrap();
+    for operation in [
+        DeviceAccessOperation::UserCaList,
+        DeviceAccessOperation::UserCaRead,
+        DeviceAccessOperation::UserCaCreate,
+        DeviceAccessOperation::UserCertificateIssue,
+    ] {
+        let path = operation.route_template().strip_prefix("/api/v1").unwrap();
+        let method = operation.http_method().to_ascii_lowercase();
+        assert_eq!(
+            document["paths"][path][method]["x-scoplen-required-device-scope"],
+            operation.accepted_scopes()[0].as_str()
+        );
+        assert_eq!(operation.accepted_scopes().len(), 1);
+        assert!(!operation.has_accepted_scope("owner orgs:write ca:* certificates:*"));
+    }
+    for (method, path) in [
+        ("PATCH", "/api/v1/orgs/{org}/certificate-authorities/{id}"),
+        ("DELETE", "/api/v1/orgs/{org}/certificate-authorities/{id}"),
+        ("GET", "/api/v1/orgs/{org}/certificates"),
+    ] {
+        assert_eq!(DeviceAccessOperation::from_route(method, path), None);
+    }
 }

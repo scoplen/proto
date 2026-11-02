@@ -1279,6 +1279,48 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/view\"}",
       "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-operation-ca-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities\"}",
+      "expected": "ca:read"
+    },
+    {
+      "id": "auth-scope-operation-ca-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}\"}",
+      "expected": "ca:read"
+    },
+    {
+      "id": "auth-scope-operation-ca-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities\"}",
+      "expected": "ca:write"
+    },
+    {
+      "id": "auth-scope-operation-certificate-issue-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/certificates\"}",
+      "expected": "certificates:issue"
+    },
+    {
+      "id": "auth-scope-operation-ca-patch-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-ca-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-certificate-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificates\"}",
+      "expected": "unmapped"
     }
   ]
 }

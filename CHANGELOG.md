@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add bounded D-137 initial local-user-CA request, public Resource and Page codecs with exact
+  Ed25519 key/fingerprint validation, independent vectors and parser seeds. Concrete CA API
+  declarations and existing certificate issuance now specify current authority and original
+  24-hour receipt recovery. The initial Device ceiling gains the seven frozen D-137 scopes;
+  old refresh families require fresh authentication for an expanded ceiling. Production CA
+  custody, signing, transactions and native team SSH remain consumer responsibilities.
 - Add D-137 bounded Group and persisted-Policy codecs, exact administration routes/scopes,
   OpenAPI/TypeScript exports and independent vectors/parser seeds. The shared simple-rule
   generator emits one canonical Organization-scoped view or exact-user connect permit;

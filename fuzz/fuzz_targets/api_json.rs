@@ -43,6 +43,7 @@ use scoplen_api::team::{
     TeamInvitationPage, TeamInvitationResource, TeamMemberPage, TeamMemberResource,
     TeamMemberUpdateRequest,
 };
+use scoplen_api::user_ca::{UserCaCreateRequest, UserCaPage, UserCaResource};
 
 macro_rules! round_trip {
     ($message:ty, $input:expr) => {
@@ -87,6 +88,9 @@ fuzz_target!(|bytes: &[u8]| {
         );
     }
     round_trip!(AccountProfile, bytes);
+    round_trip!(UserCaCreateRequest, bytes);
+    round_trip!(UserCaResource, bytes);
+    round_trip!(UserCaPage, bytes);
     round_trip!(OrganizationCreateRequest, bytes);
     round_trip!(OrganizationUpdateRequest, bytes);
     round_trip!(OrganizationResource, bytes);

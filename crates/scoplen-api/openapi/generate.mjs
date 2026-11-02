@@ -8,6 +8,7 @@ import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
 import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs";
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
 import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
+import { generateUserCaTypes } from "./generate-user-ca.mjs";
 import { generateInventoryTypes } from "./generate-inventory.mjs";
 import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
 
@@ -374,8 +375,13 @@ const certificateVariants = ["CertificateHostRequest", "CertificateHostGroupRequ
 if (certificatePost?.operationId !== "createCertificates" ||
     JSON.stringify(certificatePost.parameters) !== JSON.stringify([
       { $ref: "#/components/parameters/org" },
-      { $ref: "#/components/parameters/idempotency" },
+      { name: "Idempotency-Key", in: "header", required: true, schema: { type: "string", format: "uuid", pattern: authPatterns.device_id } },
     ]) ||
+    certificatePost["x-scoplen-required-device-scope"] !== "certificates:issue" ||
+    JSON.stringify(certificatePost.security) !== JSON.stringify([{ accessToken: [], dpopProof: [] }]) ||
+    certificatePost["x-scoplen-request-max-bytes"] !== 16384 ||
+    certificatePost["x-scoplen-response-max-bytes"] !== 131072 ||
+    certificatePost.responses?.["503"]?.content?.["application/problem+json"]?.schema?.oneOf?.map(value => value.$ref).join("|") !== "#/components/schemas/OrganizationStorageUnavailableProblem|#/components/schemas/OrganizationCommitOutcomeUnknownProblem" ||
     certificatePost.requestBody?.required !== true ||
     !certificatePost.requestBody.description?.includes("16384 bytes") ||
     certificatePost.requestBody.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/CertificateRequest" ||
@@ -576,7 +582,13 @@ const groupPolicyBegin = completeInventoryTypes.indexOf(groupPolicyStart);
 const groupPolicyFinish = completeInventoryTypes.indexOf(groupPolicyEnd, groupPolicyBegin + groupPolicyStart.length);
 if (groupPolicyBegin < 0 || groupPolicyFinish < 0) throw new Error("types.ts lacks GroupPolicy markers");
 const completeGroupPolicyTypes = `${completeInventoryTypes.slice(0, groupPolicyBegin + groupPolicyStart.length)}${generateGroupPolicyTypes(document)}${completeInventoryTypes.slice(groupPolicyFinish)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeGroupPolicyTypes]];
+const caStart = "// BEGIN GENERATED UserCa\n";
+const caEnd = "// END GENERATED UserCa";
+const caBegin = completeGroupPolicyTypes.indexOf(caStart);
+const caFinish = completeGroupPolicyTypes.indexOf(caEnd, caBegin + caStart.length);
+if (caBegin < 0 || caFinish < 0) throw new Error("types.ts lacks UserCa markers");
+const completeCaTypes = `${completeGroupPolicyTypes.slice(0, caBegin + caStart.length)}${generateUserCaTypes(document)}${completeGroupPolicyTypes.slice(caFinish)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeCaTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");
