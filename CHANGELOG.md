@@ -13,6 +13,28 @@ All notable changes to the `proto` repository will be recorded here.
   scopes; existing refresh families require fresh authentication to gain new rights.
   Current reference ownership, active memberships, persistence and transactional authority
   remain production consumer responsibilities.
+- Accept valid short ECDSA private scalars in OpenSSH files through a narrowly patched
+  `ssh-key` 0.7.0-rc.11 runtime dependency. Deterministic public import/signing regressions
+  cover the short P-256 scalar that could make random OpenSSH interoperability keys fail.
+  Consumers must apply the same dependency patch in their own Cargo workspace.
+
+- Add D-137 typed Organization inventory JSON, strict named-field replacement and canonical
+  K-1 conversion for Hosts, AccessProfiles, Routes, HostGroups, TrustRecords, Snippets and
+  GatewayNetworks. Exact Device operations, OpenAPI/TypeScript, independent vectors and parser
+  seeds cover the seven routes without Organization Credentials or Personal fallbacks.
+  The initial Device ceiling now has the seventeen scopes specified by D-137; refresh never
+  expands an existing ceiling. Durable authorization, inventory storage and consumer workflows
+  remain separate outcomes.
+
+- Pin corpus replay and scheduled fuzzing to the previously successful nightly Rust and
+  cargo-fuzz versions, avoiding a compiler query-cycle regression in the rolling nightly.
+
+- Add D-137 Organization session ownership/revision, complete current-view query/page codecs,
+  revision-bound acknowledgements and content-free team notification hints, with independent
+  CBOR vectors and parser seeds. Public source/query validators and explicit read budgets
+  preserve Personal/Shared wire bytes. The new descriptor context and notification variants
+  are source-breaking before Stable; production authorization, revision transactions and
+  client reconciliation remain consumer work.
 
 - Add D-136 named-Account team invitation, member administration and dissolution JSON codecs,
   public links, independent vectors, parser seeds and exact OpenAPI/TypeScript contracts.

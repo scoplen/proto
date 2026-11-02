@@ -18,6 +18,50 @@ export interface components {
     SimpleRuleConnect: SimpleRuleConnect;
     SimpleRuleInput: SimpleRuleInput;
     GroupPolicyBodyTooLargeProblem: GroupPolicyBodyTooLargeProblem;
+    InventorySnippetVariable: InventorySnippetVariable;
+    InventoryBodyTooLargeProblem: InventoryBodyTooLargeProblem;
+    InventoryHostFields: InventoryHostFields;
+    InventoryHostReadFields: InventoryHostReadFields;
+    InventoryHostCreateRequest: InventoryHostCreateRequest;
+    InventoryHostReplaceRequest: InventoryHostReplaceRequest;
+    InventoryHostResource: InventoryHostResource;
+    InventoryHostPage: InventoryHostPage;
+    InventoryAccessProfileFields: InventoryAccessProfileFields;
+    InventoryAccessProfileReadFields: InventoryAccessProfileReadFields;
+    InventoryAccessProfileCreateRequest: InventoryAccessProfileCreateRequest;
+    InventoryAccessProfileReplaceRequest: InventoryAccessProfileReplaceRequest;
+    InventoryAccessProfileResource: InventoryAccessProfileResource;
+    InventoryAccessProfilePage: InventoryAccessProfilePage;
+    InventoryRouteFields: InventoryRouteFields;
+    InventoryRouteReadFields: InventoryRouteReadFields;
+    InventoryRouteCreateRequest: InventoryRouteCreateRequest;
+    InventoryRouteReplaceRequest: InventoryRouteReplaceRequest;
+    InventoryRouteResource: InventoryRouteResource;
+    InventoryRoutePage: InventoryRoutePage;
+    InventoryHostGroupFields: InventoryHostGroupFields;
+    InventoryHostGroupReadFields: InventoryHostGroupReadFields;
+    InventoryHostGroupCreateRequest: InventoryHostGroupCreateRequest;
+    InventoryHostGroupReplaceRequest: InventoryHostGroupReplaceRequest;
+    InventoryHostGroupResource: InventoryHostGroupResource;
+    InventoryHostGroupPage: InventoryHostGroupPage;
+    InventoryTrustRecordFields: InventoryTrustRecordFields;
+    InventoryTrustRecordReadFields: InventoryTrustRecordReadFields;
+    InventoryTrustRecordCreateRequest: InventoryTrustRecordCreateRequest;
+    InventoryTrustRecordReplaceRequest: InventoryTrustRecordReplaceRequest;
+    InventoryTrustRecordResource: InventoryTrustRecordResource;
+    InventoryTrustRecordPage: InventoryTrustRecordPage;
+    InventorySnippetFields: InventorySnippetFields;
+    InventorySnippetReadFields: InventorySnippetReadFields;
+    InventorySnippetCreateRequest: InventorySnippetCreateRequest;
+    InventorySnippetReplaceRequest: InventorySnippetReplaceRequest;
+    InventorySnippetResource: InventorySnippetResource;
+    InventorySnippetPage: InventorySnippetPage;
+    InventoryGatewayNetworkFields: InventoryGatewayNetworkFields;
+    InventoryGatewayNetworkReadFields: InventoryGatewayNetworkReadFields;
+    InventoryGatewayNetworkCreateRequest: InventoryGatewayNetworkCreateRequest;
+    InventoryGatewayNetworkReplaceRequest: InventoryGatewayNetworkReplaceRequest;
+    InventoryGatewayNetworkResource: InventoryGatewayNetworkResource;
+    InventoryGatewayNetworkPage: InventoryGatewayNetworkPage;
     TeamRole: TeamRole;
     TeamInvitationStatus: TeamInvitationStatus;
     TeamMemberStatus: TeamMemberStatus;
@@ -120,13 +164,6 @@ export interface components {
     Organization: Resource;
     IdentityProvider: Resource;
     ServicePrincipal: Resource;
-    Host: Resource;
-    AccessProfile: Resource;
-    Route: Resource;
-    HostGroup: Resource;
-    Snippet: Resource;
-    TrustRecord: Resource;
-    GatewayNetwork: Resource;
     InventoryImport: Resource;
     Role: Resource;
     Grant: Resource;
@@ -673,3 +710,57 @@ export type SimpleRule = { view: SimpleRuleSelector[]; connect?: never } | { con
 export type SimpleRuleInput = { organization: string } & SimpleRuleSubject & SimpleRule;
 export type GroupPolicyBodyTooLargeProblem = ProblemDetails & { status: 413; code: "organization.invalid_request"; changed: false; retryable: false; };
 // END GENERATED GroupPolicy
+
+// BEGIN GENERATED OrganizationInventory
+export type InventorySnippetVariable = { kind: 1; default?: string } | { kind: 2; default?: string } | { kind: 3; choices: string[]; default?: string } | { kind: 4 };
+export type InventoryBodyTooLargeProblem = ProblemDetails & { status: 413; code: "organization.invalid_request"; changed: false; retryable: false };
+
+export type InventoryHostFields = { name: string; address: string; port?: number; tags?: Record<string, string>; groups?: Record<string, true>; favorite?: boolean; notes?: string; default_profile?: string; ssh_options?: Record<string, string>; mosh?: Record<string, string>; };
+export type InventoryHostReadFields = InventoryHostFields;
+export interface InventoryHostCreateRequest { id: string; data: { fields: InventoryHostFields }; }
+export interface InventoryHostReplaceRequest { data: { fields: InventoryHostFields }; }
+export interface InventoryHostResource { id: string; etag: string; created_at: string; updated_at: string; data: { schema: 1; fields: InventoryHostReadFields; [extension: string]: unknown }; [extension: string]: unknown; }
+export interface InventoryHostPage { items: InventoryHostResource[]; next_cursor: string | null; [extension: string]: unknown; }
+
+export type InventoryAccessProfileFields = { host: string; name?: string; username: string; route?: string | 0; terminal_profile?: string; startup_command?: string; agent_forwarding?: boolean; };
+export type InventoryAccessProfileReadFields = InventoryAccessProfileFields;
+export interface InventoryAccessProfileCreateRequest { id: string; data: { fields: InventoryAccessProfileFields }; }
+export interface InventoryAccessProfileReplaceRequest { data: { fields: InventoryAccessProfileFields }; }
+export interface InventoryAccessProfileResource { id: string; etag: string; created_at: string; updated_at: string; data: { schema: 1; fields: InventoryAccessProfileReadFields; [extension: string]: unknown }; [extension: string]: unknown; }
+export interface InventoryAccessProfilePage { items: InventoryAccessProfileResource[]; next_cursor: string | null; [extension: string]: unknown; }
+
+export type InventoryRouteFields = { name: string; kind: 1; hops: string[] } | { name: string; kind: 2 | 3; proxy: string } | { name: string; kind: 4; command: string } | { name: string; kind: 5; gateway_network: string };
+export type InventoryRouteReadFields = InventoryRouteFields;
+export interface InventoryRouteCreateRequest { id: string; data: { fields: InventoryRouteFields }; }
+export interface InventoryRouteReplaceRequest { data: { fields: InventoryRouteFields }; }
+export interface InventoryRouteResource { id: string; etag: string; created_at: string; updated_at: string; data: { schema: 1; fields: InventoryRouteReadFields; [extension: string]: unknown }; [extension: string]: unknown; }
+export interface InventoryRoutePage { items: InventoryRouteResource[]; next_cursor: string | null; [extension: string]: unknown; }
+
+export type InventoryHostGroupFields = { name: string; parent?: string; color?: string; defaults?: Record<string, string>; };
+export type InventoryHostGroupReadFields = InventoryHostGroupFields;
+export interface InventoryHostGroupCreateRequest { id: string; data: { fields: InventoryHostGroupFields }; }
+export interface InventoryHostGroupReplaceRequest { data: { fields: InventoryHostGroupFields }; }
+export interface InventoryHostGroupResource { id: string; etag: string; created_at: string; updated_at: string; data: { schema: 1; fields: InventoryHostGroupReadFields; [extension: string]: unknown }; [extension: string]: unknown; }
+export interface InventoryHostGroupPage { items: InventoryHostGroupResource[]; next_cursor: string | null; [extension: string]: unknown; }
+
+export type InventoryTrustRecordFields = { host?: string; pattern?: string; key?: string; fingerprint?: string; provenance?: 1 | 2 | 3 | 4; revoked?: boolean; ca?: boolean; } & ({ host: string } | { pattern: string });
+export type InventoryTrustRecordReadFields = InventoryTrustRecordFields & { accepted_at: string; accepted_by_device: string; accepted_by_account: string };
+export interface InventoryTrustRecordCreateRequest { id: string; data: { fields: InventoryTrustRecordFields }; }
+export interface InventoryTrustRecordReplaceRequest { data: { fields: InventoryTrustRecordFields }; }
+export interface InventoryTrustRecordResource { id: string; etag: string; created_at: string; updated_at: string; data: { schema: 1; fields: InventoryTrustRecordReadFields; [extension: string]: unknown }; [extension: string]: unknown; }
+export interface InventoryTrustRecordPage { items: InventoryTrustRecordResource[]; next_cursor: string | null; [extension: string]: unknown; }
+
+export type InventorySnippetFields = { name: string; template: string; variables?: Record<string, InventorySnippetVariable>; tags?: Record<string, true>; folder?: string; };
+export type InventorySnippetReadFields = InventorySnippetFields;
+export interface InventorySnippetCreateRequest { id: string; data: { fields: InventorySnippetFields }; }
+export interface InventorySnippetReplaceRequest { data: { fields: InventorySnippetFields }; }
+export interface InventorySnippetResource { id: string; etag: string; created_at: string; updated_at: string; data: { schema: 1; fields: InventorySnippetReadFields; [extension: string]: unknown }; [extension: string]: unknown; }
+export interface InventorySnippetPage { items: InventorySnippetResource[]; next_cursor: string | null; [extension: string]: unknown; }
+
+export type InventoryGatewayNetworkFields = { name?: string; description?: string; };
+export type InventoryGatewayNetworkReadFields = InventoryGatewayNetworkFields;
+export interface InventoryGatewayNetworkCreateRequest { id: string; data: { fields: InventoryGatewayNetworkFields }; }
+export interface InventoryGatewayNetworkReplaceRequest { data: { fields: InventoryGatewayNetworkFields }; }
+export interface InventoryGatewayNetworkResource { id: string; etag: string; created_at: string; updated_at: string; data: { schema: 1; fields: InventoryGatewayNetworkReadFields; [extension: string]: unknown }; [extension: string]: unknown; }
+export interface InventoryGatewayNetworkPage { items: InventoryGatewayNetworkResource[]; next_cursor: string | null; [extension: string]: unknown; }
+// END GENERATED OrganizationInventory

@@ -168,6 +168,20 @@ the fixed contract. Group writes require `teams:manage` plus `manage_members`; r
 require `policies:read`/`policies:write` and `view_policy`/`manage_policy`. Current membership,
 reference resolution, IdP read-only enforcement, receipts, storage, audit and transaction-current
 authority remain production consumer work.
+D-137's `inventory` module provides strict, bounded named-field create/replacement, Resource
+and Page codecs for the seven ordinary Organization inventory types. It maps to canonical K-1
+with server-supplied clocks and Device origins, exposes typed reference locators, and rechecks
+the complete 256-KiB object budget at conversion. TrustRecord attribution is server-assigned;
+Organization Credentials, Personal credential references, proxy secrets and stored Snippet
+secret defaults are unavailable. Readers preserve response-envelope extension tolerance while
+rejecting unsupported schemas or unknown typed fields as writable replacements.
+
+The fourteen inventory paths register thirty-five exact read/create/replace/delete operations
+and concrete OpenAPI/TypeScript declarations. Initial Device authentication uses D-137's exact
+seventeen-scope ceiling; existing refresh families never gain scopes. These shared codecs do
+not implement durable authorization, reference resolution, current-view publication or team
+SSH. Independent vectors include all seven known-answer K-1 mappings, integer and attribution
+boundaries, strict parser failures and encoded-size recipes.
 
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
@@ -839,6 +853,16 @@ response budget from local policy, not the advertised vault quota. A rejected re
 replace the consumer's current vault list, and HTTP consumers must also bound decompressed bytes
 while collecting the response.
 
+D-137 Organization descriptors require `organization: Some(OrganizationVaultContext)` with
+the durable owner and a positive `view_revision`; other kinds use `None` and retain their bytes.
+`SyncOrganizationViewQuery` and `SyncOrganizationViewResponse` implement the complete `/view`
+page with explicit read budgets, live K-1 payload/id checks and source/revision/query correlation.
+`SyncOrganizationAckRequest`/`Response` carry the separate revision-bound progress. Notification
+events add `OrganizationViewChanged` and an id-free `MembershipsChanged`; their known fields are
+rejected in other protocol states. These codecs do not authorize requests, stage/publish local
+views or implement server revision transactions. Consumers own those behaviors and the required
+periodic full refresh. Personal/Shared session, notification and acknowledgement bytes stay unchanged.
+
 Change-feed, snapshot, and version-history responses accept an explicit `SyncReadLimits` profile
 through their `*_with_limits` methods, including query/path-aware validators. The independent
 default read budgets are 260 KiB per opaque payload and 266,295,039 bytes for the complete CBOR
@@ -1038,6 +1062,10 @@ The shared loader is usable by both workstreams.
 Rust 1.99.0 is pinned in `rust-toolchain.toml` and is the minimum supported version, aligned with
 the other implementation repositories. The Pageant dependency remains patched locally for its
 bounded native WM_COPYDATA mapping and current-thread query names required by K-7.
+The `ssh-key` dependency uses the runtime source in `vendor/ssh-key` to accept valid short
+ECDSA private scalars in OpenSSH files. Its provenance, narrow patch and removal condition are
+recorded in [vendor/ssh-key/PATCHES.md](vendor/ssh-key/PATCHES.md). A consumer using these crates
+must apply the same `ssh-key` patch in its own Cargo workspace; dependency patches do not propagate.
 
 ```text
 cargo fmt --all -- --check
@@ -1055,6 +1083,9 @@ node --test crates/scoplen-api/openapi/generate-organizations.test.mjs
 node scripts/generate-group-policy-vectors.mjs --check
 node --test scripts/generate-group-policy-vectors.test.mjs
 node --test crates/scoplen-api/openapi/generate-group-policy.test.mjs
+node scripts/generate-inventory-vectors.mjs --check
+node --test scripts/generate-inventory-vectors.test.mjs
+node --test crates/scoplen-api/openapi/generate-inventory.test.mjs
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in
@@ -1086,8 +1117,9 @@ resource profiles exercise the bounded session, read, write, and version-history
 Their synthetic seeds derive from published K-4 vectors and include malformed key updates,
 truncated CBOR, and the exact and exceeded session, query, and acknowledgement input bounds.
 The Linux change check replays every target's corpus, and
-the daily five-minute fuzz run starts from the same seeds. On Linux, replay one target with nightly
-Rust and `cargo-fuzz` using `cargo +nightly fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
+the daily five-minute fuzz run starts from the same seeds. Both use `nightly-2026-10-26` and
+`cargo-fuzz` 0.13.2. On Linux, replay one target with
+`cargo +nightly-2026-10-26 fuzz run sftp_decoder fuzz/corpus/sftp_decoder -- -runs=0`.
 The `crypto_decoders` target additionally parses and statelessly verifies DPoP against fixed RFC
 9449 context and signed gateway tickets and D-100 device access tokens against separate fixed
 synthetic keyrings. Tracked seeds include the RFC proof, published gateway and access tokens,

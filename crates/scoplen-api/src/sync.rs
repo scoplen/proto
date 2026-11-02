@@ -15,6 +15,12 @@ use uuid::Uuid;
 
 use crate::ProblemDetails;
 
+mod organization_view;
+pub use organization_view::{
+    SyncOrganizationAckRequest, SyncOrganizationAckResponse, SyncOrganizationViewQuery,
+    SyncOrganizationViewResponse,
+};
+
 /// Default maximum number of writes accepted in one atomic batch.
 pub const MAX_SYNC_BATCH_OBJECTS: usize = 500;
 /// Default maximum encoded size of one write request body.
@@ -29,6 +35,10 @@ pub const MAX_SYNC_READ_BODY_BYTES: usize = 266_295_039;
 pub const MAX_SYNC_PAGE_QUERY_BYTES: usize = 37;
 /// Maximum complete deterministic CBOR acknowledgement request.
 pub const MAX_SYNC_ACK_REQUEST_BYTES: usize = 17;
+/// Maximum raw Organization view query with three canonical decimal parameters.
+pub const MAX_SYNC_ORGANIZATION_VIEW_QUERY_BYTES: usize = 67;
+/// Maximum complete Organization acknowledgement request.
+pub const MAX_SYNC_ORGANIZATION_ACK_REQUEST_BYTES: usize = 40;
 /// Maximum complete encoded session request.
 pub const MAX_SYNC_SESSION_REQUEST_BYTES: usize = 4 * 1024;
 /// Default maximum complete encoded session response.
@@ -356,33 +366,70 @@ pub struct SessionVault {
     pub seq: u64,
     pub key_epoch: u64,
     pub rotation_pending: bool,
+    /// Required for Organization vaults; absent for encrypted or unknown vault kinds.
+    pub organization: Option<OrganizationVaultContext>,
+}
+
+/// Durable Organization owner and current full-view equality fence.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OrganizationVaultContext {
+    pub organization: Uuid,
+    pub view_revision: u64,
+}
+
+impl OrganizationVaultContext {
+    fn validate(self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.organization, "organization")?;
+        positive(self.view_revision, "view_revision")
+    }
 }
 
 impl SessionVault {
     fn validate(&self) -> Result<(), SyncCodecError> {
         valid_uuid(self.id, "vault id")?;
         nonempty(self.kind.as_str(), "kind")?;
-        positive(self.key_epoch, "key_epoch")
+        positive(self.key_epoch, "key_epoch")?;
+        match (&self.kind, self.organization) {
+            (VaultKind::Organization, Some(context)) => context.validate(),
+            (VaultKind::Organization, None) => Err(invalid("missing Organization vault context")),
+            (_, Some(_)) => Err(invalid("Organization context requires organization kind")),
+            (_, None) => Ok(()),
+        }
     }
 
     fn into_value(self) -> Value {
-        map(vec![
+        let mut fields = vec![
             ("id", Value::Bytes(self.id.as_bytes().to_vec())),
             ("kind", Value::Text(self.kind.as_str().to_owned())),
             ("seq", Value::UInt(self.seq)),
             ("key_epoch", Value::UInt(self.key_epoch)),
             ("rotation_pending", Value::Bool(self.rotation_pending)),
-        ])
+        ];
+        if let Some(context) = self.organization {
+            fields.push(("organization", Value::Bytes(context.organization.as_bytes().to_vec())));
+            fields.push(("view_revision", Value::UInt(context.view_revision)));
+        }
+        map(fields)
     }
 
     fn from_value(value: Value) -> Result<Self, SyncCodecError> {
         let mut fields = expect_map(value)?;
+        let kind = VaultKind::parse(take_text(&mut fields, "kind")?)?;
+        let organization = if kind == VaultKind::Organization {
+            Some(OrganizationVaultContext {
+                organization: take_uuid(&mut fields, "organization")?,
+                view_revision: take_uint(&mut fields, "view_revision")?,
+            })
+        } else {
+            None
+        };
         let vault = Self {
             id: take_uuid(&mut fields, "id")?,
-            kind: VaultKind::parse(take_text(&mut fields, "kind")?)?,
+            kind,
             seq: take_uint(&mut fields, "seq")?,
             key_epoch: take_uint(&mut fields, "key_epoch")?,
             rotation_pending: take_bool(&mut fields, "rotation_pending")?,
+            organization,
         };
         vault.validate()?;
         Ok(vault)
@@ -1253,7 +1300,7 @@ impl SyncNotificationReady {
     }
 }
 
-const NOTIFICATION_CONTEXT_FORBIDDEN: [&str; 7] = [
+const NOTIFICATION_CONTEXT_FORBIDDEN: [&str; 11] = [
     "access_token",
     "dpop_proof",
     "authenticated",
@@ -1261,9 +1308,24 @@ const NOTIFICATION_CONTEXT_FORBIDDEN: [&str; 7] = [
     "seq",
     "rotation_pending",
     "device_revoked",
+    "organization",
+    "view_revision",
+    "organization_view_changed",
+    "memberships_changed",
 ];
-const NOTIFICATION_READY_FORBIDDEN: [&str; 7] =
-    ["htm", "access_token", "dpop_proof", "vault", "seq", "rotation_pending", "device_revoked"];
+const NOTIFICATION_READY_FORBIDDEN: [&str; 11] = [
+    "htm",
+    "access_token",
+    "dpop_proof",
+    "vault",
+    "seq",
+    "rotation_pending",
+    "device_revoked",
+    "organization",
+    "view_revision",
+    "organization_view_changed",
+    "memberships_changed",
+];
 const NOTIFICATION_EVENT_FORBIDDEN: [&str; 4] =
     ["htm", "access_token", "dpop_proof", "authenticated"];
 
@@ -1324,6 +1386,10 @@ pub enum SyncNotification {
     RotationPending { vault: Uuid },
     /// The authenticated device was revoked.
     DeviceRevoked,
+    /// A currently accessible team's complete view must be refreshed.
+    OrganizationViewChanged { organization: Uuid, vault: Uuid, view_revision: u64 },
+    /// Rediscover current teams without disclosing an inaccessible team or vault id.
+    MembershipsChanged,
 }
 
 impl SyncNotification {
@@ -1339,7 +1405,12 @@ impl SyncNotification {
                 positive(*seq, "notification sequence")
             }
             Self::RotationPending { vault } => valid_uuid(*vault, "notification vault"),
-            Self::DeviceRevoked => Ok(()),
+            Self::DeviceRevoked | Self::MembershipsChanged => Ok(()),
+            Self::OrganizationViewChanged { organization, vault, view_revision } => {
+                valid_uuid(*organization, "notification organization")?;
+                valid_uuid(*vault, "notification vault")?;
+                positive(*view_revision, "notification view_revision")
+            }
         }
     }
 
@@ -1360,6 +1431,13 @@ impl SyncNotification {
                 ("vault", Value::Bytes(vault.as_bytes().to_vec())),
             ]),
             Self::DeviceRevoked => map(vec![("device_revoked", Value::Bool(true))]),
+            Self::OrganizationViewChanged { organization, vault, view_revision } => map(vec![
+                ("organization_view_changed", Value::Bool(true)),
+                ("organization", Value::Bytes(organization.as_bytes().to_vec())),
+                ("vault", Value::Bytes(vault.as_bytes().to_vec())),
+                ("view_revision", Value::UInt(*view_revision)),
+            ]),
+            Self::MembershipsChanged => map(vec![("memberships_changed", Value::Bool(true))]),
         };
         let encoded = cbor::encode(&value)?;
         enforce_notification_body_limit(&encoded)?;
@@ -1379,6 +1457,31 @@ impl SyncNotification {
         enforce_notification_body_limit(input)?;
         let mut fields = decode_map(input)?;
         reject_notification_fields(&fields, &NOTIFICATION_EVENT_FORBIDDEN)?;
+        if fields.contains_key("organization_view_changed")
+            || fields.contains_key("memberships_changed")
+        {
+            let view = fields.remove("organization_view_changed");
+            let memberships = fields.remove("memberships_changed");
+            reject_notification_fields(&fields, &["seq", "rotation_pending", "device_revoked"])?;
+            let event = match (view, memberships) {
+                (Some(Value::Bool(true)), None) => Self::OrganizationViewChanged {
+                    organization: take_uuid(&mut fields, "organization")?,
+                    vault: take_uuid(&mut fields, "vault")?,
+                    view_revision: take_uint(&mut fields, "view_revision")?,
+                },
+                (None, Some(Value::Bool(true))) => {
+                    reject_notification_fields(
+                        &fields,
+                        &["organization", "vault", "view_revision"],
+                    )?;
+                    Self::MembershipsChanged
+                }
+                _ => return Err(invalid("invalid or ambiguous Organization notification marker")),
+            };
+            event.validate()?;
+            return Ok(event);
+        }
+        reject_notification_fields(&fields, &["organization", "view_revision"])?;
         let device_revoked = fields.remove("device_revoked");
         let rotation_pending = fields.remove("rotation_pending");
         let seq = fields.remove("seq");
@@ -1560,6 +1663,13 @@ fn session_response_body_bytes(response: &SyncSessionResponse) -> Result<usize, 
     for vault in &response.vaults {
         let entry =
             session_vault_body_bytes(vault.kind.as_str().len(), vault.seq, vault.key_epoch)?;
+        let entry = if let Some(context) = vault.organization {
+            entry
+                .checked_add(44 + argument_bytes(context.view_revision))
+                .ok_or_else(|| invalid("session vault encoded size overflows this platform"))?
+        } else {
+            entry
+        };
         size = size
             .checked_add(entry)
             .ok_or_else(|| invalid("session response encoded size overflows this platform"))?;

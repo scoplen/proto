@@ -8,6 +8,7 @@ import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
 import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs";
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
 import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
+import { generateInventoryTypes } from "./generate-inventory.mjs";
 import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
 
 const root = new URL(".", import.meta.url);
@@ -562,12 +563,19 @@ const teamBegin = completeOrganizationTypes.indexOf(teamStart);
 const teamFinish = completeOrganizationTypes.indexOf(teamEnd, teamBegin + teamStart.length);
 if (teamBegin < 0 || teamFinish < 0) throw new Error("types.ts lacks TeamMembership markers");
 const completeTeamTypes = `${completeOrganizationTypes.slice(0, teamBegin + teamStart.length)}${generateTeamTypes(document)}${completeOrganizationTypes.slice(teamFinish)}`;
+const inventoryStart = "// BEGIN GENERATED OrganizationInventory\n";
+const inventoryEnd = "// END GENERATED OrganizationInventory";
+const inventoryBegin = completeTeamTypes.indexOf(inventoryStart);
+const inventoryFinish = completeTeamTypes.indexOf(inventoryEnd, inventoryBegin + inventoryStart.length);
+if (inventoryBegin < 0 || inventoryFinish < 0) throw new Error("types.ts lacks OrganizationInventory markers");
+const completeInventoryTypes = completeTeamTypes.slice(0, inventoryBegin + inventoryStart.length) +
+  generateInventoryTypes(document) + completeTeamTypes.slice(inventoryFinish);
 const groupPolicyStart = "// BEGIN GENERATED GroupPolicy\n";
 const groupPolicyEnd = "// END GENERATED GroupPolicy";
-const groupPolicyBegin = completeTeamTypes.indexOf(groupPolicyStart);
-const groupPolicyFinish = completeTeamTypes.indexOf(groupPolicyEnd, groupPolicyBegin + groupPolicyStart.length);
+const groupPolicyBegin = completeInventoryTypes.indexOf(groupPolicyStart);
+const groupPolicyFinish = completeInventoryTypes.indexOf(groupPolicyEnd, groupPolicyBegin + groupPolicyStart.length);
 if (groupPolicyBegin < 0 || groupPolicyFinish < 0) throw new Error("types.ts lacks GroupPolicy markers");
-const completeGroupPolicyTypes = `${completeTeamTypes.slice(0, groupPolicyBegin + groupPolicyStart.length)}${generateGroupPolicyTypes(document)}${completeTeamTypes.slice(groupPolicyFinish)}`;
+const completeGroupPolicyTypes = `${completeInventoryTypes.slice(0, groupPolicyBegin + groupPolicyStart.length)}${generateGroupPolicyTypes(document)}${completeInventoryTypes.slice(groupPolicyFinish)}`;
 const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeGroupPolicyTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {

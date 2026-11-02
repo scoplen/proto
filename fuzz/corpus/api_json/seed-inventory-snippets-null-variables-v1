@@ -1,0 +1,1 @@
+{"name":"Inspect","template":"echo {{text}} {{count}} {{mode}} {{secret}}","variables":null,"tags":{"ops":true},"folder":"Operations"}

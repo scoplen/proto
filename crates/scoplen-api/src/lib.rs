@@ -21,6 +21,7 @@ pub mod gateway;
 pub mod gateway_ticket;
 pub mod group_policy;
 pub mod internal_grpc;
+pub mod inventory;
 pub mod operator_auth;
 pub mod operator_logout_reference;
 pub mod organization;
@@ -96,6 +97,7 @@ pub const ERROR_CODES: &[&str] = &[
     "sync.rate_limited",
     "sync.read_only",
     "sync.storage_unavailable",
+    "sync.view_changed",
 ];
 
 /// Errors returned while constructing or validating API contract values.

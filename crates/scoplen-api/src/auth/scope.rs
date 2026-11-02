@@ -12,15 +12,15 @@ pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read ca:read ca:write cer
 pub enum DeviceAccessScope {
     /// Read the current device's account profile and signed device statements.
     AccountRead,
-    /// Read current Organization user-CA public trust metadata.
+    /// Read current Organization user-CA public trust.
     CaRead,
-    /// Provision an Organization user CA under current policy authorization.
+    /// Provision an Organization local user CA under current policy.
     CaWrite,
-    /// Request a user certificate under current per-target read and connect authorization.
+    /// Issue a source-bound certificate after per-target authorization.
     CertificatesIssue,
-    /// Read each independently authorized Organization inventory object.
+    /// Read individually authorized Organization inventory.
     InventoryRead,
-    /// Author Organization inventory under current policy and reference authorization.
+    /// Author Organization inventory under current policy.
     InventoryWrite,
     /// Read that account's encrypted K-4 key bundle.
     KeysRead,
@@ -32,9 +32,9 @@ pub enum DeviceAccessScope {
     OrganizationRead,
     /// Update Organization settings under current membership and policy authorization.
     OrganizationWrite,
-    /// Read Organization groups and persisted policies under current route authorization.
+    /// Read current Organization groups and policies.
     PoliciesRead,
-    /// Author Organization policies under current policy authorization.
+    /// Author Organization policies under current policy.
     PoliciesWrite,
     /// Read authorized vault data and establish authorized notification subscriptions.
     SyncRead,
@@ -147,6 +147,76 @@ pub enum DeviceAccessOperation {
     TeamMemberRemove,
     /// Dissolve a team as a current Owner.
     TeamDissolve,
+    /// Host List in the current Organization.
+    InventoryHostList,
+    /// Host Read in the current Organization.
+    InventoryHostRead,
+    /// Host Create in the current Organization.
+    InventoryHostCreate,
+    /// Host Replace in the current Organization.
+    InventoryHostReplace,
+    /// Host Delete in the current Organization.
+    InventoryHostDelete,
+    /// Access Profile List in the current Organization.
+    InventoryAccessProfileList,
+    /// Access Profile Read in the current Organization.
+    InventoryAccessProfileRead,
+    /// Access Profile Create in the current Organization.
+    InventoryAccessProfileCreate,
+    /// Access Profile Replace in the current Organization.
+    InventoryAccessProfileReplace,
+    /// Access Profile Delete in the current Organization.
+    InventoryAccessProfileDelete,
+    /// Route List in the current Organization.
+    InventoryRouteList,
+    /// Route Read in the current Organization.
+    InventoryRouteRead,
+    /// Route Create in the current Organization.
+    InventoryRouteCreate,
+    /// Route Replace in the current Organization.
+    InventoryRouteReplace,
+    /// Route Delete in the current Organization.
+    InventoryRouteDelete,
+    /// Host Group List in the current Organization.
+    InventoryHostGroupList,
+    /// Host Group Read in the current Organization.
+    InventoryHostGroupRead,
+    /// Host Group Create in the current Organization.
+    InventoryHostGroupCreate,
+    /// Host Group Replace in the current Organization.
+    InventoryHostGroupReplace,
+    /// Host Group Delete in the current Organization.
+    InventoryHostGroupDelete,
+    /// Trust Record List in the current Organization.
+    InventoryTrustRecordList,
+    /// Trust Record Read in the current Organization.
+    InventoryTrustRecordRead,
+    /// Trust Record Create in the current Organization.
+    InventoryTrustRecordCreate,
+    /// Trust Record Replace in the current Organization.
+    InventoryTrustRecordReplace,
+    /// Trust Record Delete in the current Organization.
+    InventoryTrustRecordDelete,
+    /// Snippet List in the current Organization.
+    InventorySnippetList,
+    /// Snippet Read in the current Organization.
+    InventorySnippetRead,
+    /// Snippet Create in the current Organization.
+    InventorySnippetCreate,
+    /// Snippet Replace in the current Organization.
+    InventorySnippetReplace,
+    /// Snippet Delete in the current Organization.
+    InventorySnippetDelete,
+    /// Gateway Network List in the current Organization.
+    InventoryGatewayNetworkList,
+    /// Gateway Network Read in the current Organization.
+    InventoryGatewayNetworkRead,
+    /// Gateway Network Create in the current Organization.
+    InventoryGatewayNetworkCreate,
+    /// Gateway Network Replace in the current Organization.
+    InventoryGatewayNetworkReplace,
+    /// Gateway Network Delete in the current Organization.
+    InventoryGatewayNetworkDelete,
     /// Create one local Group with current same-team Membership associations.
     OrganizationGroupCreate,
     /// List Groups under current administrative read authority.
@@ -179,6 +249,8 @@ pub enum DeviceAccessOperation {
     VaultChangesRead,
     /// Read a vault snapshot.
     VaultSnapshotRead,
+    /// Read a complete revision-bound Organization view.
+    OrganizationViewRead,
     /// Read an object's retained versions.
     ObjectVersionsRead,
     /// Authenticate notifications and recheck authorized subscriptions and delivery.
@@ -201,7 +273,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 77] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
@@ -218,6 +290,41 @@ impl DeviceAccessOperation {
         Self::TeamMemberUpdate,
         Self::TeamMemberRemove,
         Self::TeamDissolve,
+        Self::InventoryHostList,
+        Self::InventoryHostRead,
+        Self::InventoryHostCreate,
+        Self::InventoryHostReplace,
+        Self::InventoryHostDelete,
+        Self::InventoryAccessProfileList,
+        Self::InventoryAccessProfileRead,
+        Self::InventoryAccessProfileCreate,
+        Self::InventoryAccessProfileReplace,
+        Self::InventoryAccessProfileDelete,
+        Self::InventoryRouteList,
+        Self::InventoryRouteRead,
+        Self::InventoryRouteCreate,
+        Self::InventoryRouteReplace,
+        Self::InventoryRouteDelete,
+        Self::InventoryHostGroupList,
+        Self::InventoryHostGroupRead,
+        Self::InventoryHostGroupCreate,
+        Self::InventoryHostGroupReplace,
+        Self::InventoryHostGroupDelete,
+        Self::InventoryTrustRecordList,
+        Self::InventoryTrustRecordRead,
+        Self::InventoryTrustRecordCreate,
+        Self::InventoryTrustRecordReplace,
+        Self::InventoryTrustRecordDelete,
+        Self::InventorySnippetList,
+        Self::InventorySnippetRead,
+        Self::InventorySnippetCreate,
+        Self::InventorySnippetReplace,
+        Self::InventorySnippetDelete,
+        Self::InventoryGatewayNetworkList,
+        Self::InventoryGatewayNetworkRead,
+        Self::InventoryGatewayNetworkCreate,
+        Self::InventoryGatewayNetworkReplace,
+        Self::InventoryGatewayNetworkDelete,
         Self::OrganizationGroupCreate,
         Self::OrganizationGroupList,
         Self::OrganizationGroupRead,
@@ -234,6 +341,7 @@ impl DeviceAccessOperation {
         Self::VaultKeysRead,
         Self::VaultChangesRead,
         Self::VaultSnapshotRead,
+        Self::OrganizationViewRead,
         Self::ObjectVersionsRead,
         Self::Notifications,
         Self::VaultCreate,
@@ -281,12 +389,48 @@ impl DeviceAccessOperation {
             Self::OrganizationPolicyCreate
             | Self::OrganizationPolicyReplace
             | Self::OrganizationPolicyDelete => &[DeviceAccessScope::PoliciesWrite],
+            Self::InventoryHostList
+            | Self::InventoryHostRead
+            | Self::InventoryAccessProfileList
+            | Self::InventoryAccessProfileRead
+            | Self::InventoryRouteList
+            | Self::InventoryRouteRead
+            | Self::InventoryHostGroupList
+            | Self::InventoryHostGroupRead
+            | Self::InventoryTrustRecordList
+            | Self::InventoryTrustRecordRead
+            | Self::InventorySnippetList
+            | Self::InventorySnippetRead
+            | Self::InventoryGatewayNetworkList
+            | Self::InventoryGatewayNetworkRead => &[DeviceAccessScope::InventoryRead],
+            Self::InventoryHostCreate
+            | Self::InventoryHostReplace
+            | Self::InventoryHostDelete
+            | Self::InventoryAccessProfileCreate
+            | Self::InventoryAccessProfileReplace
+            | Self::InventoryAccessProfileDelete
+            | Self::InventoryRouteCreate
+            | Self::InventoryRouteReplace
+            | Self::InventoryRouteDelete
+            | Self::InventoryHostGroupCreate
+            | Self::InventoryHostGroupReplace
+            | Self::InventoryHostGroupDelete
+            | Self::InventoryTrustRecordCreate
+            | Self::InventoryTrustRecordReplace
+            | Self::InventoryTrustRecordDelete
+            | Self::InventorySnippetCreate
+            | Self::InventorySnippetReplace
+            | Self::InventorySnippetDelete
+            | Self::InventoryGatewayNetworkCreate
+            | Self::InventoryGatewayNetworkReplace
+            | Self::InventoryGatewayNetworkDelete => &[DeviceAccessScope::InventoryWrite],
             Self::AccountKeysRead => &[DeviceAccessScope::KeysRead],
             Self::AccountKeysWrite => &[DeviceAccessScope::KeysWrite],
             Self::SyncSession
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
+            | Self::OrganizationViewRead
             | Self::ObjectVersionsRead
             | Self::Notifications => &[DeviceAccessScope::SyncRead],
             Self::VaultCreate
@@ -319,25 +463,54 @@ impl DeviceAccessOperation {
             | Self::TeamInvitationRead
             | Self::TeamMemberList
             | Self::TeamMemberRead
-            | Self::OrganizationGroupList
-            | Self::OrganizationGroupRead
-            | Self::OrganizationPolicyList
-            | Self::OrganizationPolicyRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
+            | Self::OrganizationViewRead
             | Self::ObjectVersionsRead
+            | Self::InventoryHostList
+            | Self::InventoryHostRead
+            | Self::InventoryAccessProfileList
+            | Self::InventoryAccessProfileRead
+            | Self::InventoryRouteList
+            | Self::InventoryRouteRead
+            | Self::InventoryHostGroupList
+            | Self::InventoryHostGroupRead
+            | Self::InventoryTrustRecordList
+            | Self::InventoryTrustRecordRead
+            | Self::InventorySnippetList
+            | Self::InventorySnippetRead
+            | Self::InventoryGatewayNetworkList
+            | Self::InventoryGatewayNetworkRead
+            | Self::OrganizationGroupList
+            | Self::OrganizationGroupRead
+            | Self::OrganizationPolicyList
+            | Self::OrganizationPolicyRead
             | Self::Notifications => "GET",
             Self::AccountKeysWrite
             | Self::OrganizationGroupReplace
-            | Self::OrganizationPolicyReplace => "PUT",
+            | Self::OrganizationPolicyReplace
+            | Self::InventoryHostReplace
+            | Self::InventoryAccessProfileReplace
+            | Self::InventoryRouteReplace
+            | Self::InventoryHostGroupReplace
+            | Self::InventoryTrustRecordReplace
+            | Self::InventorySnippetReplace
+            | Self::InventoryGatewayNetworkReplace => "PUT",
             Self::OrganizationUpdate | Self::TeamMemberUpdate => "PATCH",
             Self::VaultMemberRemove
             | Self::TeamInvitationRevoke
             | Self::TeamMemberRemove
             | Self::OrganizationGroupDelete
-            | Self::OrganizationPolicyDelete => "DELETE",
+            | Self::OrganizationPolicyDelete
+            | Self::InventoryHostDelete
+            | Self::InventoryAccessProfileDelete
+            | Self::InventoryRouteDelete
+            | Self::InventoryHostGroupDelete
+            | Self::InventoryTrustRecordDelete
+            | Self::InventorySnippetDelete
+            | Self::InventoryGatewayNetworkDelete => "DELETE",
             Self::SyncSession
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
@@ -345,6 +518,13 @@ impl DeviceAccessOperation {
             | Self::TeamDissolve
             | Self::OrganizationGroupCreate
             | Self::OrganizationPolicyCreate
+            | Self::InventoryHostCreate
+            | Self::InventoryAccessProfileCreate
+            | Self::InventoryRouteCreate
+            | Self::InventoryHostGroupCreate
+            | Self::InventoryTrustRecordCreate
+            | Self::InventorySnippetCreate
+            | Self::InventoryGatewayNetworkCreate
             | Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
@@ -374,6 +554,44 @@ impl DeviceAccessOperation {
                 "/api/v1/orgs/{org}/members/{membership}"
             }
             Self::TeamDissolve => "/api/v1/orgs/{org}/dissolve",
+            Self::InventoryHostList | Self::InventoryHostCreate => "/api/v1/orgs/{org}/hosts",
+            Self::InventoryHostRead | Self::InventoryHostReplace | Self::InventoryHostDelete => {
+                "/api/v1/orgs/{org}/hosts/{id}"
+            }
+            Self::InventoryAccessProfileList | Self::InventoryAccessProfileCreate => {
+                "/api/v1/orgs/{org}/access-profiles"
+            }
+            Self::InventoryAccessProfileRead
+            | Self::InventoryAccessProfileReplace
+            | Self::InventoryAccessProfileDelete => "/api/v1/orgs/{org}/access-profiles/{id}",
+            Self::InventoryRouteList | Self::InventoryRouteCreate => "/api/v1/orgs/{org}/routes",
+            Self::InventoryRouteRead | Self::InventoryRouteReplace | Self::InventoryRouteDelete => {
+                "/api/v1/orgs/{org}/routes/{id}"
+            }
+            Self::InventoryHostGroupList | Self::InventoryHostGroupCreate => {
+                "/api/v1/orgs/{org}/host-groups"
+            }
+            Self::InventoryHostGroupRead
+            | Self::InventoryHostGroupReplace
+            | Self::InventoryHostGroupDelete => "/api/v1/orgs/{org}/host-groups/{id}",
+            Self::InventoryTrustRecordList | Self::InventoryTrustRecordCreate => {
+                "/api/v1/orgs/{org}/trust-records"
+            }
+            Self::InventoryTrustRecordRead
+            | Self::InventoryTrustRecordReplace
+            | Self::InventoryTrustRecordDelete => "/api/v1/orgs/{org}/trust-records/{id}",
+            Self::InventorySnippetList | Self::InventorySnippetCreate => {
+                "/api/v1/orgs/{org}/snippets"
+            }
+            Self::InventorySnippetRead
+            | Self::InventorySnippetReplace
+            | Self::InventorySnippetDelete => "/api/v1/orgs/{org}/snippets/{id}",
+            Self::InventoryGatewayNetworkList | Self::InventoryGatewayNetworkCreate => {
+                "/api/v1/orgs/{org}/gateway-networks"
+            }
+            Self::InventoryGatewayNetworkRead
+            | Self::InventoryGatewayNetworkReplace
+            | Self::InventoryGatewayNetworkDelete => "/api/v1/orgs/{org}/gateway-networks/{id}",
             Self::OrganizationGroupCreate | Self::OrganizationGroupList => {
                 "/api/v1/orgs/{org}/groups"
             }
@@ -391,6 +609,7 @@ impl DeviceAccessOperation {
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",
             Self::VaultChangesRead => "/sync/v1/vaults/{vault}/changes",
             Self::VaultSnapshotRead => "/sync/v1/vaults/{vault}/snapshot",
+            Self::OrganizationViewRead => "/sync/v1/vaults/{vault}/view",
             Self::ObjectVersionsRead => "/sync/v1/vaults/{vault}/objects/{object}/versions",
             Self::Notifications => "/sync/v1/notify",
             Self::VaultCreate => "/sync/v1/vaults",
