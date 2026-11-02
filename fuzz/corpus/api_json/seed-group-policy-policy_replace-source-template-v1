@@ -1,0 +1,1 @@
+{"data":{"name":"Read hosts","source":"permit(principal == ?principal, action, resource);","enabled":true}}

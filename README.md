@@ -146,6 +146,29 @@ team isolation, no-op audits and historical confirmation without restoring acces
 fixture setters supply current identity and clock state; the peer provides no HTTP, token/DPoP
 verification, durable admission/storage or production audit chain.
 
+D-137's `group_policy` module supplies strict Group/Policy create and complete-replacement
+requests, bounded Resource/Page readers, strong ETag/cache validation and captured-response
+bindings. Group members are distinct Membership ids, sorted by encoders; the server-owned
+`local`/`IdP` source is never writable. Policies preserve one bounded non-template Cedar source,
+validated against the strict shared schema. Parsed action environments and expressions reject
+`context.now` observations in any permit or forbid potentially matching `view_inventory`;
+connect-only time conditions remain supported. `policy_references` returns typed locators for
+current same-team resolution and rejects foreign explicit Organization literals; it grants no
+authority and does not require an explicit owner literal.
+
+`SimpleRuleInput` generates a single bounded permit for one Membership or Group and one
+independent view or connect rule. View selectors cover the seven Organization inventory types;
+connect selectors name Hosts or current HostGroup members plus one exact remote user. The
+generator sorts and escapes selections, validates the generated source and supplies no roles,
+time grant, approval, wildcard or dependency-read permission. Previewing source changes no
+authorization. Native and console consumers persist it through the same authorized policy API.
+The ten exact Group/Policy operations, public TypeScript exports and independent vectors share
+the fixed contract. Group writes require `teams:manage` plus `manage_members`; reads require
+`policies:read` and either `view_policy` or `manage_members`. Policy reads/writes separately
+require `policies:read`/`policies:write` and `view_policy`/`manage_policy`. Current membership,
+reference resolution, IdP read-only enforcement, receipts, storage, audit and transaction-current
+authority remain production consumer work.
+
 K-1 reference discovery follows the documented object paths, including live membership keys
 and Workspace session maps. It excludes cleared entries, account/device provenance and unknown
 fields; consumers resolve the returned identifiers against their live object inventory.
@@ -746,7 +769,7 @@ response continues to treat the token as opaque.
 
 `scoplen-api::auth` publishes D-107's `DeviceAccessScope`, `INITIAL_DEVICE_ACCESS_SCOPE`,
 and `DeviceAccessOperation`. Initial first-party device issuance uses exactly
-`account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage`; refresh may preserve or narrow its
+`account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage`; refresh may preserve or narrow its
 recorded ceiling, never widen it. The operation registry requires router-owned canonical
 methods and route templates. Unknown protected routes fail closed for this device profile.
 `accepted_scopes()` exposes exact any-of scope alternatives and `has_accepted_scope()` checks
@@ -1029,6 +1052,9 @@ node --test scripts/generate-password-bootstrap-vectors.test.mjs
 node scripts/generate-organization-vectors.mjs --check
 node --test scripts/generate-organization-vectors.test.mjs
 node --test crates/scoplen-api/openapi/generate-organizations.test.mjs
+node scripts/generate-group-policy-vectors.mjs --check
+node --test scripts/generate-group-policy-vectors.test.mjs
+node --test crates/scoplen-api/openapi/generate-group-policy.test.mjs
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in

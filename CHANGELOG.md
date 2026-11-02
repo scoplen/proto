@@ -4,6 +4,16 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-137 bounded Group and persisted-Policy codecs, exact administration routes/scopes,
+  OpenAPI/TypeScript exports and independent vectors/parser seeds. The shared simple-rule
+  generator emits one canonical Organization-scoped view or exact-user connect permit;
+  permissions remain independent and never synthesize dependency reads. Policy validation
+  uses Cedar's parsed actions/expressions to reject time-dependent inventory visibility.
+  Immutable built-in roles add `view_policy`. The initial Device ceiling has all 17 D-137
+  scopes; existing refresh families require fresh authentication to gain new rights.
+  Current reference ownership, active memberships, persistence and transactional authority
+  remain production consumer responsibilities.
+
 - Add D-136 named-Account team invitation, member administration and dissolution JSON codecs,
   public links, independent vectors, parser seeds and exact OpenAPI/TypeScript contracts.
   The zeroizing K-2 invitation helper generates the eight-symbol password and context-bound

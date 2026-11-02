@@ -5,13 +5,23 @@
 ///
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
-pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage";
+pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeviceAccessScope {
     /// Read the current device's account profile and signed device statements.
     AccountRead,
+    /// Read current Organization user-CA public trust metadata.
+    CaRead,
+    /// Provision an Organization user CA under current policy authorization.
+    CaWrite,
+    /// Request a user certificate under current per-target read and connect authorization.
+    CertificatesIssue,
+    /// Read each independently authorized Organization inventory object.
+    InventoryRead,
+    /// Author Organization inventory under current policy and reference authorization.
+    InventoryWrite,
     /// Read that account's encrypted K-4 key bundle.
     KeysRead,
     /// Update that account's encrypted K-4 key bundle with the required signatures and wraps.
@@ -22,6 +32,10 @@ pub enum DeviceAccessScope {
     OrganizationRead,
     /// Update Organization settings under current membership and policy authorization.
     OrganizationWrite,
+    /// Read Organization groups and persisted policies under current route authorization.
+    PoliciesRead,
+    /// Author Organization policies under current policy authorization.
+    PoliciesWrite,
     /// Read authorized vault data and establish authorized notification subscriptions.
     SyncRead,
     /// Mutate authorized vault state, subject to each operation's additional checks.
@@ -34,13 +48,20 @@ pub enum DeviceAccessScope {
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 17] = [
         Self::AccountRead,
+        Self::CaRead,
+        Self::CaWrite,
+        Self::CertificatesIssue,
+        Self::InventoryRead,
+        Self::InventoryWrite,
         Self::KeysRead,
         Self::KeysWrite,
         Self::OrganizationCreate,
         Self::OrganizationRead,
         Self::OrganizationWrite,
+        Self::PoliciesRead,
+        Self::PoliciesWrite,
         Self::SyncRead,
         Self::SyncWrite,
         Self::TeamsJoin,
@@ -52,11 +73,18 @@ impl DeviceAccessScope {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::AccountRead => "account:read",
+            Self::CaRead => "ca:read",
+            Self::CaWrite => "ca:write",
+            Self::CertificatesIssue => "certificates:issue",
+            Self::InventoryRead => "inventory:read",
+            Self::InventoryWrite => "inventory:write",
             Self::KeysRead => "keys:read",
             Self::KeysWrite => "keys:write",
             Self::OrganizationCreate => "orgs:create",
             Self::OrganizationRead => "orgs:read",
             Self::OrganizationWrite => "orgs:write",
+            Self::PoliciesRead => "policies:read",
+            Self::PoliciesWrite => "policies:write",
             Self::SyncRead => "sync:read",
             Self::SyncWrite => "sync:write",
             Self::TeamsJoin => "teams:join",
@@ -119,6 +147,26 @@ pub enum DeviceAccessOperation {
     TeamMemberRemove,
     /// Dissolve a team as a current Owner.
     TeamDissolve,
+    /// Create one local Group with current same-team Membership associations.
+    OrganizationGroupCreate,
+    /// List Groups under current administrative read authority.
+    OrganizationGroupList,
+    /// Read one Group under current administrative read authority.
+    OrganizationGroupRead,
+    /// Completely replace one local Group's name and Membership associations.
+    OrganizationGroupReplace,
+    /// Delete one local Group after checking current policy dependencies.
+    OrganizationGroupDelete,
+    /// Create one current Organization's persisted custom policy.
+    OrganizationPolicyCreate,
+    /// List the current Organization's custom policies.
+    OrganizationPolicyList,
+    /// Read one current Organization's custom policy.
+    OrganizationPolicyRead,
+    /// Completely replace one current Organization's custom policy.
+    OrganizationPolicyReplace,
+    /// Delete one current Organization's custom policy.
+    OrganizationPolicyDelete,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -153,7 +201,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 41] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
@@ -170,6 +218,16 @@ impl DeviceAccessOperation {
         Self::TeamMemberUpdate,
         Self::TeamMemberRemove,
         Self::TeamDissolve,
+        Self::OrganizationGroupCreate,
+        Self::OrganizationGroupList,
+        Self::OrganizationGroupRead,
+        Self::OrganizationGroupReplace,
+        Self::OrganizationGroupDelete,
+        Self::OrganizationPolicyCreate,
+        Self::OrganizationPolicyList,
+        Self::OrganizationPolicyRead,
+        Self::OrganizationPolicyReplace,
+        Self::OrganizationPolicyDelete,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -212,7 +270,17 @@ impl DeviceAccessOperation {
             | Self::TeamMemberList
             | Self::TeamMemberRead
             | Self::TeamMemberUpdate
-            | Self::TeamDissolve => &[DeviceAccessScope::TeamsManage],
+            | Self::TeamDissolve
+            | Self::OrganizationGroupCreate
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationGroupDelete => &[DeviceAccessScope::TeamsManage],
+            Self::OrganizationGroupList
+            | Self::OrganizationGroupRead
+            | Self::OrganizationPolicyList
+            | Self::OrganizationPolicyRead => &[DeviceAccessScope::PoliciesRead],
+            Self::OrganizationPolicyCreate
+            | Self::OrganizationPolicyReplace
+            | Self::OrganizationPolicyDelete => &[DeviceAccessScope::PoliciesWrite],
             Self::AccountKeysRead => &[DeviceAccessScope::KeysRead],
             Self::AccountKeysWrite => &[DeviceAccessScope::KeysWrite],
             Self::SyncSession
@@ -251,22 +319,32 @@ impl DeviceAccessOperation {
             | Self::TeamInvitationRead
             | Self::TeamMemberList
             | Self::TeamMemberRead
+            | Self::OrganizationGroupList
+            | Self::OrganizationGroupRead
+            | Self::OrganizationPolicyList
+            | Self::OrganizationPolicyRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
             | Self::ObjectVersionsRead
             | Self::Notifications => "GET",
-            Self::AccountKeysWrite => "PUT",
+            Self::AccountKeysWrite
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationPolicyReplace => "PUT",
             Self::OrganizationUpdate | Self::TeamMemberUpdate => "PATCH",
-            Self::VaultMemberRemove | Self::TeamInvitationRevoke | Self::TeamMemberRemove => {
-                "DELETE"
-            }
+            Self::VaultMemberRemove
+            | Self::TeamInvitationRevoke
+            | Self::TeamMemberRemove
+            | Self::OrganizationGroupDelete
+            | Self::OrganizationPolicyDelete => "DELETE",
             Self::SyncSession
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
             | Self::TeamDissolve
+            | Self::OrganizationGroupCreate
+            | Self::OrganizationPolicyCreate
             | Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
@@ -296,6 +374,18 @@ impl DeviceAccessOperation {
                 "/api/v1/orgs/{org}/members/{membership}"
             }
             Self::TeamDissolve => "/api/v1/orgs/{org}/dissolve",
+            Self::OrganizationGroupCreate | Self::OrganizationGroupList => {
+                "/api/v1/orgs/{org}/groups"
+            }
+            Self::OrganizationGroupRead
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationGroupDelete => "/api/v1/orgs/{org}/groups/{id}",
+            Self::OrganizationPolicyCreate | Self::OrganizationPolicyList => {
+                "/api/v1/orgs/{org}/policies"
+            }
+            Self::OrganizationPolicyRead
+            | Self::OrganizationPolicyReplace
+            | Self::OrganizationPolicyDelete => "/api/v1/orgs/{org}/policies/{id}",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",
