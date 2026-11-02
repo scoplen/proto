@@ -1,0 +1,1 @@
+{"name":"Inspect","template":"echo {{text}} {{count}} {{mode}} {{secret}}","variables":{"input":{"kind":1,"choices":["a"]}},"tags":{"ops":true},"folder":"Operations"}

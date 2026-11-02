@@ -99,11 +99,18 @@ fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
         tokens,
         [
             "account:read",
+            "ca:read",
+            "ca:write",
+            "certificates:issue",
+            "inventory:read",
+            "inventory:write",
             "keys:read",
             "keys:write",
             "orgs:create",
             "orgs:read",
             "orgs:write",
+            "policies:read",
+            "policies:write",
             "sync:read",
             "sync:write",
             "teams:join",
@@ -134,7 +141,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 32);
+    assert_eq!(routes.len(), 67);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {
@@ -287,4 +294,30 @@ fn organization_update_proof_binds_actual_patch_and_exact_organization() {
             Err(DpopError::InvalidProof)
         );
     }
+}
+
+#[test]
+fn inventory_registry_matches_each_authored_method_route_and_scope() {
+    let document: serde_json::Value =
+        serde_json::from_str(include_str!("../openapi/v1.yaml")).unwrap();
+    let mut count = 0;
+    for operation in DeviceAccessOperation::ALL {
+        let scopes = operation.accepted_scopes();
+        if !scopes.contains(&DeviceAccessScope::InventoryRead)
+            && !scopes.contains(&DeviceAccessScope::InventoryWrite)
+        {
+            continue;
+        }
+        assert_eq!(scopes.len(), 1);
+        let path = operation.route_template().strip_prefix("/api/v1").unwrap();
+        let method = operation.http_method().to_ascii_lowercase();
+        let authored = &document["paths"][path][&method];
+        assert_eq!(authored["x-scoplen-required-device-scope"], scopes[0].as_str());
+        assert_eq!(
+            authored["security"],
+            serde_json::json!([{ "accessToken": [], "dpopProof": [] }])
+        );
+        count += 1;
+    }
+    assert_eq!(count, 35);
 }

@@ -20,6 +20,10 @@ use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceRe
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
 };
+use scoplen_api::inventory::{
+    InventoryCreateRequest, InventoryFields, InventoryPage, InventoryReplaceRequest,
+    InventoryResource, InventoryType,
+};
 use scoplen_api::operator_auth::{
     OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
     OperatorLogoutRequest, OperatorLogoutResponse, OperatorSetupFinishRequest,
@@ -47,6 +51,18 @@ macro_rules! round_trip {
     };
 }
 
+macro_rules! inventory_round_trip {
+    ($message:ty, $kind:expr, $input:expr) => {
+        if let Ok(message) = <$message>::from_json($kind, $input) {
+            let encoded = message.to_json().expect("validated inventory message encodes");
+            assert_eq!(<$message>::from_json($kind, &encoded), Ok(message));
+            let decoded = <$message>::from_json($kind, &encoded)
+                .expect("canonical inventory message decodes");
+            assert_eq!(decoded.to_json().expect("canonical inventory message encodes"), encoded);
+        }
+    };
+}
+
 fuzz_target!(|bytes: &[u8]| {
     if let Ok(problem) = ProblemDetails::from_json(bytes, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES) {
         let encoded = serde_json::to_vec(&problem).expect("validated problem encodes");
@@ -69,6 +85,13 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(TeamDissolutionReceipt, bytes);
     round_trip!(TeamInvitationPage, bytes);
     round_trip!(TeamMemberPage, bytes);
+    for kind in InventoryType::ALL {
+        inventory_round_trip!(InventoryFields, kind, bytes);
+        inventory_round_trip!(InventoryCreateRequest, kind, bytes);
+        inventory_round_trip!(InventoryReplaceRequest, kind, bytes);
+        inventory_round_trip!(InventoryResource, kind, bytes);
+        inventory_round_trip!(InventoryPage, kind, bytes);
+    }
     if let Ok(value) = TeamInvitationCreateRequest::from_json(bytes) {
         let encoded = value.to_json().expect("validated secret request encodes");
         assert_eq!(TeamInvitationCreateRequest::from_json(encoded.as_bytes()), Ok(value));

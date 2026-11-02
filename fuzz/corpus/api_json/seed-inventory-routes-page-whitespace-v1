@@ -1,0 +1,1 @@
+	{"items":[{"id":"019bdad6-b800-7000-8000-000000000010","etag":"\"inventory-current\"","created_at":"2026-11-01T00:00:00Z","updated_at":"2026-11-01T00:00:00Z","data":{"fields":{"hops":["019bdad6-b800-7000-8000-000000000020","019bdad6-b800-7000-8000-000000000021"],"kind":1,"name":"Jump"},"schema":1}}],"next_cursor":null}
