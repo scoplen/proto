@@ -167,6 +167,12 @@ connect-only time conditions remain supported. `policy_references` returns typed
 current same-team resolution and rejects foreign explicit Organization literals; it grants no
 authority and does not require an explicit owner literal.
 
+The connect schema's `sso_age_seconds` is optional: a password-only Account supplies no SSO
+fact. Policies must guard reads with `context has sso_age_seconds`; they may explicitly allow
+its absence or forbid absent/stale SSO. Present ages must be nonnegative. Strict policy
+validation rejects unguarded reads, and any evaluation diagnostic denies authorization even
+alongside another permit. Consumers provide only verified Organization SSO observations.
+
 `SimpleRuleInput` generates a single bounded permit for one Membership or Group and one
 independent view or connect rule. View selectors cover the seven Organization inventory types;
 connect selectors name Hosts or current HostGroup members plus one exact remote user. The

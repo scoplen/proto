@@ -81,7 +81,7 @@ impl Fixture {
             "connect" => json!({
                 "device": entity_ref("Device", self.id("Device")),
                 "remote_user": "operator", "route_kind": "direct",
-                "sso_age_seconds": 0, "source_ip": "192.0.2.1",
+                "source_ip": "192.0.2.1",
             }),
             "request_access" => json!({"duration_seconds": 300, "reason": "Maintenance"}),
             "approve_access" => json!({
@@ -371,6 +371,97 @@ fn optional_direct_host_gateway_and_trust_host_use_absence_without_a_sentinel() 
     assert_eq!(fixture.decide("", "view_inventory", "TrustRecord"), Ok(Decision::Allow));
     fixture.remove("GatewayNetwork");
     assert!(fixture.decide(PERMIT_ALL, "view_inventory", "Host").is_err());
+}
+
+#[test]
+fn password_only_connect_omits_sso_and_policy_decides_whether_it_is_required() {
+    let mut fixture = Fixture::new();
+    assert_eq!(fixture.decide("", "connect", "Host"), Ok(Decision::Allow));
+    fixture.role("member");
+    let absent = r#"permit(principal, action == Action::"connect", resource) when { !(context has sso_age_seconds) };"#;
+    assert_eq!(fixture.decide(absent, "connect", "Host"), Ok(Decision::Allow));
+    let required = r#"permit(principal, action == Action::"connect", resource) when { context has sso_age_seconds && context.sso_age_seconds <= 300 };"#;
+    assert_eq!(fixture.decide(required, "connect", "Host"), Ok(Decision::Deny));
+    let authorizer = fixture.authorizer(required);
+    for (age, expected) in [(0, Decision::Allow), (300, Decision::Allow), (301, Decision::Deny)] {
+        let mut context = fixture.context("connect");
+        context["sso_age_seconds"] = json!(age);
+        assert_eq!(
+            authorizer.authorize(
+                &fixture.trusted(1),
+                &fixture.request_with("connect", "Host", context),
+                &fixture.entities(),
+            ),
+            Ok(expected),
+        );
+    }
+    let unguarded = r#"permit(principal, action == Action::"connect", resource) when { context.sso_age_seconds <= 300 };"#;
+    assert!(matches!(
+        OrganizationAuthorizer::new(
+            fixture.uuid("Organization"),
+            &unguarded.parse().expect("policy"),
+        ),
+        Err(Error::InvalidConfiguration)
+    ));
+}
+
+#[test]
+fn explicit_sso_forbid_overrides_member_and_owner_permits() {
+    let forbid = r#"forbid(principal, action == Action::"connect", resource) unless { context has sso_age_seconds && context.sso_age_seconds <= 300 };"#;
+    for role in ["member", "owner"] {
+        let mut fixture = Fixture::new();
+        fixture.role(role);
+        let authorizer = fixture.authorizer(&format!("{PERMIT_ALL} {forbid}"));
+        for (age, expected) in
+            [(None, Decision::Deny), (Some(300), Decision::Allow), (Some(301), Decision::Deny)]
+        {
+            let mut context = fixture.context("connect");
+            if let Some(age) = age {
+                context["sso_age_seconds"] = json!(age);
+            }
+            assert_eq!(
+                authorizer.authorize(
+                    &fixture.trusted(1),
+                    &fixture.request_with("connect", "Host", context),
+                    &fixture.entities(),
+                ),
+                Ok(expected),
+                "{role}: {age:?}",
+            );
+        }
+    }
+}
+
+#[test]
+fn invalid_sso_facts_and_evaluation_errors_cannot_gain_connect_authority() {
+    let fixture = Fixture::new();
+    let authorizer = fixture.authorizer(PERMIT_ALL);
+    let mut null = fixture.context("connect");
+    null["sso_age_seconds"] = Value::Null;
+    assert!(Context::from_json_value(null, None).is_err());
+    for invalid in [json!("0"), json!(false), json!(-1)] {
+        let mut context = fixture.context("connect");
+        context["sso_age_seconds"] = invalid;
+        assert_eq!(
+            authorizer.authorize(
+                &fixture.trusted(1),
+                &fixture.request_with("connect", "Host", context),
+                &fixture.entities(),
+            ),
+            Err(Error::InvalidRequest),
+        );
+    }
+    let overflowing = r#"forbid(principal, action == Action::"connect", resource) when { context has sso_age_seconds && context.sso_age_seconds + 1 < 0 };"#;
+    let mut context = fixture.context("connect");
+    context["sso_age_seconds"] = json!(i64::MAX);
+    assert_eq!(
+        fixture.authorizer(&format!("{PERMIT_ALL} {overflowing}")).authorize(
+            &fixture.trusted(1),
+            &fixture.request_with("connect", "Host", context),
+            &fixture.entities(),
+        ),
+        Err(Error::Evaluation),
+    );
 }
 
 #[test]

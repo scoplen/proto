@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Make the Cedar connect context's SSO age optional for password-only Accounts (D-138).
+  Strict policy validation now requires guarded reads; missing SSO can be explicitly allowed
+  or forbidden without inventing a timestamp. Present negative ages and all evaluation errors
+  fail authorization. This is a breaking pre-Stable policy-schema change; HTTP, JWT and
+  certificate representations are unchanged.
+
 - Add bounded D-137 initial local-user-CA request, public Resource and Page codecs with exact
   Ed25519 key/fingerprint validation, independent vectors and parser seeds. Concrete CA API
   declarations and existing certificate issuance now specify current authority and original
