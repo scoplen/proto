@@ -10,6 +10,7 @@ cargo-fuzz = true
 [patch.crates-io]
 # Use the same bounded native Pageant transport as the main workspace.
 pageant = { path = "../vendor/pageant" }
+ssh-key = { path = "../vendor/ssh-key" }
 
 [dependencies]
 libfuzzer-sys = "0.4.7"
