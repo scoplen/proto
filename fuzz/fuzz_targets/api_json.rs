@@ -29,6 +29,7 @@ use scoplen_api::organization::{
     OrganizationCreateRequest, OrganizationPage, OrganizationResource, OrganizationUpdateRequest,
     parse_organization_if_match,
 };
+use scoplen_api::user_ca::{UserCaCreateRequest, UserCaPage, UserCaResource};
 use scoplen_api::team::{
     TeamAcceptanceReceipt, TeamDissolutionReceipt, TeamDissolveRequest,
     TeamInvitationAcceptRequest, TeamInvitationCreateRequest, TeamInvitationLink,
@@ -57,6 +58,9 @@ fuzz_target!(|bytes: &[u8]| {
         );
     }
     round_trip!(AccountProfile, bytes);
+    round_trip!(UserCaCreateRequest, bytes);
+    round_trip!(UserCaResource, bytes);
+    round_trip!(UserCaPage, bytes);
     round_trip!(OrganizationCreateRequest, bytes);
     round_trip!(OrganizationUpdateRequest, bytes);
     round_trip!(OrganizationResource, bytes);

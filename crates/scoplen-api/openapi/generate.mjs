@@ -8,6 +8,7 @@ import { generateAccountDeviceTypes } from "./generate-account-devices.mjs";
 import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs";
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
 import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
+import { generateUserCaTypes } from "./generate-user-ca.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -372,8 +373,13 @@ const certificateVariants = ["CertificateHostRequest", "CertificateHostGroupRequ
 if (certificatePost?.operationId !== "createCertificates" ||
     JSON.stringify(certificatePost.parameters) !== JSON.stringify([
       { $ref: "#/components/parameters/org" },
-      { $ref: "#/components/parameters/idempotency" },
+      { name: "Idempotency-Key", in: "header", required: true, schema: { type: "string", format: "uuid", pattern: authPatterns.device_id } },
     ]) ||
+    certificatePost["x-scoplen-required-device-scope"] !== "certificates:issue" ||
+    JSON.stringify(certificatePost.security) !== JSON.stringify([{ accessToken: [], dpopProof: [] }]) ||
+    certificatePost["x-scoplen-request-max-bytes"] !== 16384 ||
+    certificatePost["x-scoplen-response-max-bytes"] !== 131072 ||
+    certificatePost.responses?.["503"]?.content?.["application/problem+json"]?.schema?.oneOf?.map(value => value.$ref).join("|") !== "#/components/schemas/OrganizationStorageUnavailableProblem|#/components/schemas/OrganizationCommitOutcomeUnknownProblem" ||
     certificatePost.requestBody?.required !== true ||
     !certificatePost.requestBody.description?.includes("16384 bytes") ||
     certificatePost.requestBody.content?.["application/json"]?.schema?.$ref !== "#/components/schemas/CertificateRequest" ||
@@ -561,7 +567,13 @@ const teamBegin = completeOrganizationTypes.indexOf(teamStart);
 const teamFinish = completeOrganizationTypes.indexOf(teamEnd, teamBegin + teamStart.length);
 if (teamBegin < 0 || teamFinish < 0) throw new Error("types.ts lacks TeamMembership markers");
 const completeTeamTypes = `${completeOrganizationTypes.slice(0, teamBegin + teamStart.length)}${generateTeamTypes(document)}${completeOrganizationTypes.slice(teamFinish)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeTeamTypes]];
+const caStart = "// BEGIN GENERATED UserCa\n";
+const caEnd = "// END GENERATED UserCa";
+const caBegin = completeTeamTypes.indexOf(caStart);
+const caFinish = completeTeamTypes.indexOf(caEnd, caBegin + caStart.length);
+if (caBegin < 0 || caFinish < 0) throw new Error("types.ts lacks UserCa markers");
+const completeCaTypes = `${completeTeamTypes.slice(0, caBegin + caStart.length)}${generateUserCaTypes(document)}${completeTeamTypes.slice(caFinish)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeCaTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

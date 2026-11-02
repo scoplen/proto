@@ -12,7 +12,7 @@
       "id": "auth-scope-initial-v1",
       "kind": "auth.scope.initial",
       "input": "first-party-device",
-      "expected": "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage"
+      "expected": "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
     },
     {
       "id": "auth-scope-token-account-read-v1",
@@ -529,6 +529,90 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/view\"}",
       "expected": "sync:read"
+    },
+    {
+      "id": "auth-scope-token-ca-read-v1",
+      "kind": "auth.scope.token",
+      "input": "ca:read",
+      "expected": "ca:read"
+    },
+    {
+      "id": "auth-scope-token-ca-write-v1",
+      "kind": "auth.scope.token",
+      "input": "ca:write",
+      "expected": "ca:write"
+    },
+    {
+      "id": "auth-scope-token-certificates-issue-v1",
+      "kind": "auth.scope.token",
+      "input": "certificates:issue",
+      "expected": "certificates:issue"
+    },
+    {
+      "id": "auth-scope-token-inventory-read-v1",
+      "kind": "auth.scope.token",
+      "input": "inventory:read",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-token-inventory-write-v1",
+      "kind": "auth.scope.token",
+      "input": "inventory:write",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-token-policies-read-v1",
+      "kind": "auth.scope.token",
+      "input": "policies:read",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-token-policies-write-v1",
+      "kind": "auth.scope.token",
+      "input": "policies:write",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-operation-ca-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities\"}",
+      "expected": "ca:read"
+    },
+    {
+      "id": "auth-scope-operation-ca-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}\"}",
+      "expected": "ca:read"
+    },
+    {
+      "id": "auth-scope-operation-ca-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities\"}",
+      "expected": "ca:write"
+    },
+    {
+      "id": "auth-scope-operation-certificate-issue-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/certificates\"}",
+      "expected": "certificates:issue"
+    },
+    {
+      "id": "auth-scope-operation-ca-patch-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-ca-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-certificate-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificates\"}",
+      "expected": "unmapped"
     }
   ]
 }

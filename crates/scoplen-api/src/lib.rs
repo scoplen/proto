@@ -49,6 +49,7 @@ pub mod proto {
 }
 pub mod sync;
 pub mod team;
+pub mod user_ca;
 
 /// `FileDescriptorSet` for the internal protobuf contracts.
 pub const INTERNAL_PROTO_DESCRIPTOR: &[u8] =

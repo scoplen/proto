@@ -5,13 +5,23 @@
 ///
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
-pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage";
+pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeviceAccessScope {
     /// Read the current device's account profile and signed device statements.
     AccountRead,
+    /// Read current Organization user-CA public trust.
+    CaRead,
+    /// Provision an Organization local user CA under current policy.
+    CaWrite,
+    /// Issue a source-bound certificate after per-target authorization.
+    CertificatesIssue,
+    /// Read individually authorized Organization inventory.
+    InventoryRead,
+    /// Author Organization inventory under current policy.
+    InventoryWrite,
     /// Read that account's encrypted K-4 key bundle.
     KeysRead,
     /// Update that account's encrypted K-4 key bundle with the required signatures and wraps.
@@ -22,6 +32,10 @@ pub enum DeviceAccessScope {
     OrganizationRead,
     /// Update Organization settings under current membership and policy authorization.
     OrganizationWrite,
+    /// Read current Organization groups and policies.
+    PoliciesRead,
+    /// Author Organization policies under current policy.
+    PoliciesWrite,
     /// Read authorized vault data and establish authorized notification subscriptions.
     SyncRead,
     /// Mutate authorized vault state, subject to each operation's additional checks.
@@ -34,13 +48,20 @@ pub enum DeviceAccessScope {
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 17] = [
         Self::AccountRead,
+        Self::CaRead,
+        Self::CaWrite,
+        Self::CertificatesIssue,
+        Self::InventoryRead,
+        Self::InventoryWrite,
         Self::KeysRead,
         Self::KeysWrite,
         Self::OrganizationCreate,
         Self::OrganizationRead,
         Self::OrganizationWrite,
+        Self::PoliciesRead,
+        Self::PoliciesWrite,
         Self::SyncRead,
         Self::SyncWrite,
         Self::TeamsJoin,
@@ -52,11 +73,18 @@ impl DeviceAccessScope {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::AccountRead => "account:read",
+            Self::CaRead => "ca:read",
+            Self::CaWrite => "ca:write",
+            Self::CertificatesIssue => "certificates:issue",
+            Self::InventoryRead => "inventory:read",
+            Self::InventoryWrite => "inventory:write",
             Self::KeysRead => "keys:read",
             Self::KeysWrite => "keys:write",
             Self::OrganizationCreate => "orgs:create",
             Self::OrganizationRead => "orgs:read",
             Self::OrganizationWrite => "orgs:write",
+            Self::PoliciesRead => "policies:read",
+            Self::PoliciesWrite => "policies:write",
             Self::SyncRead => "sync:read",
             Self::SyncWrite => "sync:write",
             Self::TeamsJoin => "teams:join",
@@ -119,6 +147,14 @@ pub enum DeviceAccessOperation {
     TeamMemberRemove,
     /// Dissolve a team as a current Owner.
     TeamDissolve,
+    /// List public user-CA metadata under current Organization membership.
+    UserCaList,
+    /// Read one current Organization's public user CA.
+    UserCaRead,
+    /// Provision the initial local user CA under current policy authority.
+    UserCaCreate,
+    /// Issue a scoped user certificate under current target authority.
+    UserCertificateIssue,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -155,7 +191,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 36] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
@@ -172,6 +208,10 @@ impl DeviceAccessOperation {
         Self::TeamMemberUpdate,
         Self::TeamMemberRemove,
         Self::TeamDissolve,
+        Self::UserCaList,
+        Self::UserCaRead,
+        Self::UserCaCreate,
+        Self::UserCertificateIssue,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -216,6 +256,9 @@ impl DeviceAccessOperation {
             | Self::TeamMemberRead
             | Self::TeamMemberUpdate
             | Self::TeamDissolve => &[DeviceAccessScope::TeamsManage],
+            Self::UserCaList | Self::UserCaRead => &[DeviceAccessScope::CaRead],
+            Self::UserCaCreate => &[DeviceAccessScope::CaWrite],
+            Self::UserCertificateIssue => &[DeviceAccessScope::CertificatesIssue],
             Self::AccountKeysRead => &[DeviceAccessScope::KeysRead],
             Self::AccountKeysWrite => &[DeviceAccessScope::KeysWrite],
             Self::SyncSession
@@ -255,6 +298,8 @@ impl DeviceAccessOperation {
             | Self::TeamInvitationRead
             | Self::TeamMemberList
             | Self::TeamMemberRead
+            | Self::UserCaList
+            | Self::UserCaRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
@@ -272,6 +317,8 @@ impl DeviceAccessOperation {
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
             | Self::TeamDissolve
+            | Self::UserCaCreate
+            | Self::UserCertificateIssue
             | Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
@@ -301,6 +348,9 @@ impl DeviceAccessOperation {
                 "/api/v1/orgs/{org}/members/{membership}"
             }
             Self::TeamDissolve => "/api/v1/orgs/{org}/dissolve",
+            Self::UserCaList | Self::UserCaCreate => "/api/v1/orgs/{org}/certificate-authorities",
+            Self::UserCaRead => "/api/v1/orgs/{org}/certificate-authorities/{id}",
+            Self::UserCertificateIssue => "/api/v1/orgs/{org}/certificates",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",

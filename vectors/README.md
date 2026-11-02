@@ -5,6 +5,14 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`user-ca.json` contains D-137's independent initial local-user-CA creation, public metadata,
+Page and shared problem vectors. Node computes the fingerprint from the complete decoded
+OpenSSH Ed25519 blob and emits exact JSON parser seeds, including original per-item bounds.
+Run `node scripts/generate-user-ca-vectors.mjs [--check]`. Public Rust tests consume the full
+set; no fixture establishes authenticated Organization ownership or possession of a CA seed.
+`auth-scopes.json` records the seventeen-scope ceiling, three CA operations and existing
+certificate issuance; unsupported CA mutations and certificate listing remain unmapped.
+
 `organization-view.json` contains D-137's independent Organization descriptor, complete view,
 query, acknowledgement and notification CBOR known answers and malformed inputs. The Node
 producer uses its own deterministic CBOR writer and generates exact-byte seeds for the existing
