@@ -1,0 +1,1 @@
+{"id":"019bdad6-b800-7000-8000-000000000010","data":{"fields":{"folder":"Operations","name":"Inspect","tags":{"ops":true},"template":"echo {{text}} {{count}} {{mode}} {{secret}}","variables":{"count":{"default":"-9223372036854775808","kind":2},"mode":{"choices":["safe","fast"],"default":"safe","kind":3},"secret":{"kind":4},"text":{"default":"ok","kind":1}}}}}

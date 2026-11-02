@@ -9,6 +9,14 @@ All notable changes to the `proto` repository will be recorded here.
   cover the short P-256 scalar that could make random OpenSSH interoperability keys fail.
   Consumers must apply the same dependency patch in their own Cargo workspace.
 
+- Add D-137 typed Organization inventory JSON, strict named-field replacement and canonical
+  K-1 conversion for Hosts, AccessProfiles, Routes, HostGroups, TrustRecords, Snippets and
+  GatewayNetworks. Exact Device operations, OpenAPI/TypeScript, independent vectors and parser
+  seeds cover the seven routes without Organization Credentials or Personal fallbacks.
+  The initial Device ceiling now has the seventeen scopes specified by D-137; refresh never
+  expands an existing ceiling. Durable authorization, inventory storage and consumer workflows
+  remain separate outcomes.
+
 - Pin corpus replay and scheduled fuzzing to the previously successful nightly Rust and
   cargo-fuzz versions, avoiding a compiler query-cycle regression in the rolling nightly.
 

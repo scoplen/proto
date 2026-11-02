@@ -5,6 +5,18 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`organization-inventory.json` contains independently produced D-137 named-field JSON for all
+seven ordinary Organization inventory types, with exact K-1 CBOR known answers and bounded
+size recipes. Requests reject clocks, unknown/duplicate keys, optional nulls, unsupported
+schemas, noncanonical UUIDs, integer aliases and secret-bearing fields. TrustRecord response
+attribution and Snippet signed-integer defaults use canonical decimal strings. The producer
+uses its own CBOR encoder; `inventory.model` vectors bind the complete K-1 bytes, while
+`inventory.bound` recipes exercise actual encoder budgets without large checked-in blobs.
+Run `node scripts/generate-inventory-vectors.mjs [--check]` and its corresponding Node test.
+Matching `api_json` seeds are raw accepted/rejected JSON. `auth-scopes.json` includes all
+thirty-five inventory operations and rejects the superseded PATCH form. Production current
+authority, same-team reference resolution and atomic publication remain consumer checks.
+
 `organization-view.json` contains D-137's independent Organization descriptor, complete view,
 query, acknowledgement and notification CBOR known answers and malformed inputs. The Node
 producer uses its own deterministic CBOR writer and generates exact-byte seeds for the existing

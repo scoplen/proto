@@ -12,7 +12,7 @@
       "id": "auth-scope-initial-v1",
       "kind": "auth.scope.initial",
       "input": "first-party-device",
-      "expected": "account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage"
+      "expected": "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
     },
     {
       "id": "auth-scope-token-account-read-v1",
@@ -523,6 +523,300 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/dissolve\"}",
       "expected": "teams:manage"
+    },
+    {
+      "id": "auth-scope-token-ca-read-v1",
+      "kind": "auth.scope.token",
+      "input": "ca:read",
+      "expected": "ca:read"
+    },
+    {
+      "id": "auth-scope-token-ca-write-v1",
+      "kind": "auth.scope.token",
+      "input": "ca:write",
+      "expected": "ca:write"
+    },
+    {
+      "id": "auth-scope-token-certificates-issue-v1",
+      "kind": "auth.scope.token",
+      "input": "certificates:issue",
+      "expected": "certificates:issue"
+    },
+    {
+      "id": "auth-scope-token-inventory-read-v1",
+      "kind": "auth.scope.token",
+      "input": "inventory:read",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-token-inventory-write-v1",
+      "kind": "auth.scope.token",
+      "input": "inventory:write",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-token-policies-read-v1",
+      "kind": "auth.scope.token",
+      "input": "policies:read",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-token-policies-write-v1",
+      "kind": "auth.scope.token",
+      "input": "policies:write",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-inventory-host-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/hosts\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-host-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/hosts/{id}\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-host-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/hosts\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-host-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/hosts/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-host-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/hosts/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-access-profile-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/access-profiles\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-access-profile-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/access-profiles/{id}\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-access-profile-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/access-profiles\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-access-profile-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/access-profiles/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-access-profile-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/access-profiles/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-route-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/routes\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-route-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/routes/{id}\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-route-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/routes\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-route-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/routes/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-route-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/routes/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-host-group-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/host-groups\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-host-group-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/host-groups/{id}\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-host-group-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/host-groups\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-host-group-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/host-groups/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-host-group-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/host-groups/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-trust-record-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/trust-records\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-trust-record-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/trust-records/{id}\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-trust-record-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/trust-records\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-trust-record-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/trust-records/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-trust-record-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/trust-records/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-snippet-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-snippet-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-snippet-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-snippet-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-snippet-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-gateway-network-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/gateway-networks\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-gateway-network-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/gateway-networks/{id}\"}",
+      "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-inventory-gateway-network-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/gateway-networks\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-gateway-network-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/gateway-networks/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-gateway-network-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/gateway-networks/{id}\"}",
+      "expected": "inventory:write"
+    },
+    {
+      "id": "auth-scope-inventory-hosts-patch-unmapped-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/hosts/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-inventory-access-profiles-patch-unmapped-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/access-profiles/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-inventory-routes-patch-unmapped-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/routes/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-inventory-host-groups-patch-unmapped-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/host-groups/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-inventory-trust-records-patch-unmapped-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/trust-records/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-inventory-snippets-patch-unmapped-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-inventory-gateway-networks-patch-unmapped-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/gateway-networks/{id}\"}",
+      "expected": "unmapped"
     },
     {
       "id": "auth-scope-operation-organization-view-v1",

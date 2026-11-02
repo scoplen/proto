@@ -1,0 +1,1 @@
+{"id":"019bdad6-b800-7000-8000-000000000010","data":{"fields":{"address":"host.example.test","default_profile":"019bdad6-b800-7000-8000-000000000020","favorite":false,"groups":{"019bdad6-b800-7000-8000-000000000030":true},"mosh":{"predict":"adaptive"},"name":"Bastion","notes":" Café ","port":22,"ssh_options":{"Compression":"yes"},"tags":{"env":"prod","zone":"west"}}},"extra":1}

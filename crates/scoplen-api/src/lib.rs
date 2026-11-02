@@ -20,6 +20,7 @@ pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
 pub mod internal_grpc;
+pub mod inventory;
 pub mod operator_auth;
 pub mod operator_logout_reference;
 pub mod organization;

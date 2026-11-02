@@ -1,0 +1,1 @@
+{"name":false,"template":"echo {{text}} {{count}} {{mode}} {{secret}}","variables":{"text":{"kind":1,"default":"ok"},"count":{"kind":2,"default":"-9223372036854775808"},"mode":{"kind":3,"default":"safe","choices":["safe","fast"]},"secret":{"kind":4}},"tags":{"ops":true},"folder":"Operations"}
