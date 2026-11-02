@@ -147,6 +147,96 @@ pub enum DeviceAccessOperation {
     TeamMemberRemove,
     /// Dissolve a team as a current Owner.
     TeamDissolve,
+    /// Host List in the current Organization.
+    InventoryHostList,
+    /// Host Read in the current Organization.
+    InventoryHostRead,
+    /// Host Create in the current Organization.
+    InventoryHostCreate,
+    /// Host Replace in the current Organization.
+    InventoryHostReplace,
+    /// Host Delete in the current Organization.
+    InventoryHostDelete,
+    /// Access Profile List in the current Organization.
+    InventoryAccessProfileList,
+    /// Access Profile Read in the current Organization.
+    InventoryAccessProfileRead,
+    /// Access Profile Create in the current Organization.
+    InventoryAccessProfileCreate,
+    /// Access Profile Replace in the current Organization.
+    InventoryAccessProfileReplace,
+    /// Access Profile Delete in the current Organization.
+    InventoryAccessProfileDelete,
+    /// Route List in the current Organization.
+    InventoryRouteList,
+    /// Route Read in the current Organization.
+    InventoryRouteRead,
+    /// Route Create in the current Organization.
+    InventoryRouteCreate,
+    /// Route Replace in the current Organization.
+    InventoryRouteReplace,
+    /// Route Delete in the current Organization.
+    InventoryRouteDelete,
+    /// Host Group List in the current Organization.
+    InventoryHostGroupList,
+    /// Host Group Read in the current Organization.
+    InventoryHostGroupRead,
+    /// Host Group Create in the current Organization.
+    InventoryHostGroupCreate,
+    /// Host Group Replace in the current Organization.
+    InventoryHostGroupReplace,
+    /// Host Group Delete in the current Organization.
+    InventoryHostGroupDelete,
+    /// Trust Record List in the current Organization.
+    InventoryTrustRecordList,
+    /// Trust Record Read in the current Organization.
+    InventoryTrustRecordRead,
+    /// Trust Record Create in the current Organization.
+    InventoryTrustRecordCreate,
+    /// Trust Record Replace in the current Organization.
+    InventoryTrustRecordReplace,
+    /// Trust Record Delete in the current Organization.
+    InventoryTrustRecordDelete,
+    /// Snippet List in the current Organization.
+    InventorySnippetList,
+    /// Snippet Read in the current Organization.
+    InventorySnippetRead,
+    /// Snippet Create in the current Organization.
+    InventorySnippetCreate,
+    /// Snippet Replace in the current Organization.
+    InventorySnippetReplace,
+    /// Snippet Delete in the current Organization.
+    InventorySnippetDelete,
+    /// Gateway Network List in the current Organization.
+    InventoryGatewayNetworkList,
+    /// Gateway Network Read in the current Organization.
+    InventoryGatewayNetworkRead,
+    /// Gateway Network Create in the current Organization.
+    InventoryGatewayNetworkCreate,
+    /// Gateway Network Replace in the current Organization.
+    InventoryGatewayNetworkReplace,
+    /// Gateway Network Delete in the current Organization.
+    InventoryGatewayNetworkDelete,
+    /// Create one local Group with current same-team Membership associations.
+    OrganizationGroupCreate,
+    /// List Groups under current administrative read authority.
+    OrganizationGroupList,
+    /// Read one Group under current administrative read authority.
+    OrganizationGroupRead,
+    /// Completely replace one local Group's name and Membership associations.
+    OrganizationGroupReplace,
+    /// Delete one local Group after checking current policy dependencies.
+    OrganizationGroupDelete,
+    /// Create one current Organization's persisted custom policy.
+    OrganizationPolicyCreate,
+    /// List the current Organization's custom policies.
+    OrganizationPolicyList,
+    /// Read one current Organization's custom policy.
+    OrganizationPolicyRead,
+    /// Completely replace one current Organization's custom policy.
+    OrganizationPolicyReplace,
+    /// Delete one current Organization's custom policy.
+    OrganizationPolicyDelete,
     /// List public user-CA metadata under current Organization membership.
     UserCaList,
     /// Read one current Organization's public user CA.
@@ -191,7 +281,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 36] = [
+    pub const ALL: [Self; 81] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
@@ -208,6 +298,51 @@ impl DeviceAccessOperation {
         Self::TeamMemberUpdate,
         Self::TeamMemberRemove,
         Self::TeamDissolve,
+        Self::InventoryHostList,
+        Self::InventoryHostRead,
+        Self::InventoryHostCreate,
+        Self::InventoryHostReplace,
+        Self::InventoryHostDelete,
+        Self::InventoryAccessProfileList,
+        Self::InventoryAccessProfileRead,
+        Self::InventoryAccessProfileCreate,
+        Self::InventoryAccessProfileReplace,
+        Self::InventoryAccessProfileDelete,
+        Self::InventoryRouteList,
+        Self::InventoryRouteRead,
+        Self::InventoryRouteCreate,
+        Self::InventoryRouteReplace,
+        Self::InventoryRouteDelete,
+        Self::InventoryHostGroupList,
+        Self::InventoryHostGroupRead,
+        Self::InventoryHostGroupCreate,
+        Self::InventoryHostGroupReplace,
+        Self::InventoryHostGroupDelete,
+        Self::InventoryTrustRecordList,
+        Self::InventoryTrustRecordRead,
+        Self::InventoryTrustRecordCreate,
+        Self::InventoryTrustRecordReplace,
+        Self::InventoryTrustRecordDelete,
+        Self::InventorySnippetList,
+        Self::InventorySnippetRead,
+        Self::InventorySnippetCreate,
+        Self::InventorySnippetReplace,
+        Self::InventorySnippetDelete,
+        Self::InventoryGatewayNetworkList,
+        Self::InventoryGatewayNetworkRead,
+        Self::InventoryGatewayNetworkCreate,
+        Self::InventoryGatewayNetworkReplace,
+        Self::InventoryGatewayNetworkDelete,
+        Self::OrganizationGroupCreate,
+        Self::OrganizationGroupList,
+        Self::OrganizationGroupRead,
+        Self::OrganizationGroupReplace,
+        Self::OrganizationGroupDelete,
+        Self::OrganizationPolicyCreate,
+        Self::OrganizationPolicyList,
+        Self::OrganizationPolicyRead,
+        Self::OrganizationPolicyReplace,
+        Self::OrganizationPolicyDelete,
         Self::UserCaList,
         Self::UserCaRead,
         Self::UserCaCreate,
@@ -255,7 +390,52 @@ impl DeviceAccessOperation {
             | Self::TeamMemberList
             | Self::TeamMemberRead
             | Self::TeamMemberUpdate
-            | Self::TeamDissolve => &[DeviceAccessScope::TeamsManage],
+            | Self::TeamDissolve
+            | Self::OrganizationGroupCreate
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationGroupDelete => &[DeviceAccessScope::TeamsManage],
+            Self::OrganizationGroupList
+            | Self::OrganizationGroupRead
+            | Self::OrganizationPolicyList
+            | Self::OrganizationPolicyRead => &[DeviceAccessScope::PoliciesRead],
+            Self::OrganizationPolicyCreate
+            | Self::OrganizationPolicyReplace
+            | Self::OrganizationPolicyDelete => &[DeviceAccessScope::PoliciesWrite],
+            Self::InventoryHostList
+            | Self::InventoryHostRead
+            | Self::InventoryAccessProfileList
+            | Self::InventoryAccessProfileRead
+            | Self::InventoryRouteList
+            | Self::InventoryRouteRead
+            | Self::InventoryHostGroupList
+            | Self::InventoryHostGroupRead
+            | Self::InventoryTrustRecordList
+            | Self::InventoryTrustRecordRead
+            | Self::InventorySnippetList
+            | Self::InventorySnippetRead
+            | Self::InventoryGatewayNetworkList
+            | Self::InventoryGatewayNetworkRead => &[DeviceAccessScope::InventoryRead],
+            Self::InventoryHostCreate
+            | Self::InventoryHostReplace
+            | Self::InventoryHostDelete
+            | Self::InventoryAccessProfileCreate
+            | Self::InventoryAccessProfileReplace
+            | Self::InventoryAccessProfileDelete
+            | Self::InventoryRouteCreate
+            | Self::InventoryRouteReplace
+            | Self::InventoryRouteDelete
+            | Self::InventoryHostGroupCreate
+            | Self::InventoryHostGroupReplace
+            | Self::InventoryHostGroupDelete
+            | Self::InventoryTrustRecordCreate
+            | Self::InventoryTrustRecordReplace
+            | Self::InventoryTrustRecordDelete
+            | Self::InventorySnippetCreate
+            | Self::InventorySnippetReplace
+            | Self::InventorySnippetDelete
+            | Self::InventoryGatewayNetworkCreate
+            | Self::InventoryGatewayNetworkReplace
+            | Self::InventoryGatewayNetworkDelete => &[DeviceAccessScope::InventoryWrite],
             Self::UserCaList | Self::UserCaRead => &[DeviceAccessScope::CaRead],
             Self::UserCaCreate => &[DeviceAccessScope::CaWrite],
             Self::UserCertificateIssue => &[DeviceAccessScope::CertificatesIssue],
@@ -298,20 +478,56 @@ impl DeviceAccessOperation {
             | Self::TeamInvitationRead
             | Self::TeamMemberList
             | Self::TeamMemberRead
-            | Self::UserCaList
-            | Self::UserCaRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
             | Self::OrganizationViewRead
             | Self::ObjectVersionsRead
+            | Self::InventoryHostList
+            | Self::InventoryHostRead
+            | Self::InventoryAccessProfileList
+            | Self::InventoryAccessProfileRead
+            | Self::InventoryRouteList
+            | Self::InventoryRouteRead
+            | Self::InventoryHostGroupList
+            | Self::InventoryHostGroupRead
+            | Self::InventoryTrustRecordList
+            | Self::InventoryTrustRecordRead
+            | Self::InventorySnippetList
+            | Self::InventorySnippetRead
+            | Self::InventoryGatewayNetworkList
+            | Self::InventoryGatewayNetworkRead
+            | Self::OrganizationGroupList
+            | Self::OrganizationGroupRead
+            | Self::OrganizationPolicyList
+            | Self::OrganizationPolicyRead
+            | Self::UserCaList
+            | Self::UserCaRead
             | Self::Notifications => "GET",
-            Self::AccountKeysWrite => "PUT",
+            Self::AccountKeysWrite
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationPolicyReplace
+            | Self::InventoryHostReplace
+            | Self::InventoryAccessProfileReplace
+            | Self::InventoryRouteReplace
+            | Self::InventoryHostGroupReplace
+            | Self::InventoryTrustRecordReplace
+            | Self::InventorySnippetReplace
+            | Self::InventoryGatewayNetworkReplace => "PUT",
             Self::OrganizationUpdate | Self::TeamMemberUpdate => "PATCH",
-            Self::VaultMemberRemove | Self::TeamInvitationRevoke | Self::TeamMemberRemove => {
-                "DELETE"
-            }
+            Self::VaultMemberRemove
+            | Self::TeamInvitationRevoke
+            | Self::TeamMemberRemove
+            | Self::OrganizationGroupDelete
+            | Self::OrganizationPolicyDelete
+            | Self::InventoryHostDelete
+            | Self::InventoryAccessProfileDelete
+            | Self::InventoryRouteDelete
+            | Self::InventoryHostGroupDelete
+            | Self::InventoryTrustRecordDelete
+            | Self::InventorySnippetDelete
+            | Self::InventoryGatewayNetworkDelete => "DELETE",
             Self::SyncSession
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
@@ -319,6 +535,15 @@ impl DeviceAccessOperation {
             | Self::TeamDissolve
             | Self::UserCaCreate
             | Self::UserCertificateIssue
+            | Self::OrganizationGroupCreate
+            | Self::OrganizationPolicyCreate
+            | Self::InventoryHostCreate
+            | Self::InventoryAccessProfileCreate
+            | Self::InventoryRouteCreate
+            | Self::InventoryHostGroupCreate
+            | Self::InventoryTrustRecordCreate
+            | Self::InventorySnippetCreate
+            | Self::InventoryGatewayNetworkCreate
             | Self::VaultCreate
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
@@ -348,6 +573,56 @@ impl DeviceAccessOperation {
                 "/api/v1/orgs/{org}/members/{membership}"
             }
             Self::TeamDissolve => "/api/v1/orgs/{org}/dissolve",
+            Self::InventoryHostList | Self::InventoryHostCreate => "/api/v1/orgs/{org}/hosts",
+            Self::InventoryHostRead | Self::InventoryHostReplace | Self::InventoryHostDelete => {
+                "/api/v1/orgs/{org}/hosts/{id}"
+            }
+            Self::InventoryAccessProfileList | Self::InventoryAccessProfileCreate => {
+                "/api/v1/orgs/{org}/access-profiles"
+            }
+            Self::InventoryAccessProfileRead
+            | Self::InventoryAccessProfileReplace
+            | Self::InventoryAccessProfileDelete => "/api/v1/orgs/{org}/access-profiles/{id}",
+            Self::InventoryRouteList | Self::InventoryRouteCreate => "/api/v1/orgs/{org}/routes",
+            Self::InventoryRouteRead | Self::InventoryRouteReplace | Self::InventoryRouteDelete => {
+                "/api/v1/orgs/{org}/routes/{id}"
+            }
+            Self::InventoryHostGroupList | Self::InventoryHostGroupCreate => {
+                "/api/v1/orgs/{org}/host-groups"
+            }
+            Self::InventoryHostGroupRead
+            | Self::InventoryHostGroupReplace
+            | Self::InventoryHostGroupDelete => "/api/v1/orgs/{org}/host-groups/{id}",
+            Self::InventoryTrustRecordList | Self::InventoryTrustRecordCreate => {
+                "/api/v1/orgs/{org}/trust-records"
+            }
+            Self::InventoryTrustRecordRead
+            | Self::InventoryTrustRecordReplace
+            | Self::InventoryTrustRecordDelete => "/api/v1/orgs/{org}/trust-records/{id}",
+            Self::InventorySnippetList | Self::InventorySnippetCreate => {
+                "/api/v1/orgs/{org}/snippets"
+            }
+            Self::InventorySnippetRead
+            | Self::InventorySnippetReplace
+            | Self::InventorySnippetDelete => "/api/v1/orgs/{org}/snippets/{id}",
+            Self::InventoryGatewayNetworkList | Self::InventoryGatewayNetworkCreate => {
+                "/api/v1/orgs/{org}/gateway-networks"
+            }
+            Self::InventoryGatewayNetworkRead
+            | Self::InventoryGatewayNetworkReplace
+            | Self::InventoryGatewayNetworkDelete => "/api/v1/orgs/{org}/gateway-networks/{id}",
+            Self::OrganizationGroupCreate | Self::OrganizationGroupList => {
+                "/api/v1/orgs/{org}/groups"
+            }
+            Self::OrganizationGroupRead
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationGroupDelete => "/api/v1/orgs/{org}/groups/{id}",
+            Self::OrganizationPolicyCreate | Self::OrganizationPolicyList => {
+                "/api/v1/orgs/{org}/policies"
+            }
+            Self::OrganizationPolicyRead
+            | Self::OrganizationPolicyReplace
+            | Self::OrganizationPolicyDelete => "/api/v1/orgs/{org}/policies/{id}",
             Self::UserCaList | Self::UserCaCreate => "/api/v1/orgs/{org}/certificate-authorities",
             Self::UserCaRead => "/api/v1/orgs/{org}/certificate-authorities/{id}",
             Self::UserCertificateIssue => "/api/v1/orgs/{org}/certificates",

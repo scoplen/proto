@@ -7,7 +7,7 @@ members = [
     "crates/scoplen-api",
     "crates/scoplen-test-vectors",
 ]
-exclude = ["fuzz"]
+exclude = ["fuzz", "vendor/ssh-key"]
 
 [workspace.package]
 version = "0.1.0"
@@ -34,3 +34,5 @@ unused_async_trait_impl = "allow"
 # The published Pageant adapter lacks the bounded native WM_COPYDATA query and
 # current-thread mapping names required by K-7. Retain that transport implementation.
 pageant = { path = "vendor/pageant" }
+# Accept valid short ECDSA mpint scalars until the upstream decoder is corrected.
+ssh-key = { path = "vendor/ssh-key" }

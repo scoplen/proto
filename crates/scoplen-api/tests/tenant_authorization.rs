@@ -146,7 +146,7 @@ fn public_fixture_covers_every_role_action_and_inventory_type() {
     let base = Fixture::new();
     assert_eq!(base.0["version"], 1);
     let actions = base.0["role_actions"]["owner"].as_array().expect("owner actions");
-    assert_eq!(actions.len(), 14);
+    assert_eq!(actions.len(), 15);
     for (role, allowed) in base.0["role_actions"].as_object().expect("roles") {
         let mut fixture = base.clone();
         fixture.role(role);

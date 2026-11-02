@@ -20,6 +20,14 @@ use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceRe
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
 };
+use scoplen_api::group_policy::{
+    GroupCreateRequest, GroupPage, GroupReplaceRequest, GroupResource, PolicyCreateRequest,
+    PolicyPage, PolicyReplaceRequest, PolicyResource, SimpleRuleInput,
+};
+use scoplen_api::inventory::{
+    InventoryCreateRequest, InventoryFields, InventoryPage, InventoryReplaceRequest,
+    InventoryResource, InventoryType,
+};
 use scoplen_api::operator_auth::{
     OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
     OperatorLogoutRequest, OperatorLogoutResponse, OperatorSetupFinishRequest,
@@ -29,19 +37,41 @@ use scoplen_api::organization::{
     OrganizationCreateRequest, OrganizationPage, OrganizationResource, OrganizationUpdateRequest,
     parse_organization_if_match,
 };
-use scoplen_api::user_ca::{UserCaCreateRequest, UserCaPage, UserCaResource};
 use scoplen_api::team::{
     TeamAcceptanceReceipt, TeamDissolutionReceipt, TeamDissolveRequest,
     TeamInvitationAcceptRequest, TeamInvitationCreateRequest, TeamInvitationLink,
     TeamInvitationPage, TeamInvitationResource, TeamMemberPage, TeamMemberResource,
     TeamMemberUpdateRequest,
 };
+use scoplen_api::user_ca::{UserCaCreateRequest, UserCaPage, UserCaResource};
 
 macro_rules! round_trip {
     ($message:ty, $input:expr) => {
         if let Ok(message) = <$message>::from_json($input) {
             let encoded = message.to_json().expect("validated JSON message encodes");
             assert_eq!(<$message>::from_json(&encoded), Ok(message));
+            let decoded = <$message>::from_json(&encoded).expect("canonical JSON decodes");
+            assert_eq!(decoded.to_json().expect("canonical JSON encodes"), encoded);
+        }
+    };
+}
+
+macro_rules! inventory_round_trip {
+    ($message:ty, $kind:expr, $input:expr) => {
+        if let Ok(message) = <$message>::from_json($kind, $input) {
+            let encoded = message.to_json().expect("validated inventory message encodes");
+            assert_eq!(<$message>::from_json($kind, &encoded), Ok(message));
+            let decoded = <$message>::from_json($kind, &encoded)
+                .expect("canonical inventory message decodes");
+            assert_eq!(decoded.to_json().expect("canonical inventory message encodes"), encoded);
+        }
+    };
+}
+
+macro_rules! canonical_round_trip {
+    ($message:ty, $input:expr) => {
+        if let Ok(message) = <$message>::from_json($input) {
+            let encoded = message.to_json().expect("validated JSON message encodes");
             let decoded = <$message>::from_json(&encoded).expect("canonical JSON decodes");
             assert_eq!(decoded.to_json().expect("canonical JSON encodes"), encoded);
         }
@@ -65,6 +95,21 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(OrganizationUpdateRequest, bytes);
     round_trip!(OrganizationResource, bytes);
     round_trip!(OrganizationPage, bytes);
+    canonical_round_trip!(GroupCreateRequest, bytes);
+    canonical_round_trip!(GroupReplaceRequest, bytes);
+    canonical_round_trip!(GroupResource, bytes);
+    canonical_round_trip!(GroupPage, bytes);
+    canonical_round_trip!(PolicyCreateRequest, bytes);
+    canonical_round_trip!(PolicyReplaceRequest, bytes);
+    canonical_round_trip!(PolicyResource, bytes);
+    canonical_round_trip!(PolicyPage, bytes);
+    canonical_round_trip!(SimpleRuleInput, bytes);
+    if let Ok(input) = SimpleRuleInput::from_json(bytes) {
+        let source = input.generate().expect("validated simple rule generates");
+        let canonical = SimpleRuleInput::from_json(&input.to_json().expect("rule encodes"))
+            .expect("canonical rule decodes");
+        assert_eq!(canonical.generate().expect("canonical rule generates"), source);
+    }
     round_trip!(TeamInvitationResource, bytes);
     round_trip!(TeamMemberResource, bytes);
     round_trip!(TeamMemberUpdateRequest, bytes);
@@ -73,6 +118,13 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(TeamDissolutionReceipt, bytes);
     round_trip!(TeamInvitationPage, bytes);
     round_trip!(TeamMemberPage, bytes);
+    for kind in InventoryType::ALL {
+        inventory_round_trip!(InventoryFields, kind, bytes);
+        inventory_round_trip!(InventoryCreateRequest, kind, bytes);
+        inventory_round_trip!(InventoryReplaceRequest, kind, bytes);
+        inventory_round_trip!(InventoryResource, kind, bytes);
+        inventory_round_trip!(InventoryPage, kind, bytes);
+    }
     if let Ok(value) = TeamInvitationCreateRequest::from_json(bytes) {
         let encoded = value.to_json().expect("validated secret request encodes");
         assert_eq!(TeamInvitationCreateRequest::from_json(encoded.as_bytes()), Ok(value));

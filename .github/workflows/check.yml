@@ -43,6 +43,12 @@ jobs:
         run: node --test scripts/generate-organization-vectors.test.mjs
       - name: Test team membership OpenAPI contract checks
         run: node --test crates/scoplen-api/openapi/generate-team.test.mjs
+      - name: Test group and policy OpenAPI contract checks
+        run: node --test crates/scoplen-api/openapi/generate-group-policy.test.mjs
+      - name: Check group and policy vectors
+        run: node scripts/generate-group-policy-vectors.mjs --check
+      - name: Test independent group and policy vector producer
+        run: node --test scripts/generate-group-policy-vectors.test.mjs
       - name: Check team invitation cryptographic and API vectors
         run: |
           node scripts/generate-team-invitation-vectors.mjs --check
@@ -59,6 +65,10 @@ jobs:
         run: node --test crates/scoplen-api/openapi/generate-user-ca*.test.mjs scripts/generate-user-ca-vectors.test.mjs
       - name: Check used Account-id digest vectors
         run: node scripts/generate-account-used-id-vectors.mjs --check
+      - name: Check typed Organization inventory contracts and vectors
+        run: |
+          node scripts/generate-inventory-vectors.mjs --check
+          node --test scripts/generate-inventory-vectors.test.mjs crates/scoplen-api/openapi/generate-inventory.test.mjs
       - name: Check Operator logout vectors and parser bounds
         run: node scripts/generate-operator-logout-vectors.mjs --check
       - name: Test Operator logout vector checkout boundaries

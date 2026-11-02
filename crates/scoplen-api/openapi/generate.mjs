@@ -9,6 +9,8 @@ import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs"
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
 import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
 import { generateUserCaTypes } from "./generate-user-ca.mjs";
+import { generateInventoryTypes } from "./generate-inventory.mjs";
+import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -18,7 +20,7 @@ if (paths.length < 30) throw new Error(`control-plane contract has only ${paths.
 for (const path of paths) {
   if (!path.startsWith("/")) throw new Error(`invalid path: ${path}`);
   const operations = document.paths[path];
-  if (!Object.keys(operations).some((method) => ["get", "post", "patch", "delete"].includes(method))) {
+  if (!Object.keys(operations).some((method) => ["get", "post", "put", "patch", "delete"].includes(method))) {
     throw new Error(`path has no HTTP operation: ${path}`);
   }
 }
@@ -567,12 +569,25 @@ const teamBegin = completeOrganizationTypes.indexOf(teamStart);
 const teamFinish = completeOrganizationTypes.indexOf(teamEnd, teamBegin + teamStart.length);
 if (teamBegin < 0 || teamFinish < 0) throw new Error("types.ts lacks TeamMembership markers");
 const completeTeamTypes = `${completeOrganizationTypes.slice(0, teamBegin + teamStart.length)}${generateTeamTypes(document)}${completeOrganizationTypes.slice(teamFinish)}`;
+const inventoryStart = "// BEGIN GENERATED OrganizationInventory\n";
+const inventoryEnd = "// END GENERATED OrganizationInventory";
+const inventoryBegin = completeTeamTypes.indexOf(inventoryStart);
+const inventoryFinish = completeTeamTypes.indexOf(inventoryEnd, inventoryBegin + inventoryStart.length);
+if (inventoryBegin < 0 || inventoryFinish < 0) throw new Error("types.ts lacks OrganizationInventory markers");
+const completeInventoryTypes = completeTeamTypes.slice(0, inventoryBegin + inventoryStart.length) +
+  generateInventoryTypes(document) + completeTeamTypes.slice(inventoryFinish);
+const groupPolicyStart = "// BEGIN GENERATED GroupPolicy\n";
+const groupPolicyEnd = "// END GENERATED GroupPolicy";
+const groupPolicyBegin = completeInventoryTypes.indexOf(groupPolicyStart);
+const groupPolicyFinish = completeInventoryTypes.indexOf(groupPolicyEnd, groupPolicyBegin + groupPolicyStart.length);
+if (groupPolicyBegin < 0 || groupPolicyFinish < 0) throw new Error("types.ts lacks GroupPolicy markers");
+const completeGroupPolicyTypes = `${completeInventoryTypes.slice(0, groupPolicyBegin + groupPolicyStart.length)}${generateGroupPolicyTypes(document)}${completeInventoryTypes.slice(groupPolicyFinish)}`;
 const caStart = "// BEGIN GENERATED UserCa\n";
 const caEnd = "// END GENERATED UserCa";
-const caBegin = completeTeamTypes.indexOf(caStart);
-const caFinish = completeTeamTypes.indexOf(caEnd, caBegin + caStart.length);
+const caBegin = completeGroupPolicyTypes.indexOf(caStart);
+const caFinish = completeGroupPolicyTypes.indexOf(caEnd, caBegin + caStart.length);
 if (caBegin < 0 || caFinish < 0) throw new Error("types.ts lacks UserCa markers");
-const completeCaTypes = `${completeTeamTypes.slice(0, caBegin + caStart.length)}${generateUserCaTypes(document)}${completeTeamTypes.slice(caFinish)}`;
+const completeCaTypes = `${completeGroupPolicyTypes.slice(0, caBegin + caStart.length)}${generateUserCaTypes(document)}${completeGroupPolicyTypes.slice(caFinish)}`;
 const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeCaTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {

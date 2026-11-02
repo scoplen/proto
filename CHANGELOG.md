@@ -10,6 +10,27 @@ All notable changes to the `proto` repository will be recorded here.
   24-hour receipt recovery. The initial Device ceiling gains the seven frozen D-137 scopes;
   old refresh families require fresh authentication for an expanded ceiling. Production CA
   custody, signing, transactions and native team SSH remain consumer responsibilities.
+- Add D-137 bounded Group and persisted-Policy codecs, exact administration routes/scopes,
+  OpenAPI/TypeScript exports and independent vectors/parser seeds. The shared simple-rule
+  generator emits one canonical Organization-scoped view or exact-user connect permit;
+  permissions remain independent and never synthesize dependency reads. Policy validation
+  uses Cedar's parsed actions/expressions to reject time-dependent inventory visibility.
+  Immutable built-in roles add `view_policy`. The initial Device ceiling has all 17 D-137
+  scopes; existing refresh families require fresh authentication to gain new rights.
+  Current reference ownership, active memberships, persistence and transactional authority
+  remain production consumer responsibilities.
+- Accept valid short ECDSA private scalars in OpenSSH files through a narrowly patched
+  `ssh-key` 0.7.0-rc.11 runtime dependency. Deterministic public import/signing regressions
+  cover the short P-256 scalar that could make random OpenSSH interoperability keys fail.
+  Consumers must apply the same dependency patch in their own Cargo workspace.
+
+- Add D-137 typed Organization inventory JSON, strict named-field replacement and canonical
+  K-1 conversion for Hosts, AccessProfiles, Routes, HostGroups, TrustRecords, Snippets and
+  GatewayNetworks. Exact Device operations, OpenAPI/TypeScript, independent vectors and parser
+  seeds cover the seven routes without Organization Credentials or Personal fallbacks.
+  The initial Device ceiling now has the seventeen scopes specified by D-137; refresh never
+  expands an existing ceiling. Durable authorization, inventory storage and consumer workflows
+  remain separate outcomes.
 
 - Pin corpus replay and scheduled fuzzing to the previously successful nightly Rust and
   cargo-fuzz versions, avoiding a compiler query-cycle regression in the rolling nightly.
