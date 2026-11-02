@@ -19,6 +19,7 @@ pub mod certificate;
 pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
+pub mod group_policy;
 pub mod internal_grpc;
 pub mod inventory;
 pub mod operator_auth;

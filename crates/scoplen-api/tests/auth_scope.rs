@@ -88,7 +88,7 @@ fn published_scope_vectors_use_the_public_registry() {
     }
     assert_eq!(initial, 1);
     assert_eq!(problems, 1);
-    assert!(tokens >= 10 && routes >= 23 && contains >= 10);
+    assert!(tokens >= 17 && routes >= 41 && contains >= 10);
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 67);
+    assert_eq!(routes.len(), 77);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {
@@ -261,6 +261,95 @@ fn authored_openapi_uses_the_shared_scope_ceiling_and_account_requirement() {
         document["paths"]["/accounts/me/devices"]["get"]["x-scoplen-required-device-scope"],
         DeviceAccessScope::AccountRead.as_str()
     );
+}
+
+#[test]
+fn group_policy_operations_match_authored_routes_and_independent_coarse_permissions() {
+    let document: serde_json::Value =
+        serde_json::from_str(include_str!("../openapi/v1.yaml")).expect("authored OpenAPI");
+    let operations = [
+        (
+            DeviceAccessOperation::OrganizationGroupCreate,
+            "POST",
+            "/groups",
+            DeviceAccessScope::TeamsManage,
+        ),
+        (
+            DeviceAccessOperation::OrganizationGroupList,
+            "GET",
+            "/groups",
+            DeviceAccessScope::PoliciesRead,
+        ),
+        (
+            DeviceAccessOperation::OrganizationGroupRead,
+            "GET",
+            "/groups/{id}",
+            DeviceAccessScope::PoliciesRead,
+        ),
+        (
+            DeviceAccessOperation::OrganizationGroupReplace,
+            "PUT",
+            "/groups/{id}",
+            DeviceAccessScope::TeamsManage,
+        ),
+        (
+            DeviceAccessOperation::OrganizationGroupDelete,
+            "DELETE",
+            "/groups/{id}",
+            DeviceAccessScope::TeamsManage,
+        ),
+        (
+            DeviceAccessOperation::OrganizationPolicyCreate,
+            "POST",
+            "/policies",
+            DeviceAccessScope::PoliciesWrite,
+        ),
+        (
+            DeviceAccessOperation::OrganizationPolicyList,
+            "GET",
+            "/policies",
+            DeviceAccessScope::PoliciesRead,
+        ),
+        (
+            DeviceAccessOperation::OrganizationPolicyRead,
+            "GET",
+            "/policies/{id}",
+            DeviceAccessScope::PoliciesRead,
+        ),
+        (
+            DeviceAccessOperation::OrganizationPolicyReplace,
+            "PUT",
+            "/policies/{id}",
+            DeviceAccessScope::PoliciesWrite,
+        ),
+        (
+            DeviceAccessOperation::OrganizationPolicyDelete,
+            "DELETE",
+            "/policies/{id}",
+            DeviceAccessScope::PoliciesWrite,
+        ),
+    ];
+    for (operation, method, suffix, scope) in operations {
+        let template = format!("/api/v1/orgs/{{org}}{suffix}");
+        assert_eq!(operation.http_method(), method);
+        assert_eq!(operation.route_template(), template);
+        assert_eq!(operation.accepted_scopes(), &[scope]);
+        assert_eq!(DeviceAccessOperation::from_route(method, &template), Some(operation));
+        assert_eq!(DeviceAccessOperation::from_route(&method.to_lowercase(), &template), None);
+        assert_eq!(DeviceAccessOperation::from_route(method, &format!("{template}/")), None);
+        assert_eq!(DeviceAccessOperation::from_route(method, &format!("{template}?limit=1")), None);
+        let openapi_path = format!("/orgs/{{org}}{suffix}");
+        assert_eq!(
+            document["paths"][openapi_path][method.to_lowercase()]["x-scoplen-required-device-scope"],
+            scope.as_str()
+        );
+        for other in DeviceAccessScope::ALL {
+            assert_eq!(operation.has_accepted_scope(other.as_str()), scope == other);
+        }
+    }
+    for path in ["/api/v1/orgs/{org}/groups/{id}", "/api/v1/orgs/{org}/policies/{id}"] {
+        assert_eq!(DeviceAccessOperation::from_route("PATCH", path), None);
+    }
 }
 
 #[test]

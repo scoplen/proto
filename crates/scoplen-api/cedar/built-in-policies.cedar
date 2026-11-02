@@ -32,7 +32,7 @@ when { context.host != resource.host || context.account != resource.account };
 permit(principal is Account,
        action in [Action::"view_inventory", Action::"connect", Action::"request_access", Action::"approve_access",
                   Action::"view_recording", Action::"monitor_session", Action::"terminate_session",
-                  Action::"manage_organization", Action::"manage_inventory", Action::"manage_policy", Action::"manage_members",
+                  Action::"manage_organization", Action::"manage_inventory", Action::"view_policy", Action::"manage_policy", Action::"manage_members",
                   Action::"manage_ca", Action::"manage_gateways", Action::"view_audit"], resource)
 when { context.membership.roles.contains("owner") };
 
@@ -40,7 +40,7 @@ when { context.membership.roles.contains("owner") };
 permit(principal is Account, action, resource)
 when {
     context.membership.roles.contains("administrator") &&
-    [Action::"view_inventory", Action::"manage_organization", Action::"manage_inventory", Action::"manage_policy", Action::"manage_members",
+    [Action::"view_inventory", Action::"manage_organization", Action::"manage_inventory", Action::"view_policy", Action::"manage_policy", Action::"manage_members",
      Action::"manage_ca", Action::"manage_gateways"].contains(action)
 };
 
@@ -48,7 +48,7 @@ when {
 permit(principal is Account, action, resource)
 when {
     context.membership.roles.contains("security_auditor") &&
-    [Action::"view_inventory", Action::"view_audit", Action::"view_recording", Action::"monitor_session"].contains(action)
+    [Action::"view_inventory", Action::"view_policy", Action::"view_audit", Action::"view_recording", Action::"monitor_session"].contains(action)
 };
 
 // Approver decisions are routed by organization policy before this check.

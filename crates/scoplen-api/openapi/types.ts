@@ -3,6 +3,21 @@
 
 export interface components {
   schemas: {
+    GroupSource: GroupSource;
+    GroupFields: GroupFields;
+    GroupCreateRequest: GroupCreateRequest;
+    GroupReplaceRequest: GroupReplaceRequest;
+    GroupResource: GroupResource;
+    GroupPage: GroupPage;
+    PolicyFields: PolicyFields;
+    PolicyCreateRequest: PolicyCreateRequest;
+    PolicyReplaceRequest: PolicyReplaceRequest;
+    PolicyResource: PolicyResource;
+    PolicyPage: PolicyPage;
+    SimpleRuleSelector: SimpleRuleSelector;
+    SimpleRuleConnect: SimpleRuleConnect;
+    SimpleRuleInput: SimpleRuleInput;
+    GroupPolicyBodyTooLargeProblem: GroupPolicyBodyTooLargeProblem;
     InventorySnippetVariable: InventorySnippetVariable;
     InventoryBodyTooLargeProblem: InventoryBodyTooLargeProblem;
     InventoryHostFields: InventoryHostFields;
@@ -147,11 +162,9 @@ export interface components {
     Account: Resource;
     Device: Resource;
     Organization: Resource;
-    Group: Resource;
     IdentityProvider: Resource;
     ServicePrincipal: Resource;
     InventoryImport: Resource;
-    Policy: Resource;
     Role: Resource;
     Grant: Resource;
     AccessRequest: Resource;
@@ -669,6 +682,34 @@ export type TeamInvitationDeniedProblem = ProblemDetails & { status: 409; code: 
 
 export type TeamBodyTooLargeProblem = ProblemDetails & { status: 413; code: "organization.invalid_request"; changed: false; retryable: false; };
 // END GENERATED TeamMembership
+// BEGIN GENERATED GroupPolicy
+export type GroupSource = "local" | "IdP";
+export interface GroupFields { name: string; members: string[]; }
+export interface GroupCreateRequest { id: string; data: GroupFields; }
+export interface GroupReplaceRequest { data: GroupFields; }
+export interface GroupResource {
+  id: string; etag: string; created_at: string; updated_at: string;
+  data: GroupFields & { source: GroupSource; [extension: string]: unknown };
+  [extension: string]: unknown;
+}
+export interface GroupPage { items: GroupResource[]; next_cursor: string | null; [extension: string]: unknown; }
+export interface PolicyFields { name: string; source: string; enabled: boolean; }
+export interface PolicyCreateRequest { id: string; data: PolicyFields; }
+export interface PolicyReplaceRequest { data: PolicyFields; }
+export interface PolicyResource {
+  id: string; etag: string; created_at: string; updated_at: string;
+  data: PolicyFields & { [extension: string]: unknown };
+  [extension: string]: unknown;
+}
+export interface PolicyPage { items: PolicyResource[]; next_cursor: string | null; [extension: string]: unknown; }
+export interface SimpleRuleSelector { type: 1 | 2 | 4 | 5 | 6 | 7 | 11; id: string; }
+export interface SimpleRuleConnect { hosts: string[]; host_groups: string[]; remote_user: string; }
+export type SimpleRuleSubject = { membership: string; group?: never } | { group: string; membership?: never };
+export type SimpleRule = { view: SimpleRuleSelector[]; connect?: never } | { connect: SimpleRuleConnect; view?: never };
+/** Pure preview input; use the shared native generator and persist through the authorized policy route. */
+export type SimpleRuleInput = { organization: string } & SimpleRuleSubject & SimpleRule;
+export type GroupPolicyBodyTooLargeProblem = ProblemDetails & { status: 413; code: "organization.invalid_request"; changed: false; retryable: false; };
+// END GENERATED GroupPolicy
 
 // BEGIN GENERATED OrganizationInventory
 export type InventorySnippetVariable = { kind: 1; default?: string } | { kind: 2; default?: string } | { kind: 3; choices: string[]; default?: string } | { kind: 4 };

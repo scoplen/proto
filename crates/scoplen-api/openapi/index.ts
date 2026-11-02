@@ -2,6 +2,23 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  GroupSource,
+  GroupFields,
+  GroupCreateRequest,
+  GroupReplaceRequest,
+  GroupResource,
+  GroupPage,
+  PolicyFields,
+  PolicyCreateRequest,
+  PolicyReplaceRequest,
+  PolicyResource,
+  PolicyPage,
+  SimpleRuleSelector,
+  SimpleRuleConnect,
+  SimpleRuleSubject,
+  SimpleRule,
+  SimpleRuleInput,
+  GroupPolicyBodyTooLargeProblem,
   InventorySnippetVariable,
   InventoryBodyTooLargeProblem,
   InventoryHostFields,

@@ -531,10 +531,58 @@
       "expected": "ca:read"
     },
     {
+      "id": "auth-scope-contains-ca-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage\",\"required\":\"ca:read\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-old-family-ca-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage\",\"required\":\"ca:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-wildcard-ca-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"ca:*\",\"required\":\"ca:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-case-ca-read-v1",
+      "kind": "auth.scope.token",
+      "input": "CA:READ",
+      "expected": "unknown"
+    },
+    {
       "id": "auth-scope-token-ca-write-v1",
       "kind": "auth.scope.token",
       "input": "ca:write",
       "expected": "ca:write"
+    },
+    {
+      "id": "auth-scope-contains-ca-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage\",\"required\":\"ca:write\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-old-family-ca-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage\",\"required\":\"ca:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-wildcard-ca-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"ca:*\",\"required\":\"ca:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-case-ca-write-v1",
+      "kind": "auth.scope.token",
+      "input": "CA:WRITE",
+      "expected": "unknown"
     },
     {
       "id": "auth-scope-token-certificates-issue-v1",
@@ -543,10 +591,58 @@
       "expected": "certificates:issue"
     },
     {
+      "id": "auth-scope-contains-certificates-issue-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage\",\"required\":\"certificates:issue\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-old-family-certificates-issue-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage\",\"required\":\"certificates:issue\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-wildcard-certificates-issue-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"certificates:*\",\"required\":\"certificates:issue\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-case-certificates-issue-v1",
+      "kind": "auth.scope.token",
+      "input": "CERTIFICATES:ISSUE",
+      "expected": "unknown"
+    },
+    {
       "id": "auth-scope-token-inventory-read-v1",
       "kind": "auth.scope.token",
       "input": "inventory:read",
       "expected": "inventory:read"
+    },
+    {
+      "id": "auth-scope-contains-inventory-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage\",\"required\":\"inventory:read\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-old-family-inventory-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage\",\"required\":\"inventory:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-wildcard-inventory-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"inventory:*\",\"required\":\"inventory:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-case-inventory-read-v1",
+      "kind": "auth.scope.token",
+      "input": "INVENTORY:READ",
+      "expected": "unknown"
     },
     {
       "id": "auth-scope-token-inventory-write-v1",
@@ -555,16 +651,376 @@
       "expected": "inventory:write"
     },
     {
+      "id": "auth-scope-contains-inventory-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage\",\"required\":\"inventory:write\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-old-family-inventory-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage\",\"required\":\"inventory:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-wildcard-inventory-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"inventory:*\",\"required\":\"inventory:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-case-inventory-write-v1",
+      "kind": "auth.scope.token",
+      "input": "INVENTORY:WRITE",
+      "expected": "unknown"
+    },
+    {
       "id": "auth-scope-token-policies-read-v1",
       "kind": "auth.scope.token",
       "input": "policies:read",
       "expected": "policies:read"
     },
     {
+      "id": "auth-scope-contains-policies-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage\",\"required\":\"policies:read\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-old-family-policies-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage\",\"required\":\"policies:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-wildcard-policies-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"policies:*\",\"required\":\"policies:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-case-policies-read-v1",
+      "kind": "auth.scope.token",
+      "input": "POLICIES:READ",
+      "expected": "unknown"
+    },
+    {
       "id": "auth-scope-token-policies-write-v1",
       "kind": "auth.scope.token",
       "input": "policies:write",
       "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-contains-policies-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage\",\"required\":\"policies:write\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-old-family-policies-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read keys:read keys:write orgs:create orgs:read orgs:write sync:read sync:write teams:join teams:manage\",\"required\":\"policies:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-wildcard-policies-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"policies:*\",\"required\":\"policies:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-case-policies-write-v1",
+      "kind": "auth.scope.token",
+      "input": "POLICIES:WRITE",
+      "expected": "unknown"
+    },
+    {
+      "id": "auth-scope-ca-read-no-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"ca:read\",\"required\":\"ca:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-ca-write-no-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"ca:write\",\"required\":\"ca:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-inventory-read-no-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"inventory:read\",\"required\":\"inventory:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-inventory-write-no-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"inventory:write\",\"required\":\"inventory:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-policies-read-no-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"policies:read\",\"required\":\"policies:write\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-policies-write-no-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"policies:write\",\"required\":\"policies:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-operation-groups-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/groups\"}",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-operation-groups-list-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"get\",\"route_template\":\"/api/v1/orgs/{org}/groups\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-list-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/groups?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-list-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/groups/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/groups\"}",
+      "expected": "teams:manage"
+    },
+    {
+      "id": "auth-scope-operation-groups-create-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"post\",\"route_template\":\"/api/v1/orgs/{org}/groups\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-create-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/groups?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-create-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/groups/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-operation-groups-read-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"get\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-read-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-read-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "teams:manage"
+    },
+    {
+      "id": "auth-scope-operation-groups-replace-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"put\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-replace-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-replace-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "teams:manage"
+    },
+    {
+      "id": "auth-scope-operation-groups-delete-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"delete\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-delete-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-delete-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-groups-retired-patch-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/policies\"}",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-operation-policies-list-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"get\",\"route_template\":\"/api/v1/orgs/{org}/policies\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-list-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/policies?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-list-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/policies/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/policies\"}",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-operation-policies-create-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"post\",\"route_template\":\"/api/v1/orgs/{org}/policies\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-create-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/policies?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-create-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/policies/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-operation-policies-read-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"get\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-read-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-read-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-operation-policies-replace-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"put\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-replace-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-replace-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-operation-policies-delete-method-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"delete\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-delete-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-delete-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}/\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-policies-retired-patch-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "unmapped"
     },
     {
       "id": "auth-scope-inventory-host-list-v1",

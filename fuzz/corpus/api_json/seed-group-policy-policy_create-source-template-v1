@@ -1,0 +1,1 @@
+{"id":"019bdad6-b800-7000-8000-000000000005","data":{"name":"Read hosts","source":"permit(principal == ?principal, action, resource);","enabled":true}}

@@ -217,6 +217,26 @@ pub enum DeviceAccessOperation {
     InventoryGatewayNetworkReplace,
     /// Gateway Network Delete in the current Organization.
     InventoryGatewayNetworkDelete,
+    /// Create one local Group with current same-team Membership associations.
+    OrganizationGroupCreate,
+    /// List Groups under current administrative read authority.
+    OrganizationGroupList,
+    /// Read one Group under current administrative read authority.
+    OrganizationGroupRead,
+    /// Completely replace one local Group's name and Membership associations.
+    OrganizationGroupReplace,
+    /// Delete one local Group after checking current policy dependencies.
+    OrganizationGroupDelete,
+    /// Create one current Organization's persisted custom policy.
+    OrganizationPolicyCreate,
+    /// List the current Organization's custom policies.
+    OrganizationPolicyList,
+    /// Read one current Organization's custom policy.
+    OrganizationPolicyRead,
+    /// Completely replace one current Organization's custom policy.
+    OrganizationPolicyReplace,
+    /// Delete one current Organization's custom policy.
+    OrganizationPolicyDelete,
     /// Read account keys.
     AccountKeysRead,
     /// Update account keys.
@@ -253,7 +273,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 67] = [
+    pub const ALL: [Self; 77] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::OrganizationCreate,
@@ -305,6 +325,16 @@ impl DeviceAccessOperation {
         Self::InventoryGatewayNetworkCreate,
         Self::InventoryGatewayNetworkReplace,
         Self::InventoryGatewayNetworkDelete,
+        Self::OrganizationGroupCreate,
+        Self::OrganizationGroupList,
+        Self::OrganizationGroupRead,
+        Self::OrganizationGroupReplace,
+        Self::OrganizationGroupDelete,
+        Self::OrganizationPolicyCreate,
+        Self::OrganizationPolicyList,
+        Self::OrganizationPolicyRead,
+        Self::OrganizationPolicyReplace,
+        Self::OrganizationPolicyDelete,
         Self::AccountKeysRead,
         Self::AccountKeysWrite,
         Self::SyncSession,
@@ -348,7 +378,17 @@ impl DeviceAccessOperation {
             | Self::TeamMemberList
             | Self::TeamMemberRead
             | Self::TeamMemberUpdate
-            | Self::TeamDissolve => &[DeviceAccessScope::TeamsManage],
+            | Self::TeamDissolve
+            | Self::OrganizationGroupCreate
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationGroupDelete => &[DeviceAccessScope::TeamsManage],
+            Self::OrganizationGroupList
+            | Self::OrganizationGroupRead
+            | Self::OrganizationPolicyList
+            | Self::OrganizationPolicyRead => &[DeviceAccessScope::PoliciesRead],
+            Self::OrganizationPolicyCreate
+            | Self::OrganizationPolicyReplace
+            | Self::OrganizationPolicyDelete => &[DeviceAccessScope::PoliciesWrite],
             Self::InventoryHostList
             | Self::InventoryHostRead
             | Self::InventoryAccessProfileList
@@ -443,8 +483,14 @@ impl DeviceAccessOperation {
             | Self::InventorySnippetRead
             | Self::InventoryGatewayNetworkList
             | Self::InventoryGatewayNetworkRead
+            | Self::OrganizationGroupList
+            | Self::OrganizationGroupRead
+            | Self::OrganizationPolicyList
+            | Self::OrganizationPolicyRead
             | Self::Notifications => "GET",
             Self::AccountKeysWrite
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationPolicyReplace
             | Self::InventoryHostReplace
             | Self::InventoryAccessProfileReplace
             | Self::InventoryRouteReplace
@@ -456,6 +502,8 @@ impl DeviceAccessOperation {
             Self::VaultMemberRemove
             | Self::TeamInvitationRevoke
             | Self::TeamMemberRemove
+            | Self::OrganizationGroupDelete
+            | Self::OrganizationPolicyDelete
             | Self::InventoryHostDelete
             | Self::InventoryAccessProfileDelete
             | Self::InventoryRouteDelete
@@ -468,6 +516,8 @@ impl DeviceAccessOperation {
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
             | Self::TeamDissolve
+            | Self::OrganizationGroupCreate
+            | Self::OrganizationPolicyCreate
             | Self::InventoryHostCreate
             | Self::InventoryAccessProfileCreate
             | Self::InventoryRouteCreate
@@ -542,6 +592,18 @@ impl DeviceAccessOperation {
             Self::InventoryGatewayNetworkRead
             | Self::InventoryGatewayNetworkReplace
             | Self::InventoryGatewayNetworkDelete => "/api/v1/orgs/{org}/gateway-networks/{id}",
+            Self::OrganizationGroupCreate | Self::OrganizationGroupList => {
+                "/api/v1/orgs/{org}/groups"
+            }
+            Self::OrganizationGroupRead
+            | Self::OrganizationGroupReplace
+            | Self::OrganizationGroupDelete => "/api/v1/orgs/{org}/groups/{id}",
+            Self::OrganizationPolicyCreate | Self::OrganizationPolicyList => {
+                "/api/v1/orgs/{org}/policies"
+            }
+            Self::OrganizationPolicyRead
+            | Self::OrganizationPolicyReplace
+            | Self::OrganizationPolicyDelete => "/api/v1/orgs/{org}/policies/{id}",
             Self::AccountKeysRead | Self::AccountKeysWrite => "/sync/v1/keys",
             Self::SyncSession => "/sync/v1/session",
             Self::VaultKeysRead => "/sync/v1/vaults/{vault}/keys",

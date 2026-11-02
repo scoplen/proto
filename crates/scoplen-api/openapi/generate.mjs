@@ -9,6 +9,7 @@ import { generateAccountAdmissionTypes } from "./generate-account-admission.mjs"
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
 import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
 import { generateInventoryTypes } from "./generate-inventory.mjs";
+import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -569,7 +570,13 @@ const inventoryFinish = completeTeamTypes.indexOf(inventoryEnd, inventoryBegin +
 if (inventoryBegin < 0 || inventoryFinish < 0) throw new Error("types.ts lacks OrganizationInventory markers");
 const completeInventoryTypes = completeTeamTypes.slice(0, inventoryBegin + inventoryStart.length) +
   generateInventoryTypes(document) + completeTeamTypes.slice(inventoryFinish);
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeInventoryTypes]];
+const groupPolicyStart = "// BEGIN GENERATED GroupPolicy\n";
+const groupPolicyEnd = "// END GENERATED GroupPolicy";
+const groupPolicyBegin = completeInventoryTypes.indexOf(groupPolicyStart);
+const groupPolicyFinish = completeInventoryTypes.indexOf(groupPolicyEnd, groupPolicyBegin + groupPolicyStart.length);
+if (groupPolicyBegin < 0 || groupPolicyFinish < 0) throw new Error("types.ts lacks GroupPolicy markers");
+const completeGroupPolicyTypes = `${completeInventoryTypes.slice(0, groupPolicyBegin + groupPolicyStart.length)}${generateGroupPolicyTypes(document)}${completeInventoryTypes.slice(groupPolicyFinish)}`;
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeGroupPolicyTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

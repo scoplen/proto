@@ -20,6 +20,10 @@ use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceRe
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
 };
+use scoplen_api::group_policy::{
+    GroupCreateRequest, GroupPage, GroupReplaceRequest, GroupResource, PolicyCreateRequest,
+    PolicyPage, PolicyReplaceRequest, PolicyResource, SimpleRuleInput,
+};
 use scoplen_api::inventory::{
     InventoryCreateRequest, InventoryFields, InventoryPage, InventoryReplaceRequest,
     InventoryResource, InventoryType,
@@ -63,6 +67,16 @@ macro_rules! inventory_round_trip {
     };
 }
 
+macro_rules! canonical_round_trip {
+    ($message:ty, $input:expr) => {
+        if let Ok(message) = <$message>::from_json($input) {
+            let encoded = message.to_json().expect("validated JSON message encodes");
+            let decoded = <$message>::from_json(&encoded).expect("canonical JSON decodes");
+            assert_eq!(decoded.to_json().expect("canonical JSON encodes"), encoded);
+        }
+    };
+}
+
 fuzz_target!(|bytes: &[u8]| {
     if let Ok(problem) = ProblemDetails::from_json(bytes, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES) {
         let encoded = serde_json::to_vec(&problem).expect("validated problem encodes");
@@ -77,6 +91,21 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(OrganizationUpdateRequest, bytes);
     round_trip!(OrganizationResource, bytes);
     round_trip!(OrganizationPage, bytes);
+    canonical_round_trip!(GroupCreateRequest, bytes);
+    canonical_round_trip!(GroupReplaceRequest, bytes);
+    canonical_round_trip!(GroupResource, bytes);
+    canonical_round_trip!(GroupPage, bytes);
+    canonical_round_trip!(PolicyCreateRequest, bytes);
+    canonical_round_trip!(PolicyReplaceRequest, bytes);
+    canonical_round_trip!(PolicyResource, bytes);
+    canonical_round_trip!(PolicyPage, bytes);
+    canonical_round_trip!(SimpleRuleInput, bytes);
+    if let Ok(input) = SimpleRuleInput::from_json(bytes) {
+        let source = input.generate().expect("validated simple rule generates");
+        let canonical = SimpleRuleInput::from_json(&input.to_json().expect("rule encodes"))
+            .expect("canonical rule decodes");
+        assert_eq!(canonical.generate().expect("canonical rule generates"), source);
+    }
     round_trip!(TeamInvitationResource, bytes);
     round_trip!(TeamMemberResource, bytes);
     round_trip!(TeamMemberUpdateRequest, bytes);

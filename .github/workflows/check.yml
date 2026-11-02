@@ -43,6 +43,12 @@ jobs:
         run: node --test scripts/generate-organization-vectors.test.mjs
       - name: Test team membership OpenAPI contract checks
         run: node --test crates/scoplen-api/openapi/generate-team.test.mjs
+      - name: Test group and policy OpenAPI contract checks
+        run: node --test crates/scoplen-api/openapi/generate-group-policy.test.mjs
+      - name: Check group and policy vectors
+        run: node scripts/generate-group-policy-vectors.mjs --check
+      - name: Test independent group and policy vector producer
+        run: node --test scripts/generate-group-policy-vectors.test.mjs
       - name: Check team invitation cryptographic and API vectors
         run: |
           node scripts/generate-team-invitation-vectors.mjs --check

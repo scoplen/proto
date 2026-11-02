@@ -1,0 +1,1 @@
+{"data":{"name":"Read hosts","source":"permit(principal, action == Action::\"view_inventory\", resource);","enabled":true},"future":true}
