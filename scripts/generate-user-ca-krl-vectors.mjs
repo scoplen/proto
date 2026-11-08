@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Independent D-141 OpenSSH wire writer; it does not read Rust or generated schemas.
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, realpath, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const root = new URL("../", import.meta.url);
@@ -93,4 +93,7 @@ async function main() {
   console.log(`validated ${vectors.length} D-141 KRL vectors and ${outputs.length - 1} raw parser seeds`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1]
+  && await realpath(process.argv[1]) === await realpath(fileURLToPath(import.meta.url))) {
+  await main();
+}
