@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Preserve all required browser-session fields and the native-refresh exclusion in the
+  generated Account-browser TypeScript responses. Check public exports with strict TypeScript
+  assignments, including required fields, token type, lifetime and forbidden native credentials.
+
 - Add D-140's independent bounded Account-browser wire profile, opaque access/refresh codecs
   and domain-separated digests, exact cookie/HTTP metadata, finite scope/operation mapping
   and real Account/family writer metadata. Reuse the existing password/options/login and
