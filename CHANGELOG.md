@@ -4,6 +4,15 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-140's independent bounded Account-browser wire profile, opaque access/refresh codecs
+  and domain-separated digests, exact cookie/HTTP metadata, finite scope/operation mapping
+  and real Account/family writer metadata. Reuse the existing password/options/login and
+  browser/logout shapes without changing Device or Operator behavior. Independent public
+  vectors, a digest-only single-family reference peer and generated OpenAPI/TypeScript cover
+  syntax, bounds, refresh/reuse, current-state denial and confirmed-only logout. Production
+  password/proof verification, storage, audit, WebAssembly Worker and console acceptance remain
+  separate outcomes; these codecs do not make browser sign-in usable.
+
 - Update the pinned Alpine interoperability packages to OpenSSH 9.9p2 r1 and 10.6p2 r0.
   The current-version fixture now selects `10.6p2` in place of `10.6p1`; installed-package and
   SSH banner assertions remain mandatory.

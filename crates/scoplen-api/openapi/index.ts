@@ -102,6 +102,14 @@ export type {
   AccountPasswordOptionsResponse,
   AccountPasswordLoginRequest,
   AccountPasswordLoginResponse,
+  AccountBrowserPasswordOptionsRequest,
+  AccountBrowserPasswordOptionsResponse,
+  AccountBrowserPasswordLoginRequest,
+  AccountBrowserPasswordLoginResponse,
+  AccountBrowserRefreshRequest,
+  AccountBrowserRefreshResponse,
+  AccountBrowserLogoutRequest,
+  AccountBrowserLogoutResponse,
   AccountRegistrationRequest,
   AccountDeviceAdmissionRequest,
   AccountDeviceAdmissionFields,
@@ -156,4 +164,5 @@ export type {
   AuthCommitOutcomeUnknownProblem,
   AuthStorageFailureProblem,
 } from "./types";
+export { initialAccountBrowserScope, accountBrowserOperations } from "./types";
 export * from "./proto";

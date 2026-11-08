@@ -117,6 +117,25 @@ scripted rollback, unknown commit and lost response. It supplies no token/proof 
 durable database, HTTP route or audit chain. Production team creation, native interaction,
 invitations, dissolution and asset permissions remain separate consumer outcomes.
 
+D-140's independent `account_browser` module supplies four bounded endpoint wrappers over the
+existing password/options, transient login, browser-session and true-only logout shapes.
+It rejects recursive duplicate names and native bootstrap/admission/refresh fields, validates
+the exact `ab1_`/`ar1_` opaque credential encodings and separate SHA-256 digest domains, and
+fixes access/family lifetimes, cookie attributes and endpoint credential modes. The separate
+finite browser operation map permits only current Account profile and the specified ordinary
+team/inventory/group/policy operations. It never widens the Device or Operator maps.
+`AccountBrowserWriter` identifies the real Account/family for Organization origins and the
+six inventory/control create-receipt bindings; it supplies no Device or current authority.
+The single-family reference peer retains only credential digests and exercises refresh,
+reuse revocation, current-generation denial, confirmed logout and transaction/response faults.
+Its trusted inputs are externally verified password/proof/Account facts and independently
+generated credentials; it supplies no password authentication, HTTP, durable storage or audit
+chain. The fixture has explicit bounded proof/rotation collections, not production admission.
+Public `vectors/account-browser.json` independently checks encodings, hash domains, the complete
+browser route whitelist and writer metadata. OpenAPI/TypeScript describe the same bounded
+profile. Shared wire support alone does not establish a usable browser login, production API
+or console; the Rust/WebAssembly Worker and consumer acceptance are separate outcomes.
+
 D-134 adds a distinct strict `OrganizationUpdateRequest` codec, required bounded strong
 `If-Match` parsing and the exact `orgs:write`/`PATCH /api/v1/orgs/{org}` operation. The
 `manage_organization` Cedar action permits the built-in Owner and Administrator roles while
@@ -1109,6 +1128,8 @@ node --test crates/scoplen-api/openapi/generate-group-policy.test.mjs
 node scripts/generate-inventory-vectors.mjs --check
 node --test scripts/generate-inventory-vectors.test.mjs
 node --test crates/scoplen-api/openapi/generate-inventory.test.mjs
+node scripts/generate-account-browser-vectors.mjs --check
+node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in

@@ -10,6 +10,12 @@ use scoplen_api::account_admission::{
     AccountRegistrationRequest, AccountRequestChallengeRequest, AccountRequestChallengeResponse,
     MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
 };
+use scoplen_api::account_browser::{
+    AccountBrowserAccessToken, AccountBrowserLogoutRequest, AccountBrowserLogoutResponse,
+    AccountBrowserPasswordLoginRequest, AccountBrowserPasswordLoginResponse,
+    AccountBrowserPasswordOptionsRequest, AccountBrowserPasswordOptionsResponse,
+    AccountBrowserRefreshRequest, AccountBrowserRefreshResponse, AccountBrowserRefreshToken,
+};
 use scoplen_api::account_devices::AccountDeviceStatements;
 use scoplen_api::account_profile::AccountProfile;
 use scoplen_api::auth::{
@@ -139,6 +145,23 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(AccountPasswordOptionsRequest, bytes);
     round_trip!(AccountPasswordOptionsResponse, bytes);
     round_trip!(AccountPasswordLoginResponse, bytes);
+    round_trip!(AccountBrowserPasswordOptionsRequest, bytes);
+    round_trip!(AccountBrowserPasswordOptionsResponse, bytes);
+    round_trip!(AccountBrowserPasswordLoginResponse, bytes);
+    round_trip!(AccountBrowserRefreshResponse, bytes);
+    if let Ok(value) = AccountBrowserPasswordLoginRequest::from_json(bytes) {
+        let encoded = value.to_json().expect("validated browser login encodes");
+        assert_eq!(AccountBrowserPasswordLoginRequest::from_json(encoded.as_bytes()), Ok(value));
+    }
+    if let Ok(value) = AccountBrowserRefreshRequest::from_json(bytes) {
+        assert_eq!(AccountBrowserRefreshRequest::from_json(value.to_json()), Ok(value));
+    }
+    if let Ok(value) = AccountBrowserLogoutRequest::from_json(bytes) {
+        assert_eq!(AccountBrowserLogoutRequest::from_json(value.to_json()), Ok(value));
+    }
+    if let Ok(value) = AccountBrowserLogoutResponse::from_json(bytes) {
+        assert_eq!(AccountBrowserLogoutResponse::from_json(value.to_json()), Ok(value));
+    }
     round_trip!(AccountRegistrationRequest, bytes);
     round_trip!(AccountDeviceAdmissionRequest, bytes);
     round_trip!(AccountCommittedConfirmation, bytes);
@@ -179,6 +202,12 @@ fuzz_target!(|bytes: &[u8]| {
     );
 
     if let Ok(text) = std::str::from_utf8(bytes) {
+        if let Ok(value) = AccountBrowserAccessToken::parse(text) {
+            assert_eq!(AccountBrowserAccessToken::parse(value.as_str()), Ok(value));
+        }
+        if let Ok(value) = AccountBrowserRefreshToken::parse(text) {
+            assert_eq!(AccountBrowserRefreshToken::parse(value.as_str()), Ok(value));
+        }
         if let Ok(value) = TeamInvitationLink::parse(text) {
             assert_eq!(value.to_url().expect("validated link encodes"), text);
         }
