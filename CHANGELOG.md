@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add a thin shared Rust/WebAssembly adapter for D-140's authentication-secret derivation,
+  D-136 invitation helper and strict D-137 simple-rule generator. Pin the Rust target and
+  matching bindings CLI, generate a private local consumer package and check its actual
+  exports in a one-use browser Worker, including RNG/resource/Worker failures. Native API
+  transport keeps its default `internal-grpc` feature; browser builds disable that feature.
+  Production password Worker/network integration and console acceptance remain consumer work.
+
 - Preserve all required browser-session fields and the native-refresh exclusion in the
   generated Account-browser TypeScript responses. Check public exports with strict TypeScript
   assignments, including required fields, token type, lifetime and forbidden native credentials.

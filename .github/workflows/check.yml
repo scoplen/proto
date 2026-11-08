@@ -33,6 +33,15 @@ jobs:
         run: node --test crates/scoplen-api/openapi/generate-operator.test.mjs
       - name: Test Account entry OpenAPI contract checks
         run: node --test crates/scoplen-api/openapi/generate-account-admission.test.mjs
+      - name: Test Account browser OpenAPI contract checks
+        run: node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
+      - name: Test Account browser public TypeScript contract
+        run: >-
+          npm exec --yes --package typescript@5.9.3 --
+          tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler
+          crates/scoplen-api/openapi/account-browser.types.test.ts
+      - name: Check Account browser vectors and parser bounds
+        run: node scripts/generate-account-browser-vectors.mjs --check
       - name: Check Account entry vectors and parser bounds
         run: node scripts/generate-account-admission-vectors.mjs --check
       - name: Test team creation and discovery OpenAPI contract checks
@@ -92,6 +101,32 @@ jobs:
             test -n "$(find "fuzz/corpus/$target" -maxdepth 1 -type f -name 'seed-*' -print -quit)"
             cargo +"$FUZZ_TOOLCHAIN" fuzz run "$target" "fuzz/corpus/$target" -- -runs=0 -timeout=10
           done
+
+  browser:
+    name: Shared browser module
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - name: Install browser system prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang llvm
+      - name: Install fixed browser tools
+        run: |
+          rustup target add --toolchain 1.99.0 wasm32-unknown-unknown
+          cargo +1.99.0 install wasm-bindgen-cli --version 0.2.129 --locked
+      - name: Test API without native gRPC transport
+        run: cargo test --locked -p scoplen-api --no-default-features --lib
+      - name: Check WASM bindings
+        run: cargo clippy --locked --target wasm32-unknown-unknown -p scoplen-browser -- -D warnings
+      - name: Build fixed browser package
+        run: node scripts/build-browser.mjs
+      - name: Check packaged module in Chromium
+        run: node scripts/check-browser.mjs
 
   dependency-audit:
     name: Dependency policy

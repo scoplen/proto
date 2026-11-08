@@ -1079,8 +1079,15 @@ checks RFC 9106's Argon2id-v19 answer. Run
 Unicode 17.0 tables. The Rust build checks its Unicode version at compile time. Password parser
 fuzzing normalizes bounded input and checks metadata/artifact decoders without invoking Argon2.
 
-The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`, and
-`scoplen-test-vectors`. K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
+The Cargo workspace contains `scoplen-ssh`, `scoplen-model`, `scoplen-crypto`, `scoplen-api`,
+`scoplen-browser` and `scoplen-test-vectors`. The thin browser adapter reuses shared password,
+invitation and strict simple-rule implementations; its pinned WASM build, local consumer
+package and real-browser checks are documented in
+[crates/scoplen-browser/README.md](crates/scoplen-browser/README.md). It derives only AuthSecret
+and does not open Personal material or supply browser authentication/HTTP integration.
+`scoplen-api` keeps internal gRPC transport enabled by default through `internal-grpc`; browser
+dependencies disable this feature without replacing the shared Cedar validator.
+K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
 in `vectors/crypto.json`. D-128 native entry/protected-map/signature vectors are in
 `vectors/account-admission.json`, independently produced by
 `node scripts/generate-account-admission-vectors.mjs [--check]`. The Node producer verifies

@@ -5,6 +5,7 @@ members = [
     "crates/scoplen-model",
     "crates/scoplen-crypto",
     "crates/scoplen-api",
+    "crates/scoplen-browser",
     "crates/scoplen-test-vectors",
 ]
 exclude = ["fuzz", "vendor/ssh-key"]
