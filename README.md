@@ -602,7 +602,7 @@ certificate and the same raw public key still authenticate and run the exact com
 status zero. OpenSSH enforces the KRL; the client does not load or parse it. The Linux CI workflow
 runs the same script on each change; disposable keys and the container are removed afterward.
 `pwsh ./scripts/ssh-keyboard-interactive-interop.ps1` uses Alpine 3.21 with pinned
-`openssh-server-pam=9.9_p2-r0` and `linux-pam=1.6.1-r1`. It verifies the package versions, banner
+`openssh-server-pam=9.9_p2-r1` and `linux-pam=1.6.1-r1`. It verifies the package versions, banner
 and effective configuration, forces PAM keyboard-interactive with password/public-key fallback
 disabled, and checks a valid answer, wrong-answer refusal, and a fresh valid connection. Accepted
 connections run an exact command and require its exact output and exit status zero. The fixture

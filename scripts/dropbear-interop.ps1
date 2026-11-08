@@ -25,7 +25,7 @@ foreach ($name in $testVariables) {
 try {
     $setup = @'
 set -eu
-apk add --no-cache dropbear=2024.86-r0 openssh-sftp-server=9.9_p2-r0 python3
+apk add --no-cache dropbear=2024.86-r0 openssh-sftp-server=9.9_p2-r1 python3
 test -x /usr/lib/ssh/sftp-server
 adduser -D scoplen
 printf 'scoplen:scoplen-test-password\n' | chpasswd
@@ -90,7 +90,7 @@ wait "$echo_server" "$allowed" "$denied"
 
     $packages = docker exec $container apk info -v
     if ($LASTEXITCODE -ne 0 -or $packages -notcontains 'dropbear-2024.86-r0' -or
-        $packages -notcontains 'openssh-sftp-server-9.9_p2-r0') {
+        $packages -notcontains 'openssh-sftp-server-9.9_p2-r1') {
         throw 'Disposable Dropbear or SFTP server package version differed from the pinned fixture'
     }
 

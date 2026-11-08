@@ -9,7 +9,7 @@ $tempBase = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimE
 $tempRoot = [System.IO.Path]::GetFullPath((Join-Path $tempBase ('scoplen-openssh-keys-' + [guid]::NewGuid().ToString('N'))))
 $started = $false
 $serverProfiles = @{
-    '9.9p2' = @{ Image = 'alpine:3.21'; Package = 'openssh-server=9.9_p2-r0'; Installed = 'openssh-server-9.9_p2-r0 '; Banner = '^SSH-2\.0-OpenSSH_9\.9\r?$' }
+    '9.9p2' = @{ Image = 'alpine:3.21'; Package = 'openssh-server=9.9_p2-r1'; Installed = 'openssh-server-9.9_p2-r1 '; Banner = '^SSH-2\.0-OpenSSH_9\.9\r?$' }
     '10.6p1' = @{ Image = 'alpine:edge'; Package = 'openssh-server=10.6_p1-r1'; Installed = 'openssh-server-10.6_p1-r1 '; Banner = '^SSH-2\.0-OpenSSH_10\.6\r?$' }
 }
 $serverProfile = $serverProfiles[$ServerVersion]

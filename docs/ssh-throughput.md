@@ -15,7 +15,7 @@ The script needs PowerShell 7, Docker with a running Linux daemon, `ssh`, `ssh-k
 release mode. `-BytesMiB` (16–1024, default 256), `-Samples` (3–20, default 5), and `-Image`
 (default `alpine:3.21`) are optional. For a repeat with the same base image, pass the recorded
 repository digest to `-Image`. The script pins Alpine's `openssh-server` package to
-`9.9_p2-r0`; it fails rather than silently changing the server version if that package becomes
+`9.9_p2-r1`; it fails rather than silently changing the server version if that package becomes
 unavailable. It removes the temporary private key, host pin, and containers on success or failure.
 
 ## Method
@@ -44,7 +44,7 @@ regression tracking required by `13-testing-and-quality.md` §2 and §7 remain o
 
 ## Windows run, 2026-10-18
 
-- Host: Windows 10.0.26200, AMD Ryzen 9 7945HX, Rust 1.85.0.
+- Platform: Windows, Rust 1.85.0.
 - OpenSSH client: OpenSSH for Windows 9.5p2. Server: OpenSSH 9.9p2, OpenSSL 3.3.7.
 - Base image ID: `sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507`.
 - Source revision: `scoplen-proto@b893d03` plus the comparison code in this change.
