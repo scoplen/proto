@@ -11,6 +11,7 @@ import { generateTeamTypes, initialTeamDeviceScope } from "./generate-team.mjs";
 import { generateUserCaTypes } from "./generate-user-ca.mjs";
 import { generateInventoryTypes } from "./generate-inventory.mjs";
 import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
+import { generateAccountBrowserTypes } from "./generate-account-browser.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -588,7 +589,14 @@ const caBegin = completeGroupPolicyTypes.indexOf(caStart);
 const caFinish = completeGroupPolicyTypes.indexOf(caEnd, caBegin + caStart.length);
 if (caBegin < 0 || caFinish < 0) throw new Error("types.ts lacks UserCa markers");
 const completeCaTypes = `${completeGroupPolicyTypes.slice(0, caBegin + caStart.length)}${generateUserCaTypes(document)}${completeGroupPolicyTypes.slice(caFinish)}`;
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeCaTypes]];
+const browserStart = "// BEGIN GENERATED AccountBrowser\n";
+const browserEnd = "// END GENERATED AccountBrowser";
+const browserBegin = completeCaTypes.indexOf(browserStart);
+const browserFinish = completeCaTypes.indexOf(browserEnd, browserBegin + browserStart.length);
+if (browserBegin < 0 || browserFinish < 0) throw new Error("types.ts lacks AccountBrowser markers");
+const completeBrowserTypes = completeCaTypes.slice(0, browserBegin + browserStart.length) +
+  generateAccountBrowserTypes(document) + completeCaTypes.slice(browserFinish);
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeBrowserTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

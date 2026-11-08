@@ -1,0 +1,810 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "account-browser-access-digest-v1",
+      "kind": "account.browser.access.digest",
+      "input": "ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "expected": "85c7a68d56f4b20ede0a208eebc5342bbde532b3a2b36bfba2a0ca52793cd27d"
+    },
+    {
+      "id": "account-browser-access-padding-v1",
+      "kind": "account.browser.access.reject",
+      "input": "ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-access-short-v1",
+      "kind": "account.browser.access.reject",
+      "input": "ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-access-long-v1",
+      "kind": "account.browser.access.reject",
+      "input": "ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8A",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-access-wrong-profile-v1",
+      "kind": "account.browser.access.reject",
+      "input": "ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-access-jwt-v1",
+      "kind": "account.browser.access.reject",
+      "input": "eyJhbGciOiJFZERTQSJ9.e30.c2ln",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-access-tail-v1",
+      "kind": "account.browser.access.reject",
+      "input": "ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh_",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-access-space-v1",
+      "kind": "account.browser.access.reject",
+      "input": " ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh-digest-v1",
+      "kind": "account.browser.refresh.digest",
+      "input": "ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "expected": "6d067aada29dad9e25aceb7c3ae1eb2ad60de7020dbd5a04fc1076a038b5a282"
+    },
+    {
+      "id": "account-browser-refresh-padding-v1",
+      "kind": "account.browser.refresh.reject",
+      "input": "ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh-short-v1",
+      "kind": "account.browser.refresh.reject",
+      "input": "ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh-long-v1",
+      "kind": "account.browser.refresh.reject",
+      "input": "ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8A",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh-wrong-profile-v1",
+      "kind": "account.browser.refresh.reject",
+      "input": "ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh-jwt-v1",
+      "kind": "account.browser.refresh.reject",
+      "input": "eyJhbGciOiJFZERTQSJ9.e30.c2ln",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh-tail-v1",
+      "kind": "account.browser.refresh.reject",
+      "input": "ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh_",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh-space-v1",
+      "kind": "account.browser.refresh.reject",
+      "input": " ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-options.request-valid-v1",
+      "kind": "account.browser.options.request",
+      "input": "{\"username\":\"alice\"}",
+      "expected": "{\"username\":\"alice\"}"
+    },
+    {
+      "id": "account-browser-options.request-duplicate-v1",
+      "kind": "account.browser.options.request.reject",
+      "input": "{\"username\":\"alice\",\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-options.request-trailing-v1",
+      "kind": "account.browser.options.request.reject",
+      "input": "{\"username\":\"alice\"}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-options.response-valid-v1",
+      "kind": "account.browser.options.response",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"profile\":1,\"salt\":\"AAECAwQFBgcICQoLDA0ODw\",\"expires_at_ms\":\"1700000120000\"}",
+      "expected": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"profile\":1,\"salt\":\"AAECAwQFBgcICQoLDA0ODw\",\"expires_at_ms\":\"1700000120000\"}"
+    },
+    {
+      "id": "account-browser-options.response-duplicate-v1",
+      "kind": "account.browser.options.response.reject",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"profile\":1,\"salt\":\"AAECAwQFBgcICQoLDA0ODw\",\"expires_at_ms\":\"1700000120000\",\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-options.response-trailing-v1",
+      "kind": "account.browser.options.response.reject",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"profile\":1,\"salt\":\"AAECAwQFBgcICQoLDA0ODw\",\"expires_at_ms\":\"1700000120000\"}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.request-valid-v1",
+      "kind": "account.browser.login.request",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"auth_secret\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\"}",
+      "expected": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"auth_secret\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\"}"
+    },
+    {
+      "id": "account-browser-login.request-duplicate-v1",
+      "kind": "account.browser.login.request.reject",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"auth_secret\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\",\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.request-trailing-v1",
+      "kind": "account.browser.login.request.reject",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"auth_secret\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\"}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-valid-v1",
+      "kind": "account.browser.login.response",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}",
+      "expected": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}"
+    },
+    {
+      "id": "account-browser-login.response-duplicate-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-trailing-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.request-valid-v1",
+      "kind": "account.browser.refresh.request",
+      "input": "{}",
+      "expected": "{}"
+    },
+    {
+      "id": "account-browser-refresh.request-duplicate-v1",
+      "kind": "account.browser.refresh.request.reject",
+      "input": "{,\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.request-trailing-v1",
+      "kind": "account.browser.refresh.request.reject",
+      "input": "{}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-valid-v1",
+      "kind": "account.browser.refresh.response",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":123}",
+      "expected": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":123}"
+    },
+    {
+      "id": "account-browser-refresh.response-duplicate-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":123,\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-trailing-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":123}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-logout.request-valid-v1",
+      "kind": "account.browser.logout.request",
+      "input": "{}",
+      "expected": "{}"
+    },
+    {
+      "id": "account-browser-logout.request-duplicate-v1",
+      "kind": "account.browser.logout.request.reject",
+      "input": "{,\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-logout.request-trailing-v1",
+      "kind": "account.browser.logout.request.reject",
+      "input": "{}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-logout.response-valid-v1",
+      "kind": "account.browser.logout.response",
+      "input": "{\"revoked\":true}",
+      "expected": "{\"revoked\":true}"
+    },
+    {
+      "id": "account-browser-logout.response-duplicate-v1",
+      "kind": "account.browser.logout.response.reject",
+      "input": "{\"revoked\":true,\"duplicate\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-logout.response-trailing-v1",
+      "kind": "account.browser.logout.response.reject",
+      "input": "{\"revoked\":true}{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-extensions-v1",
+      "kind": "account.browser.login.response",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"extra\":{\"safe\":true}}",
+      "expected": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}"
+    },
+    {
+      "id": "account-browser-login.response-refresh_token-null-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"refresh_token\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-refresh_token-string-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"refresh_token\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-refresh_token-object-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"refresh_token\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-admission_token-null-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"admission_token\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-admission_token-string-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"admission_token\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-admission_token-object-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"admission_token\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-snapshot-null-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"snapshot\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-snapshot-string-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"snapshot\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-snapshot-object-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"snapshot\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-expires_in-599-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":599,\"refresh_expires_in\":2592000}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-expires_in-601-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":601,\"refresh_expires_in\":2592000}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-refresh_expires_in-0-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":0}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-refresh_expires_in-2592001-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592001}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login.response-access_token-ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-extensions-v1",
+      "kind": "account.browser.refresh.response",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"extra\":{\"safe\":true}}",
+      "expected": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}"
+    },
+    {
+      "id": "account-browser-refresh.response-refresh_token-null-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"refresh_token\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-refresh_token-string-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"refresh_token\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-refresh_token-object-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"refresh_token\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-admission_token-null-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"admission_token\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-admission_token-string-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"admission_token\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-admission_token-object-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"admission_token\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-snapshot-null-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"snapshot\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-snapshot-string-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"snapshot\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-snapshot-object-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000,\"snapshot\":{}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-expires_in-599-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":599,\"refresh_expires_in\":2592000}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-expires_in-601-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":601,\"refresh_expires_in\":2592000}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-refresh_expires_in-0-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":0}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-refresh_expires_in-2592001-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592001}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-refresh.response-access_token-ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8-v1",
+      "kind": "account.browser.refresh.response.reject",
+      "input": "{\"access_token\":\"ar1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":2592000}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login-response-short-family-v1",
+      "kind": "account.browser.login.response.reject",
+      "input": "{\"access_token\":\"ab1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"token_type\":\"DPoP\",\"expires_in\":600,\"refresh_expires_in\":123}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-logout-false-v1",
+      "kind": "account.browser.logout.response.reject",
+      "input": "{\"revoked\":false}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-logout-extension-v1",
+      "kind": "account.browser.logout.response.reject",
+      "input": "{\"revoked\":true,\"extra\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-options-extension-v1",
+      "kind": "account.browser.options.response",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"profile\":1,\"salt\":\"AAECAwQFBgcICQoLDA0ODw\",\"expires_at_ms\":\"1700000120000\",\"extra\":1}",
+      "expected": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"profile\":1,\"salt\":\"AAECAwQFBgcICQoLDA0ODw\",\"expires_at_ms\":\"1700000120000\"}"
+    },
+    {
+      "id": "account-browser-options-request-field-v1",
+      "kind": "account.browser.options.request.reject",
+      "input": "{\"username\":\"alice\",\"family_id\":\"chosen\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-login-request-field-v1",
+      "kind": "account.browser.login.request.reject",
+      "input": "{\"attempt_id\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"auth_secret\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\",\"device_id\":\"chosen\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-scope-v1",
+      "kind": "account.browser.scope",
+      "input": "initial",
+      "expected": "account:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage"
+    },
+    {
+      "id": "account-browser-operation-77-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/accounts/me\"}",
+      "expected": "{\"scopes\":[\"account:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-78-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs\"}",
+      "expected": "{\"scopes\":[\"orgs:create\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-79-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs\"}",
+      "expected": "{\"scopes\":[\"orgs:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-80-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}\"}",
+      "expected": "{\"scopes\":[\"orgs:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-81-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}\"}",
+      "expected": "{\"scopes\":[\"orgs:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-82-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/invitations\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-83-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/invitations\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-84-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/invitations/{invitation}\"}",
+      "expected": "{\"scopes\":[\"teams:join\",\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-85-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/invitations/{invitation}\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-86-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/invitations/{invitation}/accept\"}",
+      "expected": "{\"scopes\":[\"teams:join\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-87-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/members\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-88-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/members/{membership}\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-89-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/members/{membership}\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-90-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/members/{membership}\"}",
+      "expected": "{\"scopes\":[\"teams:join\",\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-91-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/dissolve\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-92-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/hosts\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-93-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/hosts\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-94-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/hosts/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-95-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/hosts/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-96-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/hosts/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-97-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/host-groups\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-98-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/host-groups\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-99-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/host-groups/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-100-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/host-groups/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-101-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/host-groups/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-102-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/access-profiles\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-103-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/access-profiles\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-104-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/access-profiles/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-105-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/access-profiles/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-106-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/access-profiles/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-107-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/routes\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-108-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/routes\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-109-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/routes/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-110-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/routes/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-111-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/routes/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-112-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/groups\"}",
+      "expected": "{\"scopes\":[\"policies:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-113-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/groups\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-114-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "{\"scopes\":[\"policies:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-115-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-116-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/groups/{id}\"}",
+      "expected": "{\"scopes\":[\"teams:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-117-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/policies\"}",
+      "expected": "{\"scopes\":[\"policies:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-118-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/policies\"}",
+      "expected": "{\"scopes\":[\"policies:write\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-119-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "{\"scopes\":[\"policies:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-120-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "{\"scopes\":[\"policies:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-121-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/policies/{id}\"}",
+      "expected": "{\"scopes\":[\"policies:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-logout-v1",
+      "kind": "account.browser.operation.logout",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/accounts/browser/logout\"}",
+      "expected": "self-session-termination"
+    },
+    {
+      "id": "account-browser-operation-denied-123-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/accounts/me/devices\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-124-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/sync/v1/keys\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-125-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/certificates\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-126-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/operator/logout\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-127-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/trust-records\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-128-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-129-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/gateway-networks\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-130-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/admin/accounts\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-131-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-132-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"get\",\"path\":\"/api/v1/accounts/me\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-writer-v1",
+      "kind": "account.browser.writer",
+      "input": "{\"account_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"family_id\":\"0191d3e0-8000-7000-8000-000000000002\"}",
+      "expected": "{\"kind\":\"account-browser\",\"origin\":\"0191d3e0-8000-7000-8000-000000000002\"}"
+    }
+  ]
+}

@@ -13505,6 +13505,415 @@
           }
         ]
       }
+    },
+    "/auth/accounts/browser/password/options": {
+      "post": {
+        "operationId": "accountBrowserPasswordOptions",
+        "tags": [
+          "Account browser authentication"
+        ],
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "description": "D-140 independent current Account/browser family, never a Device or Operator. Exact trusted Origin and one fresh bounded ES256 DPoP proof are required; no ath and no Authorization. Reject query, If-Match, Idempotency-Key, redirects, BOM, compression except identity, unknown request fields and recursive duplicate names. JSON/UTF-8 only. Browser credentials=omit. Ignore cookies for authentication and identity selection. Attempt purpose/JKT/origin is browser-bound; native/browser attempts never cross. Share native password admission debt and stable synthetic salt behavior.",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 1024,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "omit",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "At most 256 complete encoded UTF-8 bytes including whitespace.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountBrowserPasswordOptionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "At most 1024 complete encoded bytes. Request-bound response.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBrowserPasswordOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/AccountEntryInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/AccountEntryAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/AccountEntryPolicyDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccountEntryBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/AccountEntryMediaType"
+          },
+          "429": {
+            "$ref": "#/components/responses/AccountEntryRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountEntryStorageUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/AccountEntryProblem"
+          }
+        }
+      }
+    },
+    "/auth/accounts/browser/password/login": {
+      "post": {
+        "operationId": "accountBrowserPasswordLogin",
+        "tags": [
+          "Account browser authentication"
+        ],
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "description": "D-140 independent current Account/browser family, never a Device or Operator. Exact trusted Origin and one fresh bounded ES256 DPoP proof are required; no ath and no Authorization. Reject query, If-Match, Idempotency-Key, redirects, BOM, compression except identity, unknown request fields and recursive duplicate names. JSON/UTF-8 only. Browser credentials=same-origin. Ignore cookies for authentication and identity selection. Only confirmed COMMIT discloses credentials; uncertain COMMIT is changed=true, retryable=false and returns no credentials/cookie. Never automatically replay.",
+        "x-scoplen-request-max-bytes": 512,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "same-origin",
+        "x-scoplen-initial-browser-scope": "account:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "At most 512 complete encoded UTF-8 bytes including whitespace.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountBrowserPasswordLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "At most 8192 complete encoded bytes. Only four browser session fields; access lasts exactly 600 seconds and family expires absolutely 2592000 seconds after login.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "Set-Cookie": {
+                "required": true,
+                "description": "__Secure-spl-account-refresh=<token>; Path=/api/v1/auth/accounts/browser/refresh; HttpOnly; Secure; SameSite=Strict; no Domain; Max-Age equals returned remaining family seconds. Never overwrite __Secure-spl-refresh. Refresh token is ar1_ plus canonical unpadded base64url of 32 independent random bytes.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBrowserPasswordLoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/AccountEntryInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/AccountEntryAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/AccountEntryPolicyDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccountEntryBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/AccountEntryMediaType"
+          },
+          "429": {
+            "$ref": "#/components/responses/AccountEntryRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountBrowserSessionStorageFailure"
+          },
+          "default": {
+            "$ref": "#/components/responses/AccountEntryProblem"
+          }
+        }
+      }
+    },
+    "/auth/accounts/browser/refresh": {
+      "post": {
+        "operationId": "accountBrowserRefresh",
+        "tags": [
+          "Account browser authentication"
+        ],
+        "security": [
+          {
+            "dpopProof": []
+          }
+        ],
+        "description": "D-140 independent current Account/browser family, never a Device or Operator. Exact trusted Origin and one fresh bounded ES256 DPoP proof are required; no ath and no Authorization. Reject query, If-Match, Idempotency-Key, redirects, BOM, compression except identity, unknown request fields and recursive duplicate names. JSON/UTF-8 only. Browser credentials=same-origin. Exactly one ar1_ Account refresh cookie; reject mixed native/Operator credentials; no cookie/body fallback. Rotate once without widening scope or extending absolute family expiry. Only confirmed COMMIT discloses credentials; uncertain COMMIT is changed=true, retryable=false and returns no credentials/cookie. Never automatically replay.",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "same-origin",
+        "x-scoplen-initial-browser-scope": "account:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "At most 256 complete encoded UTF-8 bytes including whitespace.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountBrowserRefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "At most 8192 complete encoded bytes. Only four browser session fields; access lasts exactly 600 seconds and family expires absolutely 2592000 seconds after login.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "Set-Cookie": {
+                "required": true,
+                "description": "__Secure-spl-account-refresh=<token>; Path=/api/v1/auth/accounts/browser/refresh; HttpOnly; Secure; SameSite=Strict; no Domain; Max-Age equals returned remaining family seconds. Never overwrite __Secure-spl-refresh. Refresh token is ar1_ plus canonical unpadded base64url of 32 independent random bytes.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBrowserRefreshResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/AccountEntryInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/AccountEntryAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/AccountEntryPolicyDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccountEntryBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/AccountEntryMediaType"
+          },
+          "429": {
+            "$ref": "#/components/responses/AccountEntryRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountBrowserSessionStorageFailure"
+          },
+          "default": {
+            "$ref": "#/components/responses/AccountEntryProblem"
+          }
+        }
+      }
+    },
+    "/auth/accounts/browser/logout": {
+      "post": {
+        "operationId": "accountBrowserLogout",
+        "tags": [
+          "Account browser authentication"
+        ],
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "description": "D-140 independent current Account/browser family, never a Device or Operator. Exact trusted Origin and one fresh bounded ES256 DPoP proof are required; token-bound ath over the exact ab1_ credential. Reject query, If-Match, Idempotency-Key, redirects, BOM, compression except identity, unknown request fields and recursive duplicate names. JSON/UTF-8 only. Browser credentials=omit. Ignore cookies for authentication and identity selection. Confirmed-only true terminal result; already-revoked fresh-proof confirmation grants no general authorization. Unknown revocation permits explicit retained-token/fresh-proof retry while eligible; no cookie is read, set or cleared.",
+        "x-scoplen-request-max-bytes": 256,
+        "x-scoplen-response-max-bytes": 256,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "omit",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "At most 256 complete encoded UTF-8 bytes including whitespace.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountBrowserLogoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "At most 256 complete encoded bytes. Request-bound response.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBrowserLogoutResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/AccountEntryInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/AccountEntryAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/AccountEntryPolicyDenied"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccountEntryBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/AccountEntryMediaType"
+          },
+          "429": {
+            "$ref": "#/components/responses/AccountEntryRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountBrowserLogoutStorageFailure"
+          },
+          "default": {
+            "$ref": "#/components/responses/AccountEntryProblem"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13518,6 +13927,12 @@
         "type": "apiKey",
         "in": "header",
         "name": "DPoP"
+      },
+      "accountBrowserAccess": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Exactly DPoP ab1_<canonical base64url of 32 random bytes>. Lexical parsing grants no identity; check current digest/family/Account/generation/JKT/origin/scope. Never accept Device/Operator JWTs."
       }
     },
     "parameters": {
@@ -15360,6 +15775,164 @@
           "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/InventoryBodyTooLargeProblem"
+            }
+          }
+        }
+      },
+      "AccountBrowserLogoutStorageFailure": {
+        "description": "Known precommit rollback versus unconfirmed COMMIT. Unknown result establishes no success.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "X-Request-Id": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "x-scoplen-response-max-bytes": 4096,
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "const": 503
+                        },
+                        "code": {
+                          "const": "auth.storage_unavailable"
+                        },
+                        "changed": {
+                          "const": false
+                        },
+                        "retryable": {
+                          "const": true
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "const": 503
+                        },
+                        "code": {
+                          "const": "auth.commit_outcome_unknown"
+                        },
+                        "changed": {
+                          "const": true
+                        },
+                        "retryable": {
+                          "const": true
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AccountBrowserSessionStorageFailure": {
+        "description": "Known precommit rollback versus unconfirmed COMMIT. Unknown result establishes no success.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "const": "no-cache"
+            }
+          },
+          "X-Request-Id": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "x-scoplen-response-max-bytes": 4096,
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "const": 503
+                        },
+                        "code": {
+                          "const": "auth.storage_unavailable"
+                        },
+                        "changed": {
+                          "const": false
+                        },
+                        "retryable": {
+                          "const": true
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "const": 503
+                        },
+                        "code": {
+                          "const": "auth.commit_outcome_unknown"
+                        },
+                        "changed": {
+                          "const": true
+                        },
+                        "retryable": {
+                          "const": false
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
             }
           }
         }
@@ -21294,7 +21867,480 @@
           }
         },
         "x-scoplen-max-bytes": 8388608
+      },
+      "AccountBrowserPasswordOptionsRequest": {
+        "$ref": "#/components/schemas/AccountPasswordOptionsRequest"
+      },
+      "AccountBrowserPasswordOptionsResponse": {
+        "$ref": "#/components/schemas/AccountPasswordOptionsResponse"
+      },
+      "AccountBrowserPasswordLoginRequest": {
+        "$ref": "#/components/schemas/AccountPasswordLoginRequest"
+      },
+      "AccountBrowserRefreshRequest": {
+        "$ref": "#/components/schemas/BrowserAuthRefreshRequest"
+      },
+      "AccountBrowserLogoutRequest": {
+        "$ref": "#/components/schemas/OperatorLogoutRequest"
+      },
+      "AccountBrowserLogoutResponse": {
+        "$ref": "#/components/schemas/OperatorLogoutResponse"
+      },
+      "AccountBrowserPasswordLoginResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BrowserAuthTokenResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "access_token": {
+                "type": "string",
+                "pattern": "^ab1_[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+                "minLength": 47,
+                "maxLength": 47
+              },
+              "expires_in": {
+                "type": "integer",
+                "const": 600
+              },
+              "refresh_expires_in": {
+                "type": "integer",
+                "const": 2592000
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "refresh_token"
+                  ]
+                },
+                {
+                  "required": [
+                    "admission_token"
+                  ]
+                },
+                {
+                  "required": [
+                    "snapshot"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "AccountBrowserRefreshResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BrowserAuthTokenResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "access_token": {
+                "type": "string",
+                "pattern": "^ab1_[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+                "minLength": 47,
+                "maxLength": 47
+              },
+              "expires_in": {
+                "type": "integer",
+                "const": 600
+              },
+              "refresh_expires_in": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2592000
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "refresh_token"
+                  ]
+                },
+                {
+                  "required": [
+                    "admission_token"
+                  ]
+                },
+                {
+                  "required": [
+                    "snapshot"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
       }
     }
-  }
+  },
+  "x-scoplen-account-browser-operations": [
+    {
+      "method": "GET",
+      "path": "/api/v1/accounts/me",
+      "scopes": [
+        "account:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs",
+      "scopes": [
+        "orgs:create"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs",
+      "scopes": [
+        "orgs:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}",
+      "scopes": [
+        "orgs:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/orgs/{org}",
+      "scopes": [
+        "orgs:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/invitations",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/invitations",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/invitations/{invitation}",
+      "scopes": [
+        "teams:join",
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/invitations/{invitation}/accept",
+      "scopes": [
+        "teams:join"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/invitations/{invitation}",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/members",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/members/{membership}",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/orgs/{org}/members/{membership}",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/members/{membership}",
+      "scopes": [
+        "teams:join",
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/dissolve",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/hosts",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/hosts/{id}",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/hosts",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{org}/hosts/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/hosts/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/host-groups",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/host-groups/{id}",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/host-groups",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{org}/host-groups/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/host-groups/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/access-profiles",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/access-profiles/{id}",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/access-profiles",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{org}/access-profiles/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/access-profiles/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/routes",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/routes/{id}",
+      "scopes": [
+        "inventory:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/routes",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{org}/routes/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/routes/{id}",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/groups",
+      "scopes": [
+        "policies:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/groups/{id}",
+      "scopes": [
+        "policies:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/groups",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{org}/groups/{id}",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/groups/{id}",
+      "scopes": [
+        "teams:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/policies",
+      "scopes": [
+        "policies:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/policies/{id}",
+      "scopes": [
+        "policies:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/policies",
+      "scopes": [
+        "policies:write"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{org}/policies/{id}",
+      "scopes": [
+        "policies:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/policies/{id}",
+      "scopes": [
+        "policies:write"
+      ],
+      "writerReceipt": false
+    }
+  ]
 }

@@ -10,6 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 pub mod account_admission;
+pub mod account_browser;
 pub mod account_devices;
 pub mod account_profile;
 pub mod account_rate_reference;
