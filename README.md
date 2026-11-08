@@ -1137,11 +1137,14 @@ node --test scripts/generate-inventory-vectors.test.mjs
 node --test crates/scoplen-api/openapi/generate-inventory.test.mjs
 node scripts/generate-account-browser-vectors.mjs --check
 node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
+npm exec --yes --package typescript@5.9.3 -- tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler crates/scoplen-api/openapi/account-browser.types.test.ts
 ```
 
 The OpenAPI generator checks the authored error and authentication schemas and detects drift in
 the generated path list and TypeScript declarations. Run it without `--check` to regenerate those sections;
 the Rust CI matrix runs the drift check on every supported desktop runner.
+The pinned TypeScript check exercises browser-session fields through the public export,
+including required-field and native-credential refusals.
 
 For a paired same-host comparison with OpenSSH under the two required S4 ciphers, run
 `pwsh ./scripts/ssh-throughput.ps1`. Each cipher fails the command when its measured median
