@@ -6,6 +6,10 @@ export interface components {
     UserCaCreateRequest: UserCaCreateRequest;
     UserCaResource: UserCaResource;
     UserCaPage: UserCaPage;
+    UserCaKrl: UserCaKrl;
+    CertificateRevokedProblem: CertificateRevokedProblem;
+    CertificateQuotaExceededProblem: CertificateQuotaExceededProblem;
+    CertificateBodyTooLargeProblem: CertificateBodyTooLargeProblem;
     GroupSource: GroupSource;
     GroupFields: GroupFields;
     GroupCreateRequest: GroupCreateRequest;
@@ -702,6 +706,12 @@ export interface UserCaResource {
   [extension: string]: unknown;
 }
 export interface UserCaPage { items: UserCaResource[]; next_cursor: string | null; [extension: string]: unknown; }
+
+/** Complete raw binary KRL, not JSON; authenticated request and captured CA supply provenance. */
+export type UserCaKrl = Uint8Array;
+export interface CertificateRevokedProblem extends ProblemDetails { status: 409; code: "certificate.revoked"; changed: false; retryable: false; }
+export interface CertificateQuotaExceededProblem extends ProblemDetails { status: 413; code: "certificate.quota_exceeded"; changed: false; retryable: false; }
+export interface CertificateBodyTooLargeProblem extends ProblemDetails { status: 413; code: "certificate.invalid_request"; changed: false; retryable: false; }
 // END GENERATED UserCa
 // BEGIN GENERATED GroupPolicy
 export type GroupSource = "local" | "IdP";

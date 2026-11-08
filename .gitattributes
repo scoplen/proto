@@ -5,4 +5,5 @@ fuzz/corpus/sync_control/seed-organization-view-* -text
 fuzz/corpus/sync_data/seed-organization-view-* -text
 fuzz/corpus/sync_notification/seed-organization-view-* -text
 fuzz/corpus/api_json/seed-user-ca-create-order-v1 -text whitespace=-blank-at-eol
+fuzz/corpus/api_json/seed-user-ca-krl-* -text
 fuzz/corpus/api_json/seed-group-policy-*-whitespace-v1 -text whitespace=-space-before-tab

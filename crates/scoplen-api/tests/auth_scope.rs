@@ -141,7 +141,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 81);
+    assert_eq!(routes.len(), 82);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {
@@ -418,6 +418,7 @@ fn public_user_ca_and_issuance_routes_match_the_authored_scope_contract() {
     for operation in [
         DeviceAccessOperation::UserCaList,
         DeviceAccessOperation::UserCaRead,
+        DeviceAccessOperation::UserCaKrlRead,
         DeviceAccessOperation::UserCaCreate,
         DeviceAccessOperation::UserCertificateIssue,
     ] {

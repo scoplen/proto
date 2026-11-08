@@ -5,17 +5,19 @@ import { generateUserCaTypes, userCaDefinitions } from "./generate-user-ca.mjs";
 
 const collection = "/orgs/{org}/certificate-authorities";
 const individual = `${collection}/{id}`;
+const krl = `${individual}/krl`;
 const fixture = () => {
   const { schemas, responses, paths } = userCaDefinitions();
   return structuredClone({ components: { schemas, responses }, paths });
 };
 
-test("D-137 freezes only three initial local-user-CA operations and precise public metadata", () => {
+test("D-137/D-141 freeze initial local-user-CA metadata and revocation reads", () => {
   const document = fixture();
   const types = generateUserCaTypes(document);
-  assert.deepEqual(Object.keys(document.paths), [collection, individual]);
+  assert.deepEqual(Object.keys(document.paths), [collection, individual, krl]);
   assert.deepEqual(Object.keys(document.paths[collection]), ["get", "post"]);
   assert.deepEqual(Object.keys(document.paths[individual]), ["get"]);
+  assert.deepEqual(Object.keys(document.paths[krl]), ["get"]);
   assert.equal(document.paths[collection].post["x-scoplen-required-device-scope"], "ca:write");
   assert.equal(document.paths[collection].post["x-scoplen-cedar-action"], "manage_ca");
   assert.equal(document.paths[collection].get["x-scoplen-required-device-scope"], "ca:read");
@@ -33,6 +35,50 @@ test("D-137 freezes only three initial local-user-CA operations and precise publ
   assert.match(types, /kind: "user"; backend: "local"; state: "active"/);
   assert.doesNotMatch(types, /private_key|seed:|organization_id:/);
   assert.deepEqual(document.paths[collection].post.security, [{ accessToken: [], dpopProof: [] }]);
+});
+
+test("D-141 KRL read is binary and current-member scoped without browser or admin substitution", () => {
+  const document = fixture();
+  const operation = document.paths[krl].get;
+  assert.equal(operation["x-scoplen-required-device-scope"], "ca:read");
+  assert.equal(operation["x-scoplen-cedar-action"], undefined);
+  assert.deepEqual(operation.security, [{ accessToken: [], dpopProof: [] }]);
+  assert.equal(operation["x-scoplen-response-max-bytes"], 4194304);
+  assert.equal(operation.requestBody, undefined);
+  assert.deepEqual(operation.parameters.map(p => p.name), ["org", "id"]);
+  const success = operation.responses["200"];
+  assert.deepEqual(Object.keys(success.content), ["application/octet-stream"]);
+  assert.equal(success.content["application/octet-stream"].schema.$ref, "#/components/schemas/UserCaKrl");
+  assert.equal(success.headers.ETag, undefined);
+  assert.equal(success.headers["Cache-Control"].schema.const, "no-store");
+  assert.equal(success.headers.Pragma.schema.const, "no-cache");
+  assert.equal(success.headers["X-Request-ID"].required, true);
+  assert.equal(operation.responses["304"], undefined);
+  assert.equal(operation.responses["206"], undefined);
+  assert.match(operation.description, /dissolved Organization/);
+  assert.match(operation.description, /never an empty KRL/);
+  assert.match(generateUserCaTypes(document), /UserCaKrl = Uint8Array/);
+});
+
+test("D-141 exact terminal problems distinguish historical revocation and quota from syntax", () => {
+  const { schemas, responses } = userCaDefinitions();
+  for (const [name, status, code] of [
+    ["CertificateRevokedProblem", 409, "certificate.revoked"],
+    ["CertificateQuotaExceededProblem", 413, "certificate.quota_exceeded"],
+    ["CertificateBodyTooLargeProblem", 413, "certificate.invalid_request"],
+  ]) {
+    assert.deepEqual(schemas[name].allOf[1].properties, {
+      status: { const: status }, code: { const: code }, changed: { const: false }, retryable: { const: false },
+    });
+  }
+  assert.deepEqual(responses.CertificateTooLarge.content["application/problem+json"].schema.oneOf, [
+    { $ref: "#/components/schemas/CertificateBodyTooLargeProblem" },
+    { $ref: "#/components/schemas/CertificateQuotaExceededProblem" },
+  ]);
+  assert.deepEqual(responses.CertificateConflict.content["application/problem+json"].schema.oneOf, [
+    { $ref: "#/components/schemas/OrganizationConflictProblem" },
+    { $ref: "#/components/schemas/CertificateRevokedProblem" },
+  ]);
 });
 
 for (const [name, mutate] of [
@@ -61,6 +107,15 @@ for (const [name, mutate] of [
   ["create-unknown-commit", d => { d.paths[collection].post.responses["503"].content["application/problem+json"].schema.oneOf.pop(); }],
   ["generic-patch", d => { d.paths[individual].patch = {}; }],
   ["generic-delete", d => { d.paths[individual].delete = {}; }],
+  ["krl-scope", d => { d.paths[krl].get["x-scoplen-required-device-scope"] = "ca:write"; }],
+  ["krl-body", d => { d.paths[krl].get.requestBody = {}; }],
+  ["krl-bound", d => { d.paths[krl].get["x-scoplen-response-max-bytes"]++; }],
+  ["krl-json", d => { d.paths[krl].get.responses["200"].content = { "application/json": {} }; }],
+  ["krl-cache", d => { delete d.paths[krl].get.responses["200"].headers.Pragma; }],
+  ["krl-absence", d => { d.paths[krl].get.responses["503"].content["application/problem+json"].schema = { type: "null" }; }],
+  ["revoked-retry", d => { d.components.schemas.CertificateRevokedProblem.allOf[1].properties.retryable.const = true; }],
+  ["quota-status", d => { d.components.schemas.CertificateQuotaExceededProblem.allOf[1].properties.status.const = 429; }],
+  ["quota-syntax", d => { d.components.responses.CertificateTooLarge.content["application/problem+json"].schema.oneOf.shift(); }],
 ]) test(`D-137 detects user-CA ${name} drift`, () => {
   const document = fixture(); mutate(document);
   assert.throws(() => generateUserCaTypes(document), /D-137 user-CA/);

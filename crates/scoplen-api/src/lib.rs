@@ -17,6 +17,7 @@ pub mod account_rate_reference;
 pub mod account_registration_reference;
 pub mod auth;
 pub mod certificate;
+pub mod certificate_reference;
 pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
@@ -24,6 +25,7 @@ pub mod group_policy;
 #[cfg(feature = "internal-grpc")]
 pub mod internal_grpc;
 pub mod inventory;
+pub mod krl;
 pub mod operator_auth;
 pub mod operator_logout_reference;
 pub mod organization;
@@ -82,6 +84,8 @@ pub const ERROR_CODES: &[&str] = &[
     "auth.storage_unavailable",
     "auth.use_dpop_nonce",
     "certificate.invalid_request",
+    "certificate.quota_exceeded",
+    "certificate.revoked",
     "gateway.invalid_request",
     "organization.commit_outcome_unknown",
     "organization.conflict",

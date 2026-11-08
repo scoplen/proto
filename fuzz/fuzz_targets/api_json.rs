@@ -34,6 +34,7 @@ use scoplen_api::inventory::{
     InventoryCreateRequest, InventoryFields, InventoryPage, InventoryReplaceRequest,
     InventoryResource, InventoryType,
 };
+use scoplen_api::krl::UserCaKrl;
 use scoplen_api::operator_auth::{
     OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
     OperatorLogoutRequest, OperatorLogoutResponse, OperatorSetupFinishRequest,
@@ -85,6 +86,12 @@ macro_rules! canonical_round_trip {
 }
 
 fuzz_target!(|bytes: &[u8]| {
+    let ca = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea";
+    if let Ok(snapshot) = UserCaKrl::from_bytes(bytes, ca) {
+        let encoded = snapshot.to_bytes().expect("validated KRL encodes");
+        assert_eq!(encoded, bytes);
+        assert_eq!(UserCaKrl::from_bytes(&encoded, ca), Ok(snapshot));
+    }
     if let Ok(problem) = ProblemDetails::from_json(bytes, MAX_ACCOUNT_ENTRY_PROBLEM_BYTES) {
         let encoded = serde_json::to_vec(&problem).expect("validated problem encodes");
         assert_eq!(

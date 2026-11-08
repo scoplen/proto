@@ -167,7 +167,7 @@ fn every_truncated_nonempty_snapshot_is_refused_except_its_valid_empty_header() 
     for len in 0..bytes.len() {
         if len == 44 {
             let empty = UserCaKrl::from_bytes(&bytes[..len], CA).unwrap();
-            assert!(empty.revoked_serials().is_empty());
+            assert_eq!(empty.revoked_serials(), &[] as &[u64]);
         } else {
             assert!(UserCaKrl::from_bytes(&bytes[..len], CA).is_err(), "length {len}");
         }

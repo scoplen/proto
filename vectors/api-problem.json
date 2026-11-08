@@ -115,6 +115,30 @@
       "kind": "api.problem.cbor",
       "input": "{\"type\":\"about:blank\",\"title\":\"Account-key outcome unknown\",\"status\":503,\"detail\":\"The account-key update may have committed. Keep local keys and the exact signed request; retrieve and verify the current bundle first. Recover explicitly with fresh DPoP and current authorization; do not automatically replay.\",\"instance\":\"sync-keys-unknown-1\",\"code\":\"sync.storage_unavailable\",\"changed\":true,\"retryable\":false}",
       "expected": "a864636f6465781873796e632e73746f726167655f756e617661696c61626c6564747970656b61626f75743a626c616e6b657469746c65781b4163636f756e742d6b6579206f7574636f6d6520756e6b6e6f776e6664657461696c78e1546865206163636f756e742d6b657920757064617465206d6179206861766520636f6d6d69747465642e204b656570206c6f63616c206b65797320616e6420746865206578616374207369676e656420726571756573743b20726574726965766520616e6420766572696679207468652063757272656e742062756e646c652066697273742e205265636f766572206578706c696369746c7920776974682066726573682044506f5020616e642063757272656e7420617574686f72697a6174696f6e3b20646f206e6f74206175746f6d61746963616c6c79207265706c61792e667374617475731901f7676368616e676564f568696e7374616e63657373796e632d6b6579732d756e6b6e6f776e2d3169726574727961626c65f4"
+    },
+    {
+      "id": "api-problem-certificate-revoked-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Certificate revoked\",\"status\":409,\"detail\":\"The original certificate was revoked. No new certificate was issued. Review access and start a new connection explicitly; replaying this request will not restore it.\",\"instance\":\"revoked-1\",\"code\":\"certificate.revoked\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Certificate revoked\",\"status\":409,\"detail\":\"The original certificate was revoked. No new certificate was issued. Review access and start a new connection explicitly; replaying this request will not restore it.\",\"instance\":\"revoked-1\",\"code\":\"certificate.revoked\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-certificate-revoked-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Certificate revoked\",\"status\":409,\"detail\":\"The original certificate was revoked. No new certificate was issued. Review access and start a new connection explicitly; replaying this request will not restore it.\",\"instance\":\"revoked-1\",\"code\":\"certificate.revoked\",\"changed\":false,\"retryable\":false}",
+      "expected": "a864636f64657363657274696669636174652e7265766f6b656464747970656b61626f75743a626c616e6b657469746c65734365727469666963617465207265766f6b65646664657461696c78a5546865206f726967696e616c20636572746966696361746520776173207265766f6b65642e204e6f206e657720636572746966696361746520776173206973737565642e205265766965772061636365737320616e642073746172742061206e657720636f6e6e656374696f6e206578706c696369746c793b207265706c6179696e67207468697320726571756573742077696c6c206e6f7420726573746f72652069742e66737461747573190199676368616e676564f468696e7374616e6365697265766f6b65642d3169726574727961626c65f4"
+    },
+    {
+      "id": "api-problem-certificate-quota-exceeded-json",
+      "kind": "api.problem.json",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Certificate quota exceeded\",\"status\":413,\"detail\":\"No certificate was issued. Wait for existing certificates to expire before starting a new connection; do not automatically replay this request.\",\"instance\":\"quota_exceeded-1\",\"code\":\"certificate.quota_exceeded\",\"changed\":false,\"retryable\":false}",
+      "expected": "{\"type\":\"about:blank\",\"title\":\"Certificate quota exceeded\",\"status\":413,\"detail\":\"No certificate was issued. Wait for existing certificates to expire before starting a new connection; do not automatically replay this request.\",\"instance\":\"quota_exceeded-1\",\"code\":\"certificate.quota_exceeded\",\"changed\":false,\"retryable\":false}"
+    },
+    {
+      "id": "api-problem-certificate-quota-exceeded-cbor",
+      "kind": "api.problem.cbor",
+      "input": "{\"type\":\"about:blank\",\"title\":\"Certificate quota exceeded\",\"status\":413,\"detail\":\"No certificate was issued. Wait for existing certificates to expire before starting a new connection; do not automatically replay this request.\",\"instance\":\"quota_exceeded-1\",\"code\":\"certificate.quota_exceeded\",\"changed\":false,\"retryable\":false}",
+      "expected": "a864636f6465781a63657274696669636174652e71756f74615f657863656564656464747970656b61626f75743a626c616e6b657469746c65781a43657274696669636174652071756f74612065786365656465646664657461696c788f4e6f20636572746966696361746520776173206973737565642e205761697420666f72206578697374696e672063657274696669636174657320746f20657870697265206265666f7265207374617274696e672061206e657720636f6e6e656374696f6e3b20646f206e6f74206175746f6d61746963616c6c79207265706c6179207468697320726571756573742e6673746174757319019d676368616e676564f468696e7374616e63657071756f74615f65786365656465642d3169726574727961626c65f4"
     }
   ]
 }

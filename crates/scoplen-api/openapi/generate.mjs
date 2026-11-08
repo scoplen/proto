@@ -393,7 +393,9 @@ if (certificatePost?.operationId !== "createCertificates" ||
     !certificatePost.responses?.["201"]?.headers?.ETag?.description?.includes("exactly equal") ||
     certificatePost.responses?.["201"]?.headers?.["Cache-Control"]?.schema?.const !== "no-store" ||
     certificatePost.responses?.["201"]?.headers?.Pragma?.schema?.const !== "no-cache" ||
-    !["400", "413", "default"].every((status) => certificatePost.responses?.[status]?.$ref === "#/components/responses/Problem") ||
+    !["400", "default"].every((status) => certificatePost.responses?.[status]?.$ref === "#/components/responses/Problem") ||
+    certificatePost.responses?.["409"]?.$ref !== "#/components/responses/CertificateConflict" ||
+    certificatePost.responses?.["413"]?.$ref !== "#/components/responses/CertificateTooLarge" ||
     JSON.stringify(refs(certificate)) !== JSON.stringify(certificateVariants.map((name) => `#/components/schemas/${name}`))) {
   throw new Error("certificate issuance endpoint differs from D-88");
 }

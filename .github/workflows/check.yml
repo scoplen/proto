@@ -35,11 +35,12 @@ jobs:
         run: node --test crates/scoplen-api/openapi/generate-account-admission.test.mjs
       - name: Test Account browser OpenAPI contract checks
         run: node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
-      - name: Test Account browser public TypeScript contract
+      - name: Test browser and user-CA public TypeScript contracts
         run: >-
           npm exec --yes --package typescript@5.9.3 --
           tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler
           crates/scoplen-api/openapi/account-browser.types.test.ts
+          crates/scoplen-api/openapi/user-ca-krl.types.test.ts
       - name: Check Account browser vectors and parser bounds
         run: node scripts/generate-account-browser-vectors.mjs --check
       - name: Check Account entry vectors and parser bounds
@@ -70,6 +71,14 @@ jobs:
         run: node --test scripts/generate-organization-view-vectors.test.mjs
       - name: Check public user-CA vectors and parser seeds
         run: node scripts/generate-user-ca-vectors.mjs --check
+      - name: Check user-CA revocation vectors
+        run: node scripts/generate-user-ca-krl-vectors.mjs --check
+      - name: Check certificate problem vectors
+        run: node scripts/generate-certificate-problem-vectors.mjs --check
+      - name: Test certificate problem vector preservation
+        run: node --test scripts/generate-certificate-problem-vectors.test.mjs
+      - name: Test user-CA KRL producer and OpenSSH queries
+        run: node --test scripts/generate-user-ca-krl-vectors.test.mjs scripts/user-ca-krl-openssh.test.mjs
       - name: Test public user-CA contracts and independent producer
         run: node --test crates/scoplen-api/openapi/generate-user-ca*.test.mjs scripts/generate-user-ca-vectors.test.mjs
       - name: Check used Account-id digest vectors

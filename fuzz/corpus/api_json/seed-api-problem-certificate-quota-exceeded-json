@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Certificate quota exceeded","status":413,"detail":"No certificate was issued. Wait for existing certificates to expire before starting a new connection; do not automatically replay this request.","instance":"quota_exceeded-1","code":"certificate.quota_exceeded","changed":false,"retryable":false}
