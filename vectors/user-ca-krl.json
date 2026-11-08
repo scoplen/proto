@@ -1,0 +1,402 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "user-ca-krl-empty-v1",
+      "kind": "user_ca.krl.bytes",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"version\":\"1\",\"generated_at_seconds\":\"1762646400\",\"serials\":[]}",
+      "expected": "5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000"
+    },
+    {
+      "id": "user-ca-krl-one-v1",
+      "kind": "user_ca.krl.bytes",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"version\":\"1\",\"generated_at_seconds\":\"1762646400\",\"serials\":[\"1\"]}",
+      "expected": "5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000048000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a0000000020000000080000000000000001"
+    },
+    {
+      "id": "user-ca-krl-discrete-v1",
+      "kind": "user_ca.krl.bytes",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"version\":\"1\",\"generated_at_seconds\":\"1762646400\",\"serials\":[\"1\",\"256\",\"18446744073709551615\"]}",
+      "expected": "5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff"
+    },
+    {
+      "id": "user-ca-krl-uint64-header-v1",
+      "kind": "user_ca.krl.bytes",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"version\":\"18446744073709551615\",\"generated_at_seconds\":\"18446744073709551615\",\"serials\":[\"18446744073709551615\"]}",
+      "expected": "5353484b524c0a0000000001ffffffffffffffffffffffffffffffff000000000000000000000000000000000100000048000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a000000002000000008ffffffffffffffff"
+    },
+    {
+      "id": "user-ca-krl-epoch-zero-v1",
+      "kind": "user_ca.krl.bytes",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"version\":\"1\",\"generated_at_seconds\":\"0\",\"serials\":[]}",
+      "expected": "5353484b524c0a00000000010000000000000001000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "user-ca-krl-foreign-empty-binding-v1",
+      "kind": "user_ca.krl.bytes",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID1AF8PoQ4lakrcKp00bfrycmCzPLsSWjMDNVfEq9GYM\",\"version\":\"1\",\"generated_at_seconds\":\"1762646400\",\"serials\":[]}",
+      "expected": "5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000"
+    },
+    {
+      "id": "user-ca-krl-magic-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"0053484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-format-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000002000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-zero-version-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000000000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-flags-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000100000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-reserved-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000178000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-comment-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000001780100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-section-length-small-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000057000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-section-length-large-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000059000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-section-length-u32-max-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd9800000000000000000000000000000000001ffffffff000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-ca-length-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000320000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-ca-wildcard-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd9800000000000000000000000000000000001000000250000000000000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-section-reserved-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000001200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-serial-length-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001700000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-serial-zero-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000048000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a0000000020000000080000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-serial-duplicate-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000050000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001000000000000000010000000000000001\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-serial-descending-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000050000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001000000000000000020000000000000001\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-empty-subsection-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000040000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a000000002000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-duplicate-section-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff0100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-duplicate-subsection-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000075000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-trailing-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff00\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-outer-2-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000200000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-outer-3-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000300000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-outer-4-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000400000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-outer-5-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000500000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-outer-255-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000ff00000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-subsection-33-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000210000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-subsection-34-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000220000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-subsection-35-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000230000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-subsection-57-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000390000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-0-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-7-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-8-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a00\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-11-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a00000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-19-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a000000000100000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-27-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd9\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-35-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-39-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd9800000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-43-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-48-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd9800000000000000000000000000000000001000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-52-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-103-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f70751\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-107-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-108-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-112-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a0000000020000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-truncated-136-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-wrong-ca-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID1AF8PoQ4lakrcKp00bfrycmCzPLsSWjMDNVfEq9GYM\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-expected-ca-comment-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea fixture\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-empty-expected-ca-comment-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea fixture\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-expected-ca-newline-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\\n\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-empty-expected-ca-newline-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\\n\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-expected-ca-space-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519  AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-empty-expected-ca-space-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519  AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-expected-ca-algorithm-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-rsa AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-empty-expected-ca-algorithm-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-rsa AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-expected-ca-invalid-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 invalid\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd980000000000000000000000000000000000100000058000000330000000b7373682d6564323535313900000020d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a00000000200000001800000000000000010000000000000100ffffffffffffffff\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-empty-expected-ca-invalid-v1",
+      "kind": "user_ca.krl.reject",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 invalid\",\"hex\":\"5353484b524c0a0000000001000000000000000100000000690fd98000000000000000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "user-ca-krl-count-100000-v1",
+      "kind": "user_ca.krl.bound",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"count\":100000}",
+      "expected": "accepted"
+    },
+    {
+      "id": "user-ca-krl-count-100001-v1",
+      "kind": "user_ca.krl.bound",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"count\":100001}",
+      "expected": "too-many-serials"
+    },
+    {
+      "id": "user-ca-krl-bytes-4194304-v1",
+      "kind": "user_ca.krl.bound",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"bytes\":4194304}",
+      "expected": "invalid-format"
+    },
+    {
+      "id": "user-ca-krl-bytes-4194305-v1",
+      "kind": "user_ca.krl.bound",
+      "input": "{\"ca_public_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea\",\"bytes\":4194305}",
+      "expected": "input-too-large"
+    }
+  ]
+}

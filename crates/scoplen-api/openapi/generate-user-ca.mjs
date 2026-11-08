@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// D-137 initial public local-user-CA metadata; signing custody remains server-internal.
+// D-137 public local-user-CA metadata and D-141 revocation; signing custody remains internal.
 import { isDeepStrictEqual } from "node:util";
 
 const uuid = { type: "string", format: "uuid", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" };
@@ -34,6 +34,12 @@ const failures = mutation => ({
 const authority = "Require current Account/Device and active same-Organization membership, actual-method/trusted-URL token-bound DPoP and durable replay protection. JWT Organization snapshots, cached metadata and roles never supply current authority. No refresh cookie is read or changed. ";
 const readBoundary = "Public trust reads require ca:read and current membership; they grant no inventory visibility or certificate issuance. Retain the authenticated origin/Account/Organization/Device request provenance: the Resource has no echoed Organization field. Missing, foreign and inaccessible resources use the same static organization.not_found. ";
 
+const certificateProblems = [
+  ["CertificateRevokedProblem", 409, "certificate.revoked"],
+  ["CertificateQuotaExceededProblem", 413, "certificate.quota_exceeded"],
+  ["CertificateBodyTooLargeProblem", 413, "certificate.invalid_request"],
+];
+
 export function userCaDefinitions() {
   const schemas = {
     UserCaCreateRequest: { ...object({ id: uuid, data: object({ kind: { type: "string", const: "user" }, backend: { type: "string", const: "local" } }, true) }, true), "x-scoplen-max-bytes": 16384 },
@@ -55,6 +61,25 @@ export function userCaDefinitions() {
         next_cursor: { anyOf: [uuid, { type: "null" }], description: "Non-null only if more eligible items exist; equals the last returned id of a nonempty Page." },
       }),
       "x-scoplen-max-bytes": 1048576,
+    },
+    UserCaKrl: {
+      type: "string", format: "binary", maxLength: 4194304,
+      description: "Complete raw OpenSSH KRL v1 subset, <=4194304 bytes. Positive persistent uint64 version, uint64 generation Unix seconds, zero flags and empty reserved/comment. Empty set: 44-byte header only. Nonempty: one exact Ed25519 CA certificate section and one ascending unique positive uint64 serial list, <=100000 entries (800113 bytes). No wildcard CA, other sections or trailing bytes. Authenticated request provenance and captured CA supply binding, including the header-only case; parsing grants no current authority. No KRL signatures, JSON wrapper or new HTTP version field.",
+    },
+  };
+  for (const [name, status, code] of certificateProblems) {
+    schemas[name] = { allOf: [ref("ProblemDetails"), { type: "object", properties: {
+      status: { const: status }, code: { const: code }, changed: { const: false }, retryable: { const: false },
+    } }] };
+  }
+  const responses = {
+    CertificateConflict: {
+      description: "409 organization.conflict for mismatched original receipt bindings, or certificate.revoked for a strictly bound original receipt whose serial was revoked, after current Device/member/target authorization. The revoked response makes no new issuance; it does not claim the historical issuance never committed. Retain the receipt; never return, re-sign or extend its old certificate. Only a captured source-bound definite response terminates that pending client operation, with an explicit new connection required.",
+      headers, content: { "application/problem+json": { schema: { oneOf: [ref("OrganizationConflictProblem"), ref("CertificateRevokedProblem")] } } },
+    },
+    CertificateTooLarge: {
+      description: "413 certificate.invalid_request for a complete request over 16384 bytes, or certificate.quota_exceeded when 100000 unexpired certificates already exist for the CA, including revoked entries. Current authority and exact nonrevoked receipt replay precede the cap. Quota refusal allocates no serial and writes no certificate/receipt/issuance audit. Both have changed=false/retryable=false; consumers inspect the exact code rather than HTTP status alone.",
+      headers, content: { "application/problem+json": { schema: { oneOf: [ref("CertificateBodyTooLargeProblem"), ref("CertificateQuotaExceededProblem")] } } },
     },
   };
   const paths = {
@@ -81,8 +106,19 @@ export function userCaDefinitions() {
         responses: { "200": success("UserCaResource", true), ...failures(false) },
       },
     },
+    "/orgs/{org}/certificate-authorities/{id}/krl": {
+      get: {
+        operationId: "getUserCaKrl", security, "x-scoplen-required-device-scope": "ca:read", "x-scoplen-response-max-bytes": 4194304,
+        description: `${authority}Require exactly ca:read and active same-Organization membership, not manage_ca or an inventory permit. Reject body, every query, If-Match and Idempotency-Key. Return only the complete persisted snapshot; no partial response, 304 or HTTP ETag. Capture origin/Account/Organization/Device/CA provenance and compare the embedded public CA when present. Missing/foreign CA, inactive/removed membership and dissolved Organization share the static organization.not_found boundary. Missing, corrupt, unsupported, oversized or incompletely read snapshots are organization.storage_unavailable, never an empty KRL. GET preserves version/time/bytes. Membership suspension/removal/self-leave and dissolution atomically persist CA-scoped serial revocations; restoration/rejoin never clears old revocations. This Device operation accepts no Account-browser or Operator substitute and supplies no host-agent delivery, post-dissolution read or existing-session termination.`,
+        parameters: [org, { name: "id", in: "path", required: true, schema: uuid }],
+        responses: {
+          "200": { description: "Complete persisted raw KRL <=4194304 bytes, application/octet-stream; header version/time belong to this CA. No-store; an authenticated empty snapshot is not a missing snapshot.", headers, content: { "application/octet-stream": { schema: ref("UserCaKrl") } } },
+          ...failures(false),
+        },
+      },
+    },
   };
-  return { schemas, responses: {}, paths };
+  return { schemas, responses, paths };
 }
 
 export function generateUserCaTypes(document) {
@@ -101,5 +137,9 @@ export function generateUserCaTypes(document) {
     '  data: { kind: "user"; backend: "local"; state: "active"; public_key: string; fingerprint: string; [extension: string]: unknown };',
     "  [extension: string]: unknown;", "}",
     "export interface UserCaPage { items: UserCaResource[]; next_cursor: string | null; [extension: string]: unknown; }", "",
+    "/** Complete raw binary KRL, not JSON; authenticated request and captured CA supply provenance. */",
+    "export type UserCaKrl = Uint8Array;",
+    ...certificateProblems.map(([name, status, code]) =>
+      `export interface ${name} extends ProblemDetails { status: ${status}; code: "${code}"; changed: false; retryable: false; }`), "",
   ].join("\n");
 }

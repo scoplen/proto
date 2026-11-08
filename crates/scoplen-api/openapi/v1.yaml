@@ -9903,10 +9903,10 @@
             "$ref": "#/components/responses/OrganizationNotFound"
           },
           "409": {
-            "$ref": "#/components/responses/OrganizationConflict"
+            "$ref": "#/components/responses/CertificateConflict"
           },
           "413": {
-            "$ref": "#/components/responses/Problem"
+            "$ref": "#/components/responses/CertificateTooLarge"
           },
           "415": {
             "$ref": "#/components/responses/OrganizationContentType"
@@ -9967,7 +9967,7 @@
         "x-scoplen-required-device-scope": "certificates:issue",
         "x-scoplen-request-max-bytes": 16384,
         "x-scoplen-response-max-bytes": 131072,
-        "description": "Require certificates:issue, current Account/Device/active Membership, actual-method/trusted-URL token-bound DPoP and durable replay protection. Recheck every scoped Host/HostGroup target read/connect decision, including every current group Host, and the current active same-Organization user CA. Reject queries and If-Match. The D-88 request has no route/profile field; trusted route_kind=\"direct\" supplies unmanaged-path context. Deny unmet grant, approval, hardware or managed-route conditions; require an explicit current policy permit. The configured TTL defaults to 1800 seconds and never exceeds 86400. Bind the canonical UUIDv7 Idempotency-Key and 24-hour receipt to origin/Account/Device/Organization, original method/path and canonical D-88 body. Under the Organization authority lock, allocate a unique positive uint64 CA serial and atomically persist issuance, receipt and exactly one audit. Publish only after confirmed commit. Exact original-key/body replay rechecks current membership and all target authority before returning the original certificate without a new serial or extended expiry. It cannot restore removed authority. Unknown COMMIT permits explicit original-key/body confirmation only, never automatic key replacement. Syntactic 400/413 errors retain certificate.invalid_request."
+        "description": "Require certificates:issue, current Account/Device/active Membership, actual-method/trusted-URL token-bound DPoP and durable replay protection. Recheck every scoped Host/HostGroup target read/connect decision, including every current group Host, and the current active same-Organization user CA. Reject queries and If-Match. The D-88 request has no route/profile field; trusted route_kind=\"direct\" supplies unmanaged-path context. Deny unmet grant, approval, hardware or managed-route conditions; require an explicit current policy permit. The configured TTL defaults to 1800 seconds and never exceeds 86400. Bind the canonical UUIDv7 Idempotency-Key and 24-hour receipt to origin/Account/Device/Organization, original method/path and canonical D-88 body. Under the Organization authority lock, allocate a unique positive uint64 CA serial and atomically persist issuance, receipt and exactly one audit. Publish only after confirmed commit. Exact original-key/body replay rechecks current membership and all target authority before returning the original certificate without a new serial or extended expiry. It cannot restore removed authority. Unknown COMMIT permits explicit original-key/body confirmation only, never automatic key replacement. Syntactic 400/413 errors retain certificate.invalid_request. D-141 rechecks current authority and exact receipt bindings before revoked-receipt termination. An exact nonrevoked receipt returns before the per-CA cap of 100000 unexpired issuances (including revoked); quota refusal precedes serial allocation and certificate/receipt/issuance audit mutation. A definite revoked response requires an explicit new client connection, never automatic request replacement."
       }
     },
     "/orgs/{org}/certificates/{id}": {
@@ -10868,29 +10868,149 @@
     },
     "/orgs/{org}/certificate-authorities/{id}/krl": {
       "get": {
-        "operationId": "getCertificateRevocationList",
+        "operationId": "getUserCaKrl",
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-device-scope": "ca:read",
+        "x-scoplen-response-max-bytes": 4194304,
+        "description": "Require current Account/Device and active same-Organization membership, actual-method/trusted-URL token-bound DPoP and durable replay protection. JWT Organization snapshots, cached metadata and roles never supply current authority. No refresh cookie is read or changed. Require exactly ca:read and active same-Organization membership, not manage_ca or an inventory permit. Reject body, every query, If-Match and Idempotency-Key. Return only the complete persisted snapshot; no partial response, 304 or HTTP ETag. Capture origin/Account/Organization/Device/CA provenance and compare the embedded public CA when present. Missing/foreign CA, inactive/removed membership and dissolved Organization share the static organization.not_found boundary. Missing, corrupt, unsupported, oversized or incompletely read snapshots are organization.storage_unavailable, never an empty KRL. GET preserves version/time/bytes. Membership suspension/removal/self-leave and dissolution atomically persist CA-scoped serial revocations; restoration/rejoin never clears old revocations. This Device operation accepts no Account-browser or Operator substitute and supplies no host-agent delivery, post-dissolution read or existing-session termination.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/id"
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "OpenSSH KRL",
+            "description": "Complete persisted raw KRL <=4194304 bytes, application/octet-stream; header version/time belong to this CA. No-store; an authenticated empty snapshot is not a missing snapshot.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
             "content": {
               "application/octet-stream": {
                 "schema": {
+                  "$ref": "#/components/schemas/UserCaKrl"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "description": "503 organization.storage_unavailable, changed=false/retryable=true. No partial success or false absence.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
                   "type": "string",
-                  "format": "binary"
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
                 }
               }
             }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Shared bounded problem <=4096 bytes, with no-store/no-cache/X-Request-ID. No private key, Account data or foreign-tenant existence signal.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -14013,6 +14133,86 @@
       }
     },
     "responses": {
+      "CertificateConflict": {
+        "description": "409 organization.conflict for mismatched original receipt bindings, or certificate.revoked for a strictly bound original receipt whose serial was revoked, after current Device/member/target authorization. The revoked response makes no new issuance; it does not claim the historical issuance never committed. Retain the receipt; never return, re-sign or extend its old certificate. Only a captured source-bound definite response terminates that pending client operation, with an explicit new connection required.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/OrganizationConflictProblem"
+                },
+                {
+                  "$ref": "#/components/schemas/CertificateRevokedProblem"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "CertificateTooLarge": {
+        "description": "413 certificate.invalid_request for a complete request over 16384 bytes, or certificate.quota_exceeded when 100000 unexpired certificates already exist for the CA, including revoked entries. Current authority and exact nonrevoked receipt replay precede the cap. Quota refusal allocates no serial and writes no certificate/receipt/issuance audit. Both have changed=false/retryable=false; consumers inspect the exact code rather than HTTP status alone.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/CertificateBodyTooLargeProblem"
+                },
+                {
+                  "$ref": "#/components/schemas/CertificateQuotaExceededProblem"
+                }
+              ]
+            }
+          }
+        }
+      },
       "Resource": {
         "description": "Resource",
         "headers": {
@@ -15939,6 +16139,84 @@
       }
     },
     "schemas": {
+      "UserCaKrl": {
+        "type": "string",
+        "format": "binary",
+        "maxLength": 4194304,
+        "description": "Complete raw OpenSSH KRL v1 subset, <=4194304 bytes. Positive persistent uint64 version, uint64 generation Unix seconds, zero flags and empty reserved/comment. Empty set: 44-byte header only. Nonempty: one exact Ed25519 CA certificate section and one ascending unique positive uint64 serial list, <=100000 entries (800113 bytes). No wildcard CA, other sections or trailing bytes. Authenticated request provenance and captured CA supply binding, including the header-only case; parsing grants no current authority. No KRL signatures, JSON wrapper or new HTTP version field."
+      },
+      "CertificateRevokedProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "code": {
+                "const": "certificate.revoked"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "CertificateQuotaExceededProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 413
+              },
+              "code": {
+                "const": "certificate.quota_exceeded"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "CertificateBodyTooLargeProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 413
+              },
+              "code": {
+                "const": "certificate.invalid_request"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
       "AuthJwk": {
         "type": "object",
         "required": [

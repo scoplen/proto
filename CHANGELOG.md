@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-141's bounded initial OpenSSH KRL serial-list codec, authenticated Device read mapping,
+  distinct revoked/quota problems, independent vectors and generated API types. A narrow
+  reference peer models current-authority receipt recovery, membership revocation and fresh
+  serials after rejoin; real OpenSSH query checks validate the encoded profile. Production
+  lifecycle transactions, Host installation and automated delivery remain consumer outcomes.
+
 - Add a thin shared Rust/WebAssembly adapter for D-140's authentication-secret derivation,
   D-136 invitation helper and strict D-137 simple-rule generator. Pin the Rust target and
   matching bindings CLI, generate a private local consumer package and check its actual

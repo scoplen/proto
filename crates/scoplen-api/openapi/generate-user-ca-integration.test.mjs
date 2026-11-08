@@ -32,9 +32,9 @@ test("issuance preserves D-88 and D-90 with current authority and original recei
   assert.equal(issue.requestBody.content["application/json"].schema.$ref, "#/components/schemas/CertificateRequest");
   assert.equal(issue.responses["201"].content["application/json"].schema.$ref, "#/components/schemas/CertificateIssuanceResponse");
   assert.equal(issue.responses["201"].headers["X-Request-ID"].required, true);
-  for (const status of ["400", "413"]) {
-    assert.equal(issue.responses[status].$ref, "#/components/responses/Problem");
-  }
+  assert.equal(issue.responses["400"].$ref, "#/components/responses/Problem");
+  assert.equal(issue.responses["409"].$ref, "#/components/responses/CertificateConflict");
+  assert.equal(issue.responses["413"].$ref, "#/components/responses/CertificateTooLarge");
   assert.deepEqual(issue.responses["503"].content["application/problem+json"].schema.oneOf, [
     { $ref: "#/components/schemas/OrganizationStorageUnavailableProblem" },
     { $ref: "#/components/schemas/OrganizationCommitOutcomeUnknownProblem" },

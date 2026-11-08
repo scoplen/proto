@@ -168,6 +168,20 @@ Device ceiling contains the seventeen frozen D-137 scopes; old refresh families 
 authentication rather than a widened refresh. These shared contracts neither hold a private
 CA seed nor implement production provisioning, signing, durable receipts or native team SSH.
 
+D-141's `krl` module encodes and strictly reads the initial unsigned OpenSSH v1 serial-list
+profile, including the valid header-only empty snapshot. Input is bounded at 4 MiB and
+100,000 ascending unique positive serials; the captured canonical Ed25519 CA and authenticated
+request retain provenance, including for empty snapshots. HTTP metadata helpers require the
+binary content type and no-store/no-cache/request-id headers. The exact Device KRL read reuses
+`ca:read` without widening browser operations or initial scope strings. The distinct
+`certificate.revoked` and `certificate.quota_exceeded` problems have definite nonmutating
+confirmation semantics; the latter differs from request-body 413 syntax refusal.
+`certificate_reference` models current fixture authority, immutable original issuance receipts,
+membership serial revocation and restored-member issuance with scripted transaction outcomes.
+It supplies no real certificate signing, DPoP, database or HTTP service. Independent vectors,
+OpenSSH queries and generated contracts do not establish production membership transactions,
+Host installation, automatic KRL delivery or termination of existing SSH sessions.
+
 `TeamReferencePeer` is a bounded independent D-136 fixture using the real codecs, K-2 verifier
 and Cedar authorizer. It models designated-recipient attempts/lockout, current issuer and
 Owner restrictions, member suspension/removal/re-invitation, self-leave, dissolution and exact
@@ -1137,6 +1151,10 @@ node --test scripts/generate-inventory-vectors.test.mjs
 node --test crates/scoplen-api/openapi/generate-inventory.test.mjs
 node scripts/generate-account-browser-vectors.mjs --check
 node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
+node scripts/generate-user-ca-krl-vectors.mjs --check
+node scripts/generate-certificate-problem-vectors.mjs --check
+node --test scripts/generate-user-ca-krl-vectors.test.mjs scripts/user-ca-krl-openssh.test.mjs scripts/generate-certificate-problem-vectors.test.mjs
+npm exec --yes --package typescript@5.9.3 -- tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler crates/scoplen-api/openapi/user-ca-krl.types.test.ts
 npm exec --yes --package typescript@5.9.3 -- tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler crates/scoplen-api/openapi/account-browser.types.test.ts
 ```
 

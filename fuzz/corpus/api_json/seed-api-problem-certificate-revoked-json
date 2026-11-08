@@ -1,0 +1,1 @@
+{"type":"about:blank","title":"Certificate revoked","status":409,"detail":"The original certificate was revoked. No new certificate was issued. Review access and start a new connection explicitly; replaying this request will not restore it.","instance":"revoked-1","code":"certificate.revoked","changed":false,"retryable":false}

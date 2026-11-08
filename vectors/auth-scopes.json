@@ -1321,6 +1321,24 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificates\"}",
       "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-ca-krl-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}/krl\"}",
+      "expected": "ca:read"
+    },
+    {
+      "id": "auth-scope-operation-ca-krl-write-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}/krl\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-ca-krl-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}/krl?all=true\"}",
+      "expected": "unmapped"
     }
   ]
 }

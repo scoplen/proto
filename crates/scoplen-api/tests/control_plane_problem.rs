@@ -24,12 +24,53 @@ fn published_problem_json_vectors_use_registered_codes() {
         );
         count += 1;
     }
-    assert_eq!(count, 12);
+    assert_eq!(count, 14);
 }
 
 #[test]
 fn sync_storage_failure_vectors_distinguish_rollback_from_uncertain_commit() {
     assert_sync_storage_failure_vectors("api-problem-sync-storage");
+}
+
+#[test]
+fn certificate_terminal_problem_vectors_keep_exact_codes_and_parser_seeds() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let document =
+        scoplen_test_vectors::VectorDocument::from_path(root.join("vectors/api-problem.json"))
+            .unwrap();
+    for (name, status, code) in [
+        ("revoked", 409, "certificate.revoked"),
+        ("quota-exceeded", 413, "certificate.quota_exceeded"),
+    ] {
+        let prefix = format!("api-problem-certificate-{name}");
+        let json = document.vectors.iter().find(|v| v.id == format!("{prefix}-json")).unwrap();
+        let cbor = document.vectors.iter().find(|v| v.id == format!("{prefix}-cbor")).unwrap();
+        let problem = SharedProblemDetails::from_json(json.input.as_bytes(), 4096).unwrap();
+        assert_eq!(problem.status, status);
+        assert_eq!(problem.code.as_str(), code);
+        assert!(problem.code.is_known());
+        assert!(!problem.changed && !problem.retryable);
+        assert_eq!(json.input, cbor.input);
+        let bytes = problem.to_cbor().unwrap();
+        let expected = cbor
+            .expected
+            .as_bytes()
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(bytes, expected);
+        assert_eq!(SharedProblemDetails::from_cbor(&bytes), Ok(problem));
+        assert_eq!(
+            std::fs::read(root.join(format!("fuzz/corpus/api_json/seed-{prefix}-json"))).unwrap(),
+            json.input.as_bytes()
+        );
+        let seed = std::fs::read(root.join(format!("fuzz/corpus/sync_data/seed-16-{prefix}-cbor")))
+            .unwrap();
+        assert_eq!(seed.first(), Some(&16));
+        assert_eq!(&seed[1..], bytes);
+    }
 }
 
 #[test]

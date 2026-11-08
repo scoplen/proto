@@ -186,7 +186,12 @@ fn profiles_are_separate_and_secrets_are_redacted() {
     ] {
         assert!(AccountBrowserAccessScope::from_token(forbidden).is_none());
     }
-    assert_eq!(DeviceAccessOperation::ALL.len(), 81);
+    assert_eq!(DeviceAccessOperation::ALL.len(), 82);
+    let krl = DeviceAccessOperation::UserCaKrlRead;
+    assert!(
+        AccountBrowserAccessOperation::from_route(krl.http_method(), krl.route_template())
+            .is_none()
+    );
     assert!(INITIAL_DEVICE_ACCESS_SCOPE.contains("keys:write"));
     let access = AccountBrowserAccessToken::from_random_bytes(&[7; 32]);
     let refresh = AccountBrowserRefreshToken::from_random_bytes(&[7; 32]);
