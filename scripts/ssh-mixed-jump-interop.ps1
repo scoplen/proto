@@ -41,7 +41,7 @@ try {
     }
     $setup = @'
 set -eu
-apk add --no-cache dropbear=2024.86-r0 openssh-server=9.9_p2-r0 python3
+apk add --no-cache dropbear=2024.86-r0 openssh-server=9.9_p2-r1 python3
 mkdir -p /run/sshd
 for index in 0 1 2 3; do
   adduser -D "hop$index"
@@ -144,7 +144,7 @@ wait
     if (-not $ready) { throw 'Mixed Jump SSH listeners did not become ready' }
     $packages = & docker exec $container apk info -v
     Check-LastExit 'read mixed Jump package versions'
-    if ($packages -notcontains 'dropbear-2024.86-r0' -or $packages -notcontains 'openssh-server-9.9_p2-r0') {
+    if ($packages -notcontains 'dropbear-2024.86-r0' -or $packages -notcontains 'openssh-server-9.9_p2-r1') {
         throw 'Mixed Jump server packages differed from their fixed versions'
     }
 

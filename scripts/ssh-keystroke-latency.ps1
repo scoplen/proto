@@ -82,7 +82,7 @@ try {
         $container = 'scoplen-ssh-latency-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
         $setup = @"
 set -eu
-apk add --no-cache openssh-server=9.9_p2-r0 >/dev/null
+apk add --no-cache openssh-server=9.9_p2-r1 >/dev/null
 adduser -D scoplen
 passwd -d scoplen >/dev/null
 mkdir -p /home/scoplen/.ssh /run/sshd

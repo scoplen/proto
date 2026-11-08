@@ -35,7 +35,7 @@ pwsh ./scripts/ssh-keystroke-latency.ps1
 It requires PowerShell 7, Docker with a running Linux daemon, `ssh`, `ssh-keygen`, Rust 1.99.0,
 and access to the Alpine package repository. `-Image` defaults to `alpine:3.21`; use the recorded
 image digest for a repeat with the same base image. The script pins Alpine's OpenSSH package to
-`9.9_p2-r0` and fails if it is unavailable. It binds each server to a random loopback port,
+`9.9_p2-r1` and fails if it is unavailable. It binds each server to a random loopback port,
 creates disposable Ed25519 user and host keys, pins the host key in both clients, and removes its
 container and temporary files on success or failure.
 It prints the source revision and whether the worktree has uncommitted changes, so measurements
@@ -61,7 +61,7 @@ criteria.
 
 ## Local runs, 2026-10-18
 
-On Windows 10.0.26200 with Rust 1.85.0, the release example completed all 1,000 measured
+On Windows with Rust 1.85.0, the release example completed all 1,000 measured
 exchanges for each client. Scoplen's p50/p95/p99 were 56.9/112.1/165.3 µs; direct `russh`'s were
 55.9/109.8/175.7 µs. These are one local diagnostic run, not a stable hardware baseline or a
 pass/fail judgment for the one-turn requirement.
@@ -71,8 +71,8 @@ gave Scoplen 103.4/165.9/206.9 µs and direct `russh` 100.6/163.2/202.8 µs at p
 Both runs completed all 1,000 exchanges per client; the difference shows why one run is not a
 stable baseline.
 
-The external comparison ran on Windows 10.0.26200 with an AMD Ryzen 9 7945HX, Rust 1.85.0,
-OpenSSH for Windows 9.5p2, and disposable OpenSSH 9.9p2 from Alpine 3.21 image
+The external comparison used Rust 1.85.0, OpenSSH for Windows 9.5p2,
+and disposable OpenSSH 9.9p2 from Alpine 3.21 image
 `sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507`. Each cipher
 had 100 warmups and 1,000 retained samples per client:
 
