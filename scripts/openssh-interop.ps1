@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-param([ValidateSet('9.9p2', '10.6p1')][string]$ServerVersion = '9.9p2')
+param([ValidateSet('9.9p2', '10.6p2')][string]$ServerVersion = '9.9p2')
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -10,7 +10,7 @@ $tempRoot = [System.IO.Path]::GetFullPath((Join-Path $tempBase ('scoplen-openssh
 $started = $false
 $serverProfiles = @{
     '9.9p2' = @{ Image = 'alpine:3.21'; Package = 'openssh-server=9.9_p2-r1'; Installed = 'openssh-server-9.9_p2-r1 '; Banner = '^SSH-2\.0-OpenSSH_9\.9\r?$' }
-    '10.6p1' = @{ Image = 'alpine:edge'; Package = 'openssh-server=10.6_p1-r1'; Installed = 'openssh-server-10.6_p1-r1 '; Banner = '^SSH-2\.0-OpenSSH_10\.6\r?$' }
+    '10.6p2' = @{ Image = 'alpine:edge'; Package = 'openssh-server=10.6_p2-r0'; Installed = 'openssh-server-10.6_p2-r0 '; Banner = '^SSH-2\.0-OpenSSH_10\.6\r?$' }
 }
 $serverProfile = $serverProfiles[$ServerVersion]
 $authVariables = @(

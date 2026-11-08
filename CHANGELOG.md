@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Update the pinned Alpine interoperability packages to OpenSSH 9.9p2 r1 and 10.6p2 r0.
+  The current-version fixture now selects `10.6p2` in place of `10.6p1`; installed-package and
+  SSH banner assertions remain mandatory.
+
 - Make the Cedar connect context's SSO age optional for password-only Accounts (D-138).
   Strict policy validation now requires guarded reads; missing SSO can be explicitly allowed
   or forbidden without inventing a timestamp. Present negative ages and all evaluation errors
