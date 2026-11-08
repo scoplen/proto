@@ -584,8 +584,8 @@ runs stop their owned container and retain private diagnostics. This fixture doe
 complete the authentication, server or platform interoperability matrix.
 
 `pwsh ./scripts/openssh-interop.ps1` provisions a disposable Alpine 3.21 OpenSSH 9.9p2 server;
-`pwsh ./scripts/openssh-interop.ps1 -ServerVersion 10.6p1` runs the same checks against the
-current OpenSSH 10.6p1 package from Alpine edge. Both paths check the installed package and SSH
+`pwsh ./scripts/openssh-interop.ps1 -ServerVersion 10.6p2` runs the same checks against the
+current OpenSSH 10.6p2 package from Alpine edge. Both paths check the installed package and SSH
 banner before connecting, then run the direct SFTP/forwarding, ProxyCommand, SOCKS, and nested-jump
 examples. The fixture also tests raw keys and user certificates with Ed25519, ECDSA
 P-256/P-384/P-521, RSA-SHA2-256, and RSA-SHA2-512. A
@@ -709,7 +709,7 @@ The 8.8p1 fixture sets `SCOPLEN_OPENSSH_SFTP_PROFILE=8.8p1` for the shared examp
 the same advertised `limits`, `statvfs`, `fstatvfs`, `fsync`, `hardlink`, `posix-rename`,
 `expand-path`, and `lsetstat` extensions and their success and failure checks. OpenSSH 8.8p1 does
 not advertise `copy-data`; the fixture checks its explicit unsupported status and released request
-slot. The 9.9p2 and 10.6p1 fixtures continue to require and exercise `copy-data`.
+slot. The 9.9p2 and 10.6p2 fixtures continue to require and exercise `copy-data`.
 The link setup follows OpenSSH's reversed `SYMLINK` wire order relative to the SFTP v3 draft.
 It also checks `READLINK` returns the exact target bytes, rejects a missing link and the removed
 link, and releases each request slot. The authenticated in-process server exercises the SFTP v3
