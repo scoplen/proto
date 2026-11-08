@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -30,14 +30,17 @@ test("independent D-141 wire writer freezes exact framing and bounded recipes", 
   assert.equal(find("bytes-4194305").expected, "input-too-large");
 });
 
-test("producer checks independent output, exact raw seeds and checkout boundaries", async () => {
+test("producer checks independent output, exact raw seeds and symlinked checkout boundaries", async () => {
   const parent = resolve(tmpdir());
-  const root = await mkdtemp(join(parent, "scoplen-krl-vectors-"));
+  const temporary = await mkdtemp(join(parent, "scoplen-krl-vectors-"));
+  const root = join(temporary, "checkout");
   try {
     for (const directory of ["scripts", "vectors", "fuzz/corpus/api_json"]) await mkdir(join(root, directory), { recursive: true });
     const script = "scripts/generate-user-ca-krl-vectors.mjs";
     await copyFile(new URL(script, new URL("../", import.meta.url)), join(root, script));
-    const run = (...args) => spawnSync(process.execPath, [join(root, script), ...args], { cwd: root, encoding: "utf8", timeout: 15000 });
+    const entry = join(temporary, "linked-checkout");
+    await symlink(root, entry, process.platform === "win32" ? "junction" : "dir");
+    const run = (...args) => spawnSync(process.execPath, [join(entry, script), ...args], { cwd: root, encoding: "utf8", timeout: 15000 });
     let result = run(); assert.equal(result.status, 0, result.stderr);
     const path = join(root, "vectors/user-ca-krl.json");
     const original = await readFile(path, "utf8");
@@ -56,8 +59,8 @@ test("producer checks independent output, exact raw seeds and checkout boundarie
     result = run("--check"); assert.notEqual(result.status, 0);
     assert.match(result.stderr, /D-141 KRL output stale: fuzz\/corpus\/api_json\/seed-user-ca-krl-empty-v1/);
   } finally {
-    assert.equal(dirname(resolve(root)), parent);
-    assert.ok(root.startsWith(join(parent, "scoplen-krl-vectors-")));
-    await rm(root, { recursive: true, force: true });
+    assert.equal(dirname(resolve(temporary)), parent);
+    assert.ok(temporary.startsWith(join(parent, "scoplen-krl-vectors-")));
+    await rm(temporary, { recursive: true, force: true });
   }
 });
