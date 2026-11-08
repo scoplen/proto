@@ -543,6 +543,78 @@
       "expected": "accepted"
     },
     {
+      "id": "group-policy-connect-source-ip-permit-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action == Action::\"connect\", resource) when { context.source_ip == \"192.0.2.1\" };",
+      "expected": "true"
+    },
+    {
+      "id": "group-policy-connect-source-ip-forbid-bracket-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "forbid(principal, action == Action::\"connect\", resource) unless { context[\"source_ip\"] == \"192.0.2.1\" };",
+      "expected": "true"
+    },
+    {
+      "id": "group-policy-connect-source-ip-has-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action in [Action::\"connect\"], resource) when { context has source_ip };",
+      "expected": "true"
+    },
+    {
+      "id": "group-policy-connect-source-ip-unconstrained-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "forbid(principal, action, resource) when { action == Action::\"connect\" && context has source_ip };",
+      "expected": "true"
+    },
+    {
+      "id": "group-policy-connect-source-ip-action-set-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action in [Action::\"view_inventory\", Action::\"connect\"], resource) when { if action == Action::\"connect\" then context.source_ip == \"192.0.2.1\" else true };",
+      "expected": "true"
+    },
+    {
+      "id": "group-policy-connect-source-ip-indirect-context-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action == Action::\"connect\", resource) when { (if true then context else context).source_ip == \"192.0.2.1\" };",
+      "expected": "true"
+    },
+    {
+      "id": "group-policy-connect-source-ip-whole-context-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "forbid(principal, action == Action::\"connect\", resource) when { context == context };",
+      "expected": "true"
+    },
+    {
+      "id": "group-policy-connect-source-ip-ordinary-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action == Action::\"connect\", resource);",
+      "expected": "false"
+    },
+    {
+      "id": "group-policy-connect-source-ip-other-action-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action == Action::\"view_policy\", resource) when { context == context };",
+      "expected": "false"
+    },
+    {
+      "id": "group-policy-connect-source-ip-comment-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action == Action::\"connect\", resource); // context.source_ip",
+      "expected": "false"
+    },
+    {
+      "id": "group-policy-connect-source-ip-string-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action == Action::\"connect\", resource) when { \"context.source_ip\" == \"context.source_ip\" };",
+      "expected": "false"
+    },
+    {
+      "id": "group-policy-connect-source-ip-other-fields-v1",
+      "kind": "group_policy.connect_source_ip",
+      "input": "permit(principal, action == Action::\"connect\", resource) when { context.remote_user == \"source_ip\" && context.now > 1 };",
+      "expected": "false"
+    },
+    {
       "id": "group-policy-simple-member-view-v1",
       "kind": "group_policy.simple_input",
       "input": "{\"organization\":\"019bdad6-b800-7000-8000-000000000001\",\"membership\":\"019bdad6-b800-7000-8000-000000000002\",\"view\":[{\"type\":7,\"id\":\"019bdad6-b800-7000-8000-000000000006\"},{\"type\":1,\"id\":\"019bdad6-b800-7000-8000-000000000005\"}]}",

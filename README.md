@@ -167,6 +167,12 @@ connect-only time conditions remain supported. `policy_references` returns typed
 current same-team resolution and rejects foreign explicit Organization literals; it grants no
 authority and does not require an explicit owner literal.
 
+D-139's `connect_policy_observes_source_ip` inspects a validated parsed policy for source-IP
+observations in schema-valid connect environments, including permit/forbid and whole-context
+observations. Comments and string literals do not trigger it. The initial local-user-CA consumer
+rejects issuance while any current enabled policy returns true; this helper does not check
+enabled state, authorize requests or translate policies into certificate address constraints.
+
 The connect schema's `sso_age_seconds` is optional: a password-only Account supplies no SSO
 fact. Policies must guard reads with `context has sso_age_seconds`; they may explicitly allow
 its absence or forbid absent/stale SSO. Present ages must be nonnegative. Strict policy

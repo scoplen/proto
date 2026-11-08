@@ -69,6 +69,21 @@ for (const [name, policy, expected] of [
   ["view-string", 'permit(principal, action == Action::"view_inventory", resource) when { "context.now" == "context.now" };', "accepted"],
 ]) add(`profile-${name}`, "profile", policy, expected);
 
+for (const [name, policy, observes] of [
+  ["permit", 'permit(principal, action == Action::"connect", resource) when { context.source_ip == "192.0.2.1" };', true],
+  ["forbid-bracket", 'forbid(principal, action == Action::"connect", resource) unless { context["source_ip"] == "192.0.2.1" };', true],
+  ["has", 'permit(principal, action in [Action::"connect"], resource) when { context has source_ip };', true],
+  ["unconstrained", 'forbid(principal, action, resource) when { action == Action::"connect" && context has source_ip };', true],
+  ["action-set", 'permit(principal, action in [Action::"view_inventory", Action::"connect"], resource) when { if action == Action::"connect" then context.source_ip == "192.0.2.1" else true };', true],
+  ["indirect-context", 'permit(principal, action == Action::"connect", resource) when { (if true then context else context).source_ip == "192.0.2.1" };', true],
+  ["whole-context", 'forbid(principal, action == Action::"connect", resource) when { context == context };', true],
+  ["ordinary", 'permit(principal, action == Action::"connect", resource);', false],
+  ["other-action", 'permit(principal, action == Action::"view_policy", resource) when { context == context };', false],
+  ["comment", 'permit(principal, action == Action::"connect", resource); // context.source_ip', false],
+  ["string", 'permit(principal, action == Action::"connect", resource) when { "context.source_ip" == "context.source_ip" };', false],
+  ["other-fields", 'permit(principal, action == Action::"connect", resource) when { context.remote_user == "source_ip" && context.now > 1 };', false],
+]) add(`connect-source-ip-${name}`, "connect_source_ip", policy, String(observes));
+
 const kinds = { 1: "Host", 2: "AccessProfile", 4: "Route", 5: "HostGroup", 6: "TrustRecord", 7: "Snippet", 11: "GatewayNetwork" };
 const sorted = values => [...values].sort();
 const canonical = value => {
@@ -123,7 +138,7 @@ for (const [name, value] of [
 add("simple-float-type", "simple_input", json(base).replace('"type":7', '"type":7.0'));
 
 const outputs = [["vectors/group-policy.json", json({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2) + "\n"]];
-for (const vector of vectors.filter(value => value.kind !== "group_policy.profile")) outputs.push([`fuzz/corpus/api_json/seed-${vector.id}`, vector.input]);
+for (const vector of vectors.filter(value => !["group_policy.profile", "group_policy.connect_source_ip"].includes(value.kind))) outputs.push([`fuzz/corpus/api_json/seed-${vector.id}`, vector.input]);
 for (const [path, expected] of outputs) {
   const url = new URL(path, root);
   if (process.argv.includes("--check")) {

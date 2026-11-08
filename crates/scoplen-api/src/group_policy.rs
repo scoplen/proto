@@ -640,11 +640,26 @@ pub fn parse_policy_source(source: &str) -> Result<Policy, Error> {
     if policy
         .get_valid_request_envs(&schema)
         .any(|env| env.action().id().unescaped() == "view_inventory")
-        && references_context_now(&policy.to_json().map_err(|_| invalid("source"))?)
+        && references_context_attribute(&policy.to_json().map_err(|_| invalid("source"))?, "now")
     {
         return Err(invalid("time-dependent inventory visibility"));
     }
     Ok(policy)
+}
+
+/// Whether a validated policy can match `connect` and observes its source IP.
+/// The initial local-user-CA consumer denies issuance if any enabled policy returns true.
+/// Obtain `policy` from [`parse_policy_source`]; this inspection is not policy validation,
+/// authorization, enabled-state checking or translation into certificate address constraints.
+/// # Errors
+/// Rejects failure to load the shared schema or inspect the parsed policy expression.
+pub fn connect_policy_observes_source_ip(policy: &Policy) -> Result<bool, Error> {
+    let schema = Schema::from_str(CEDAR_SCHEMA).map_err(|_| invalid("policy schema"))?;
+    Ok(policy.get_valid_request_envs(&schema).any(|env| env.action().id().unescaped() == "connect")
+        && references_context_attribute(
+            &policy.to_json().map_err(|_| invalid("source"))?,
+            "source_ip",
+        ))
 }
 
 /// Inspect parsed entity locators for current same-Organization resolution by the consumer.
@@ -688,7 +703,7 @@ pub fn policy_references(policy: &Policy, organization: Uuid) -> Result<Vec<Enti
     Ok(result.into_iter().collect())
 }
 
-fn references_context_now(value: &Value) -> bool {
+fn references_context_attribute(value: &Value, attribute: &str) -> bool {
     match value {
         Value::Object(fields) => {
             for operator in [".", "has"] {
@@ -697,14 +712,16 @@ fn references_context_now(value: &Value) -> bool {
                         left.get("Var").and_then(Value::as_str) == Some("context")
                     })
                 {
-                    return access.get("attr").and_then(Value::as_str) == Some("now");
+                    return access.get("attr").and_then(Value::as_str) == Some(attribute);
                 }
             }
-            // Using the entire context also observes its now field, for example record equality.
+            // Whole-context observations include every field, for example record equality.
             fields.get("Var").and_then(Value::as_str) == Some("context")
-                || fields.values().any(references_context_now)
+                || fields.values().any(|value| references_context_attribute(value, attribute))
         }
-        Value::Array(items) => items.iter().any(references_context_now),
+        Value::Array(items) => {
+            items.iter().any(|value| references_context_attribute(value, attribute))
+        }
         _ => false,
     }
 }
