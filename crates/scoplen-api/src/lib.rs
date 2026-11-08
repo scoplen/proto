@@ -21,6 +21,7 @@ pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
 pub mod group_policy;
+#[cfg(feature = "internal-grpc")]
 pub mod internal_grpc;
 pub mod inventory;
 pub mod operator_auth;
@@ -30,6 +31,7 @@ pub mod organization_reference;
 mod request_wire;
 pub mod team_reference;
 /// Generated Rust bindings for internal gateway and host-agent protobuf contracts.
+#[cfg(feature = "internal-grpc")]
 #[allow(clippy::all, clippy::doc_markdown, clippy::must_use_candidate)]
 pub mod proto {
     /// Generated `spl.agent.v1` contract.
@@ -55,6 +57,7 @@ pub mod team;
 pub mod user_ca;
 
 /// `FileDescriptorSet` for the internal protobuf contracts.
+#[cfg(feature = "internal-grpc")]
 pub const INTERNAL_PROTO_DESCRIPTOR: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/scoplen-internal-descriptor.bin"));
 

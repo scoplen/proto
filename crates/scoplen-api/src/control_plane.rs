@@ -123,12 +123,15 @@ mod tests {
         BUILT_IN_POLICIES, CEDAR_SCHEMA, GATEWAY_CONTROL_PROTO, HOST_AGENT_PROTO, ListQuery, Page,
         QueryError, Resource,
     };
+    #[cfg(feature = "internal-grpc")]
     use crate::{INTERNAL_PROTO_DESCRIPTOR, proto};
     use cedar_policy::{
         Authorizer, Context, Decision, Entities, EntityUid, PolicySet, Request, Schema,
         ValidationMode, Validator,
     };
+    #[cfg(feature = "internal-grpc")]
     use prost::Message;
+    #[cfg(feature = "internal-grpc")]
     use prost_types::FileDescriptorSet;
     use serde_json::json;
     use std::str::FromStr;
@@ -246,6 +249,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "internal-grpc")]
     fn generated_internal_bindings_round_trip_and_descriptor_is_published() {
         let request = proto::spl::gateway::v1::RegisterRequest {
             gateway_id: "018f35d4-1f8f-7e2a-9e56-7a5e8a9f11a1".into(),

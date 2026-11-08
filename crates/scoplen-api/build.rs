@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "internal-grpc")]
 use std::{env, path::PathBuf};
 
+#[cfg(feature = "internal-grpc")]
 fn main() {
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest path"));
     let proto_root = manifest_dir.join("proto");
@@ -26,3 +28,6 @@ fn main() {
         .compile_protos(&[gateway, agent], std::slice::from_ref(&proto_root))
         .expect("internal protobuf contracts compile");
 }
+
+#[cfg(not(feature = "internal-grpc"))]
+fn main() {}
