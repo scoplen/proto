@@ -9,8 +9,8 @@ use scoplen_api::{
         GroupCreateRequest, GroupFields, GroupPage, GroupReplaceRequest, GroupResource,
         GroupSource, MAX_GROUP_POLICY_BYTES, MAX_GROUP_POLICY_PAGE_BYTES, MAX_POLICY_SOURCE_BYTES,
         PolicyCreateRequest, PolicyFields, PolicyPage, PolicyReplaceRequest, PolicyResource,
-        SimpleRule, SimpleRuleInput, SimpleRuleSelector, SimpleRuleSubject, parse_policy_source,
-        policy_references,
+        SimpleRule, SimpleRuleInput, SimpleRuleSelector, SimpleRuleSubject,
+        connect_policy_observes_source_ip, parse_policy_source, policy_references,
     },
     organization::OrganizationListQuery,
 };
@@ -232,6 +232,35 @@ fn policy_codecs_preserve_source_and_inspection_does_not_require_explicit_owner_
     let page = PolicyPage { items: vec![value], next_cursor: None };
     assert_eq!(PolicyPage::from_json(&page.to_json().unwrap()).unwrap(), page);
     assert!(PolicyPage::from_http_json(&page.to_json().unwrap(), None, Some("no-cache")).is_err());
+}
+
+#[test]
+fn initial_certificate_source_ip_inspection_uses_parsed_connect_policies() {
+    for source in [
+        r#"permit(principal, action == Action::"connect", resource) when { context.source_ip == "192.0.2.1" };"#,
+        r#"forbid(principal, action == Action::"connect", resource) unless { context["source_ip"] == "192.0.2.1" };"#,
+        r#"permit(principal, action in [Action::"connect"], resource) when { context has source_ip };"#,
+        r#"forbid(principal, action, resource) when { action == Action::"connect" && context has source_ip };"#,
+        r#"permit(principal, action in [Action::"view_inventory", Action::"connect"], resource) when { if action == Action::"connect" then context.source_ip == "192.0.2.1" else true };"#,
+        r#"permit(principal, action == Action::"connect", resource) when { (if true then context else context).source_ip == "192.0.2.1" };"#,
+        r#"forbid(principal, action == Action::"connect", resource) when { context == context };"#,
+    ] {
+        let policy =
+            parse_policy_source(source).unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        assert!(connect_policy_observes_source_ip(&policy).unwrap(), "{source}");
+    }
+    for source in [
+        SOURCE,
+        r#"permit(principal, action == Action::"view_policy", resource) when { context == context };"#,
+        r#"permit(principal, action == Action::"connect", resource); // context.source_ip"#,
+        r#"permit(principal, action == Action::"connect", resource) when { "context.source_ip" == "context.source_ip" };"#,
+        r#"permit(principal, action == Action::"connect", resource) when { context.remote_user == "source_ip" && context.now > 1 };"#,
+        r#"permit(principal, action == Action::"connect", resource) when { context.organization == context.membership.organization };"#,
+    ] {
+        let policy =
+            parse_policy_source(source).unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        assert!(!connect_policy_observes_source_ip(&policy).unwrap(), "{source}");
+    }
 }
 
 #[test]
@@ -478,6 +507,9 @@ fn independent_vectors_exercise_public_codecs_and_generator() {
             "group_policy.profile" => {
                 parse_policy_source(&vector.input).map(|_| b"accepted".to_vec())
             }
+            "group_policy.connect_source_ip" => parse_policy_source(&vector.input)
+                .and_then(|policy| connect_policy_observes_source_ip(&policy))
+                .map(|observes| observes.to_string().into_bytes()),
             _ => panic!("unknown vector kind {}", vector.kind),
         };
         if vector.expected == "rejected" {
