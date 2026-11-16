@@ -12,6 +12,9 @@ pub const FORMAT: &str = "scoplen-test-vectors";
 /// The current vector document schema version.
 pub const VERSION: u32 = 1;
 
+/// Independently authored D-142 named-object JSON acceptance and rejection vectors.
+pub const MODEL_PORTABLE: &[u8] = include_bytes!("../../../vectors/model-portable.json");
+
 /// A complete vector document.
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 pub struct VectorDocument {

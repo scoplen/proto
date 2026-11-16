@@ -234,6 +234,18 @@ impl Object {
 
     /// Validate the registry-specific required fields and all model limits.
     pub fn validate(&self) -> Result<(), ModelError> {
+        self.validate_inner(false)
+    }
+
+    pub(super) fn validate_portable(&self, redacted: bool) -> Result<(), ModelError> {
+        self.validate_inner(redacted)?;
+        if cbor::encode(&self.value_without_validation())?.len() > MAX_OBJECT_BYTES {
+            return Err(ModelError::ObjectLimit);
+        }
+        Ok(())
+    }
+
+    fn validate_inner(&self, redacted: bool) -> Result<(), ModelError> {
         clock::validate_uuid_v7(self.id).map_err(ModelError::Clock)?;
         validate_schema(self.object_type, self.schema)?;
         for (path, entry) in &self.fields {
@@ -244,7 +256,7 @@ impl Object {
         if !self.object_type.is_known() {
             return Ok(());
         }
-        validate_type_fields(self)
+        validate_type_fields(self, redacted)
     }
 
     /// Encode this object as a canonical deterministic CBOR envelope.
@@ -271,6 +283,10 @@ impl Object {
     /// Convert to the generic CBOR value used by the codec.
     pub fn to_value(&self) -> Result<cbor::Value, ModelError> {
         self.validate()?;
+        Ok(self.value_without_validation())
+    }
+
+    fn value_without_validation(&self) -> cbor::Value {
         let mut fields = Vec::with_capacity(self.fields.len());
         for (path, entry) in &self.fields {
             fields.push((path_to_value(path), entry_to_value(entry)));
@@ -284,7 +300,7 @@ impl Object {
         if let Some(tombstone) = self.tombstone {
             envelope.push((cbor::Value::UInt(5), tombstone_to_value(tombstone)));
         }
-        Ok(cbor::Value::Map(envelope))
+        cbor::Value::Map(envelope)
     }
 
     /// Parse an object from an already decoded canonical CBOR value.
@@ -835,7 +851,7 @@ fn validate_session_spec(value: &cbor::Value) -> bool {
     }
 }
 
-fn validate_type_fields(object: &Object) -> Result<(), ModelError> {
+fn validate_type_fields(object: &Object, redacted: bool) -> Result<(), ModelError> {
     validate_field_shapes(object)?;
     match object.object_type {
         ObjectType::HOST => {
@@ -851,7 +867,7 @@ fn validate_type_fields(object: &Object) -> Result<(), ModelError> {
             object.required_uuid(1).map_err(|_| invalid_field(object, "host is required"))?;
             object.required_text(3).map_err(|_| invalid_field(object, "username is required"))?;
         }
-        ObjectType::CREDENTIAL => validate_credential_fields(object)?,
+        ObjectType::CREDENTIAL => validate_credential_fields(object, redacted)?,
         ObjectType::ROUTE => validate_route_fields(object)?,
         ObjectType::HOST_GROUP => {
             object.required_text(1).map_err(|_| invalid_field(object, "name is required"))?;
@@ -887,7 +903,7 @@ fn validate_type_fields(object: &Object) -> Result<(), ModelError> {
     Ok(())
 }
 
-fn validate_credential_fields(object: &Object) -> Result<(), ModelError> {
+fn validate_credential_fields(object: &Object, redacted: bool) -> Result<(), ModelError> {
     let kind = object.required_uint(2).map_err(|_| invalid_field(object, "kind is required"))?;
     let binding =
         object.required_uint(3).map_err(|_| invalid_field(object, "binding is required"))?;
@@ -911,7 +927,7 @@ fn validate_credential_fields(object: &Object) -> Result<(), ModelError> {
         return Err(invalid_field(object, "this credential kind cannot use shared binding"));
     }
     let has_secret = object.set_field(4).is_some();
-    if (binding == 1) != has_secret {
+    if (binding == 1) != has_secret && !(redacted && binding == 1 && !has_secret) {
         return Err(invalid_field(object, "shared credentials require exactly one secret field"));
     }
     if object.set_field(6).is_some() && ![2, 4].contains(&kind) {
