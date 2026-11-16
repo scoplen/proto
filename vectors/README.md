@@ -5,6 +5,17 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`portable-age.json` contains three binary age v1 passphrase files produced by Go age v1.3.2.
+The exact public synthetic passphrase includes whitespace, decomposed Unicode and NUL; inputs
+carry its JSON string and standard-base64 ciphertext, and expected values are base64 plaintext.
+Only these small fixtures use a test work factor. Run
+`node scripts/portable-age-interop.mjs --check-vectors` to authenticate all existing fixtures,
+or `--write-vectors` to replace them with newly randomized standard files. The command without
+options checks the public Rust API against Go in both directions using normal production
+scrypt defaults, empty and multichunk payloads, and tampered/truncated final chunks. Pipes
+remain in memory; the script creates no plaintext file. Native inventory rollback and JSON
+validation remain consumer checks, separate from authenticated container completion.
+
 `user-ca.json` contains D-137's independent initial local-user-CA creation, public metadata,
 Page and shared problem vectors. Node computes the fingerprint from the complete decoded
 OpenSSH Ed25519 blob and emits exact JSON parser seeds, including original per-item bounds.

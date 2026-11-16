@@ -19,6 +19,8 @@ mod hpke;
 mod keys;
 mod operator_access_token;
 mod password_bootstrap;
+#[cfg(feature = "portable-export")]
+mod portable_export;
 mod primitives;
 mod recovery;
 mod secret;
@@ -75,6 +77,10 @@ pub use password_bootstrap::{
     PASSWORD_ARK_WRAP_BYTES, PASSWORD_BOOTSTRAP_PROFILE, PasswordArkWrap, PasswordBootstrap,
     PasswordBootstrapContext, PasswordBootstrapError, PasswordKdfContext, PasswordSecrets,
     PasswordVerifier, normalize_account_password,
+};
+#[cfg(feature = "portable-export")]
+pub use portable_export::{
+    PortableExportError, PortableExportPassphrase, PortableExportReader, PortableExportWriter,
 };
 pub use primitives::{
     ARGON2_MEMORY_KIB, ARGON2_PARALLELISM, ARGON2_TIME_COST, Argon2idParams, PrimitiveError,

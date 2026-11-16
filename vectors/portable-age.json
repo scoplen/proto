@@ -1,0 +1,24 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "portable-age-go-1.3.2-empty",
+      "kind": "crypto.portable-age.decrypt",
+      "input": "{\"passphrase\":\"\\tD-142 synthetic é\\u0000密\\n\",\"ciphertext_base64\":\"YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHNjcnlwdCA0bUdhRVc2dk81RkN3NE5BZDNvMmJ3IDQKS2g3eEJpUTBQYU5NQnFOT0E5K01GbGtlbkdxQ1RhRUlxODdmYmtUSU5ucwotLS0gS29vM2FlQy85T1ZHdWQvOVVneDZVTnh1T3RnWi9hc2w5YTRFOUJWcm9sawoFSrv9MSdBgnpyT6OPL7ZMrGb7oHCFfT8lOjVZtsBy5Q==\"}",
+      "expected": ""
+    },
+    {
+      "id": "portable-age-go-1.3.2-binary",
+      "kind": "crypto.portable-age.decrypt",
+      "input": "{\"passphrase\":\"\\tD-142 synthetic é\\u0000密\\n\",\"ciphertext_base64\":\"YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHNjcnlwdCBPcFd3V2F0amNCMmRTSjhXU2F2cFh3IDQKTHVCTE5menNhRUd2WG0xdDZhMDFEK2FGOGFmSEozdFJSTEhGWUdma3F0ZwotLS0gT1QreGs2VkFMTzNBN1JPY0hTR3ZCaUNrdkZlM3QrazVjY29kUmI3bXR2QQrisiTFYHzFfzzsB9CirIyjDdGwey48OyuioptnBDG9yE6nwOtBJK4=\"}",
+      "expected": "AAECf4D+/w=="
+    },
+    {
+      "id": "portable-age-go-1.3.2-text",
+      "kind": "crypto.portable-age.decrypt",
+      "input": "{\"passphrase\":\"\\tD-142 synthetic é\\u0000密\\n\",\"ciphertext_base64\":\"YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHNjcnlwdCBoL0FhUVhuaDdabEZHV0hoSjRlc0VnIDQKTFZOR0hsa0tuSFhmUEYwQmFSTVdVazE0dGU1V2VaaWZnUWxnMHg2TzhjQQotLS0gVXFVcjhqVkRYMTRYbm94VUZlbitCWWRBeE9jeWRrb1FHNjhCdjRwOHZHQQrHfHqzf+iyJJPfeB9TNZqwDdbIUNqBWe6SIopkLJTgSYjQWnU5lQY43Xv2JKEDrnVDf7SczrT+6E+8\"}",
+      "expected": "RC0xNDIgc3ludGhldGljIHBsYWludGV4dAo="
+    }
+  ]
+}
