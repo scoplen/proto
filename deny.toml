@@ -4,7 +4,13 @@ version = 2
 # requires rsa 0.10.0-rc.19 for the documented RSA/SHA-2 wire support; keep
 # the exception visible to dependency review until an upstream timing-safe
 # implementation is available.
-ignore = ["RUSTSEC-2023-0071"]
+ignore = [
+    "RUSTSEC-2023-0071",
+    # age's translation proc macros use these only for build configuration/diagnostics.
+    # Neither advisory reports a vulnerability; remove when age replaces these macros.
+    { id = "RUSTSEC-2026-0374", reason = "unmaintained basic-toml is used only by age's translation proc-macro build configuration" },
+    { id = "RUSTSEC-2026-0173", reason = "unmaintained proc-macro-error2 supplies only age's translation compile-time diagnostics" },
+]
 
 [licenses]
 allow = [

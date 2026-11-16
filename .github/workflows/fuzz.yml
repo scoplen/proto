@@ -22,6 +22,7 @@ jobs:
         target:
           - vector_loader
           - object_decoder
+          - model_portable
           - crypto_decoders
           - agent_decoder
           - sftp_decoder
