@@ -1,0 +1,1 @@
+{"format":"scoplen-export","model_version":1,"exported_at":0,"source":{"kind":"device","id":"01900000-0000-7000-8000-000000000030"},"secrets":"omitted","objects":[{"type":"Preference","id":"01900000-0000-7000-8000-000000000010","schema":1,"fields":{"key":"fixture.preference"},"omitted_secrets":[]}]}

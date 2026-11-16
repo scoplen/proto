@@ -36,6 +36,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "model_portable"
+path = "fuzz_targets/model_portable.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "crypto_decoders"
 path = "fuzz_targets/crypto_decoders.rs"
 test = false
