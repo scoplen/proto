@@ -18,6 +18,9 @@ use scoplen_api::account_browser::{
 };
 use scoplen_api::account_devices::AccountDeviceStatements;
 use scoplen_api::account_profile::AccountProfile;
+use scoplen_api::audit::{
+    AuditEvent, AuditFilter, AuditListQuery, AuditPage, AuditRange, AuditVerification,
+};
 use scoplen_api::auth::{
     AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthJwks, AuthRefreshRequest,
     AuthTokenResponse, BrowserAuthRefreshRequest, BrowserAuthTokenResponse,
@@ -147,6 +150,20 @@ fuzz_target!(|bytes: &[u8]| {
         assert_eq!(TeamInvitationAcceptRequest::from_json(encoded.as_bytes()), Ok(value));
     }
     round_trip!(AccountDeviceStatements, bytes);
+    round_trip!(AuditEvent, bytes);
+    round_trip!(AuditPage, bytes);
+    round_trip!(AuditVerification, bytes);
+    if let Ok(parameters) = serde_json::from_slice::<Vec<(String, String)>>(bytes) {
+        let _ = AuditListQuery::from_parameters(
+            parameters.iter().map(|(name, value)| (name.as_str(), value.as_str())),
+        );
+        let _ = AuditRange::from_parameters(
+            parameters.iter().map(|(name, value)| (name.as_str(), value.as_str())),
+        );
+    }
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        let _ = AuditFilter::parse(text);
+    }
     round_trip!(AccountRequestChallengeRequest, bytes);
     round_trip!(AccountRequestChallengeResponse, bytes);
     round_trip!(AccountPasswordOptionsRequest, bytes);

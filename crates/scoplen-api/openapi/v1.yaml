@@ -119,7 +119,7 @@
     "/auth/device": {
       "post": {
         "operationId": "authenticateDevice",
-        "x-scoplen-initial-device-scope": "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage",
+        "x-scoplen-initial-device-scope": "account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage",
         "security": [],
         "requestBody": {
           "required": true,
@@ -134,7 +134,7 @@
         },
         "responses": {
           "200": {
-            "description": "DPoP-bound access and refresh tokens. The server issues exactly account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage after checking the current active account, enrolled device, and certificate. Request bodies cannot propose scopes. The refresh family records this initial permission ceiling. Scopes do not grant operator, browser, or service-principal rights and do not replace current-state or resource authorization.",
+            "description": "DPoP-bound access and refresh tokens. The server issues exactly account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage after checking the current active account, enrolled device, and certificate. Request bodies cannot propose scopes. The refresh family records this initial permission ceiling. Scopes do not grant operator, browser, or service-principal rights and do not replace current-state or resource authorization.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1481,39 +1481,6 @@
           "200": {
             "$ref": "#/components/responses/GroupPage"
           },
-          "default": {
-            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
-            "headers": {
-              "Cache-Control": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-store"
-                }
-              },
-              "Pragma": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-cache"
-                }
-              },
-              "X-Request-ID": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
           },
@@ -1555,6 +1522,39 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1612,39 +1612,6 @@
         "responses": {
           "201": {
             "$ref": "#/components/responses/GroupResource"
-          },
-          "default": {
-            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
-            "headers": {
-              "Cache-Control": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-store"
-                }
-              },
-              "Pragma": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-cache"
-                }
-              },
-              "X-Request-ID": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
           },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
@@ -1709,27 +1676,6 @@
                 }
               }
             }
-          }
-        },
-        "x-scoplen-required-device-scope": "teams:manage",
-        "x-scoplen-cedar-action": "manage_members",
-        "x-scoplen-request-max-bytes": 262144,
-        "x-scoplen-response-max-bytes": 262144,
-        "description": "Require HTTPS, current Account/Device, active same-Organization Membership, actual-method/trusted-URL DPoP and durable replay protection. JWT snapshots and submitted role/group claims grant no authority. Inaccessible, foreign and absent resources share the static Organization 404 boundary. No refresh cookie is read or changed. Charge the existing independent durable team admission limits of 30 source and 10 authenticated-Account attempts per operation per 60 seconds. Recheck current authority and references under the committing transaction; row, membership associations, Organization view revision and one attributable audit commit atomically. Required audit failure rolls back mutation. One original UUIDv7 key binds origin, Account, Device, actual method/path, id and canonical typed payload for 24 hours. Changed payload or binding conflicts; used ids cannot be reused without the exact retained receipt. Exact replay rechecks current authority and returns the retained create Resource without another mutation or audit. Only local groups are mutable; source cannot be submitted. Every selected member is a currently active same-team Membership. Group updates cannot reactivate suspended or removed members. Deletion removes associations; a persisted policy referencing the Group prevents deletion with organization.conflict until updated or removed. Reject every query and If-Match.",
-        "security": [
-          {
-            "accessToken": [],
-            "dpopProof": []
-          }
-        ]
-      }
-    },
-    "/orgs/{org}/groups/{id}": {
-      "get": {
-        "operationId": "getOrganizationGroup",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/GroupResource"
           },
           "default": {
             "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
@@ -1763,6 +1709,27 @@
                 }
               }
             }
+          }
+        },
+        "x-scoplen-required-device-scope": "teams:manage",
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-request-max-bytes": 262144,
+        "x-scoplen-response-max-bytes": 262144,
+        "description": "Require HTTPS, current Account/Device, active same-Organization Membership, actual-method/trusted-URL DPoP and durable replay protection. JWT snapshots and submitted role/group claims grant no authority. Inaccessible, foreign and absent resources share the static Organization 404 boundary. No refresh cookie is read or changed. Charge the existing independent durable team admission limits of 30 source and 10 authenticated-Account attempts per operation per 60 seconds. Recheck current authority and references under the committing transaction; row, membership associations, Organization view revision and one attributable audit commit atomically. Required audit failure rolls back mutation. One original UUIDv7 key binds origin, Account, Device, actual method/path, id and canonical typed payload for 24 hours. Changed payload or binding conflicts; used ids cannot be reused without the exact retained receipt. Exact replay rechecks current authority and returns the retained create Resource without another mutation or audit. Only local groups are mutable; source cannot be submitted. Every selected member is a currently active same-team Membership. Group updates cannot reactivate suspended or removed members. Deletion removes associations; a persisted policy referencing the Group prevents deletion with organization.conflict until updated or removed. Reject every query and If-Match.",
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      }
+    },
+    "/orgs/{org}/groups/{id}": {
+      "get": {
+        "operationId": "getOrganizationGroup",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/GroupResource"
           },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
@@ -1805,6 +1772,39 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1909,39 +1909,6 @@
               }
             }
           },
-          "default": {
-            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
-            "headers": {
-              "Cache-Control": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-store"
-                }
-              },
-              "Pragma": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-cache"
-                }
-              },
-              "X-Request-ID": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
           },
@@ -2002,6 +1969,39 @@
                       "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -8285,39 +8285,6 @@
           "200": {
             "$ref": "#/components/responses/PolicyPage"
           },
-          "default": {
-            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
-            "headers": {
-              "Cache-Control": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-store"
-                }
-              },
-              "Pragma": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-cache"
-                }
-              },
-              "X-Request-ID": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
           },
@@ -8359,6 +8326,39 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -8413,39 +8413,6 @@
         "responses": {
           "201": {
             "$ref": "#/components/responses/PolicyResource"
-          },
-          "default": {
-            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
-            "headers": {
-              "Cache-Control": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-store"
-                }
-              },
-              "Pragma": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-cache"
-                }
-              },
-              "X-Request-ID": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
           },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
@@ -8510,27 +8477,6 @@
                 }
               }
             }
-          }
-        },
-        "x-scoplen-required-device-scope": "policies:write",
-        "x-scoplen-cedar-action": "manage_policy",
-        "x-scoplen-request-max-bytes": 262144,
-        "x-scoplen-response-max-bytes": 262144,
-        "description": "Require HTTPS, current Account/Device, active same-Organization Membership, actual-method/trusted-URL DPoP and durable replay protection. JWT snapshots and submitted role/group claims grant no authority. Inaccessible, foreign and absent resources share the static Organization 404 boundary. No refresh cookie is read or changed. Charge the existing independent durable team admission limits of 30 source and 10 authenticated-Account attempts per operation per 60 seconds. Recheck current authority and references under the committing transaction; row, membership associations, Organization view revision and one attributable audit commit atomically. Required audit failure rolls back mutation. One original UUIDv7 key binds origin, Account, Device, actual method/path, id and canonical typed payload for 24 hours. Changed payload or binding conflicts; used ids cannot be reused without the exact retained receipt. Exact replay rechecks current authority and returns the retained create Resource without another mutation or audit. Exactly one schema-valid non-template policy with the initial context.now visibility restriction; validate every explicit typed reference against this Organization. Advanced policies need no explicit Organization literal, but any present literal must match the owner. Enabled custom policies are evaluated only with this team's immutable built-in roles and mandatory tenant guards. A policy cannot change those guards, elevate an Operator or authorize Personal/foreign data. Reject every query and If-Match.",
-        "security": [
-          {
-            "accessToken": [],
-            "dpopProof": []
-          }
-        ]
-      }
-    },
-    "/orgs/{org}/policies/{id}": {
-      "get": {
-        "operationId": "getOrganizationPolicy",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/PolicyResource"
           },
           "default": {
             "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
@@ -8564,6 +8510,27 @@
                 }
               }
             }
+          }
+        },
+        "x-scoplen-required-device-scope": "policies:write",
+        "x-scoplen-cedar-action": "manage_policy",
+        "x-scoplen-request-max-bytes": 262144,
+        "x-scoplen-response-max-bytes": 262144,
+        "description": "Require HTTPS, current Account/Device, active same-Organization Membership, actual-method/trusted-URL DPoP and durable replay protection. JWT snapshots and submitted role/group claims grant no authority. Inaccessible, foreign and absent resources share the static Organization 404 boundary. No refresh cookie is read or changed. Charge the existing independent durable team admission limits of 30 source and 10 authenticated-Account attempts per operation per 60 seconds. Recheck current authority and references under the committing transaction; row, membership associations, Organization view revision and one attributable audit commit atomically. Required audit failure rolls back mutation. One original UUIDv7 key binds origin, Account, Device, actual method/path, id and canonical typed payload for 24 hours. Changed payload or binding conflicts; used ids cannot be reused without the exact retained receipt. Exact replay rechecks current authority and returns the retained create Resource without another mutation or audit. Exactly one schema-valid non-template policy with the initial context.now visibility restriction; validate every explicit typed reference against this Organization. Advanced policies need no explicit Organization literal, but any present literal must match the owner. Enabled custom policies are evaluated only with this team's immutable built-in roles and mandatory tenant guards. A policy cannot change those guards, elevate an Operator or authorize Personal/foreign data. Reject every query and If-Match.",
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          }
+        ]
+      }
+    },
+    "/orgs/{org}/policies/{id}": {
+      "get": {
+        "operationId": "getOrganizationPolicy",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PolicyResource"
           },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
@@ -8606,6 +8573,39 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -8707,39 +8707,6 @@
               }
             }
           },
-          "default": {
-            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
-            "headers": {
-              "Cache-Control": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-store"
-                }
-              },
-              "Pragma": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "const": "no-cache"
-                }
-              },
-              "X-Request-ID": {
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
           "400": {
             "$ref": "#/components/responses/OrganizationInvalidRequest"
           },
@@ -8800,6 +8767,39 @@
                       "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded shared problem <=4096 bytes; no partial success or sensitive payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -10493,99 +10493,134 @@
     },
     "/orgs/{org}/audit-events": {
       "get": {
-        "operationId": "listAudit-Events",
+        "tags": [
+          "Audit"
+        ],
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          },
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-device-scope": "audit:read",
+        "x-scoplen-required-browser-scope": "audit:read",
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "omit",
+        "description": "Require exact audit:read, fresh token-bound actual-method/URL DPoP, current Account/Device or browser family, active same-Organization Membership and trusted Cedar view_audit. Existing Owner/Security auditor permits remain; Administrator has no implicit permit. Operator/deployment/Personal-history access is excluded. Reject body, unknown/repeated query names, If-Match and Idempotency-Key; cookie authentication is forbidden. Supplied Origin must equal trusted deployment origin. No refresh cookie is read/set/changed; older refresh ceilings never widen. Recursive duplicate fields, malformed UTF-8/BOM and complete-body overflow fail locally. No export, event mutation or signed cursor.",
+        "operationId": "listAuditEvents",
+        "x-scoplen-query-max-bytes": 4096,
+        "x-scoplen-response-max-bytes": 1048576,
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            }
           },
           {
-            "$ref": "#/components/parameters/cursor"
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$",
+              "maxLength": 20,
+              "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "const": "-sequence"
+            }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "description": "Decoded ASCII, <=6 AND-only clauses joined by exactly \" and \". Exact single spaces and quoted values, no escapes. occurred_at ge/lt \"<normalized UTC>\"; actor_account_id eq \"<UUIDv7>\"; resource eq \"<kind>:<UUIDv7>\"; event_class eq \"<safe class>\"; outcome eq \"success|failure|unknown\". Each field/operator once, upper time later than lower. No OR, parentheses, free text or inference. Decode URL once and use typed parameterized queries."
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Page"
+            "description": "Bounded immutable audit Page, request-bound descending continuation.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
           },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "post": {
-        "operationId": "createAudit-Events",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/org"
+          "400": {
+            "$ref": "#/components/responses/AuditInvalidRequest"
           },
-          {
-            "$ref": "#/components/parameters/idempotency"
-          }
-        ],
-        "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
-        },
-        "responses": {
-          "201": {
-            "$ref": "#/components/responses/Resource"
+          "401": {
+            "$ref": "#/components/responses/AccountEntryAuthenticationRequired"
           },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      }
-    },
-    "/orgs/{org}/audit-events/{id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/org"
-        },
-        {
-          "$ref": "#/components/parameters/id"
-        }
-      ],
-      "get": {
-        "operationId": "getAudit-Events",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
+          "403": {
+            "$ref": "#/components/responses/AuditDenied"
           },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "patch": {
-        "operationId": "updateAudit-Events",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ifMatch"
-          }
-        ],
-        "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
+          "404": {
+            "$ref": "#/components/responses/AuditNotFound"
           },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteAudit-Events",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ifMatch"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Deleted"
+          "413": {
+            "$ref": "#/components/responses/AuditTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/AccountEntryRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AuditStorageUnavailable"
           },
           "default": {
             "$ref": "#/components/responses/Problem"
@@ -11068,22 +11103,117 @@
     },
     "/orgs/{org}/audit-events/verify": {
       "get": {
+        "tags": [
+          "Audit"
+        ],
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          },
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-device-scope": "audit:read",
+        "x-scoplen-required-browser-scope": "audit:read",
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "omit",
+        "description": "Require exact audit:read, fresh token-bound actual-method/URL DPoP, current Account/Device or browser family, active same-Organization Membership and trusted Cedar view_audit. Existing Owner/Security auditor permits remain; Administrator has no implicit permit. Operator/deployment/Personal-history access is excluded. Reject body, unknown/repeated query names, If-Match and Idempotency-Key; cookie authentication is forbidden. Supplied Origin must equal trusted deployment origin. No refresh cookie is read/set/changed; older refresh ceilings never widen. Recursive duplicate fields, malformed UTF-8/BOM and complete-body overflow fail locally. No export, event mutation or signed cursor. Exactly from_sequence/to_sequence; contiguous inclusive range, no filtered-row verification. Snapshot chain extent includes checkpoint positions. Stream original rows and immediate predecessor under both bounds, check genesis, gaps, hashes/links and every included checkpoint's exact original signed payload. Exceeding either bound is 413 without partial evidence. Adjacent successful chunks join only at consecutive positions and equal boundary hashes; coverage remains interval-only. No whole-chain collection, new trust roots, jobs or receipts.",
         "operationId": "verifyAuditChain",
+        "x-scoplen-query-max-bytes": 128,
+        "x-scoplen-response-max-bytes": 4096,
+        "x-scoplen-max-range-events": 4096,
+        "x-scoplen-max-original-event-bytes": 16777216,
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "from_sequence",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$",
+              "maxLength": 20,
+              "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+            }
+          },
+          {
+            "name": "to_sequence",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$",
+              "maxLength": 20,
+              "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Verification result",
+            "description": "Bounded request-bound integrity result with honest included-checkpoint coverage.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Verification"
+                  "$ref": "#/components/schemas/AuditVerification"
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/AuditInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/AccountEntryAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuditDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/AuditNotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/AuditTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/AccountEntryRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AuditStorageUnavailable"
           },
           "default": {
             "$ref": "#/components/responses/Problem"
@@ -13740,7 +13870,7 @@
         "x-scoplen-response-max-bytes": 8192,
         "x-scoplen-problem-max-bytes": 4096,
         "x-scoplen-fetch-credentials": "same-origin",
-        "x-scoplen-initial-browser-scope": "account:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "x-scoplen-initial-browser-scope": "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
         "parameters": [
           {
             "name": "Origin",
@@ -13846,7 +13976,7 @@
         "x-scoplen-response-max-bytes": 8192,
         "x-scoplen-problem-max-bytes": 4096,
         "x-scoplen-fetch-credentials": "same-origin",
-        "x-scoplen-initial-browser-scope": "account:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "x-scoplen-initial-browser-scope": "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
         "parameters": [
           {
             "name": "Origin",
@@ -16136,6 +16266,276 @@
             }
           }
         }
+      },
+      "AuditInvalidRequest": {
+        "description": "Read failure; no business-state mutation. Unknown historical metadata is retained, not a storage error. Query mandatory transport metadata failures are whole-request 503; determined range integrity failures return a negative result.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "x-scoplen-response-max-bytes": 4096,
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 400
+                    },
+                    "code": {
+                      "const": "organization.invalid_request"
+                    },
+                    "changed": {
+                      "const": false
+                    },
+                    "retryable": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AuditTooLarge": {
+        "description": "Read failure; no business-state mutation. Unknown historical metadata is retained, not a storage error. Query mandatory transport metadata failures are whole-request 503; determined range integrity failures return a negative result.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "x-scoplen-response-max-bytes": 4096,
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 413
+                    },
+                    "code": {
+                      "const": "organization.invalid_request"
+                    },
+                    "changed": {
+                      "const": false
+                    },
+                    "retryable": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AuditDenied": {
+        "description": "Read failure; no business-state mutation. Unknown historical metadata is retained, not a storage error. Query mandatory transport metadata failures are whole-request 503; determined range integrity failures return a negative result.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "x-scoplen-response-max-bytes": 4096,
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 403
+                    },
+                    "code": {
+                      "const": "policy.denied"
+                    },
+                    "changed": {
+                      "const": false
+                    },
+                    "retryable": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AuditNotFound": {
+        "description": "Read failure; no business-state mutation. Unknown historical metadata is retained, not a storage error. Query mandatory transport metadata failures are whole-request 503; determined range integrity failures return a negative result.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "x-scoplen-response-max-bytes": 4096,
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 404
+                    },
+                    "code": {
+                      "const": "organization.not_found"
+                    },
+                    "changed": {
+                      "const": false
+                    },
+                    "retryable": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AuditStorageUnavailable": {
+        "description": "Read failure; no business-state mutation. Unknown historical metadata is retained, not a storage error. Query mandatory transport metadata failures are whole-request 503; determined range integrity failures return a negative result.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "x-scoplen-response-max-bytes": 4096,
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "const": 503
+                    },
+                    "code": {
+                      "const": "organization.storage_unavailable"
+                    },
+                    "changed": {
+                      "const": false
+                    },
+                    "retryable": {
+                      "const": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
     "schemas": {
@@ -17034,25 +17434,6 @@
             "items": {
               "type": "string"
             }
-          }
-        }
-      },
-      "Verification": {
-        "type": "object",
-        "required": [
-          "valid"
-        ],
-        "properties": {
-          "valid": {
-            "type": "boolean"
-          },
-          "first_event": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "last_event": {
-            "type": "string",
-            "format": "uuid"
           }
         }
       },
@@ -22254,6 +22635,347 @@
             }
           }
         ]
+      },
+      "AuditResource": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "organization",
+              "invitation",
+              "membership",
+              "host",
+              "host_group",
+              "access_profile",
+              "route",
+              "trust_record",
+              "snippet",
+              "gateway_network",
+              "group",
+              "policy",
+              "certificate_authority",
+              "certificate"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      },
+      "AuditEvent": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "organization_id",
+          "sequence",
+          "occurred_at",
+          "category",
+          "event_class",
+          "outcome",
+          "actor_account_id",
+          "actor_device_id",
+          "actor_browser_family_id",
+          "resource",
+          "previous_hash",
+          "event_hash"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "sequence": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$",
+            "maxLength": 20,
+            "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]{0,2}[1-9])?Z$",
+            "maxLength": 24,
+            "description": "Valid UTC calendar; exact integer Unix milliseconds. Omit zero fraction; otherwise trim only trailing zeroes from three millisecond digits. No rounding, offsets, leap seconds or sub-millisecond precision. Stored event and checkpoint instants are positive."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "authentication",
+              "authorization",
+              "account_change",
+              "scoplen",
+              "unknown"
+            ]
+          },
+          "event_class": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failure",
+              "unknown"
+            ]
+          },
+          "actor_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actor_device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actor_browser_family_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "event_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64
+          }
+        },
+        "x-scoplen-max-bytes": 2048,
+        "description": "Organization plus sequence is identity. Safe immutable projection, never raw original event/request bytes, secrets or current-directory identity inference. Missing/unclassified historical metadata remains null/unknown; no cryptographic claim is derived from this JSON."
+      },
+      "AuditPage": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,19}$",
+                "maxLength": 20,
+                "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 1048576,
+        "description": "Strictly decreasing unique sequences, below requested cursor and within requested filters/Organization/limit. Each original item including extensions/whitespace <=2048 bytes. Nonnull continuation equals the last nonempty item only when more matching rows exist."
+      },
+      "AuditCheckpoint": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "sequence",
+          "head_hash",
+          "signed_at",
+          "signature"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$",
+            "maxLength": 20,
+            "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+          },
+          "head_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]{0,2}[1-9])?Z$",
+            "maxLength": 24,
+            "description": "Valid UTC calendar; exact integer Unix milliseconds. Omit zero fraction; otherwise trim only trailing zeroes from three millisecond digits. No rounding, offsets, leap seconds or sub-millisecond precision. Stored event and checkpoint instants are positive."
+          },
+          "signature": {
+            "type": "string",
+            "minLength": 86,
+            "maxLength": 86,
+            "pattern": "^[A-Za-z0-9_-]{85}[AQgw]$",
+            "description": "Original 64-byte Ed25519 signature, canonical unpadded base64url. Verify using the already configured independent audit key; no key from this response."
+          }
+        }
+      },
+      "AuditVerification": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "organization_id",
+          "from_sequence",
+          "to_sequence",
+          "checked_events",
+          "valid",
+          "failure_sequence",
+          "previous_hash",
+          "head_hash",
+          "checkpoint",
+          "uncheckpointed_from_sequence"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "from_sequence": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$",
+            "maxLength": 20,
+            "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+          },
+          "to_sequence": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$",
+            "maxLength": 20,
+            "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+          },
+          "checked_events": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$",
+            "maxLength": 20,
+            "description": "Canonical uint64 decimal string including zero; never rounded through a JavaScript number."
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "failure_sequence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,19}$",
+                "maxLength": 20,
+                "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "head_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditCheckpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uncheckpointed_from_sequence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,19}$",
+                "maxLength": 20,
+                "description": "Canonical positive uint64 decimal string <=18446744073709551615; never a JSON number."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 4096,
+        "description": "Bind Organization/range to request. Success has full inclusive checked count, null failure, both hashes and interval-only checkpoint coverage. Failure has first failed selected sequence, checked_events=failure-from and null hashes/checkpoint/coverage. Predecessor failure is from/count0. Highest included checkpoint determines unsigned suffix; absence does not prove no later checkpoint exists. Genesis predecessor is zero; ending checkpoint equals head_hash. Storage failure is a problem."
       }
     }
   },
@@ -22263,6 +22985,22 @@
       "path": "/api/v1/accounts/me",
       "scopes": [
         "account:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/audit-events",
+      "scopes": [
+        "audit:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/audit-events/verify",
+      "scopes": [
+        "audit:read"
       ],
       "writerReceipt": false
     },

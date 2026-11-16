@@ -5,6 +5,16 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`audit.json` contains D-144's independent immutable Event/Page and contiguous Verification
+known answers, missing/null/encoding failures, typed query/range cases and exact UTC calendar
+boundaries. Its Node author uses built-in Date and crypto without Rust or schema helpers;
+checkpoint vectors independently sign the unchanged Organization payload at five millisecond
+fractions. Public Rust tests verify those signatures and payloads using the supplied synthetic
+fixture key, and test request binding, byte budgets and chunk boundaries. Run
+`node scripts/generate-audit-vectors.mjs [--check]` and the corresponding Node test. Matching
+`api_json` seeds exercise public response parsers; none supplies production authority or a
+database/hash-chain implementation.
+
 `portable-age.json` contains three binary age v1 passphrase files produced by Go age v1.3.2.
 The exact public synthetic passphrase includes whitespace, decomposed Unicode and NUL; inputs
 carry its JSON string and standard-base64 ciphertext, and expected values are base64 plaintext.
