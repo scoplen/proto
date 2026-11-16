@@ -12,7 +12,7 @@
       "id": "auth-scope-initial-v1",
       "kind": "auth.scope.initial",
       "input": "first-party-device",
-      "expected": "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
+      "expected": "account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
     },
     {
       "id": "auth-scope-token-account-read-v1",

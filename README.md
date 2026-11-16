@@ -128,6 +128,25 @@ scripted rollback, unknown commit and lost response. It supplies no token/proof 
 durable database, HTTP route or audit chain. Production team creation, native interaction,
 invitations, dissolution and asset permissions remain separate consumer outcomes.
 
+D-144's `audit` module supplies bounded immutable Organization Event/Page codecs, typed
+AND-only search predicates, descending sequence continuation and contiguous verification
+request/result codecs. Sequence and count values retain all `uint64` values as decimal strings;
+Audit times round-trip exact integer milliseconds. Readers bind responses to the captured
+Organization, filters, cursor and range, distinguish integrity from included-checkpoint
+coverage, and compare adjacent chunk boundaries. `AuditCheckpoint::signed_payload` reconstructs
+the unchanged Organization checkpoint bytes; syntax alone authenticates no signature or key.
+Both Device and Account-browser finite maps require exact `audit:read`, without widening
+older refresh ceilings or changing Cedar roles. The provisional mutable audit-event and UUID
+verification declarations are removed from OpenAPI and generated TypeScript. Independent Node
+vectors, public Rust reference cases and parser seeds cover missing/null historical attribution,
+decimal/calendar boundaries, original encoded-item budgets and malformed evidence. The narrow
+`audit::reference` peer rechecks exact profile scopes, current Account/session/membership/tenant
+facts and the existing Cedar `view_audit` action for every read. Its immutable original-response
+scripts cover request binding, integrity failures, storage failures and complete byte bounds;
+it supplies no production projection, database or chain verifier. Production
+query projection, current authorization, bounded original-chain verification, storage and the
+Console workflow remain consumer outcomes.
+
 D-140's independent `account_browser` module supplies four bounded endpoint wrappers over the
 existing password/options, transient login, browser-session and true-only logout shapes.
 It rejects recursive duplicate names and native bootstrap/admission/refresh fields, validates
@@ -850,7 +869,7 @@ response continues to treat the token as opaque.
 
 `scoplen-api::auth` publishes D-107's `DeviceAccessScope`, `INITIAL_DEVICE_ACCESS_SCOPE`,
 and `DeviceAccessOperation`. Initial first-party device issuance uses exactly
-`account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage`; refresh may preserve or narrow its
+`account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage`; refresh may preserve or narrow its
 recorded ceiling, never widen it. The operation registry requires router-owned canonical
 methods and route templates. Unknown protected routes fail closed for this device profile.
 `accepted_scopes()` exposes exact any-of scope alternatives and `has_accepted_scope()` checks
@@ -1166,6 +1185,9 @@ node scripts/generate-inventory-vectors.mjs --check
 node --test scripts/generate-inventory-vectors.test.mjs
 node --test crates/scoplen-api/openapi/generate-inventory.test.mjs
 node scripts/generate-account-browser-vectors.mjs --check
+node scripts/generate-audit-vectors.mjs --check
+node --test scripts/generate-audit-vectors.test.mjs crates/scoplen-api/openapi/generate-audit.test.mjs
+npm exec --yes --package typescript@5.9.3 -- tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler crates/scoplen-api/openapi/audit.types.test.ts
 node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
 node scripts/generate-user-ca-krl-vectors.mjs --check
 node scripts/generate-certificate-problem-vectors.mjs --check

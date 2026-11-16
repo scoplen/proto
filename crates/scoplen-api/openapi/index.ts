@@ -2,6 +2,16 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  AuditResourceKind,
+  AuditCategory,
+  AuditOutcome,
+  AuditResource,
+  AuditEvent,
+  AuditPage,
+  AuditListQuery,
+  AuditRangeQuery,
+  AuditCheckpoint,
+  AuditVerification,
   UserCaCreateRequest,
   UserCaResource,
   UserCaPage,

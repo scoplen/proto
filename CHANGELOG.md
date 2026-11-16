@@ -4,6 +4,15 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-144's bounded immutable Organization audit Event/Page/query/range/result codecs,
+  exact decimal sequences, reversible millisecond timestamps and request/response binding.
+  Preserve the existing checkpoint payload and interval-only signature coverage; validate
+  adjacent chunk boundaries without adding trust, jobs or retained receipts. Add exact
+  `audit:read` Device/browser mappings, independent vectors/reference cases/parser seeds and
+  generated OpenAPI/TypeScript. Remove provisional mutable audit CRUD and UUID verification
+  shapes before Stable. Production authorization, history projection, chain verification,
+  dual-store HTTP and Console acceptance remain separate consumer work.
+
 - Fix the strict-KEX interoperability control by selecting AES-GCM for its non-strict
   injected-packet peer and verifying authentication, command output and exit status. The
   prior ChaCha20 control could stop on shifted packet sequence numbers before disconnect.

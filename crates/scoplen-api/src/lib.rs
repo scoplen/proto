@@ -15,6 +15,7 @@ pub mod account_devices;
 pub mod account_profile;
 pub mod account_rate_reference;
 pub mod account_registration_reference;
+pub mod audit;
 pub mod auth;
 pub mod certificate;
 pub mod certificate_reference;

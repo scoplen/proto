@@ -7,13 +7,15 @@ use uuid::Uuid;
 use super::AccountBrowserCodecError;
 
 /// Exact initial browser ceiling in byte order; never current membership or Cedar authority.
-pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "account:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 /// Registered coarse browser permissions, independent of Device/Operator registries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccountBrowserAccessScope {
     /// Exact `account:read` browser permission.
     AccountRead,
+    /// Exact `audit:read` browser permission; current `view_audit` remains mandatory.
+    AuditRead,
     /// Exact `inventory:read` browser permission.
     InventoryRead,
     /// Exact `inventory:write` browser permission.
@@ -36,8 +38,9 @@ pub enum AccountBrowserAccessScope {
 
 impl AccountBrowserAccessScope {
     /// Every scope in canonical byte order.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::AccountRead,
+        Self::AuditRead,
         Self::InventoryRead,
         Self::InventoryWrite,
         Self::OrganizationCreate,
@@ -53,6 +56,7 @@ impl AccountBrowserAccessScope {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::AccountRead => "account:read",
+            Self::AuditRead => "audit:read",
             Self::InventoryRead => "inventory:read",
             Self::InventoryWrite => "inventory:write",
             Self::OrganizationCreate => "orgs:create",
@@ -81,6 +85,10 @@ impl AccountBrowserAccessScope {
 pub enum AccountBrowserAccessOperation {
     /// `GET /api/v1/accounts/me`.
     AccountProfileRead,
+    /// `GET /api/v1/orgs/{org}/audit-events`.
+    AuditEventList,
+    /// `GET /api/v1/orgs/{org}/audit-events/verify`.
+    AuditRangeVerify,
     /// `POST /api/v1/orgs`.
     OrganizationCreate,
     /// `GET /api/v1/orgs`.
@@ -184,8 +192,10 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 46] = [
+    pub const ALL: [Self; 48] = [
         Self::AccountProfileRead,
+        Self::AuditEventList,
+        Self::AuditRangeVerify,
         Self::OrganizationCreate,
         Self::OrganizationList,
         Self::OrganizationRead,
@@ -236,6 +246,9 @@ impl AccountBrowserAccessOperation {
     #[must_use]
     pub const fn requirement(self) -> AccountBrowserAccessRequirement {
         match self {
+            Self::AuditEventList | Self::AuditRangeVerify => {
+                AccountBrowserAccessRequirement::AnyScope(&[AccountBrowserAccessScope::AuditRead])
+            }
             Self::AccountProfileRead => {
                 AccountBrowserAccessRequirement::AnyScope(&[AccountBrowserAccessScope::AccountRead])
             }
@@ -313,7 +326,9 @@ impl AccountBrowserAccessOperation {
     #[must_use]
     pub const fn http_method(self) -> &'static str {
         match self {
-            Self::AccountProfileRead
+            Self::AuditEventList
+            | Self::AuditRangeVerify
+            | Self::AccountProfileRead
             | Self::OrganizationList
             | Self::OrganizationRead
             | Self::TeamInvitationList
@@ -365,6 +380,8 @@ impl AccountBrowserAccessOperation {
     pub const fn route_template(self) -> &'static str {
         match self {
             Self::AccountProfileRead => "/api/v1/accounts/me",
+            Self::AuditEventList => "/api/v1/orgs/{org}/audit-events",
+            Self::AuditRangeVerify => "/api/v1/orgs/{org}/audit-events/verify",
             Self::OrganizationCreate | Self::OrganizationList => "/api/v1/orgs",
             Self::OrganizationRead | Self::OrganizationUpdate => "/api/v1/orgs/{org}",
             Self::TeamInvitationCreate | Self::TeamInvitationList => {

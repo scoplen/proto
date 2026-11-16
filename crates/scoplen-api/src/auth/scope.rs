@@ -5,13 +5,15 @@
 ///
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
-pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
+pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeviceAccessScope {
     /// Read the current device's account profile and signed device statements.
     AccountRead,
+    /// Read Organization audit projections and contiguous verification under current policy.
+    AuditRead,
     /// Read current Organization user-CA public trust.
     CaRead,
     /// Provision an Organization local user CA under current policy.
@@ -48,8 +50,9 @@ pub enum DeviceAccessScope {
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::AccountRead,
+        Self::AuditRead,
         Self::CaRead,
         Self::CaWrite,
         Self::CertificatesIssue,
@@ -73,6 +76,7 @@ impl DeviceAccessScope {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::AccountRead => "account:read",
+            Self::AuditRead => "audit:read",
             Self::CaRead => "ca:read",
             Self::CaWrite => "ca:write",
             Self::CertificatesIssue => "certificates:issue",
@@ -119,6 +123,10 @@ pub enum DeviceAccessOperation {
     AccountProfileRead,
     /// Read the complete current-account signed device-statement snapshot.
     AccountDevicesRead,
+    /// Search an Organization's immutable audit timeline.
+    AuditEventList,
+    /// Verify a contiguous unfiltered Organization audit interval.
+    AuditRangeVerify,
     /// Create an Organization with the current Account as its initial owner.
     OrganizationCreate,
     /// List the current Account's own active Organization memberships.
@@ -283,9 +291,11 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 82] = [
+    pub const ALL: [Self; 84] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
+        Self::AuditEventList,
+        Self::AuditRangeVerify,
         Self::OrganizationCreate,
         Self::OrganizationList,
         Self::OrganizationRead,
@@ -375,6 +385,7 @@ impl DeviceAccessOperation {
     #[must_use]
     pub const fn accepted_scopes(self) -> &'static [DeviceAccessScope] {
         match self {
+            Self::AuditEventList | Self::AuditRangeVerify => &[DeviceAccessScope::AuditRead],
             Self::AccountProfileRead | Self::AccountDevicesRead => {
                 &[DeviceAccessScope::AccountRead]
             }
@@ -475,7 +486,9 @@ impl DeviceAccessOperation {
     #[must_use]
     pub const fn http_method(self) -> &'static str {
         match self {
-            Self::AccountProfileRead
+            Self::AuditEventList
+            | Self::AuditRangeVerify
+            | Self::AccountProfileRead
             | Self::AccountDevicesRead
             | Self::OrganizationList
             | Self::OrganizationRead
@@ -565,6 +578,8 @@ impl DeviceAccessOperation {
         match self {
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
+            Self::AuditEventList => "/api/v1/orgs/{org}/audit-events",
+            Self::AuditRangeVerify => "/api/v1/orgs/{org}/audit-events/verify",
             Self::OrganizationCreate | Self::OrganizationList => "/api/v1/orgs",
             Self::OrganizationRead | Self::OrganizationUpdate => "/api/v1/orgs/{org}",
             Self::TeamInvitationCreate | Self::TeamInvitationList => {

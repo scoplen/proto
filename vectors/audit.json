@@ -1,0 +1,942 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "audit-browser-event-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}"
+    },
+    {
+      "id": "audit-unknown-event-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"18446744073709551615\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"unknown\",\"event_class\":\"future.unclassified\",\"outcome\":\"unknown\",\"actor_account_id\":null,\"actor_device_id\":null,\"actor_browser_family_id\":null,\"resource\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"18446744073709551615\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"unknown\",\"event_class\":\"future.unclassified\",\"outcome\":\"unknown\",\"actor_account_id\":null,\"actor_device_id\":null,\"actor_browser_family_id\":null,\"resource\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}"
+    },
+    {
+      "id": "audit-event-missing-organization_id-v1",
+      "kind": "audit.event",
+      "input": "{\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-sequence-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-occurred_at-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-category-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-event_class-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-outcome-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-actor_account_id-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-actor_device_id-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-actor_browser_family_id-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-resource-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-previous_hash-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-missing-event_hash-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-null-organization_id-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":null,\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-null-sequence-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":null,\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-null-occurred_at-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":null,\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-null-category-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":null,\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-null-outcome-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":null,\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-null-previous_hash-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":null,\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-null-event_hash-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-sequence-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"0\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-sequence-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"01\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-sequence-2-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"+1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-sequence-3-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"18446744073709551616\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-sequence-4-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":9007199254740992,\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-occurred_at-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"1970-01-01T00:00:00Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-occurred_at-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-02-30T00:00:00Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-occurred_at-2-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.010Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-organization_id-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191D3E0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-organization_id-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-4000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-category-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":null,\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-category-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"future\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-event_class-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"single\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-event_class-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"future.<script>\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-event_class-2-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"a.\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-outcome-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":null,\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-outcome-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"ok\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-actor_account_id-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"unknown\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-previous_hash-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-previous_hash-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-resource-0-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"unknown\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-resource-1-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-extension-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\",\"extension\":{\"ignored\":true}}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}"
+    },
+    {
+      "id": "audit-event-duplicate-extension-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\",\"extension\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-event-bom-v1",
+      "kind": "audit.event",
+      "input": "﻿{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-page-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740992\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}],\"next_cursor\":\"9007199254740992\"}",
+      "expected": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740992\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}],\"next_cursor\":\"9007199254740992\"}"
+    },
+    {
+      "id": "audit-empty-page-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[],\"next_cursor\":null}",
+      "expected": "{\"items\":[],\"next_cursor\":null}"
+    },
+    {
+      "id": "audit-page-ascending-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740992\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}],\"next_cursor\":\"9007199254740992\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-page-duplicate-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}],\"next_cursor\":\"9007199254740993\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-page-empty-cursor-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[],\"next_cursor\":\"1\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-page-wrong-cursor-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740992\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}],\"next_cursor\":\"9007199254740993\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-page-missing-null-cursor-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[]}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-page-null-items-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":null,\"next_cursor\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-page-numeric-cursor-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740993\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"9007199254740992\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"account_change\",\"event_class\":\"organization.groups_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"group\",\"id\":\"0191d3e0-8000-7000-8000-000000000003\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"08625d37d0bc8a5d84170aefd357d14308a56a73345ef1f7dc598a7a76a10c18\"}],\"next_cursor\":9007199254740992}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-55-v1",
+      "kind": "audit.timestamp",
+      "input": "0000-01-01T00:00:00Z",
+      "expected": "-62167219200000"
+    },
+    {
+      "id": "audit-timestamp-56-v1",
+      "kind": "audit.timestamp",
+      "input": "0000-02-29T00:00:00.001Z",
+      "expected": "-62162121599999"
+    },
+    {
+      "id": "audit-timestamp-57-v1",
+      "kind": "audit.timestamp",
+      "input": "1969-12-31T23:59:59.999Z",
+      "expected": "-1"
+    },
+    {
+      "id": "audit-timestamp-58-v1",
+      "kind": "audit.timestamp",
+      "input": "1970-01-01T00:00:00Z",
+      "expected": "0"
+    },
+    {
+      "id": "audit-timestamp-59-v1",
+      "kind": "audit.timestamp",
+      "input": "2000-02-29T12:34:56.01Z",
+      "expected": "951827696010"
+    },
+    {
+      "id": "audit-timestamp-60-v1",
+      "kind": "audit.timestamp",
+      "input": "2026-11-17T00:00:00.1Z",
+      "expected": "1794873600100"
+    },
+    {
+      "id": "audit-timestamp-61-v1",
+      "kind": "audit.timestamp",
+      "input": "9999-12-31T23:59:59.999Z",
+      "expected": "253402300799999"
+    },
+    {
+      "id": "audit-timestamp-62-v1",
+      "kind": "audit.timestamp",
+      "input": "1900-02-29T00:00:00Z",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-63-v1",
+      "kind": "audit.timestamp",
+      "input": "2026-02-29T00:00:00Z",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-64-v1",
+      "kind": "audit.timestamp",
+      "input": "2026-11-17T00:00:60Z",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-65-v1",
+      "kind": "audit.timestamp",
+      "input": "2026-11-17T00:00:00.0Z",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-66-v1",
+      "kind": "audit.timestamp",
+      "input": "2026-11-17T00:00:00.010Z",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-67-v1",
+      "kind": "audit.timestamp",
+      "input": "2026-11-17T00:00:00.0001Z",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-68-v1",
+      "kind": "audit.timestamp",
+      "input": "2026-11-17T00:00:00+00:00",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-timestamp-69-v1",
+      "kind": "audit.timestamp",
+      "input": "10000-01-01T00:00:00Z",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-70-v1",
+      "kind": "audit.query",
+      "input": "[]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-71-v1",
+      "kind": "audit.query",
+      "input": "[[\"limit\",\"500\"],[\"cursor\",\"18446744073709551615\"],[\"sort\",\"-sequence\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-72-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"occurred_at ge \\\"2026-11-01T00:00:00Z\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-73-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"occurred_at lt \\\"2026-12-01T00:00:00Z\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-74-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"actor_account_id eq \\\"0191d3e0-8000-7000-8000-000000000002\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-75-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"resource eq \\\"group:0191d3e0-8000-7000-8000-000000000003\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-76-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"event_class eq \\\"future.unclassified\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-77-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"outcome eq \\\"unknown\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-78-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"occurred_at ge \\\"2026-11-01T00:00:00Z\\\" and occurred_at lt \\\"2026-12-01T00:00:00Z\\\" and actor_account_id eq \\\"0191d3e0-8000-7000-8000-000000000002\\\" and resource eq \\\"group:0191d3e0-8000-7000-8000-000000000003\\\" and event_class eq \\\"future.unclassified\\\" and outcome eq \\\"unknown\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-query-79-v1",
+      "kind": "audit.query",
+      "input": "[[\"limit\",\"0\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-80-v1",
+      "kind": "audit.query",
+      "input": "[[\"limit\",\"501\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-81-v1",
+      "kind": "audit.query",
+      "input": "[[\"cursor\",\"01\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-82-v1",
+      "kind": "audit.query",
+      "input": "[[\"cursor\",\"18446744073709551616\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-83-v1",
+      "kind": "audit.query",
+      "input": "[[\"sort\",\"sequence\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-84-v1",
+      "kind": "audit.query",
+      "input": "[[\"limit\",\"1\"],[\"limit\",\"2\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-85-v1",
+      "kind": "audit.query",
+      "input": "[[\"from_sequence\",\"1\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-86-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-87-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"occurred_at ge \\\"2026-11-01T00:00:00Z\\\" and occurred_at ge \\\"2026-11-01T00:00:00Z\\\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-88-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"outcome eq \\\"success\\\" or outcome eq \\\"failure\\\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-89-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"outcome eq \\\"suc\\\\cess\\\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-90-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"event_class eq \\\"é.event\\\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-query-91-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"occurred_at ge \\\"2026-12-01T00:00:00Z\\\" and occurred_at lt \\\"2026-11-01T00:00:00Z\\\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-range-92-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"1\"],[\"to_sequence\",\"4096\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-range-93-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"18446744073709551615\"],[\"to_sequence\",\"18446744073709551615\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-range-94-v1",
+      "kind": "audit.range",
+      "input": "[]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-range-95-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"0\"],[\"to_sequence\",\"1\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-range-96-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"2\"],[\"to_sequence\",\"1\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-range-97-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"1\"],[\"to_sequence\",\"4097\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-range-98-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"1\"],[\"to_sequence\",\"18446744073709551615\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-range-99-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"01\"],[\"to_sequence\",\"1\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-range-100-v1",
+      "kind": "audit.range",
+      "input": "[[\"from_sequence\",\"1\"],[\"to_sequence\",\"1\"],[\"cursor\",\"1\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-operation-101-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "audit:read"
+    },
+    {
+      "id": "audit-operation-102-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-103-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-104-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-105-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"get\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-106-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "audit:read"
+    },
+    {
+      "id": "audit-operation-107-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-108-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-109-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-110-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"get\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-111-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"device\",\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-112-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "audit:read"
+    },
+    {
+      "id": "audit-operation-113-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-114-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-115-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-116-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"get\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-117-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "audit:read"
+    },
+    {
+      "id": "audit-operation-118-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-119-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-120-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-121-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"get\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-operation-122-v1",
+      "kind": "audit.operation",
+      "input": "{\"profile\":\"account-browser\",\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "audit-checkpoint-0-v1",
+      "kind": "audit.checkpoint",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"public_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"original_event_hex\":\"7b22616374696f6e223a226f7267616e697a6174696f6e2e67726f7570735f63726561746564222c226163636f756e745f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303032222c2262726f777365725f66616d696c795f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303033227d\"}",
+      "expected": "73706c2d61756469742d636865636b706f696e742d76310191d3e08000700080000000000000010000000000000001704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2000001a1e6cda800"
+    },
+    {
+      "id": "audit-checkpoint-1-v1",
+      "kind": "audit.checkpoint",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00.001Z\",\"signature\":\"zaV_ApC1VbgzI9wglR3mVNFbxx_8aSwdXm7MgwxjOpopfIBc21wHlZwYYXvmq9HFk8bZPwcduT312kIJS9CECw\"},\"public_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"original_event_hex\":\"7b22616374696f6e223a226f7267616e697a6174696f6e2e67726f7570735f63726561746564222c226163636f756e745f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303032222c2262726f777365725f66616d696c795f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303033227d\"}",
+      "expected": "73706c2d61756469742d636865636b706f696e742d76310191d3e08000700080000000000000010000000000000001704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2000001a1e6cda801"
+    },
+    {
+      "id": "audit-checkpoint-10-v1",
+      "kind": "audit.checkpoint",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00.01Z\",\"signature\":\"bByUvqzfhQtoNwbvlsD0dDwnRwGVY7K6UGDfuM0v0nZmBbRJqyNlm4yPAl2JMuglxQKYbHDaoaP1lgXd6lfUAg\"},\"public_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"original_event_hex\":\"7b22616374696f6e223a226f7267616e697a6174696f6e2e67726f7570735f63726561746564222c226163636f756e745f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303032222c2262726f777365725f66616d696c795f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303033227d\"}",
+      "expected": "73706c2d61756469742d636865636b706f696e742d76310191d3e08000700080000000000000010000000000000001704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2000001a1e6cda80a"
+    },
+    {
+      "id": "audit-checkpoint-100-v1",
+      "kind": "audit.checkpoint",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00.1Z\",\"signature\":\"3EAggSgqkEsYjQKCyLdflJKsL6yLVP50FSpTszBK6f7vHA296JnVkcVJrAQE5qPk6KVcrISfzt_PLKLV_jANAw\"},\"public_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"original_event_hex\":\"7b22616374696f6e223a226f7267616e697a6174696f6e2e67726f7570735f63726561746564222c226163636f756e745f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303032222c2262726f777365725f66616d696c795f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303033227d\"}",
+      "expected": "73706c2d61756469742d636865636b706f696e742d76310191d3e08000700080000000000000010000000000000001704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2000001a1e6cda864"
+    },
+    {
+      "id": "audit-checkpoint-999-v1",
+      "kind": "audit.checkpoint",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00.999Z\",\"signature\":\"UJQ8NWeKbuM3rHVjCR_5U_iqve4J13MLsCztBuRtn9KpiBsM5LnTV3C329AbXyIyRmLwA2lk1H-WEEAokXseBg\"},\"public_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"original_event_hex\":\"7b22616374696f6e223a226f7267616e697a6174696f6e2e67726f7570735f63726561746564222c226163636f756e745f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303032222c2262726f777365725f66616d696c795f6964223a2230313931643365302d383030302d373030302d383030302d303030303030303030303033227d\"}",
+      "expected": "73706c2d61756469742d636865636b706f696e742d76310191d3e08000700080000000000000010000000000000001704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2000001a1e6cdabe7"
+    },
+    {
+      "id": "audit-verification-checkpoint-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}"
+    },
+    {
+      "id": "audit-verification-unsigned-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":null,\"uncheckpointed_from_sequence\":\"1\"}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":null,\"uncheckpointed_from_sequence\":\"1\"}"
+    },
+    {
+      "id": "audit-verification-failure-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"0\",\"valid\":false,\"failure_sequence\":\"1\",\"previous_hash\":null,\"head_hash\":null,\"checkpoint\":null,\"uncheckpointed_from_sequence\":null}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"0\",\"valid\":false,\"failure_sequence\":\"1\",\"previous_hash\":null,\"head_hash\":null,\"checkpoint\":null,\"uncheckpointed_from_sequence\":null}"
+    },
+    {
+      "id": "audit-verification-missing-organization_id-v1",
+      "kind": "audit.verification",
+      "input": "{\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-from_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-to_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-checked_events-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-valid-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-failure_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-previous_hash-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-head_hash-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-checkpoint-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-missing-uncheckpointed_from_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-null-organization_id-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":null,\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-null-from_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":null,\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-null-to_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":null,\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-null-checked_events-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":null,\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-null-valid-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":null,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-checkpoint-missing-sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-checkpoint-missing-head_hash-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-checkpoint-missing-signed_at-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-checkpoint-missing-signature-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-checked_events-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"0\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-failure_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":\"1\",\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-previous_hash-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":null,\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-head_hash-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-uncheckpointed_from_sequence-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg\"},\"uncheckpointed_from_sequence\":\"1\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-verification-signature-padding-v1",
+      "kind": "audit.verification",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"from_sequence\":\"1\",\"to_sequence\":\"1\",\"checked_events\":\"1\",\"valid\":true,\"failure_sequence\":null,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"checkpoint\":{\"sequence\":\"1\",\"head_hash\":\"704dbba43329c463ccec6d0390090891f7d70971d8e892909c1758126f2f4da2\",\"signed_at\":\"2026-11-17T00:00:00Z\",\"signature\":\"SfFIUxm3Yf6Oy54dyaDVnBji-9kjucG6PblK92AuDrEDUoHJgrTjnllBiGt-kE365Ix6JoMK3SbuYAHie7_kBg==\"},\"uncheckpointed_from_sequence\":null}",
+      "expected": "rejected"
+    }
+  ]
+}

@@ -35,14 +35,19 @@ jobs:
         run: node --test crates/scoplen-api/openapi/generate-account-admission.test.mjs
       - name: Test Account browser OpenAPI contract checks
         run: node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
-      - name: Test browser and user-CA public TypeScript contracts
+      - name: Test browser, audit and user-CA public TypeScript contracts
         run: >-
           npm exec --yes --package typescript@5.9.3 --
           tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler
           crates/scoplen-api/openapi/account-browser.types.test.ts
+          crates/scoplen-api/openapi/audit.types.test.ts
           crates/scoplen-api/openapi/user-ca-krl.types.test.ts
       - name: Check Account browser vectors and parser bounds
         run: node scripts/generate-account-browser-vectors.mjs --check
+      - name: Check Organization audit vectors and parser bounds
+        run: node scripts/generate-audit-vectors.mjs --check
+      - name: Test Organization audit contracts and independent vector producer
+        run: node --test crates/scoplen-api/openapi/generate-audit.test.mjs scripts/generate-audit-vectors.test.mjs
       - name: Check Account entry vectors and parser bounds
         run: node scripts/generate-account-admission-vectors.mjs --check
       - name: Test team creation and discovery OpenAPI contract checks
