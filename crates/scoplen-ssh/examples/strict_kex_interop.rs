@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use russh::{kex, server};
+use russh::{cipher, kex, server};
 use scoplen_ssh::{
     ChannelEvent, ClientConfig, ClientConnection, ClientError, HostKey, HostKeyVerificationError,
 };
@@ -28,6 +28,8 @@ const DEADLINE: Duration = Duration::from_secs(10);
 const IGNORE_PACKET: [u8; 16] = [0, 0, 0, 12, 6, 2, 0, 0, 0, 0, 0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6];
 const STRICT_SERVER_MARKER: &[u8] = b"kex-strict-s-v00@openssh.com";
 const COMMAND_OUTPUT: &[u8] = b"scoplen-strict-kex-ok";
+const CONTROL_USER: &str = "control-user";
+const CONTROL_PASSWORD: &str = "control-password";
 
 #[derive(Clone, Copy, Debug)]
 enum InjectionPoint {
@@ -50,13 +52,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let connection =
         timeout(DEADLINE, ClientConnection::connect_stream(control_config, control_stream))
             .await??;
-    verify_command(connection, &username, &password).await?;
+    verify_command(connection, &username, &password)
+        .await
+        .map_err(|error| format!("OpenSSH control: {error}"))?;
     require_checks(&control_checks, 1, "OpenSSH control")?;
 
     for point in [InjectionPoint::BeforeKexInit, InjectionPoint::AfterKexInit] {
         let (strict_config, strict_checks) =
             pinned_config("strict-injected.example.test", openssh_port, &expected_key)?;
-        let result = connect_with_ignore(strict_config, openssh_port, true, point).await?;
+        let result = connect_with_ignore(strict_config, openssh_port, true, point)
+            .await
+            .map_err(|error| format!("strict OpenSSH at {point:?}: {error}"))?;
         if !matches!(result, Err(ClientError::Protocol)) {
             return Err(format!(
                 "strict OpenSSH connection did not reject IGNORE at {point:?}: {result:?}"
@@ -66,6 +72,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         require_checks(&strict_checks, 0, "strict OpenSSH rejection")?;
     }
 
+    verify_non_strict_controls().await?;
+
+    println!(
+        "OpenSSH strict KEX accepted the control, rejected IGNORE before and after KEXINIT, and non-strict KEX accepted both packets"
+    );
+    Ok(())
+}
+
+async fn verify_non_strict_controls() -> Result<(), Box<dyn Error>> {
     let server_key = PrivateKey::random(
         &mut ssh_key::rand_core::UnwrapErr(ssh_key::getrandom::SysRng),
         Algorithm::Ed25519,
@@ -74,6 +89,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut server_config = server::Config::default();
     server_config.keys.push(server_key);
     server_config.preferred.kex = Cow::Borrowed(&[kex::CURVE25519]);
+    // Injecting an uncounted packet shifts the SSH sequence number. GCM uses its
+    // own invocation counter, so this control isolates packet admission rather
+    // than failing later while decrypting a sequence-bound ChaCha20 packet.
+    server_config.preferred.cipher = Cow::Borrowed(&[cipher::AES_256_GCM]);
     let server_config = Arc::new(server_config);
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let no_strict_port = listener.local_addr()?.port();
@@ -95,14 +114,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for point in [InjectionPoint::BeforeKexInit, InjectionPoint::AfterKexInit] {
         let (no_strict_config, no_strict_checks) =
             pinned_config("no-strict.example.test", no_strict_port, &no_strict_key)?;
-        connect_with_ignore(no_strict_config, no_strict_port, false, point).await??;
+        connect_with_ignore(no_strict_config, no_strict_port, false, point)
+            .await
+            .map_err(|error| format!("non-strict control at {point:?}: {error}"))?
+            .map_err(|error| format!("non-strict control client at {point:?}: {error}"))?;
         require_checks(&no_strict_checks, 1, "non-strict control")?;
     }
     timeout(DEADLINE, server_task).await???;
 
-    println!(
-        "OpenSSH strict KEX accepted the control, rejected IGNORE before and after KEXINIT, and non-strict KEX accepted both packets"
-    );
     Ok(())
 }
 
@@ -110,6 +129,45 @@ struct NoStrictServer;
 
 impl server::Handler for NoStrictServer {
     type Error = russh::Error;
+
+    async fn auth_password(
+        &mut self,
+        user: &str,
+        password: &str,
+    ) -> Result<server::Auth, Self::Error> {
+        Ok(if user == CONTROL_USER && password == CONTROL_PASSWORD {
+            server::Auth::Accept
+        } else {
+            server::Auth::reject()
+        })
+    }
+
+    async fn channel_open_session(
+        &mut self,
+        _channel: russh::Channel<server::Msg>,
+        reply: server::ChannelOpenHandle,
+        _session: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        reply.accept().await;
+        Ok(())
+    }
+
+    async fn exec_request(
+        &mut self,
+        channel: russh::ChannelId,
+        command: &[u8],
+        session: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        if command != b"printf scoplen-strict-kex-ok" {
+            return Err(russh::Error::Inconsistent);
+        }
+        session.channel_success(channel)?;
+        session.data(channel, COMMAND_OUTPUT.to_vec())?;
+        session.exit_status_request(channel, 0)?;
+        session.eof(channel)?;
+        session.close(channel)?;
+        Ok(())
+    }
 }
 
 fn pinned_config(
@@ -161,6 +219,12 @@ async fn connect_with_ignore(
         }
     };
     let outcome = match connection {
+        Ok(connection) if !server_advertises_strict => {
+            verify_command(connection, CONTROL_USER, CONTROL_PASSWORD)
+                .await
+                .map_err(|error| format!("non-strict authenticated command: {error}"))?;
+            Ok(())
+        }
         Ok(connection) => match timeout(DEADLINE, connection.disconnect()).await {
             Ok(outcome) => outcome,
             Err(error) => {
@@ -426,5 +490,10 @@ mod tests {
         assert!(!is_expected_relay_abort(&aborted, true, true, &control_success));
         assert!(!is_expected_relay_abort(&aborted, true, false, &strict_rejection));
         assert!(!is_expected_relay_abort(&invalid, true, true, &strict_rejection));
+    }
+
+    #[tokio::test]
+    async fn non_strict_control_accepts_ignore_at_both_injection_points() {
+        super::verify_non_strict_controls().await.unwrap();
     }
 }
