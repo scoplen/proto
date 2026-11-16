@@ -19,6 +19,17 @@ XChaCha20-Poly1305, HKDF-SHA-256, Argon2id, P-256 and Ed25519 signatures, and HP
 for device and account recipients. The published K-2 known-answer set is exercised through the
 `scoplen-crypto` public API, including account/request-bound escrow share contexts and the
 administrator recovery verification code and encrypted hierarchy formats.
+
+D-142 adds the named portable JSON Schema and streaming codecs in
+[`scoplen-model::portable`](crates/scoplen-model/README.md). They preserve all eleven K-1 types,
+exact integers and arbitrary CBOR leaves, and distinguish omitted secrets from complete Objects.
+The optional `scoplen-crypto/portable-export` feature supplies standard binary age v1 passphrase
+streams through the maintained age 0.11.5 library. Readers must validate JSON EOF and authenticate
+the complete age payload before a consumer commits imported state; writers must finish before
+publishing output. Neither codec supplies destination authorization, reference remapping,
+receipts, imported-trust consent or native import/export interaction. Independent portable
+vectors and Go age 1.3.2 interoperability cover the shared boundary.
+
 Historical whole-Account escrow exports do not implement D-126 Organization-scoped recovery;
 their removal remains roadmap work.
 D-128 adds five native Account entry routes with JSON codecs, exact protected registration/admission
@@ -1130,10 +1141,15 @@ ECDSA private scalars in OpenSSH files. Its provenance, narrow patch and removal
 recorded in [vendor/ssh-key/PATCHES.md](vendor/ssh-key/PATCHES.md). A consumer using these crates
 must apply the same `ssh-key` patch in its own Cargo workspace; dependency patches do not propagate.
 
+The age dependency's translation proc macros still use the unmaintained `basic-toml` and
+`proc-macro-error2` build dependencies. Their maintenance advisories report no vulnerability;
+`deny.toml` records these two explicit compile-time exceptions until age replaces them.
+
 ```text
 cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets --all-features -- -D warnings
+node scripts/portable-age-interop.mjs
 node crates/scoplen-api/openapi/generate.mjs --check
 node --test crates/scoplen-api/openapi/generate-operator.test.mjs
 node scripts/generate-operator-logout-vectors.mjs --check
@@ -1175,7 +1191,7 @@ comparison runs with `cargo run --locked --release -p scoplen-ssh --example keys
 The methods and limits are in [docs/ssh-keystroke-latency.md](docs/ssh-keystroke-latency.md).
 
 The tracked `fuzz/corpus/<target>/seed-*` files provide synthetic valid and malformed
-inputs for all ten parser targets. Valid model and certificate inputs come from the published
+inputs for the parser targets. Valid model and certificate inputs come from the published
 known-answer vectors in `vectors/baseline.json` and `vectors/crypto.json`; SSH, SFTP, and agent
 frames follow the public codec tests. The `sync_notification` target checks context, credentials,
 acknowledgements, and events through their public codecs and requires accepted messages to
@@ -1188,6 +1204,8 @@ including canonical encoding stability after ignored response extensions. Explic
 resource profiles exercise the bounded session, read, write, and version-history entrypoints.
 Their synthetic seeds derive from published K-4 vectors and include malformed key updates,
 truncated CBOR, and the exact and exceeded session, query, and acknowledgement input bounds.
+The `model_portable` target checks the strict public streaming JSON reader,
+including the independent `vectors/model-portable.json` examples and malformed framing.
 The Linux change check replays every target's corpus, and
 the daily five-minute fuzz run starts from the same seeds. Both use `nightly-2026-10-26` and
 `cargo-fuzz` 0.13.2. On Linux, replay one target with

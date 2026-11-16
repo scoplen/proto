@@ -30,6 +30,9 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   Argon2id-v19, separate authentication/KEK outputs, the exact ARK envelope and reconstruction of
   both Account roots, with independent vectors, failure tests and bounded parser fuzz targets.
   Transport, freshness and credential lifecycle remain consumer work under D-128.
+  D-142 adds named portable JSON codecs and an optional standard age passphrase container;
+  native authorization, receipts, reference remapping, imported-trust consent and atomic
+  publication remain separate consumer outcomes.
   S4 has a concrete client adapter for transport, authentication, channels, routes, and SFTP,
   with per-Host algorithm, incoming/outgoing byte and elapsed rekey configuration, and initial and
   repeated strict-KEX interoperability verification; complete algorithm/extension support, default compatibility, interoperability, and performance remain

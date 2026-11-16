@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-142's named portable JSON Schema, streaming eleven-type snapshot codecs and precise
+  secret-omission descriptions. Add optional standard age v1 passphrase streams, independent
+  vectors, parser seeds and pinned Go age interoperability. Native authorization, receipts,
+  reference remapping, imported-trust consent and atomic publication remain consumer outcomes.
+
 - Add D-141's bounded initial OpenSSH KRL serial-list codec, authenticated Device read mapping,
   distinct revoked/quota problems, independent vectors and generated API types. A narrow
   reference peer models current-authority receipt recovery, membership revocation and fresh

@@ -1,0 +1,1619 @@
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "scoplen-export"
+    },
+    "model_version": {
+      "const": 1
+    },
+    "exported_at": {
+      "$ref": "#/$defs/uint"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "device",
+            "organization"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ]
+    },
+    "secrets": {
+      "enum": [
+        "omitted",
+        "included"
+      ]
+    },
+    "objects": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "model_version",
+    "exported_at",
+    "source",
+    "secrets",
+    "objects"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:scoplen:portable-export:1",
+  "title": "Scoplen portable inventory snapshot version 1",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "uint": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 16384,
+      "$comment": "NFC and maximum 16384 UTF-8 bytes are additionally enforced by the codec."
+    },
+    "bytes": {
+      "type": "string",
+      "maxLength": 349526,
+      "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$"
+    },
+    "bool": {
+      "type": "boolean"
+    },
+    "any": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/bool"
+        },
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "uint": {
+              "type": "string",
+              "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "uint"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "nint": {
+              "type": "string",
+              "pattern": "^-(?:[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-5]|18446744073709551616)$"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "nint"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "$ref": "#/$defs/bytes"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "bytes"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "array": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/any"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "array"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "map": {
+              "type": "array",
+              "maxItems": 4096,
+              "items": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "$ref": "#/$defs/any"
+                  },
+                  {
+                    "$ref": "#/$defs/any"
+                  }
+                ],
+                "items": false,
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "map"
+          ]
+        }
+      ],
+      "$comment": "Duplicate represented map keys, CBOR depth 128 and complete Object byte budgets are checked by the codec."
+    },
+    "device": {
+      "type": "object",
+      "properties": {
+        "public_key": {
+          "$ref": "#/$defs/text"
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "public_key",
+        "label"
+      ]
+    },
+    "variable": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "default": {
+          "$ref": "#/$defs/any"
+        },
+        "choices": {
+          "type": "object",
+          "properties": {
+            "array": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/any"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "array"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ]
+    },
+    "session": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "$ref": "#/$defs/uuid"
+        },
+        "kind": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "forward": {
+          "$ref": "#/$defs/uuid"
+        },
+        "working_directory": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "kind"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": 3
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "forward"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "forward"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "textMap": {
+      "type": "object",
+      "maxProperties": 4096,
+      "additionalProperties": {
+        "$ref": "#/$defs/text"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "uuidBoolMap": {
+      "type": "object",
+      "maxProperties": 4096,
+      "additionalProperties": {
+        "$ref": "#/$defs/bool"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/uuid"
+      }
+    },
+    "textBoolMap": {
+      "type": "object",
+      "maxProperties": 4096,
+      "additionalProperties": {
+        "$ref": "#/$defs/bool"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "deviceMap": {
+      "type": "object",
+      "maxProperties": 4096,
+      "additionalProperties": {
+        "$ref": "#/$defs/device"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/uuid"
+      }
+    },
+    "variableMap": {
+      "type": "object",
+      "maxProperties": 4096,
+      "additionalProperties": {
+        "$ref": "#/$defs/variable"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "sessionMap": {
+      "type": "object",
+      "maxProperties": 4096,
+      "additionalProperties": {
+        "$ref": "#/$defs/session"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/uuid"
+      }
+    },
+    "uuids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/uuid"
+      }
+    },
+    "route": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/uuid"
+        },
+        {
+          "const": 0
+        }
+      ]
+    },
+    "Host": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Host"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "address": {
+              "$ref": "#/$defs/text"
+            },
+            "port": {
+              "$ref": "#/$defs/uint"
+            },
+            "tags": {
+              "$ref": "#/$defs/textMap"
+            },
+            "groups": {
+              "$ref": "#/$defs/uuidBoolMap"
+            },
+            "favorite": {
+              "$ref": "#/$defs/bool"
+            },
+            "notes": {
+              "$ref": "#/$defs/text"
+            },
+            "default_profile": {
+              "$ref": "#/$defs/uuid"
+            },
+            "ssh_options": {
+              "$ref": "#/$defs/textMap"
+            },
+            "mosh": {
+              "$ref": "#/$defs/textMap"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "address"
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "AccessProfile": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "AccessProfile"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "$ref": "#/$defs/uuid"
+            },
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "username": {
+              "$ref": "#/$defs/text"
+            },
+            "credential": {
+              "$ref": "#/$defs/uuid"
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "terminal_profile": {
+              "$ref": "#/$defs/text"
+            },
+            "startup_command": {
+              "$ref": "#/$defs/text"
+            },
+            "forwards": {
+              "$ref": "#/$defs/uuidBoolMap"
+            },
+            "agent_forwarding": {
+              "$ref": "#/$defs/bool"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "host",
+            "username"
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "Credential": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Credential"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "kind": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "binding": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "secret": {
+              "$ref": "#/$defs/bytes"
+            },
+            "devices": {
+              "$ref": "#/$defs/deviceMap"
+            },
+            "public_key": {
+              "$ref": "#/$defs/text"
+            },
+            "provider": {
+              "$ref": "#/$defs/textMap"
+            },
+            "certificate_scope": {
+              "$ref": "#/$defs/uuid"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "binding"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      3,
+                      5,
+                      6
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "binding": {
+                    "enum": [
+                      2,
+                      3
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": 8
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "binding": {
+                    "const": 3
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "secret"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "devices"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "public_key"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "provider"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "certificate_scope"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "public_key"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      2,
+                      4
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "provider"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "kind": {
+                    "const": 7
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "certificate_scope"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "kind": {
+                    "const": 3
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": 3
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "certificate_scope"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "binding": {
+                    "enum": [
+                      2,
+                      3
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "secret"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 1,
+          "items": {
+            "const": "/secret"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "fields": {
+                "properties": {
+                  "binding": {
+                    "const": 1
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "oneOf": [
+              {
+                "properties": {
+                  "fields": {
+                    "required": [
+                      "secret"
+                    ]
+                  },
+                  "omitted_secrets": {
+                    "maxItems": 0
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "fields": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "secret"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "omitted_secrets": {
+                    "const": [
+                      "/secret"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "properties": {
+              "omitted_secrets": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Route": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Route"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "kind": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "hops": {
+              "$ref": "#/$defs/uuids"
+            },
+            "proxy": {
+              "$ref": "#/$defs/text"
+            },
+            "proxy_credential": {
+              "$ref": "#/$defs/uuid"
+            },
+            "command": {
+              "$ref": "#/$defs/text"
+            },
+            "gateway_network": {
+              "$ref": "#/$defs/uuid"
+            },
+            "proxy_username": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[ -~]+$"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "kind"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      1
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "hops"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "proxy"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy_credential"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "command"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "gateway_network"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy_username"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      2,
+                      3
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "proxy"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "hops"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "command"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "gateway_network"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      4
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "command"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "hops"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy_credential"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "gateway_network"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy_username"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      5
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "gateway_network"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "hops"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy_credential"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "command"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "proxy_username"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "proxy_credential"
+                ]
+              },
+              "then": {
+                "required": [
+                  "proxy_username"
+                ]
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "proxy_username"
+                ]
+              },
+              "then": {
+                "required": [
+                  "proxy_credential"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": 3
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "proxy_username": {
+                    "pattern": "^[ -9;-~]+$"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "HostGroup": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "HostGroup"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "parent": {
+              "$ref": "#/$defs/uuid"
+            },
+            "color": {
+              "$ref": "#/$defs/text"
+            },
+            "defaults": {
+              "$ref": "#/$defs/textMap"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "TrustRecord": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "TrustRecord"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "$ref": "#/$defs/uuid"
+            },
+            "pattern": {
+              "$ref": "#/$defs/text"
+            },
+            "key": {
+              "$ref": "#/$defs/text"
+            },
+            "fingerprint": {
+              "$ref": "#/$defs/text"
+            },
+            "provenance": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "accepted_at": {
+              "$ref": "#/$defs/uint"
+            },
+            "accepted_by_device": {
+              "$ref": "#/$defs/uuid"
+            },
+            "accepted_by_account": {
+              "$ref": "#/$defs/uuid"
+            },
+            "revoked": {
+              "$ref": "#/$defs/bool"
+            },
+            "ca": {
+              "$ref": "#/$defs/bool"
+            }
+          },
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": [
+                "host"
+              ]
+            },
+            {
+              "required": [
+                "pattern"
+              ]
+            }
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "Snippet": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Snippet"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "template": {
+              "$ref": "#/$defs/text"
+            },
+            "variables": {
+              "$ref": "#/$defs/variableMap"
+            },
+            "tags": {
+              "$ref": "#/$defs/textBoolMap"
+            },
+            "folder": {
+              "$ref": "#/$defs/text"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "template"
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 4096,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "Forward": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Forward"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "kind": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "bind_address": {
+              "$ref": "#/$defs/text"
+            },
+            "bind_port": {
+              "$ref": "#/$defs/uint"
+            },
+            "target_host": {
+              "$ref": "#/$defs/text"
+            },
+            "target_port": {
+              "$ref": "#/$defs/uint"
+            },
+            "profile": {
+              "$ref": "#/$defs/uuid"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "kind"
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "Workspace": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Workspace"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "layout": {
+              "$ref": "#/$defs/bytes"
+            },
+            "sessions": {
+              "$ref": "#/$defs/sessionMap"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "Preference": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Preference"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/text"
+            },
+            "value": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/any"
+                },
+                {
+                  "not": {
+                    "type": "null"
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "key"
+          ]
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "GatewayNetwork": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "GatewayNetwork"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "schema": {
+          "const": 1
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "description": {
+              "$ref": "#/$defs/text"
+            }
+          },
+          "additionalProperties": false
+        },
+        "omitted_secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 0,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?:secret|variables/(?:[^~/]|~[01])*/default)$"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "schema",
+        "fields",
+        "omitted_secrets"
+      ]
+    },
+    "entry": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Host"
+        },
+        {
+          "$ref": "#/$defs/AccessProfile"
+        },
+        {
+          "$ref": "#/$defs/Credential"
+        },
+        {
+          "$ref": "#/$defs/Route"
+        },
+        {
+          "$ref": "#/$defs/HostGroup"
+        },
+        {
+          "$ref": "#/$defs/TrustRecord"
+        },
+        {
+          "$ref": "#/$defs/Snippet"
+        },
+        {
+          "$ref": "#/$defs/Forward"
+        },
+        {
+          "$ref": "#/$defs/Workspace"
+        },
+        {
+          "$ref": "#/$defs/Preference"
+        },
+        {
+          "$ref": "#/$defs/GatewayNetwork"
+        }
+      ],
+      "$comment": "Sorted omission pointers, their matching secret fields, model conditional rules and 8 MiB encoded entry bound are enforced by the codec."
+    }
+  },
+  "$comment": "Streaming byte framing, NFC/UTF-8 byte sizes, distinct original ids and model-semantic checks are required in addition to JSON Schema validation.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "secrets": {
+            "const": "included"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "objects": {
+            "items": {
+              "properties": {
+                "omitted_secrets": {
+                  "maxItems": 0
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "Credential"
+                      },
+                      "fields": {
+                        "properties": {
+                          "binding": {
+                            "const": 1
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "required": [
+                          "secret"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "secrets": {
+            "const": "omitted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "objects": {
+            "items": {
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "Credential"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "secret"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "Snippet"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "variables": {
+                            "additionalProperties": {
+                              "if": {
+                                "properties": {
+                                  "kind": {
+                                    "const": 4
+                                  }
+                                }
+                              },
+                              "then": {
+                                "not": {
+                                  "anyOf": [
+                                    {
+                                      "required": [
+                                        "default"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

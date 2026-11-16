@@ -10,6 +10,10 @@ description = "Scoplen's deterministic object model and merge rules."
 thiserror.workspace = true
 unicode-normalization.workspace = true
 uuid.workspace = true
+serde = "1.0.219"
+serde_json = { version = "1.0.140", features = ["unbounded_depth"] }
+base64 = "0.22.1"
+zeroize = "1.8.1"
 
 [dev-dependencies]
 proptest = "1.6.0"

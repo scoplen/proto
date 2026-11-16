@@ -7,6 +7,7 @@ pub mod cbor;
 pub mod clock;
 pub mod merge;
 pub mod object;
+pub mod portable;
 
 pub use clock::{Hlc, ensure_write_clock, new_uuid_v7, system_time_millis, validate_uuid_v7};
 pub use merge::{MergeError, is_orphaned, merge, references};

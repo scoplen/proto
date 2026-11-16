@@ -6,7 +6,11 @@ license.workspace = true
 rust-version.workspace = true
 description = "Scoplen's reviewed cryptographic formats and key operations."
 
+[features]
+portable-export = ["dep:age"]
+
 [dependencies]
+age = { version = "=0.11.5", default-features = false, optional = true }
 argon2 = { version = "0.5.3", features = ["zeroize"] }
 base64 = "0.22.1"
 chacha20poly1305 = "0.10.1"
@@ -29,6 +33,10 @@ zeroize = { version = "1.8.1", features = ["derive"] }
 
 [dev-dependencies]
 scoplen-test-vectors = { path = "../scoplen-test-vectors", version = "0.1.0" }
+
+[[example]]
+name = "portable_age_interop"
+required-features = ["portable-export"]
 
 [lints]
 workspace = true

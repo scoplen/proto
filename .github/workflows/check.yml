@@ -99,6 +99,8 @@ jobs:
         run: node --test scripts/generate-password-bootstrap-vectors.test.mjs
       - name: Test
         run: cargo test --workspace --all-targets
+      - name: Test optional native portable export
+        run: cargo test --locked -p scoplen-crypto --features portable-export --test portable_export
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Build and replay fuzz corpus
@@ -106,10 +108,29 @@ jobs:
         run: |
           rustup toolchain install "$FUZZ_TOOLCHAIN" --profile minimal --component rust-src
           cargo +"$FUZZ_TOOLCHAIN" install cargo-fuzz --version 0.13.2 --locked
-          for target in vector_loader object_decoder crypto_decoders agent_decoder sftp_decoder ssh_protocol sync_notification sync_control sync_data api_json; do
+          for target in vector_loader object_decoder model_portable crypto_decoders agent_decoder sftp_decoder ssh_protocol sync_notification sync_control sync_data api_json; do
             test -n "$(find "fuzz/corpus/$target" -maxdepth 1 -type f -name 'seed-*' -print -quit)"
             cargo +"$FUZZ_TOOLCHAIN" fuzz run "$target" "fuzz/corpus/$target" -- -runs=0 -timeout=10
           done
+
+  portable-age:
+    name: Standard age portable export interoperability
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.26.5'
+          cache-dependency-path: scripts/portable-age-reference/go.sum
+      - name: Review independent standard age producer
+        working-directory: scripts/portable-age-reference
+        run: go vet -mod=readonly ./...
+      - name: Check standard age fixtures and bidirectional production-cost interoperability
+        run: node scripts/portable-age-interop.mjs
 
   browser:
     name: Shared browser module
