@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Fix the strict-KEX interoperability control by selecting AES-GCM for its non-strict
+  injected-packet peer and verifying authentication, command output and exit status. The
+  prior ChaCha20 control could stop on shifted packet sequence numbers before disconnect.
+  Preserve strict-mode rejection assertions and add fixed stage diagnostics.
+
 - Add D-142's named portable JSON Schema, streaming eleven-type snapshot codecs and precise
   secret-omission descriptions. Add optional standard age v1 passphrase streams, independent
   vectors, parser seeds and pinned Go age interoperability. Native authorization, receipts,
