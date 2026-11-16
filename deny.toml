@@ -1,9 +1,8 @@
 [advisories]
 version = 2
-# RUSTSEC-2023-0071 has no patched rsa release. `ssh-key` 0.7.0-rc.11
-# requires rsa 0.10.0-rc.19 for the documented RSA/SHA-2 wire support; keep
-# the exception visible to dependency review until an upstream timing-safe
-# implementation is available.
+# The pinned `ssh-key` 0.7.0-rc.11 stack still uses pre-release RSA for its
+# RSA/SHA-2 support. Patched RSA 0.10.0 needs the matching ssh-key feature/API
+# upgrade; remove this existing exception with that coordinated update.
 ignore = [
     "RUSTSEC-2023-0071",
     # age's translation proc macros use these only for build configuration/diagnostics.
