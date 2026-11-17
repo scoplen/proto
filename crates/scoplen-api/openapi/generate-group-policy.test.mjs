@@ -54,13 +54,13 @@ test("D-137 definitions capture strict requests, tolerant bounded responses and 
   assert.equal(schemas.GroupResource.properties.data.additionalProperties, true);
   assert.equal(schemas.GroupFields.properties.members.maxItems, 4096);
   assert.equal(schemas.PolicyFields.properties.source["x-scoplen-max-utf8-bytes"], 65536);
-  assert.equal(schemas.SimpleRuleInput.oneOf.length, 4);
+  assert.equal(schemas.SimpleRuleInput.oneOf.length, 6);
   for (const alternative of schemas.SimpleRuleInput.oneOf) {
     assert.equal(alternative.additionalProperties, false);
     assert.equal(alternative.required.length, 3);
     assert.ok(alternative.required.includes("organization"));
     assert.equal(alternative.required.filter(key => ["membership", "group"].includes(key)).length, 1);
-    assert.equal(alternative.required.filter(key => ["view", "connect"].includes(key)).length, 1);
+    assert.equal(alternative.required.filter(key => ["view", "connect", "request_access"].includes(key)).length, 1);
   }
   for (const path of Object.values(paths)) for (const operation of Object.values(path)) assert.deepEqual(operation.security, [{ accessToken: [], dpopProof: [] }]);
 });
@@ -78,6 +78,25 @@ test("D-137 read authority is separate from writes and view/connect generation",
   assert.equal(paths[policy].put["x-scoplen-cedar-action"], "manage_policy");
   assert.match(schemas.SimpleRuleInput.description, /dependency-read grants/);
   assert.match(schemas.PolicyFields.properties.source.description, /permit or forbid.*context\.now/);
+});
+
+test("D-150 adds only the explicit-Host request_access simple-rule alternative", () => {
+  const { schemas } = groupPolicyDefinitions();
+  const variants = schemas.SimpleRuleInput.oneOf.filter(alternative => alternative.required.includes("request_access"));
+  assert.equal(variants.length, 2);
+  for (const alternative of variants) {
+    const hosts = alternative.properties.request_access;
+    assert.equal(hosts.minItems, 1);
+    assert.equal(hosts.maxItems, 64);
+    assert.equal(hosts.uniqueItems, true);
+    assert.equal(hosts.items.format, "uuid");
+    assert.match(hosts.description, /resource is Host && \[Host::"uuid", \.\.\.\]\.contains\(resource\)/);
+    assert.match(hosts.description, /no HostGroups, remote username, conditions, view\/connect\/approval grants/);
+    assert.deepEqual(Object.keys(alternative.properties).sort(), ["organization", alternative.required.includes("membership") ? "membership" : "group", "request_access"].sort());
+  }
+  assert.match(schemas.SimpleRuleInput.description, /does not restrict broader existing permits/);
+  assert.match(schemas.SimpleRuleInput.description, /source-breaking; old strict readers reject it/);
+  assert.match(generateGroupPolicyTypes(document()), /request_access: string\[\]; view\?: never; connect\?: never/);
 });
 
 for (const [name, mutate] of [
@@ -135,12 +154,17 @@ for (const [name, mutate] of [
   ["subject-alternatives", d => { d.components.schemas.SimpleRuleInput.oneOf.pop(); }],
   ["unknown-simple-field", d => { d.components.schemas.SimpleRuleInput.oneOf[0].additionalProperties = true; }],
   ["empty-view", d => { d.components.schemas.SimpleRuleInput.oneOf[0].properties.view.minItems = 0; }],
-  ["view-bound", d => { d.components.schemas.SimpleRuleInput.oneOf[2].properties.view.maxItems++; }],
+  ["view-bound", d => { d.components.schemas.SimpleRuleInput.oneOf[3].properties.view.maxItems++; }],
   ["duplicate-selector", d => { d.components.schemas.SimpleRuleInput.oneOf[0].properties.view.uniqueItems = false; }],
   ["empty-connect", d => { delete d.components.schemas.SimpleRuleConnect.anyOf; }],
   ["connect-host-bound", d => { d.components.schemas.SimpleRuleConnect.properties.hosts.maxItems++; }],
   ["connect-group-bound", d => { d.components.schemas.SimpleRuleConnect.properties.host_groups.maxItems++; }],
   ["remote-user-bytes", d => { d.components.schemas.SimpleRuleConnect.properties.remote_user["x-scoplen-max-utf8-bytes"]++; }],
+  ["empty-request-hosts", d => { d.components.schemas.SimpleRuleInput.oneOf[2].properties.request_access.minItems = 0; }],
+  ["request-host-limit", d => { d.components.schemas.SimpleRuleInput.oneOf[2].properties.request_access.maxItems++; }],
+  ["duplicate-request-hosts", d => { d.components.schemas.SimpleRuleInput.oneOf[5].properties.request_access.uniqueItems = false; }],
+  ["request-host-kind", d => { d.components.schemas.SimpleRuleInput.oneOf[2].properties.request_access.items.type = "object"; }],
+  ["request-host-group", d => { d.components.schemas.SimpleRuleInput.oneOf[5].properties.host_groups = { type: "array" }; }],
 ]) test(`D-137 detects ${name} contract drift`, () => {
   const changed = document();
   mutate(changed);

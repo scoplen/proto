@@ -30,7 +30,7 @@ add("logout-extension", "logout.response.reject", { revoked: true, extra: null }
 add("options-extension", "options.response", { ...options, extra: 1 }, options);
 add("options-request-field", "options.request.reject", { username: "alice", family_id: "chosen" });
 add("login-request-field", "login.request.reject", { ...login, device_id: "chosen" });
-add("scope", "scope", "initial", "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
+add("scope", "scope", "initial", "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
 const operation = (method, path, scopes, writerReceipt = false) => add(`operation-${vectors.length}`, "operation", { method, path }, { scopes, writerReceipt });
 operation("GET", "/api/v1/accounts/me", ["account:read"]);
 for (const [method, suffix, scopes] of [["POST", "", ["orgs:create"]], ["GET", "", ["orgs:read"]], ["GET", "/{org}", ["orgs:read"]], ["PATCH", "/{org}", ["orgs:write"]]]) operation(method, `/api/v1/orgs${suffix}`, scopes);
@@ -41,6 +41,14 @@ for (const kind of ["hosts", "host-groups", "access-profiles", "routes", "groups
 }
 add("operation-logout", "operation.logout", { method: "POST", path: "/api/v1/auth/accounts/browser/logout" }, "self-session-termination");
 for (const suffix of ["", "/verify"]) operation("GET", `/api/v1/orgs/{org}/audit-events${suffix}`, ["audit:read"]);
+for (const [method, suffix, scope, receipt] of [
+  ["POST", "/check", "write", false], ["POST", "", "write", true],
+  ["GET", "", "read", false], ["GET", "/{id}", "read", false],
+  ["POST", "/{id}/decisions", "decide", true], ["POST", "/{id}/cancel", "write", true],
+]) operation(method, `/api/v1/orgs/{org}/access-requests${suffix}`, [`access-requests:${scope}`], receipt);
+for (const [method, suffix] of [["PATCH", "/{id}"], ["DELETE", "/{id}"], ["POST", "/{id}"], ["GET", "/check"], ["GET", "/{id}/decisions"], ["DELETE", "/{id}/cancel"]]) {
+  add(`operation-denied-${vectors.length}`, "operation.reject", { method, path: `/api/v1/orgs/{org}/access-requests${suffix}` });
+}
 for (const [method, path] of [["GET", "/api/v1/accounts/me/devices"], ["GET", "/sync/v1/keys"], ["POST", "/api/v1/orgs/{org}/certificates"], ["POST", "/api/v1/auth/operator/logout"], ["POST", "/api/v1/orgs/{org}/trust-records"], ["GET", "/api/v1/orgs/{org}/snippets"], ["GET", "/api/v1/orgs/{org}/gateway-networks"], ["GET", "/api/v1/admin/accounts"], ["GET", "/api/v1/orgs/"], ["get", "/api/v1/accounts/me"]]) add(`operation-denied-${vectors.length}`, "operation.reject", { method, path });
 add("writer", "writer", { account_id: "0191d3e0-8000-7000-8000-000000000001", family_id: "0191d3e0-8000-7000-8000-000000000002" }, { kind: "account-browser", origin: "0191d3e0-8000-7000-8000-000000000002" });
 const output = `${JSON.stringify({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2)}\n`;

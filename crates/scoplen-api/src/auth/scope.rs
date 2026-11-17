@@ -5,11 +5,17 @@
 ///
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
-pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
+pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeviceAccessScope {
+    /// Decide a currently routed non-self access request.
+    AccessRequestsDecide,
+    /// Read own or currently routed access requests.
+    AccessRequestsRead,
+    /// Check, create or cancel the caller's access request.
+    AccessRequestsWrite,
     /// Read the current device's account profile and signed device statements.
     AccountRead,
     /// Read Organization audit projections and contiguous verification under current policy.
@@ -50,7 +56,10 @@ pub enum DeviceAccessScope {
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 21] = [
+        Self::AccessRequestsDecide,
+        Self::AccessRequestsRead,
+        Self::AccessRequestsWrite,
         Self::AccountRead,
         Self::AuditRead,
         Self::CaRead,
@@ -75,6 +84,9 @@ impl DeviceAccessScope {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::AccessRequestsDecide => "access-requests:decide",
+            Self::AccessRequestsRead => "access-requests:read",
+            Self::AccessRequestsWrite => "access-requests:write",
             Self::AccountRead => "account:read",
             Self::AuditRead => "audit:read",
             Self::CaRead => "ca:read",
@@ -119,6 +131,18 @@ impl DeviceAccessScope {
 /// and must fail closed for this profile. A scope match is necessary, not authorization.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeviceAccessOperation {
+    /// Check the current caller's exact single-Host request input without mutation.
+    AccessRequestCheck,
+    /// Create the current caller's single-Host access request.
+    AccessRequestCreate,
+    /// List own or currently routed pending access requests.
+    AccessRequestList,
+    /// Read one currently authorized access request.
+    AccessRequestRead,
+    /// Approve or deny one currently routed non-self access request.
+    AccessRequestDecide,
+    /// Cancel the current caller's pending access request.
+    AccessRequestCancel,
     /// Read the current account profile.
     AccountProfileRead,
     /// Read the complete current-account signed device-statement snapshot.
@@ -301,7 +325,13 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 89] = [
+    pub const ALL: [Self; 95] = [
+        Self::AccessRequestCheck,
+        Self::AccessRequestCreate,
+        Self::AccessRequestList,
+        Self::AccessRequestRead,
+        Self::AccessRequestDecide,
+        Self::AccessRequestCancel,
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::AuditEventList,
@@ -400,6 +430,13 @@ impl DeviceAccessOperation {
     #[must_use]
     pub const fn accepted_scopes(self) -> &'static [DeviceAccessScope] {
         match self {
+            Self::AccessRequestCheck | Self::AccessRequestCreate | Self::AccessRequestCancel => {
+                &[DeviceAccessScope::AccessRequestsWrite]
+            }
+            Self::AccessRequestList | Self::AccessRequestRead => {
+                &[DeviceAccessScope::AccessRequestsRead]
+            }
+            Self::AccessRequestDecide => &[DeviceAccessScope::AccessRequestsDecide],
             Self::AuditEventList | Self::AuditRangeVerify => &[DeviceAccessScope::AuditRead],
             Self::AccountProfileRead | Self::AccountDevicesRead => {
                 &[DeviceAccessScope::AccountRead]
@@ -506,7 +543,9 @@ impl DeviceAccessOperation {
     #[must_use]
     pub const fn http_method(self) -> &'static str {
         match self {
-            Self::AuditEventList
+            Self::AccessRequestList
+            | Self::AccessRequestRead
+            | Self::AuditEventList
             | Self::AuditRangeVerify
             | Self::AccountProfileRead
             | Self::AccountDevicesRead
@@ -571,7 +610,11 @@ impl DeviceAccessOperation {
             | Self::InventoryTrustRecordDelete
             | Self::InventorySnippetDelete
             | Self::InventoryGatewayNetworkDelete => "DELETE",
-            Self::SyncSession
+            Self::AccessRequestCheck
+            | Self::AccessRequestCreate
+            | Self::AccessRequestDecide
+            | Self::AccessRequestCancel
+            | Self::SyncSession
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
@@ -599,8 +642,19 @@ impl DeviceAccessOperation {
 
     /// Full canonical route template, using the placeholder names specified in D-107.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Keep the finite operation-to-route registry exhaustive in one table."
+    )]
     pub const fn route_template(self) -> &'static str {
         match self {
+            Self::AccessRequestCheck => "/api/v1/orgs/{org}/access-requests/check",
+            Self::AccessRequestCreate | Self::AccessRequestList => {
+                "/api/v1/orgs/{org}/access-requests"
+            }
+            Self::AccessRequestRead => "/api/v1/orgs/{org}/access-requests/{id}",
+            Self::AccessRequestDecide => "/api/v1/orgs/{org}/access-requests/{id}/decisions",
+            Self::AccessRequestCancel => "/api/v1/orgs/{org}/access-requests/{id}/cancel",
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
             Self::AuditEventList => "/api/v1/orgs/{org}/audit-events",

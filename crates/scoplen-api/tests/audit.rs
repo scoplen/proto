@@ -236,6 +236,31 @@ fn grant_audit_producers_and_filters_use_the_exact_recorded_resource() {
 }
 
 #[test]
+fn access_request_events_and_filters_use_their_recorded_request_identity() {
+    for action in ["created", "approved", "denied", "cancelled", "expired"] {
+        let vector = vectors()
+            .vectors
+            .into_iter()
+            .find(|vector| vector.id == format!("audit-access_request_{action}-v1"))
+            .unwrap();
+        let mut item = AuditEvent::from_json(vector.input.as_bytes()).unwrap();
+        assert_eq!(item.category, AuditCategory::Authorization);
+        assert_eq!(item.resource.as_ref().unwrap().kind, AuditResourceKind::AccessRequest);
+        let target = item.resource.as_ref().unwrap().id;
+        let filter =
+            AuditFilter::parse(&format!("resource eq \"access_request:{target}\"")).unwrap();
+        assert!(filter.matches(&item).unwrap());
+        item.resource.as_mut().unwrap().kind = AuditResourceKind::Grant;
+        assert!(!filter.matches(&item).unwrap());
+        if action == "expired" {
+            assert!(item.actor_account_id.is_none());
+            assert!(item.actor_device_id.is_none());
+            assert!(item.actor_browser_family_id.is_none());
+        }
+    }
+}
+
+#[test]
 fn complete_byte_budgets_include_ignored_extensions_and_original_item_whitespace() {
     let base = String::from_utf8(event().to_json().unwrap()).unwrap();
     let prefix = format!("{},\"extension\":\"", &base[..base.len() - 1]);

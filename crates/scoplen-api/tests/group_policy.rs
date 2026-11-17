@@ -4,7 +4,9 @@ use std::str::FromStr;
 
 use cedar_policy::{Context, Decision, Entities, EntityUid, PolicySet, Request};
 use scoplen_api::{
-    control_plane::{OrganizationAuthorizationContext, OrganizationAuthorizer},
+    control_plane::{
+        OrganizationAuthorizationContext, OrganizationAuthorizationError, OrganizationAuthorizer,
+    },
     group_policy::{
         GroupCreateRequest, GroupFields, GroupPage, GroupReplaceRequest, GroupResource,
         GroupSource, MAX_GROUP_POLICY_BYTES, MAX_GROUP_POLICY_PAGE_BYTES, MAX_POLICY_SOURCE_BYTES,
@@ -384,10 +386,25 @@ fn fixture_uid(fixture: &Value, name: &str) -> EntityUid {
 }
 
 fn decide(fixture: &Value, source: &str, action: &str, resource: &str, user: &str) -> Decision {
+    decide_result(fixture, source, action, resource, user).unwrap()
+}
+
+fn decide_result(
+    fixture: &Value,
+    source: &str,
+    action: &str,
+    resource: &str,
+    user: &str,
+) -> Result<Decision, OrganizationAuthorizationError> {
     let reference = |name| json!({"__entity":{"type":name,"id":fixture["ids"][name]}});
     let mut context = json!({"organization":reference("Organization"), "membership":reference("Membership"), "now":1});
     if action == "connect" {
         context.as_object_mut().unwrap().extend(json!({"device":reference("Device"), "remote_user":user,"route_kind":"direct","source_ip":"192.0.2.1"}).as_object().unwrap().clone());
+    }
+    if action == "request_access" {
+        context.as_object_mut().unwrap().extend(
+            json!({"duration_seconds": 300, "reason": "Maintenance"}).as_object().unwrap().clone(),
+        );
     }
     let request = Request::new(
         fixture_uid(fixture, "Account"),
@@ -414,7 +431,70 @@ fn decide(fixture: &Value, source: &str, action: &str, resource: &str, user: &st
         &request,
         &Entities::from_json_value(fixture["entities"].clone(), None).unwrap(),
     )
-    .unwrap()
+}
+
+#[test]
+fn request_rules_preserve_independent_visibility_connection_and_broader_authority() {
+    let mut fixture = fixture();
+    for entity in fixture["entities"].as_array_mut().unwrap() {
+        if entity["uid"]["type"] == "Membership" {
+            entity["attrs"]["roles"] = json!(["member"]);
+        }
+    }
+    assert_eq!(decide(&fixture, "", "request_access", "Host", ""), Decision::Deny);
+    let input = SimpleRuleInput {
+        organization: fixture_uuid(&fixture, "Organization"),
+        subject: SimpleRuleSubject::Membership(fixture_uuid(&fixture, "Membership")),
+        rule: SimpleRule::RequestAccess { hosts: vec![fixture_uuid(&fixture, "Host")] },
+    };
+    let source = input.generate().unwrap();
+    assert_eq!(decide(&fixture, &source, "request_access", "Host", ""), Decision::Allow);
+    assert_eq!(decide(&fixture, &source, "view_inventory", "Host", ""), Decision::Deny);
+    assert_eq!(decide(&fixture, &source, "connect", "Host", "operator"), Decision::Deny);
+    let group = SimpleRuleInput {
+        subject: SimpleRuleSubject::Group(fixture_uuid(&fixture, "Group")),
+        ..input.clone()
+    };
+    assert_eq!(
+        decide(&fixture, &group.generate().unwrap(), "request_access", "Host", ""),
+        Decision::Allow
+    );
+    let forbidden =
+        format!("{source}\nforbid(principal, action == Action::\"request_access\", resource);");
+    assert_eq!(decide(&fixture, &forbidden, "request_access", "Host", ""), Decision::Deny);
+    let evaluation_error = format!(
+        "{source}\nforbid(principal, action == Action::\"request_access\", resource) when {{ context.duration_seconds + 9223372036854775807 > 0 }};"
+    );
+    assert_eq!(
+        decide_result(&fixture, &evaluation_error, "request_access", "Host", ""),
+        Err(OrganizationAuthorizationError::Evaluation)
+    );
+    let unrelated =
+        SimpleRuleInput { rule: SimpleRule::RequestAccess { hosts: vec![id(99)] }, ..input }
+            .generate()
+            .unwrap();
+    assert_eq!(decide(&fixture, &unrelated, "request_access", "Host", ""), Decision::Deny);
+    for entity in fixture["entities"].as_array_mut().unwrap() {
+        if entity["uid"]["type"] == "Membership" {
+            entity["attrs"]["roles"] = json!(["owner"]);
+        }
+    }
+    assert_eq!(decide(&fixture, &unrelated, "request_access", "Host", ""), Decision::Allow);
+}
+
+#[test]
+fn request_rule_requires_distinct_bounded_hosts_and_canonical_order() {
+    let input = simple(SimpleRule::RequestAccess { hosts: vec![id(6), id(5)] });
+    let sorted = simple(SimpleRule::RequestAccess { hosts: vec![id(5), id(6)] });
+    assert_eq!(input.to_json().unwrap(), sorted.to_json().unwrap());
+    assert_eq!(input.generate().unwrap(), sorted.generate().unwrap());
+    assert_eq!(SimpleRuleInput::from_json(&input.to_json().unwrap()).unwrap(), sorted);
+    for hosts in [vec![], vec![id(5), id(5)], vec![Uuid::nil()], (1..=65).map(id).collect()] {
+        assert!(simple(SimpleRule::RequestAccess { hosts }).to_json().is_err());
+    }
+    assert!(
+        simple(SimpleRule::RequestAccess { hosts: (1..=64).map(id).collect() }).generate().is_ok()
+    );
 }
 
 #[test]
