@@ -121,7 +121,7 @@ async function run(mode) {
     }
     rules += 1;
   }
-  check(normalizations === 18 && invitations === 34 && rules === 28, "Published fixture coverage changed");
+  check(normalizations === 18 && invitations === 34 && rules === 45, "Published fixture coverage changed");
   return { ok: true, mode, passwordKnownAnswer: true, normalizations, invitations, rules, secretByteBuffersCleared: true };
 }
 
