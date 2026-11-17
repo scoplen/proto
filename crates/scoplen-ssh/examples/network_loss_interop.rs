@@ -11,7 +11,8 @@ use std::{
 };
 
 use scoplen_ssh::{
-    ChannelEvent, ClientConfig, ClientConnection, ClientError, HostKey, HostKeyVerificationError,
+    ChannelEvent, ClientChannel, ClientConfig, ClientConnection, ClientError, HostKey,
+    HostKeyVerificationError,
 };
 use ssh_key::PublicKey;
 use tokio::{
@@ -24,6 +25,7 @@ use tokio::{
 
 const DEADLINE: Duration = Duration::from_secs(10);
 const PASSWORD: &[u8] = b"fixture-network-loss-password";
+const JUMP_TARGET_PORT: u16 = 2222;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RelayMode {
@@ -98,17 +100,20 @@ async fn start_relay(server_port: u16, reset_on_drop: bool) -> io::Result<Relay>
     Ok(Relay { port, mode, blackholed_client_bytes, task })
 }
 
+fn config(port: u16, host_key: &[u8]) -> Result<ClientConfig, Box<dyn std::error::Error>> {
+    let pinned = host_key.to_vec();
+    Ok(ClientConfig::new("127.0.0.1", port, move |_host: &str, key: &HostKey| match key {
+        HostKey::Raw { key_blob, .. } if *key_blob == pinned => Ok(()),
+        _ => Err(HostKeyVerificationError::Rejected("unexpected host key".to_owned())),
+    })?)
+}
+
 async fn connect(
     relay: &Relay,
     host_key: &[u8],
     keepalive: bool,
 ) -> Result<ClientConnection, Box<dyn std::error::Error>> {
-    let pinned = host_key.to_vec();
-    let mut config =
-        ClientConfig::new("127.0.0.1", relay.port, move |_host: &str, key: &HostKey| match key {
-            HostKey::Raw { key_blob, .. } if *key_blob == pinned => Ok(()),
-            _ => Err(HostKeyVerificationError::Rejected("unexpected host key".to_owned())),
-        })?;
+    let mut config = config(relay.port, host_key)?;
     if keepalive {
         config = config.with_keepalive(Some(Duration::from_millis(150)), 2)?;
     }
@@ -117,6 +122,69 @@ async fn connect(
         timeout(DEADLINE, ClientConnection::connect_stream(config, stream)).await??;
     timeout(DEADLINE, connection.authenticate_password("scoplen", PASSWORD)).await??;
     Ok(connection)
+}
+
+async fn connect_child(
+    parent: &ClientConnection,
+    host_key: &[u8],
+) -> Result<ClientConnection, Box<dyn std::error::Error>> {
+    let mut child = timeout(
+        DEADLINE,
+        ClientConnection::connect_via_direct_tcpip(
+            config(JUMP_TARGET_PORT, host_key)?,
+            parent,
+            "127.0.0.1",
+            1,
+        ),
+    )
+    .await??;
+    timeout(DEADLINE, child.authenticate_password("scoplen", PASSWORD)).await??;
+    Ok(child)
+}
+
+async fn live_shell(
+    connection: &ClientConnection,
+) -> Result<ClientChannel, Box<dyn std::error::Error>> {
+    let mut channel = timeout(DEADLINE, connection.open_session()).await??;
+    timeout(DEADLINE, channel.exec(true, b"printf jump-ready; cat")).await??;
+    let mut output = Vec::new();
+    while output.len() < b"jump-ready".len() {
+        match timeout(DEADLINE, channel.next_event()).await?? {
+            Some(ChannelEvent::Data(bytes)) => output.extend_from_slice(&bytes),
+            Some(ChannelEvent::Success) => {}
+            other => return Err(format!("Jump ready: unexpected event {other:?}").into()),
+        }
+    }
+    if output != b"jump-ready" {
+        return Err("Jump ready marker mismatch".into());
+    }
+    Ok(channel)
+}
+
+async fn assert_composed_loss(
+    server_port: u16,
+    host_key: &[u8],
+    reset: bool,
+    hops: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let relay = start_relay(server_port, reset).await?;
+    let parent = connect(&relay, host_key, false).await?;
+    let mut connections = vec![parent];
+    for _ in 0..hops {
+        let child = connect_child(connections.last().expect("parent"), host_key).await?;
+        connections.push(child);
+    }
+    let mut channel = live_shell(connections.last().expect("target")).await?;
+    relay.task.abort();
+    let result = timeout(DEADLINE, channel.next_event()).await?;
+    if !matches!(result, Err(ClientError::NetworkLost)) {
+        return Err(format!(
+            "Jump depth {hops}, reset={reset}: expected NetworkLost, got {result:?}"
+        )
+        .into());
+    }
+    println!("OpenSSH Jump depth {hops}, reset={reset}: NetworkLost after exact ready marker");
+    Ok(())
 }
 
 async fn assert_network_loss(
@@ -165,6 +233,18 @@ async fn assert_normal_exit(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let relay = start_relay(server_port, false).await?;
     let connection = connect(&relay, host_key, false).await?;
+    let mut channel = completed_shell(&connection).await?;
+    relay.task.abort();
+    if channel.next_event().await?.is_some() {
+        return Err("completed channel produced an event after termination".into());
+    }
+    println!("OpenSSH normal shell exit: terminal events and None");
+    Ok(())
+}
+
+async fn completed_shell(
+    connection: &ClientConnection,
+) -> Result<ClientChannel, Box<dyn std::error::Error>> {
     let mut channel = timeout(DEADLINE, connection.open_session()).await??;
     timeout(DEADLINE, channel.exec(true, b"printf normal-exit")).await??;
     let mut output = Vec::new();
@@ -185,11 +265,47 @@ async fn assert_normal_exit(
             format!("normal exit: output {output:?}, status {status:?}, close {closed}").into()
         );
     }
-    relay.task.abort();
-    if channel.next_event().await?.is_some() {
-        return Err("completed channel produced an event after termination".into());
+    Ok(channel)
+}
+
+async fn assert_composed_normal_termination(
+    server_port: u16,
+    host_key: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let relay = start_relay(server_port, false).await?;
+    let parent = connect(&relay, host_key, false).await?;
+    let child = connect_child(&parent, host_key).await?;
+    let mut parent_monitor = timeout(DEADLINE, parent.open_session()).await??;
+    let mut completed = completed_shell(&child).await?;
+    let channel = timeout(DEADLINE, child.open_session()).await??;
+    timeout(DEADLINE, channel.exec(true, b"printf stream-eof")).await??;
+    let mut stream = channel.into_stream();
+    let mut output = Vec::new();
+    timeout(DEADLINE, stream.read_to_end(&mut output)).await??;
+    if output != b"stream-eof" {
+        return Err("normal stream EOF output mismatch".into());
     }
-    println!("OpenSSH normal shell exit: terminal events and None");
+    relay.task.abort();
+    if !matches!(
+        timeout(DEADLINE, parent_monitor.next_event()).await?,
+        Err(ClientError::NetworkLost)
+    ) {
+        return Err("normal completion control did not observe parent network loss".into());
+    }
+    if completed.next_event().await?.is_some() || stream.read(&mut [0]).await? != 0 {
+        return Err("returned normal completion changed after parent loss".into());
+    }
+    println!("OpenSSH Jump normal exit and returned stream EOF remain terminal after parent loss");
+
+    let relay = start_relay(server_port, false).await?;
+    let parent = connect(&relay, host_key, false).await?;
+    let child = connect_child(&parent, host_key).await?;
+    let mut channel = live_shell(&child).await?;
+    timeout(DEADLINE, parent.disconnect()).await??;
+    if timeout(DEADLINE, channel.next_event()).await??.is_some() {
+        return Err("local parent disconnect produced a target event".into());
+    }
+    println!("OpenSSH Jump local parent disconnect: no retry signal");
     Ok(())
 }
 
@@ -223,5 +339,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_keepalive_loss(server_port, &host_key).await?;
     assert_normal_exit(server_port, &host_key).await?;
     assert_local_close(server_port, &host_key).await?;
+    for hops in 1..=2 {
+        for reset in [false, true] {
+            assert_composed_loss(server_port, &host_key, reset, hops).await?;
+        }
+    }
+    assert_composed_normal_termination(server_port, &host_key).await?;
     Ok(())
 }

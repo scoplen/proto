@@ -230,7 +230,7 @@ jobs:
       - name: Remote TCP and Unix socket forwarding, cancellation, and denial
         shell: pwsh
         run: ./scripts/ssh-remote-forwarding-interop.ps1
-      - name: Established channel EOF, reset, keepalive loss, and normal termination
+      - name: Direct and composed channel network loss, EOF, and normal termination
         shell: pwsh
         run: ./scripts/ssh-network-loss-interop.ps1
 

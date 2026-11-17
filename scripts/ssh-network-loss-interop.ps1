@@ -26,6 +26,8 @@ PubkeyAuthentication no
 KbdInteractiveAuthentication no
 UsePAM no
 PerSourcePenalties no
+AllowTcpForwarding local
+PermitOpen 127.0.0.1:2222
 SSHD
 /usr/sbin/sshd -t -f /tmp/sshd.conf
 exec /usr/sbin/sshd -D -e -f /tmp/sshd.conf

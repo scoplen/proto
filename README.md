@@ -463,6 +463,14 @@ For an established channel without a terminal exit, open-failure, or close event
 `next_event` reports `ClientError::NetworkLost` only after a confirmed transport I/O failure or
 engine keepalive, inactivity, or connection timeout. A normal shell exit, peer SSH disconnect,
 local close or disconnect, and an unknown shutdown end the event stream without that retry signal.
+`ClientChannel::into_stream` retains confirmed parent network-loss evidence through Jump
+composition. After available bytes, a nonempty read at EOF waits at most one second for the
+parent's classification and reports confirmed loss as `io::ErrorKind::ConnectionAborted`.
+Pending classification and its original deadline survive a cancelled read. Zero-capacity reads
+do not establish EOF; once normal EOF has been returned, later parent loss cannot change it.
+Previously observed terminal events and local-close intent retain precedence. Write and flush
+keep their behavior, and write shutdown remains a half-close. No channel-event reconstruction
+or automatic retry is added; independent consumers own their retry policy and acceptance.
 Automatic rekey waits until authentication completes, including a pending keyboard-interactive
 prompt, then handles an expired elapsed limit without waiting for channel traffic. Full
 OpenSSH cipher-dependent default compatibility remains open.
@@ -587,9 +595,12 @@ open.
 `pwsh ./scripts/ssh-network-loss-interop.ps1` starts a disposable, loopback-only OpenSSH
 listener and runs `network_loss_interop` through a controllable TCP relay. It verifies that
 established, unclosed channels report `NetworkLost` after socket EOF, socket reset, or keepalive
-blackholing, while a completed shell and a locally closed channel end normally. The fixture
-removes its container after the run; these cases do not complete the broader interoperability
-matrix.
+blackholing, while a completed shell and a locally closed channel end normally. Public
+`connect_via_direct_tcpip` connections through one and two Jump hops retain `NetworkLost` after
+parent EOF or reset, with exact ready output before the cut. Completed child shells, returned
+stream EOF and explicit local parent disconnect do not become retry signals. The fixture removes
+its container after the run; these cases do not establish desktop Jump reconnect or complete
+the broader interoperability matrix.
 `pwsh ./scripts/ssh-rsa-selection-interop.ps1` starts three disposable OpenSSH listeners with
 `PubkeyAcceptedAlgorithms` constrained to RSA-SHA2-256, both RSA SHA-2 variants, and legacy
 `ssh-rsa`. The `rsa_selection_interop` example verifies the advertised choice on each listener,

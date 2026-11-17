@@ -896,6 +896,7 @@ struct ConnectionTransport<S> {
     inner: S,
     lifetime: oneshot::Receiver<()>,
     closed: bool,
+    connection_end: Arc<ConnectionEnd>,
 }
 
 impl<S> ConnectionTransport<S> {
@@ -915,7 +916,14 @@ impl<S: AsyncRead + Unpin> AsyncRead for ConnectionTransport<S> {
         buffer: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         self.check_open(context)?;
-        Pin::new(&mut self.inner).poll_read(context, buffer)
+        let result = Pin::new(&mut self.inner).poll_read(context, buffer);
+        if let Poll::Ready(Err(error)) = &result
+            && network_io_failure(error)
+        {
+            // Engine write shutdown can fail before its disconnected callback preserves this.
+            self.connection_end.record(ConnectionEndKind::NetworkLost);
+        }
+        result
     }
 }
 
@@ -1009,7 +1017,12 @@ impl ClientConnection {
             Arc::clone(&connection_end),
         );
         let (owner, lifetime) = oneshot::channel();
-        let stream = ConnectionTransport { inner: stream, lifetime, closed: false };
+        let stream = ConnectionTransport {
+            inner: stream,
+            lifetime,
+            closed: false,
+            connection_end: Arc::clone(&connection_end),
+        };
         let handle =
             client::connect_stream(Arc::new(config.russh_config()), stream, handler).await?;
         Ok(Self {
@@ -2155,12 +2168,21 @@ impl ClientChannel {
     /// The stream carries `direct-tcpip` or session-subsystem data and lifecycle bytes. It is
     /// intended for [`ClientConnection::connect_stream`],
     /// [`ClientConnection::connect_via_direct_tcpip`], and framed subsystems such as SFTP.
+    /// Confirmed parent network loss is retained as a connection-aborted I/O error after queued
+    /// bytes. A normal EOF already returned by the stream remains terminal.
     #[must_use]
     pub fn into_stream(self) -> ClientChannelStream {
         ClientChannelStream {
             inner: self.channel.into_stream(),
             _permit: self.permit,
             _agent_forwarding: self.agent_forwarding,
+            stopped: self.stopped,
+            connection_end: self.connection_end,
+            normal_termination: self.terminal_event_seen
+                || self.event_stream_ended
+                || self.local_close.load(Ordering::Acquire),
+            end_wait: None,
+            read_ended: false,
         }
     }
 
@@ -2245,6 +2267,11 @@ pub struct ClientChannelStream {
     inner: russh::ChannelStream<client::Msg>,
     _permit: OwnedSemaphorePermit,
     _agent_forwarding: Option<Arc<AgentForwardingLease>>,
+    stopped: watch::Receiver<bool>,
+    connection_end: Arc<ConnectionEnd>,
+    normal_termination: bool,
+    end_wait: Option<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>,
+    read_ended: bool,
 }
 
 impl fmt::Debug for ClientChannelStream {
@@ -2259,7 +2286,48 @@ impl AsyncRead for ClientChannelStream {
         context: &mut Context<'_>,
         buffer: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(context, buffer)
+        if buffer.remaining() == 0 || self.read_ended {
+            return Poll::Ready(Ok(()));
+        }
+        if self.end_wait.is_none() {
+            let filled = buffer.filled().len();
+            match Pin::new(&mut self.inner).poll_read(context, buffer) {
+                Poll::Ready(Ok(())) if buffer.filled().len() == filled => {}
+                result => return result,
+            }
+            if self.normal_termination {
+                self.read_ended = true;
+                return Poll::Ready(Ok(()));
+            }
+            let mut stopped = self.stopped.clone();
+            let connection_end = Arc::clone(&self.connection_end);
+            // Keep the wait and its deadline in the stream, so cancelling a read cannot reset it.
+            self.end_wait = Some(Box::pin(async move {
+                if !*stopped.borrow() {
+                    let _ =
+                        async_timeout(CONNECTION_END_WAIT, stopped.wait_for(|stopped| *stopped))
+                            .await;
+                }
+                connection_end.is_network_lost()
+            }));
+        }
+        let network_lost = match self
+            .end_wait
+            .as_mut()
+            .expect("EOF classification started")
+            .as_mut()
+            .poll(context)
+        {
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(network_lost) => network_lost,
+        };
+        self.end_wait = None;
+        self.read_ended = true;
+        Poll::Ready(if network_lost {
+            Err(io::Error::new(io::ErrorKind::ConnectionAborted, "parent SSH connection lost"))
+        } else {
+            Ok(())
+        })
     }
 }
 
@@ -2985,6 +3053,94 @@ mod tests {
         stopped_tx.send_replace(true);
         assert!(matches!(channel.next_event().await, Err(ClientError::NetworkLost)));
         timeout(Duration::from_secs(3), server).await.expect("server stops").expect("server task");
+    }
+
+    async fn ended_channel_for_stream_classification()
+    -> (ClientChannel, watch::Sender<bool>, Arc<ConnectionEnd>) {
+        let (address, server) = start_echo_server().await;
+        let config = ClientConfig::new("127.0.0.1", address.port(), |_: &str, _: &HostKey| Ok(()))
+            .expect("config");
+        let mut connection = ClientConnection::connect(config).await.expect("connect");
+        connection.authenticate_password("user", b"password").await.expect("authenticate");
+        let mut channel = connection.open_session().await.expect("channel");
+        connection.disconnect().await.expect("stop fixture connection");
+        timeout(Duration::from_secs(3), async { while channel.channel.wait().await.is_some() {} })
+            .await
+            .expect("engine channel ends");
+        timeout(Duration::from_secs(3), server).await.expect("server stops").expect("server task");
+        let (stopped_tx, stopped) = watch::channel(false);
+        let connection_end = Arc::new(ConnectionEnd::new());
+        channel.stopped = stopped;
+        channel.connection_end = Arc::clone(&connection_end);
+        (channel, stopped_tx, connection_end)
+    }
+
+    #[tokio::test]
+    async fn channel_stream_classification_keeps_original_deadline_after_cancellation() {
+        let (channel, stopped, connection_end) = ended_channel_for_stream_classification().await;
+        let mut stream = channel.into_stream();
+        let mut byte = [0];
+        assert!(timeout(Duration::from_millis(400), stream.read(&mut byte)).await.is_err());
+        assert_eq!(stream.read(&mut []).await.expect("empty read is not EOF"), 0);
+        tokio::time::sleep(Duration::from_millis(450)).await;
+        assert_eq!(
+            timeout(Duration::from_millis(450), stream.read(&mut byte))
+                .await
+                .expect("original one-second deadline is not restarted")
+                .expect("unclassified end is normal EOF"),
+            0,
+        );
+        connection_end.record(ConnectionEndKind::NetworkLost);
+        stopped.send_replace(true);
+        assert_eq!(stream.read(&mut byte).await.expect("returned EOF stays terminal"), 0);
+    }
+
+    #[tokio::test]
+    async fn channel_stream_delayed_parent_classification_survives_cancellation() {
+        let (channel, stopped, connection_end) = ended_channel_for_stream_classification().await;
+        let mut stream = channel.into_stream();
+        let mut byte = [0];
+        assert!(timeout(Duration::from_millis(20), stream.read(&mut byte)).await.is_err());
+        connection_end.record(ConnectionEndKind::NetworkLost);
+        stopped.send_replace(true);
+        assert_eq!(
+            stream.read(&mut byte).await.expect_err("confirmed loss").kind(),
+            io::ErrorKind::ConnectionAborted
+        );
+    }
+
+    #[tokio::test]
+    async fn channel_stream_unconfirmed_parent_termination_does_not_invent_network_loss() {
+        for kind in [
+            ConnectionEndKind::Pending,
+            ConnectionEndKind::Local,
+            ConnectionEndKind::Other,
+            ConnectionEndKind::Unknown,
+        ] {
+            let (channel, stopped, connection_end) =
+                ended_channel_for_stream_classification().await;
+            let mut stream = channel.into_stream();
+            connection_end.record(kind);
+            stopped.send_replace(true);
+            assert_eq!(stream.read(&mut [0]).await.expect("non-network termination is EOF"), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn channel_stream_conversion_retains_observed_terminal_and_local_close() {
+        for local_close in [false, true] {
+            let (mut channel, stopped, connection_end) =
+                ended_channel_for_stream_classification().await;
+            if local_close {
+                let _ = channel.close().await;
+            } else {
+                channel.terminal_event_seen = true;
+            }
+            let mut stream = channel.into_stream();
+            connection_end.record(ConnectionEndKind::NetworkLost);
+            stopped.send_replace(true);
+            assert_eq!(stream.read(&mut [0]).await.expect("normal channel completion wins"), 0);
+        }
     }
 
     #[test]
