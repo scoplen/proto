@@ -133,6 +133,92 @@ fn independent_wire_digest_operation_and_writer_vectors() {
 }
 
 #[test]
+fn snippet_browser_operations_reuse_inventory_scopes_and_preserve_device_routes() {
+    use AccountBrowserAccessOperation as Browser;
+    use AccountBrowserAccessScope as Scope;
+    use DeviceAccessOperation as Device;
+
+    assert_eq!(Browser::ALL.len(), 65);
+    assert_eq!(Scope::ALL.len(), 14);
+    let collection = "/api/v1/orgs/{org}/snippets";
+    let item = "/api/v1/orgs/{org}/snippets/{id}";
+    for (browser, device, method, path, scope, receipt) in [
+        (
+            Browser::InventorySnippetList,
+            Device::InventorySnippetList,
+            "GET",
+            collection,
+            Scope::InventoryRead,
+            false,
+        ),
+        (
+            Browser::InventorySnippetRead,
+            Device::InventorySnippetRead,
+            "GET",
+            item,
+            Scope::InventoryRead,
+            false,
+        ),
+        (
+            Browser::InventorySnippetCreate,
+            Device::InventorySnippetCreate,
+            "POST",
+            collection,
+            Scope::InventoryWrite,
+            true,
+        ),
+        (
+            Browser::InventorySnippetReplace,
+            Device::InventorySnippetReplace,
+            "PUT",
+            item,
+            Scope::InventoryWrite,
+            false,
+        ),
+        (
+            Browser::InventorySnippetDelete,
+            Device::InventorySnippetDelete,
+            "DELETE",
+            item,
+            Scope::InventoryWrite,
+            false,
+        ),
+    ] {
+        assert_eq!(Browser::from_route(method, path), Some(browser));
+        assert_eq!(browser.http_method(), method);
+        assert_eq!(browser.route_template(), path);
+        let AccountBrowserAccessRequirement::AnyScope(scopes) = browser.requirement() else {
+            panic!("Snippet management requires an inventory scope")
+        };
+        assert_eq!(scopes, &[scope]);
+        assert_eq!(browser.uses_browser_writer_receipt(), receipt);
+        assert_eq!(Device::from_route(method, path), Some(device));
+    }
+    for (method, path) in [
+        ("PATCH", item),
+        ("POST", item),
+        ("PUT", collection),
+        ("DELETE", collection),
+        ("get", collection),
+        ("GET", "/api/v1/orgs/{org}/snippets/"),
+        ("GET", "/api/v1/orgs/{org}/snippets/{id}?"),
+        ("POST", "/api/v1/orgs/{org}/snippets/{id}/execute"),
+    ] {
+        assert!(Browser::from_route(method, path).is_none(), "{method} {path}");
+    }
+    for kind in ["trust-records", "gateway-networks", "certificate-authorities", "certificates"] {
+        for method in ["GET", "POST", "PUT", "DELETE"] {
+            for suffix in ["", "/{id}"] {
+                assert!(
+                    Browser::from_route(method, &format!("/api/v1/orgs/{{org}}/{kind}{suffix}"))
+                        .is_none()
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn complete_encoded_bounds_apply_before_reused_parsers() {
     let document = vectors();
     for kind in [

@@ -50,8 +50,16 @@ for (const [method, suffix, scope, receipt] of [
 for (const [method, suffix] of [["PATCH", "/{id}"], ["DELETE", "/{id}"], ["POST", "/{id}"], ["GET", "/check"], ["GET", "/{id}/decisions"], ["DELETE", "/{id}/cancel"]]) {
   add(`operation-denied-${vectors.length}`, "operation.reject", { method, path: `/api/v1/orgs/{org}/access-requests${suffix}` });
 }
-for (const [method, path] of [["GET", "/api/v1/accounts/me/devices"], ["GET", "/sync/v1/keys"], ["POST", "/api/v1/orgs/{org}/certificates"], ["POST", "/api/v1/auth/operator/logout"], ["POST", "/api/v1/orgs/{org}/trust-records"], ["GET", "/api/v1/orgs/{org}/snippets"], ["GET", "/api/v1/orgs/{org}/gateway-networks"], ["GET", "/api/v1/admin/accounts"], ["GET", "/api/v1/orgs/"], ["get", "/api/v1/accounts/me"]]) add(`operation-denied-${vectors.length}`, "operation.reject", { method, path });
+for (const [method, path] of [["GET", "/api/v1/accounts/me/devices"], ["GET", "/sync/v1/keys"], ["POST", "/api/v1/orgs/{org}/certificates"], ["POST", "/api/v1/auth/operator/logout"], ["POST", "/api/v1/orgs/{org}/trust-records"], ["PATCH", "/api/v1/orgs/{org}/snippets/{id}"], ["GET", "/api/v1/orgs/{org}/gateway-networks"], ["GET", "/api/v1/admin/accounts"], ["GET", "/api/v1/orgs/"], ["get", "/api/v1/accounts/me"]]) add(`operation-denied-${vectors.length}`, "operation.reject", { method, path });
 add("writer", "writer", { account_id: "0191d3e0-8000-7000-8000-000000000001", family_id: "0191d3e0-8000-7000-8000-000000000002" }, { kind: "account-browser", origin: "0191d3e0-8000-7000-8000-000000000002" });
+for (const [method, suffix, scope, receipt] of [
+  ["GET", "", "read", false], ["GET", "/{id}", "read", false],
+  ["POST", "", "write", true], ["PUT", "/{id}", "write", false],
+  ["DELETE", "/{id}", "write", false],
+]) operation(method, `/api/v1/orgs/{org}/snippets${suffix}`, [`inventory:${scope}`], receipt);
+for (const [method, suffix] of [["POST", "/{id}"], ["PUT", ""], ["DELETE", ""], ["get", ""], ["GET", "/"], ["GET", "/{id}?"], ["POST", "/{id}/execute"]]) {
+  add(`operation-snippet-denied-${vectors.length}`, "operation.reject", { method, path: `/api/v1/orgs/{org}/snippets${suffix}` });
+}
 const output = `${JSON.stringify({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2)}\n`;
 const outputs = [["vectors/account-browser.json", output]];
 for (const [kind, limit] of [["options.request", 256], ["options.response", 1024], ["login.request", 512], ["login.response", 8192], ["refresh.request", 256], ["refresh.response", 8192], ["logout.request", 256], ["logout.response", 256]]) {

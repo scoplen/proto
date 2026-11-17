@@ -893,7 +893,7 @@
     {
       "id": "account-browser-operation-denied-148-v1",
       "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "input": "{\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
       "expected": "rejected"
     },
     {
@@ -925,6 +925,78 @@
       "kind": "account.browser.writer",
       "input": "{\"account_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"family_id\":\"0191d3e0-8000-7000-8000-000000000002\"}",
       "expected": "{\"kind\":\"account-browser\",\"origin\":\"0191d3e0-8000-7000-8000-000000000002\"}"
+    },
+    {
+      "id": "account-browser-operation-154-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-155-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-156-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-157-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-158-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "{\"scopes\":[\"inventory:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-snippet-denied-159-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/snippets/{id}\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-snippet-denied-160-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-snippet-denied-161-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-snippet-denied-162-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"get\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-snippet-denied-163-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets/\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-snippet-denied-164-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets/{id}?\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-snippet-denied-165-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/snippets/{id}/execute\"}",
+      "expected": "rejected"
     }
   ]
 }

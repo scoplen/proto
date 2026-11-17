@@ -235,7 +235,7 @@ fixes access/family lifetimes, cookie attributes and endpoint credential modes. 
 finite browser operation map permits only current Account profile and the specified ordinary
 team/inventory/group/policy operations. It never widens the Device or Operator maps.
 `AccountBrowserWriter` identifies the real Account/family for Organization origins and the
-six inventory/control create-receipt bindings; it supplies no Device or current authority.
+inventory/control create-receipt bindings; it supplies no Device or current authority.
 The single-family reference peer retains only credential digests and exercises refresh,
 reuse revocation, current-generation denial, confirmed logout and transaction/response faults.
 Its trusted inputs are externally verified password/proof/Account facts and independently
@@ -245,6 +245,15 @@ Public `vectors/account-browser.json` independently checks encodings, hash domai
 browser route whitelist and writer metadata. OpenAPI/TypeScript describe the same bounded
 profile. Shared wire support alone does not establish a usable browser login, production API
 or console; the Rust/WebAssembly Worker and consumer acceptance are separate outcomes.
+
+D-155 adds exactly the five existing Snippet list/read/create/replace/delete routes to that
+Account-browser map, using the unchanged fourteen scopes. Only creation uses the existing
+browser-family writer receipt; refresh preserves that family. The existing typed Snippet
+fields retain all four variable kinds, canonical signed-i64 string defaults, bounded distinct
+choices and no stored secret defaults. This pre-Stable K-5 enum extension changes no Device
+operation, K-1/K-4 wire shape or path and admits no TrustRecord, GatewayNetwork, CA or command
+execution. Production Console management and delivery through the complete native view remain
+separate consumer outcomes.
 
 D-134 adds a distinct strict `OrganizationUpdateRequest` codec, required bounded strong
 `If-Match` parsing and the exact `orgs:write`/`PATCH /api/v1/orgs/{org}` operation. The
