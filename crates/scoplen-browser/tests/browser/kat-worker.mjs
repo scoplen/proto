@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import init, {
   derivePasswordAuth, generateTeamInvitation, parseTeamInvitationPassword,
-  teamInvitationVerifier, generateSimpleRule,
+  teamInvitationVerifier, generateSimpleRule, parseInventoryCsv,
 } from "/pkg/scoplen_browser.js";
 
 const bytes = hex => Uint8Array.from(hex.match(/../g) || [], pair => Number.parseInt(pair, 16));
@@ -122,7 +122,16 @@ async function run(mode) {
     rules += 1;
   }
   check(normalizations === 18 && invitations === 34 && rules === 45, "Published fixture coverage changed");
-  return { ok: true, mode, passwordKnownAnswer: true, normalizations, invitations, rules, secretByteBuffersCleared: true };
+  let csv = 0;
+  for (const vector of (await vectors("organization-inventory-import")).filter(vector => vector.kind === "inventory.import.csv")) {
+    let actual;
+    try { actual = parseInventoryCsv(bytes(vector.input)); }
+    catch (error) { actual = String(error); }
+    check(actual === vector.expected, "CSV answer differs in WebAssembly");
+    csv += 1;
+  }
+  check(csv > 30, "Published CSV fixture coverage changed");
+  return { ok: true, mode, passwordKnownAnswer: true, normalizations, invitations, rules, csv, secretByteBuffersCleared: true };
 }
 
 self.onmessage = async event => {

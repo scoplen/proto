@@ -13,7 +13,8 @@ Host/default-Login batch messages, conversion to the existing typed inventory cr
 request-bound result validation. Its independent reference peer models current Device/browser
 writers, real Cedar authority, atomic objects/sequences/revision/audit/receipt publication and
 explicit original confirmation after uncertain outcomes. The shared preview JSON invokes that
-same parser and allocates no identities. These shared
+same parser and allocates no identities. The thin `scoplen-browser` `parseInventoryCsv` export
+forwards to that implementation. These shared
 checks do not establish production HTTP/storage, Console interaction or import-to-SSH acceptance.
 
 Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1) and K-1 object

@@ -8,6 +8,22 @@ use scoplen_crypto::{PasswordBootstrapError, SecretVec, TeamInvitationError};
 use scoplen_test_vectors::VectorDocument;
 use serde_json::Value;
 
+#[test]
+fn csv_preview_uses_the_shared_public_parser_and_fixed_diagnostics() {
+    let csv =
+        b"name,address,port,username,login_name\r\n\"Host, one\",host.example.test,,operator,\r\n";
+    let actual = scoplen_browser::inventory_csv(csv).unwrap();
+    assert_eq!(actual, scoplen_api::inventory_import::inventory_csv_preview(csv).unwrap());
+    let value: Value = serde_json::from_str(&actual).unwrap();
+    assert_eq!(value["rows"][0]["port"], 22);
+    assert!(value["rows"][0].get("login_name").is_none());
+    let error =
+        scoplen_browser::inventory_csv(b"name,address,port,username,login_name\nprivate,,22,u,")
+            .unwrap_err();
+    assert_eq!(error.field, Some("address"));
+    assert!(!error.to_json().contains("private"));
+}
+
 fn hex(text: &str) -> Vec<u8> {
     text.as_bytes()
         .as_chunks::<2>()

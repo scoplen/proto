@@ -23,7 +23,7 @@ const routes = new Map([
   ["/", [join(crate, "tests/browser/index.html"), "text/html; charset=utf-8"]],
   ...["browser-kat.mjs", "kat-worker.mjs", "failure-worker.mjs"].map(name => [`/${name}`, [join(crate, "tests/browser", name), "text/javascript; charset=utf-8"]]),
   ...Object.keys(build.assets).map(name => [`/pkg/${name}`, [join(packaged, name), name.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8"]]),
-  ...["password-bootstrap", "team-invitation", "group-policy"].map(name => [`/vectors/${name}.json`, [join(root, "vectors", `${name}.json`), "application/json"]]),
+  ...["password-bootstrap", "team-invitation", "group-policy", "organization-inventory-import"].map(name => [`/vectors/${name}.json`, [join(root, "vectors", `${name}.json`), "application/json"]]),
 ]);
 const server = createServer(async (request, response) => {
   const path = new URL(request.url, "http://localhost").pathname;

@@ -5,6 +5,14 @@ and D-137 simple-rule implementations. This package derives only the Account aut
 secret. It does not open Personal bootstrap material, export Account roots, enroll a Device or
 run SSH. Rule generation retains the shared strict Cedar schema and reference validation.
 
+D-151's `parseInventoryCsv(Uint8Array): string` invokes the sole shared strict CSV parser.
+It returns JSON `{rows:[...]}` containing flat fields without ids; only absent `login_name`
+is omitted. Failures throw a JSON string containing fixed `kind` and optional one-based data
+`record`/known `field`, never source contents. Preview performs no I/O or identity allocation.
+`node scripts/check-browser-csv.mjs` calls these production web-target assets in Node after a
+build; it verifies shared vectors and asset hashes without browser interaction. The browser
+Worker KAT independently covers this export in CI.
+
 ## Build
 
 The fixed tools are Rust **1.99.0**, target **wasm32-unknown-unknown** and **wasm-bindgen-cli

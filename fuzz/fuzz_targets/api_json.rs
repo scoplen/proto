@@ -43,8 +43,10 @@ use scoplen_api::inventory::{
     InventoryCreateRequest, InventoryFields, InventoryPage, InventoryReplaceRequest,
     InventoryResource, InventoryType,
 };
+use scoplen_api::inventory_import::{
+    InventoryImportRequest, InventoryImportResult, parse_inventory_csv,
+};
 use scoplen_api::krl::UserCaKrl;
-use scoplen_api::inventory_import::{InventoryImportRequest, InventoryImportResult, parse_inventory_csv};
 use scoplen_api::operator_auth::{
     OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
     OperatorLogoutRequest, OperatorLogoutResponse, OperatorSetupFinishRequest,

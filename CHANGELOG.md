@@ -10,6 +10,8 @@ All notable changes to the `proto` repository will be recorded here.
   Add a real-Cedar
   transaction reference with original writer receipts, atomic publication and scripted
   rollback/uncertain outcomes. Production HTTP/storage and import-to-SSH remain consumer work.
+  Expose the same parser through the production thin browser package, with native and
+  browser-free packaged WebAssembly vector verification and separate browser Worker CI coverage.
 
 - Add D-150's bounded single-Host access-request codecs, exact Resource/Page/query bindings,
   fractional deadline and approval-time invariants, six Device/Account-browser operations and
