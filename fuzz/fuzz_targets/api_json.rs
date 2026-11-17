@@ -45,7 +45,8 @@ use scoplen_api::inventory::{
     InventoryResource, InventoryType,
 };
 use scoplen_api::inventory_import::{
-    InventoryImportRequest, InventoryImportResult, parse_inventory_csv,
+    InventoryImportRequest, InventoryImportResult, InventoryOpenSshCandidate, parse_inventory_csv,
+    parse_inventory_openssh,
 };
 use scoplen_api::krl::UserCaKrl;
 use scoplen_api::operator_auth::{
@@ -100,6 +101,14 @@ macro_rules! canonical_round_trip {
 
 fuzz_target!(|bytes: &[u8]| {
     let _ = parse_inventory_csv(bytes);
+    if let Ok(candidates) = parse_inventory_openssh(bytes) {
+        assert!(!candidates.is_empty() && candidates.len() <= 100);
+        for candidate in candidates {
+            if let InventoryOpenSshCandidate::Ready { fields, .. } = candidate {
+                fields.validate().expect("prepared OpenSSH fields satisfy K-1");
+            }
+        }
+    }
     round_trip!(InventoryImportRequest, bytes);
     round_trip!(InventoryImportResult, bytes);
     let ca = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea";

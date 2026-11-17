@@ -1,0 +1,7 @@
+Host a b
+User first
+Host *
+User second
+HostName target-%h
+Host a
+Port 2202

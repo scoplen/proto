@@ -1,0 +1,5 @@
+Host bad*
+PrivateUnknown value
+User wrong
+Host good
+User right

@@ -9,3 +9,4 @@ fuzz/corpus/api_json/seed-user-ca-krl-* -text
 fuzz/corpus/api_json/seed-group-policy-*-whitespace-v1 -text whitespace=-space-before-tab
 fuzz/corpus/api_json/seed-access-request-* -text whitespace=-blank-at-eol,-space-before-tab
 fuzz/corpus/api_json/seed-inventory-import-* -text whitespace=-blank-at-eol,-blank-at-eof
+fuzz/corpus/api_json/seed-openssh-import-* -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab

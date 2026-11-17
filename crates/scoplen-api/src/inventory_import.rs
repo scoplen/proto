@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-//! D-151 bounded CSV preparation and atomic Organization inventory batch wire.
+//! Bounded D-151 CSV/D-153 OpenSSH preparation and atomic Organization inventory batch wire.
 //! Parsing supplies neither current authority nor receipt/commit evidence.
 
+mod openssh;
 pub mod reference;
+
+pub use openssh::*;
 
 use std::{collections::BTreeSet, fmt};
 

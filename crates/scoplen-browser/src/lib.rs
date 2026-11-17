@@ -121,3 +121,12 @@ pub fn inventory_csv(
 ) -> Result<String, scoplen_api::inventory_import::InventoryCsvError> {
     scoplen_api::inventory_import::inventory_csv_preview(input)
 }
+
+/// Prepare all Direct OpenSSH candidates through the sole pure shared implementation.
+/// # Errors
+/// Returns only fixed source-free file errors; blocked candidates remain in the preview.
+pub fn inventory_openssh(
+    input: &[u8],
+) -> Result<String, scoplen_api::inventory_import::InventoryOpenSshError> {
+    scoplen_api::inventory_import::inventory_openssh_preview(input)
+}

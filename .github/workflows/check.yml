@@ -112,6 +112,8 @@ jobs:
           node --test scripts/generate-inventory-vectors.test.mjs crates/scoplen-api/openapi/generate-inventory.test.mjs
           node scripts/generate-inventory-import-vectors.mjs --check
           node --test scripts/generate-inventory-import-vectors.test.mjs crates/scoplen-api/openapi/generate-inventory-import.test.mjs
+          node scripts/generate-openssh-import-vectors.mjs --check
+          node --test scripts/generate-openssh-import-vectors.test.mjs scripts/openssh-import-interop.test.mjs
       - name: Check Operator logout vectors and parser bounds
         run: node scripts/generate-operator-logout-vectors.mjs --check
       - name: Test Operator logout vector checkout boundaries
@@ -182,6 +184,8 @@ jobs:
         run: node scripts/build-browser.mjs
       - name: Check production CSV WebAssembly without a browser
         run: node scripts/check-browser-csv.mjs
+      - name: Check production OpenSSH WebAssembly without a browser
+        run: node scripts/check-browser-openssh.mjs
       - name: Check packaged module in Chromium
         run: node scripts/check-browser.mjs
 

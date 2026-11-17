@@ -1,0 +1,9 @@
+
+ 	
+ # ignored "quote
+User global
+Host A
+# ignored
+ 	
+HostName TARGET
+Host B

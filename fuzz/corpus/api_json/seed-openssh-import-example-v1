@@ -1,0 +1,4 @@
+Host Mixed
+ HostName prefix-%h
+ User "part"word
+ Port=2203

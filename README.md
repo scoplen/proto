@@ -8,6 +8,17 @@ under Apache-2.0.
 
 ## Status
 
+D-153 adds `parse_inventory_openssh` and `inventory_openssh_preview` to the same shared
+`inventory_import` module. One explicitly selected bounded UTF-8 source produces every
+ordered Ready or Blocked candidate; the new `parseInventoryOpenSsh` browser export forwards
+to this pure implementation. It interprets only Host/HostName/User/Port, requires explicit
+User and refuses applicable unsupported settings. Source-free diagnostics preserve candidate
+ordinals and physical lines. Ready fields use D-151's unchanged typed request after explicit
+reviewed selection; neither parser allocates identities or performs I/O. Independent vectors,
+nonconnecting installed OpenSSH comparisons and packaged WASM checks cover preparation.
+Production Console selection, HTTP/storage and independent import-to-SSH acceptance remain
+separate consumer outcomes.
+
 D-151 adds `scoplen_api::inventory_import`: one bounded strict CSV parser, flat ordered
 Host/default-Login batch messages, conversion to the existing typed inventory creates and
 request-bound result validation. Its independent reference peer models current Device/browser
@@ -1257,6 +1268,8 @@ The age dependency's translation proc macros still use the unmaintained `basic-t
 cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets --all-features -- -D warnings
+node scripts/generate-openssh-import-vectors.mjs --check
+node --test scripts/generate-openssh-import-vectors.test.mjs scripts/openssh-import-interop.test.mjs
 node scripts/portable-age-interop.mjs
 node crates/scoplen-api/openapi/generate.mjs --check
 node --test crates/scoplen-api/openapi/generate-operator.test.mjs
@@ -1331,6 +1344,8 @@ The `api_json` target exercises the shared problem body, all seven authenticatio
 types, both gateway-ticket issuance messages, the certificate issuance request and response, and
 the current-account profile and complete signed device-statement snapshot
 through public decoders, including D-106 public JWKS and every D-128/D-152 native message and protected CBOR map.
+It also prepares D-153 OpenSSH sources through the public parser and checks all Ready fields
+against the existing K-1 validator. Independent source seeds preserve their exact raw bytes.
 D-128/D-152 seeds cover explicit intent/capability pairs, exact signature domains, complete-body bounds,
 protected extensions/trailing bytes and malicious declared collection lengths before allocation.
 Its seeds cover sorted and

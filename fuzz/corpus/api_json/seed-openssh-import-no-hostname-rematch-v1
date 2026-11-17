@@ -1,0 +1,5 @@
+Host a
+HostName target
+User op
+Host target*
+ProxyJump none
