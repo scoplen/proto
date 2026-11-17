@@ -79,6 +79,46 @@ fn rotation_keeps_real_writer_and_absolute_family_expiry_and_detects_reuse() {
     assert_eq!(peer.events(), 3);
 }
 #[test]
+fn snippet_operations_keep_the_real_family_through_refresh_and_check_current_account() {
+    let mut peer = peer();
+    let writer = peer
+        .authorize(
+            &access(1),
+            JKT,
+            Some(ORIGIN),
+            AccountBrowserAccessOperation::InventorySnippetCreate,
+            "snippet-create",
+            1001,
+        )
+        .unwrap();
+    peer.rotate(b"{}", &refresh(2), &access(3), &refresh(4), JKT, ORIGIN, "rotate", 1100).unwrap();
+    for (operation, proof) in [
+        (AccountBrowserAccessOperation::InventorySnippetList, "snippet-list"),
+        (AccountBrowserAccessOperation::InventorySnippetRead, "snippet-read"),
+        (AccountBrowserAccessOperation::InventorySnippetCreate, "snippet-create-after-refresh"),
+        (AccountBrowserAccessOperation::InventorySnippetReplace, "snippet-replace"),
+        (AccountBrowserAccessOperation::InventorySnippetDelete, "snippet-delete"),
+    ] {
+        assert_eq!(
+            peer.authorize(&access(3), JKT, Some(ORIGIN), operation, proof, 1101).unwrap(),
+            writer
+        );
+    }
+    peer.set_current_account(false, 1);
+    assert_eq!(
+        peer.authorize(
+            &access(3),
+            JKT,
+            Some(ORIGIN),
+            AccountBrowserAccessOperation::InventorySnippetCreate,
+            "inactive-account",
+            1102,
+        ),
+        Err(ReferenceAccountBrowserError::AuthenticationRequired)
+    );
+}
+
+#[test]
 fn refresh_unknown_commit_returns_no_credentials_and_later_reuse_revokes() {
     for fault in [
         ReferenceAccountBrowserFault::BeforeCommit,

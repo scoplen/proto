@@ -183,6 +183,16 @@ pub enum AccountBrowserAccessOperation {
     InventoryRouteReplace,
     /// `DELETE /api/v1/orgs/{org}/routes/{id}`.
     InventoryRouteDelete,
+    /// `GET /api/v1/orgs/{org}/snippets`.
+    InventorySnippetList,
+    /// `GET /api/v1/orgs/{org}/snippets/{id}`.
+    InventorySnippetRead,
+    /// `POST /api/v1/orgs/{org}/snippets`.
+    InventorySnippetCreate,
+    /// `PUT /api/v1/orgs/{org}/snippets/{id}`.
+    InventorySnippetReplace,
+    /// `DELETE /api/v1/orgs/{org}/snippets/{id}`.
+    InventorySnippetDelete,
     /// `GET /api/v1/orgs/{org}/groups`.
     OrganizationGroupList,
     /// `GET /api/v1/orgs/{org}/groups/{id}`.
@@ -228,7 +238,7 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 60] = [
+    pub const ALL: [Self; 65] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -273,6 +283,11 @@ impl AccountBrowserAccessOperation {
         Self::InventoryRouteCreate,
         Self::InventoryRouteReplace,
         Self::InventoryRouteDelete,
+        Self::InventorySnippetList,
+        Self::InventorySnippetRead,
+        Self::InventorySnippetCreate,
+        Self::InventorySnippetReplace,
+        Self::InventorySnippetDelete,
         Self::OrganizationGroupList,
         Self::OrganizationGroupRead,
         Self::OrganizationGroupCreate,
@@ -352,7 +367,9 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryAccessProfileList
             | Self::InventoryAccessProfileRead
             | Self::InventoryRouteList
-            | Self::InventoryRouteRead => AccountBrowserAccessRequirement::AnyScope(&[
+            | Self::InventoryRouteRead
+            | Self::InventorySnippetList
+            | Self::InventorySnippetRead => AccountBrowserAccessRequirement::AnyScope(&[
                 AccountBrowserAccessScope::InventoryRead,
             ]),
             Self::InventoryImportCreate
@@ -367,7 +384,10 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryAccessProfileDelete
             | Self::InventoryRouteCreate
             | Self::InventoryRouteReplace
-            | Self::InventoryRouteDelete => AccountBrowserAccessRequirement::AnyScope(&[
+            | Self::InventoryRouteDelete
+            | Self::InventorySnippetCreate
+            | Self::InventorySnippetReplace
+            | Self::InventorySnippetDelete => AccountBrowserAccessRequirement::AnyScope(&[
                 AccountBrowserAccessScope::InventoryWrite,
             ]),
             Self::OrganizationGroupList
@@ -412,6 +432,8 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryAccessProfileRead
             | Self::InventoryRouteList
             | Self::InventoryRouteRead
+            | Self::InventorySnippetList
+            | Self::InventorySnippetRead
             | Self::OrganizationGroupList
             | Self::OrganizationGroupRead
             | Self::OrganizationPolicyList
@@ -431,6 +453,7 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryHostGroupCreate
             | Self::InventoryAccessProfileCreate
             | Self::InventoryRouteCreate
+            | Self::InventorySnippetCreate
             | Self::OrganizationGroupCreate
             | Self::OrganizationPolicyCreate
             | Self::OrganizationGrantCreate
@@ -442,6 +465,7 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryHostGroupDelete
             | Self::InventoryAccessProfileDelete
             | Self::InventoryRouteDelete
+            | Self::InventorySnippetDelete
             | Self::OrganizationGroupDelete
             | Self::OrganizationPolicyDelete
             | Self::OrganizationGrantDelete => "DELETE",
@@ -449,6 +473,7 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryHostGroupReplace
             | Self::InventoryAccessProfileReplace
             | Self::InventoryRouteReplace
+            | Self::InventorySnippetReplace
             | Self::OrganizationGroupReplace
             | Self::OrganizationPolicyReplace
             | Self::OrganizationGrantReplace => "PUT",
@@ -503,6 +528,12 @@ impl AccountBrowserAccessOperation {
             Self::InventoryRouteRead | Self::InventoryRouteReplace | Self::InventoryRouteDelete => {
                 "/api/v1/orgs/{org}/routes/{id}"
             }
+            Self::InventorySnippetList | Self::InventorySnippetCreate => {
+                "/api/v1/orgs/{org}/snippets"
+            }
+            Self::InventorySnippetRead
+            | Self::InventorySnippetReplace
+            | Self::InventorySnippetDelete => "/api/v1/orgs/{org}/snippets/{id}",
             Self::OrganizationGroupList | Self::OrganizationGroupCreate => {
                 "/api/v1/orgs/{org}/groups"
             }
@@ -545,6 +576,7 @@ impl AccountBrowserAccessOperation {
                 | Self::InventoryHostGroupCreate
                 | Self::InventoryAccessProfileCreate
                 | Self::InventoryRouteCreate
+                | Self::InventorySnippetCreate
                 | Self::OrganizationGroupCreate
                 | Self::OrganizationPolicyCreate
                 | Self::OrganizationGrantCreate

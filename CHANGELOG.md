@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-155's five exact Account-browser Snippet operations using the existing inventory
+  scopes and original browser-family create receipt. Preserve the fourteen-scope ceiling,
+  typed Snippet fields, native Device operations and all other browser exclusions. Extend
+  the finite pre-Stable K-5 enum, independent vectors, reference-family checks and generated
+  OpenAPI/TypeScript metadata. Production Console management and native view delivery remain
+  separate consumer outcomes.
+
 - Add D-153's pure bounded Direct OpenSSH preparer, ordered typed Ready/Blocked candidates
   and fixed source-free diagnostics. Reuse D-151 fields, complete typed-pair validation and
   unchanged atomic request/receipt behavior. Add independent vectors/raw parser seeds,
