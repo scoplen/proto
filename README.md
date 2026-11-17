@@ -46,6 +46,13 @@ and complete-bootstrap CBOR, additional Account signatures and fresh Device poss
 Registration and admission expose `decode_for_authentication` for complete structural parsing
 before transaction-bound challenge/signature checks. Its results are unauthenticated; strict
 decoders retain their existing validation, and no parser result grants admission or receipt authority.
+D-152 extends the same native ceremony with a third `password_change` request kind and one
+bounded endpoint. Dedicated canonical payload/request/confirmation types use a separate
+Account-signature domain and the existing fresh Device-proof format, with a historical credential
+generation instead of an admitted key revision. A current Device, Account root and recent
+old-password capability must all authorize submission; confirmation supplies no current
+authority. The password derivation, K-4 artifacts and enrolled native Devices stay unchanged.
+This shared surface does not mount a production route or implement native Settings.
 The public deployment probe-key helper derives stable synthetic salts, denial verifiers and
 private username admission identities with separate HMAC-SHA-256 domains and canonical context.
 D-129's Account-only retention digest uses the exact domain and raw UUID bytes, without adding
@@ -1203,10 +1210,11 @@ and does not open Personal material or supply browser authentication/HTTP integr
 `scoplen-api` keeps internal gRPC transport enabled by default through `internal-grpc`; browser
 dependencies disable this feature without replacing the shared Cedar validator.
 K-1 vectors are in `vectors/baseline.json`; K-2 cryptographic vectors are
-in `vectors/crypto.json`. D-128 native entry/protected-map/signature vectors are in
+in `vectors/crypto.json`. D-128/D-152 native entry/protected-map/signature vectors are in
 `vectors/account-admission.json`, independently produced by
 `node scripts/generate-account-admission-vectors.mjs [--check]`. The Node producer verifies
-and retains a prior ECDSA proof for deterministic regeneration. Ciphertext fixtures establish
+and retains a prior ECDSA proof for deterministic regeneration. Run its corresponding Node test
+to check retained proofs, generation/intent separation and exact raw-seed drift. Ciphertext fixtures establish
 public format/signature boundaries; they do not establish successful private-key opening.
 The published K-3 auth and API problem, sync session, change-feed, and
 remaining K-4 message vectors are in `vectors/api-auth.json`, `vectors/auth-admission.json`,
@@ -1312,8 +1320,8 @@ one byte over their 4 KiB bound.
 The `api_json` target exercises the shared problem body, all seven authentication/refresh message
 types, both gateway-ticket issuance messages, the certificate issuance request and response, and
 the current-account profile and complete signed device-statement snapshot
-through public decoders, including D-106 public JWKS and every D-128 native message and protected CBOR map.
-D-128 seeds cover explicit intent/capability pairs, exact signature domains, complete-body bounds,
+through public decoders, including D-106 public JWKS and every D-128/D-152 native message and protected CBOR map.
+D-128/D-152 seeds cover explicit intent/capability pairs, exact signature domains, complete-body bounds,
 protected extensions/trailing bytes and malicious declared collection lengths before allocation.
 Its seeds cover sorted and
 unordered keys, recursive duplicate members, duplicate identifiers, private `d`, malformed
