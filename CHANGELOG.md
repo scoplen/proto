@@ -13,6 +13,9 @@ All notable changes to the `proto` repository will be recorded here.
   Expose the same parser through the production thin browser package, with native and
   browser-free packaged WebAssembly vector verification and separate browser Worker CI coverage.
 
+- Keep D-137 inventory vector generation isolated from D-151 CSV-import parser seeds.
+  Check both producers together in either order without deleting neighboring outputs.
+
 - Add D-150's bounded single-Host access-request codecs, exact Resource/Page/query bindings,
   fractional deadline and approval-time invariants, six Device/Account-browser operations and
   separate read/write/decide scopes, without widening old refresh ceilings. Add independent
