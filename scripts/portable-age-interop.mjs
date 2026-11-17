@@ -19,8 +19,11 @@ function invoke(command, args, input, cwd = root) {
   });
   if (result.error || result.status !== 0) {
     // Build diagnostics and fixed helper errors do not include the pipe's payload.
-    if (command === "cargo" || command === "go") process.stderr.write(result.stderr ?? "");
-    throw new Error(`portable-age ${command} operation failed`);
+    process.stderr.write(result.stderr ?? "");
+    throw new Error(
+      `portable-age ${command} operation failed: status=${result.status}, ` +
+      `signal=${result.signal}, spawn=${result.error?.code ?? "none"}`,
+    );
   }
   return result.stdout;
 }

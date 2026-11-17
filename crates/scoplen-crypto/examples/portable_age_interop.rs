@@ -30,8 +30,8 @@ fn run() -> Result<(), PortableExportError> {
 }
 
 fn main() {
-    if run().is_err() {
-        eprintln!("synthetic portable-age operation failed");
+    if let Err(error) = run() {
+        eprintln!("synthetic portable-age operation failed: {error}");
         std::process::exit(1);
     }
 }
