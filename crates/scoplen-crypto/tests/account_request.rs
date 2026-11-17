@@ -17,18 +17,19 @@ fn unhex(v: &str) -> Vec<u8> {
 }
 
 #[test]
-fn independent_exact_proof_vectors_cover_both_kinds_and_intents() {
+fn independent_exact_proof_vectors_cover_all_kinds_and_intents() {
     let doc =
         VectorDocument::parse_str(include_str!("../../../vectors/account-admission.json")).unwrap();
-    let mut count = 0;
+    let mut counts = std::collections::BTreeMap::new();
     for vector in doc.vectors.iter().filter(|v| v.kind == "account.admission.proof") {
-        count += 1;
         let input: Value = serde_json::from_str(&vector.input).unwrap();
-        let kind = if input["kind"] == "register" {
-            AccountRequestKind::Register
-        } else {
-            AccountRequestKind::Admit
+        let kind = match input["kind"].as_str().unwrap() {
+            "register" => AccountRequestKind::Register,
+            "admit" => AccountRequestKind::Admit,
+            "password_change" => AccountRequestKind::PasswordChange,
+            other => panic!("unknown request kind {other}"),
         };
+        *counts.entry(kind.as_str()).or_insert(0) += 1;
         let intent = if input["intent"] == "submit" {
             AccountRequestIntent::Submit
         } else {
@@ -58,10 +59,10 @@ fn independent_exact_proof_vectors_cover_both_kinds_and_intents() {
             )
             .unwrap();
         proof.verify(&signer.public_key_sec1(), &proof.sign(&signer).unwrap()).unwrap();
-        let domain = if kind == AccountRequestKind::Register {
-            b"spl-account-register-v1".as_slice()
-        } else {
-            b"spl-account-device-admit-v1".as_slice()
+        let domain = match kind {
+            AccountRequestKind::Register => b"spl-account-register-v1".as_slice(),
+            AccountRequestKind::Admit => b"spl-account-device-admit-v1".as_slice(),
+            AccountRequestKind::PasswordChange => b"spl-account-password-change-v1".as_slice(),
         };
         let account_bytes = field("account_input");
         let stable =
@@ -83,7 +84,91 @@ fn independent_exact_proof_vectors_cover_both_kinds_and_intents() {
             signature
         );
     }
-    assert_eq!(count, 4);
+    assert_eq!(counts, [("admit", 2), ("password_change", 2), ("register", 2)].into());
+}
+
+#[test]
+fn password_change_domain_and_proofs_remain_separate_from_other_operations() {
+    let kind = AccountRequestKind::PasswordChange;
+    assert_eq!(kind.as_str(), "password_change");
+    let input = AccountRequestSignatureInput::new(kind, &[1, 2, 3]).unwrap();
+    assert_eq!(input.as_bytes(), b"spl-account-password-change-v1\x01\x02\x03");
+    let account = Ed25519SigningKey::from_bytes(&[1; 32]).unwrap();
+    let signature = input.sign(&account);
+    let digest = input.request_digest(&signature);
+    input.verify(&account.public_key(), &signature).unwrap();
+    for other in [AccountRequestKind::Register, AccountRequestKind::Admit] {
+        assert!(
+            AccountRequestSignatureInput::new(other, &[1, 2, 3])
+                .unwrap()
+                .verify(&account.public_key(), &signature)
+                .is_err()
+        );
+    }
+    assert!(AccountRequestSignatureInput::new(kind, &[]).is_err());
+    assert!(AccountRequestSignatureInput::new(kind, &vec![0; 8_192]).is_ok());
+    assert!(AccountRequestSignatureInput::new(kind, &vec![0; 8_193]).is_err());
+    let device = P256SigningKey::from_bytes(&[2; 32]).unwrap();
+    let operation = Uuid::parse_str("018f3f3a-bcd1-7000-8000-000000000001").unwrap();
+    let device_id = Uuid::parse_str("018f3f3a-bcd1-7000-8000-000000000002").unwrap();
+    for intent in [AccountRequestIntent::Submit, AccountRequestIntent::Confirm] {
+        let proof = AccountRequestProof::new(
+            kind,
+            intent,
+            "https://control.example.com",
+            &[3; 32],
+            &[4; 32],
+            operation,
+            device_id,
+            &digest,
+        )
+        .unwrap();
+        let header = b"spl-account-request-proof-v1".len();
+        assert_eq!(proof.as_bytes()[header], 3);
+        assert_eq!(
+            proof.as_bytes()[header + 1],
+            if intent == AccountRequestIntent::Submit { 1 } else { 2 }
+        );
+        let signature = proof.sign(&device).unwrap();
+        proof.verify(&device.public_key_sec1(), &signature).unwrap();
+        for other in [AccountRequestKind::Register, AccountRequestKind::Admit] {
+            assert!(
+                AccountRequestProof::new(
+                    other,
+                    intent,
+                    "https://control.example.com",
+                    &[3; 32],
+                    &[4; 32],
+                    operation,
+                    device_id,
+                    &digest,
+                )
+                .unwrap()
+                .verify(&device.public_key_sec1(), &signature)
+                .is_err()
+            );
+        }
+        let other_intent = if intent == AccountRequestIntent::Submit {
+            AccountRequestIntent::Confirm
+        } else {
+            AccountRequestIntent::Submit
+        };
+        assert!(
+            AccountRequestProof::new(
+                kind,
+                other_intent,
+                "https://control.example.com",
+                &[3; 32],
+                &[4; 32],
+                operation,
+                device_id,
+                &digest,
+            )
+            .unwrap()
+            .verify(&device.public_key_sec1(), &signature)
+            .is_err()
+        );
+    }
 }
 
 #[test]

@@ -128,6 +128,37 @@ pub struct AccountDeviceAdmissionPayload {
     pub key_bundle: Vec<u8>,
 }
 
+/// Stable credential replacement bound to the current password snapshot and existing Device.
+#[derive(Clone, Eq, PartialEq)]
+pub struct AccountPasswordChangePayload {
+    /// Deployment-unique operation identifier.
+    pub operation_id: Uuid,
+    /// Exact trusted origin.
+    pub origin: String,
+    /// Account's canonical username.
+    pub username: String,
+    /// Existing password-owned Account identifier.
+    pub account_id: Uuid,
+    /// Existing Personal vault identifier.
+    pub personal_vault_id: Uuid,
+    /// Original enrolled Device identifier, unchanged by this operation.
+    pub device_id: Uuid,
+    /// Positive current snapshot-bound credential generation.
+    pub credential_generation: u64,
+    /// Checked positive successor of the original credential generation.
+    pub new_credential_generation: u64,
+    /// Domain-separated hash of the exact complete verified login snapshot.
+    pub snapshot_digest: [u8; 32],
+    /// SHA-256 of the shared one-use native password capability.
+    pub capability_digest: [u8; 32],
+    /// Fresh profile-one salt for the new credential.
+    pub password_salt: [u8; 16],
+    /// SHA-256 of the new password's `AuthSecret`.
+    pub verifier: [u8; 32],
+    /// New D-127 envelope containing the unchanged random ARK.
+    pub password_ark: [u8; 73],
+}
+
 macro_rules! redacted {
     ($($name:ty),+ $(,)?) => {$(impl std::fmt::Debug for $name {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -140,7 +171,8 @@ redacted!(
     AccountPersonalEpoch,
     AccountPersonalBootstrap,
     AccountBootstrapSnapshot,
-    AccountDeviceAdmissionPayload
+    AccountDeviceAdmissionPayload,
+    AccountPasswordChangePayload
 );
 
 impl AccountRegistrationPayload {
@@ -604,6 +636,122 @@ impl AccountDeviceAdmissionPayload {
             key_bundle: blob(&mut f, "key_bundle", 4_194_304)?,
         };
         empty(&f)?;
+        Ok(value)
+    }
+}
+
+impl AccountPasswordChangePayload {
+    /// Validate public syntax, wrapper shape and the exact successor generation.
+    ///
+    /// No ciphertext comparison can establish preservation of the ARK plaintext.
+    /// # Errors
+    /// Rejects malformed syntax/wrappers or a non-successor generation.
+    pub fn validate(&self) -> Result<(), Error> {
+        self.validate_structure()?;
+        if self.credential_generation.checked_add(1) != Some(self.new_credential_generation) {
+            return Err(Error::AdmissionConflict);
+        }
+        Ok(())
+    }
+
+    fn validate_structure(&self) -> Result<(), Error> {
+        validate_origin_username(&self.origin, &self.username)?;
+        ids(&[self.operation_id, self.account_id, self.personal_vault_id, self.device_id])?;
+        if self.credential_generation == 0 || self.new_credential_generation == 0 {
+            return Err(Error::InvalidProtected);
+        }
+        password_wrap(&self.password_ark)
+    }
+
+    /// Bind the proposal to an exact verified snapshot, capability and active existing recipient.
+    ///
+    /// Current durable Device admission, Account availability and commit-time CAS remain required.
+    /// # Errors
+    /// Rejects stale/substituted context, unsupported rotation or a missing/revoked Device wrap.
+    pub fn validate_for_snapshot(
+        &self,
+        snapshot: &AccountBootstrapSnapshot,
+        snapshot_bytes: &[u8],
+        token: &[u8; 32],
+    ) -> Result<(), Error> {
+        self.validate()?;
+        snapshot.validate_admission_state()?;
+        if snapshot.to_cbor()? != snapshot_bytes
+            || self.origin != snapshot.origin
+            || self.username != snapshot.username
+            || self.account_id != snapshot.account_id
+            || self.personal_vault_id != snapshot.personal_vault_id
+            || self.credential_generation != snapshot.credential_generation
+            || self.snapshot_digest != scoplen_crypto::account_bootstrap_digest(snapshot_bytes)
+            || self.capability_digest != scoplen_crypto::account_capability_digest(token)
+        {
+            return Err(Error::Binding);
+        }
+        let bundle = SyncAccountKeyBundleUpdate::from_cbor(&snapshot.key_bundle)
+            .map_err(|_| Error::InvalidProtected)?;
+        if !bundle.device_wraps.iter().any(|wrap| wrap.device_id == self.device_id) {
+            return Err(Error::Binding);
+        }
+        Ok(())
+    }
+
+    /// Encode the exact deterministic version-one, profile-one protected map.
+    /// # Errors
+    /// Rejects invalid fields/successor generation or the complete protected-byte bound.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, Error> {
+        self.validate()?;
+        encode(
+            &map(vec![
+                ("version", Value::UInt(1)),
+                ("operation_id", id(self.operation_id)),
+                ("origin", text(&self.origin)),
+                ("username", text(&self.username)),
+                ("account_id", id(self.account_id)),
+                ("personal_vault_id", id(self.personal_vault_id)),
+                ("device_id", id(self.device_id)),
+                ("credential_generation", Value::UInt(self.credential_generation)),
+                ("new_credential_generation", Value::UInt(self.new_credential_generation)),
+                ("snapshot_digest", bytes(&self.snapshot_digest)),
+                ("capability_digest", bytes(&self.capability_digest)),
+                ("password_profile", Value::UInt(1)),
+                ("password_salt", bytes(&self.password_salt)),
+                ("verifier", bytes(&self.verifier)),
+                ("password_ark", bytes(&self.password_ark)),
+            ]),
+            super::MAX_ACCOUNT_PASSWORD_CHANGE_PAYLOAD_BYTES,
+        )
+    }
+
+    /// Decode a complete canonical protected map and check the successor generation.
+    /// # Errors
+    /// Rejects unknown members, malformed fields, wrappers or generation transitions.
+    pub fn from_cbor(input: &[u8]) -> Result<Self, Error> {
+        let value = Self::from_cbor_structural(input)?;
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub(crate) fn from_cbor_structural(input: &[u8]) -> Result<Self, Error> {
+        let mut f = decode(input, super::MAX_ACCOUNT_PASSWORD_CHANGE_PAYLOAD_BYTES)?;
+        one(&mut f, "version")?;
+        one(&mut f, "password_profile")?;
+        let value = Self {
+            operation_id: uuid(&mut f, "operation_id")?,
+            origin: string(&mut f, "origin")?,
+            username: string(&mut f, "username")?,
+            account_id: uuid(&mut f, "account_id")?,
+            personal_vault_id: uuid(&mut f, "personal_vault_id")?,
+            device_id: uuid(&mut f, "device_id")?,
+            credential_generation: uint(&mut f, "credential_generation")?,
+            new_credential_generation: uint(&mut f, "new_credential_generation")?,
+            snapshot_digest: fixed(&mut f, "snapshot_digest")?,
+            capability_digest: fixed(&mut f, "capability_digest")?,
+            password_salt: fixed(&mut f, "password_salt")?,
+            verifier: fixed(&mut f, "verifier")?,
+            password_ark: fixed(&mut f, "password_ark")?,
+        };
+        empty(&f)?;
+        value.validate_structure()?;
         Ok(value)
     }
 }

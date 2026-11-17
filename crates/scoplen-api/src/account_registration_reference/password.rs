@@ -71,7 +71,7 @@ pub struct ReferenceAdmissionCapability {
     pub snapshot_digest: [u8; 32],
     /// Exactly five minutes after capability creation.
     pub expires_at_ms: u64,
-    /// Retained rows are unspent; admission consumption removes the row and its live indexes.
+    /// Retained rows are unspent; admission or password change removes the row and live indexes.
     pub spent: bool,
 }
 
@@ -511,7 +511,7 @@ impl ReferenceAccountRegistrationPeer {
     /// Script current credential/bootstrap changes for race and integrity acceptance.
     ///
     /// This control deliberately permits inconsistent fixture state; it is not a credential-
-    /// change endpoint or approval of the separately unfrozen password/root lifecycle.
+    /// change endpoint or approval of root rotation outside the password-change contract.
     /// # Errors
     /// Rejects an unknown Account or poisoned storage.
     pub fn script_password_state(

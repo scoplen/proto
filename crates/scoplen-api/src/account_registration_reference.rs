@@ -5,7 +5,7 @@
 //! digest retention and complete restart images. It is not HTTP transport, durable database
 //! storage or an audit chain. Low-level operations require prior caller admission;
 //! The connected challenge and password-options entries use the separate rate peer.
-//! Password entry and Device admission share this storage and the same Account transaction lock.
+//! Password entry, Device admission and password change share this storage and Account lock.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -37,10 +37,14 @@ use crate::{
 
 mod admission;
 mod password;
+mod password_change;
 pub use admission::{ReferenceDeviceAdmissionError, ReferenceDeviceAdmissionResult};
 pub use password::{
     ReferenceAdmissionCapability, ReferencePasswordAttempt, ReferencePasswordCredential,
     ReferencePasswordError, ReferencePasswordOptionsAdmissionError, ReferencePasswordSummary,
+};
+pub use password_change::{
+    ReferencePasswordChangeError, ReferencePasswordChangeReceipt, ReferencePasswordChangeResult,
 };
 
 /// The admitted default deployment-lifetime Account-id row ceiling.
@@ -244,6 +248,7 @@ struct State {
     vaults: BTreeMap<Uuid, Uuid>,
     devices: BTreeMap<Uuid, Uuid>,
     receipts: BTreeMap<Uuid, ReferenceRegistrationReceipt>,
+    password_change_receipts: BTreeMap<Uuid, ReferencePasswordChangeReceipt>,
     account_devices: BTreeMap<Uuid, BTreeSet<Uuid>>,
     account_receipts: BTreeMap<Uuid, BTreeSet<Uuid>>,
     device_key_receipts: BTreeMap<[u8; 65], BTreeSet<Uuid>>,
@@ -255,6 +260,7 @@ struct State {
     maintenance: bool,
     registrations: u64,
     admissions: u64,
+    password_changes: u64,
     denials: u64,
     ceiling_changes: u64,
     fault: Option<ReferenceRegistrationFault>,
@@ -262,6 +268,10 @@ struct State {
 }
 
 impl State {
+    fn has_operation(&self, id: &Uuid) -> bool {
+        self.receipts.contains_key(id) || self.password_change_receipts.contains_key(id)
+    }
+
     fn observe_time(&mut self, observed: u64) -> u64 {
         self.high_water_ms = self.high_water_ms.max(observed);
         self.high_water_ms
@@ -324,6 +334,8 @@ pub struct ReferenceRegistrationSummary {
     pub registrations: u64,
     /// Original confirmed or scripted committed Device-admission business success events.
     pub admissions: u64,
+    /// Original confirmed or scripted committed password-change success events.
+    pub password_changes: u64,
     /// Per-Account receipt limit retained in the complete owned fixture image.
     pub receipt_ceiling: u32,
     /// Confirmed denial transactions.
@@ -399,6 +411,7 @@ impl ReferenceAccountRegistrationPeer {
             vaults: BTreeMap::new(),
             devices: BTreeMap::new(),
             receipts: BTreeMap::new(),
+            password_change_receipts: BTreeMap::new(),
             account_devices: BTreeMap::new(),
             account_receipts: BTreeMap::new(),
             device_key_receipts: BTreeMap::new(),
@@ -410,6 +423,7 @@ impl ReferenceAccountRegistrationPeer {
             maintenance: false,
             registrations: 0,
             admissions: 0,
+            password_changes: 0,
             denials: 0,
             ceiling_changes: 0,
             fault: None,
@@ -456,13 +470,14 @@ impl ReferenceAccountRegistrationPeer {
             accounts: state.accounts.len(),
             vaults: state.vaults.len(),
             devices: state.devices.len(),
-            receipts: state.receipts.len(),
+            receipts: state.receipts.len() + state.password_change_receipts.len(),
             challenges: state.challenges.len(),
             used_account_ids: state.used_ids.len(),
             used_id_ceiling: state.used_id_ceiling,
             retention_pressure: retention_pressure(&state),
             registrations: state.registrations,
             admissions: state.admissions,
+            password_changes: state.password_changes,
             receipt_ceiling: state.receipt_ceiling,
             denials: state.denials,
             ceiling_changes: state.ceiling_changes,
@@ -800,8 +815,18 @@ impl ReferenceAccountRegistrationPeer {
             state.devices.remove(device);
         }
         for operation in &operations {
-            if let Some(receipt) = state.receipts.remove(operation) {
-                for key in [receipt.signing_key, receipt.kem_key] {
+            let keys = state
+                .receipts
+                .remove(operation)
+                .map(|receipt| [receipt.signing_key, receipt.kem_key])
+                .or_else(|| {
+                    state
+                        .password_change_receipts
+                        .remove(operation)
+                        .map(|receipt| [receipt.signing_key, receipt.kem_key])
+                });
+            if let Some(keys) = keys {
+                for key in keys {
                     if let Some(ids) = state.device_key_receipts.get_mut(&key) {
                         ids.remove(operation);
                         if ids.is_empty() {
@@ -943,7 +968,7 @@ fn submit_registration(
         || state.accounts.contains_key(&payload.account_id)
         || state.vaults.contains_key(&payload.personal_vault_id)
         || state.devices.contains_key(&payload.device_id)
-        || state.receipts.contains_key(&payload.operation_id)
+        || state.has_operation(&payload.operation_id)
         || state.used_ids.contains(&used_id)
     {
         return deny(state, Some(id), fault, ReferenceRegistrationError::RegistrationDenied);
