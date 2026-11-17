@@ -5,8 +5,8 @@ use cedar_policy::PolicySet;
 use scoplen_api::{
     account_browser::{AccountBrowserWriter, INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE},
     audit::{
-        AuditPage, AuditVerification, MAX_AUDIT_PAGE_BYTES, MAX_AUDIT_VERIFICATION_BYTES,
-        MAX_AUDIT_VERIFY_EVENT_BYTES,
+        AuditCategory, AuditPage, AuditResourceKind, AuditVerification, MAX_AUDIT_PAGE_BYTES,
+        MAX_AUDIT_VERIFICATION_BYTES, MAX_AUDIT_VERIFY_EVENT_BYTES,
         reference::{
             AuditReferenceCaller as Caller, AuditReferenceError as Error, AuditReferencePeer,
         },
@@ -78,6 +78,45 @@ fn fixture() -> Fixture {
     peer.set_verification_response(&body("audit-verification-checkpoint-v1"), 1, 100);
     peer.set_storage_available(true);
     Fixture { peer, device, browser, membership }
+}
+
+#[test]
+fn grant_history_is_readable_by_both_profiles_with_exact_resource_filters() {
+    let mut f = fixture();
+    let original = body("audit-grant-page-v1");
+    let page = AuditPage::from_json(&original).unwrap();
+    let target = page.items[0].resource.as_ref().unwrap().id;
+    for event in &page.items {
+        assert_eq!(event.category, AuditCategory::Authorization);
+        assert_eq!(event.resource.as_ref().unwrap().kind, AuditResourceKind::Grant);
+        assert_eq!(event.resource.as_ref().unwrap().id, target);
+    }
+    f.peer.set_page_response(&original);
+    let filter = format!("resource eq \"grant:{target}\"");
+    for caller in [Caller::Device(&f.device), Caller::AccountBrowser(f.browser)] {
+        assert_eq!(
+            f.peer.list(caller, id(1), [("filter", filter.as_str())], 101).unwrap(),
+            original
+        );
+        for wrong in [
+            format!("resource eq \"policy:{target}\""),
+            format!("resource eq \"grant:{}\"", id(99)),
+        ] {
+            assert_eq!(
+                f.peer.list(caller, id(1), [("filter", wrong.as_str())], 101),
+                Err(Error::StorageUnavailable)
+            );
+        }
+        assert_eq!(
+            f.peer.list(
+                caller,
+                id(1),
+                [("filter", format!("resource eq \"Grant:{target}\"").as_str())],
+                101
+            ),
+            Err(Error::InvalidRequest)
+        );
+    }
 }
 
 #[test]

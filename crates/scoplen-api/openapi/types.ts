@@ -181,7 +181,12 @@ export interface components {
     ServicePrincipal: Resource;
     InventoryImport: Resource;
     Role: Resource;
-    Grant: Resource;
+    GrantFields: GrantFields;
+    GrantCreateRequest: GrantCreateRequest;
+    GrantReplaceRequest: GrantReplaceRequest;
+    GrantResource: GrantResource;
+    GrantPage: GrantPage;
+    GrantBodyTooLargeProblem: GrantBodyTooLargeProblem;
     AccessRequest: Resource;
     AccessDecision: Resource;
     Certificate: Resource;
@@ -209,8 +214,24 @@ export interface Resource {
   data: Record<string, unknown>;
 }
 export interface ResourcePage { items: Resource[]; next_cursor: string | null; }
+// BEGIN GENERATED Grants
+export interface GrantFields {
+  membership: string; host: string; remote_user: string;
+  valid_from: string; valid_until: string | null;
+}
+export interface GrantCreateRequest { id: string; data: GrantFields; }
+export interface GrantReplaceRequest { data: GrantFields; }
+export interface GrantResource {
+  id: string; etag: string; created_at: string; updated_at: string;
+  data: GrantFields & { [extension: string]: unknown };
+  [extension: string]: unknown;
+}
+export interface GrantPage { items: GrantResource[]; next_cursor: string | null; [extension: string]: unknown; }
+export interface GrantListQuery { limit?: number; cursor?: string; }
+export type GrantBodyTooLargeProblem = ProblemDetails & { status: 413; code: "organization.invalid_request"; changed: false; retryable: false; };
+// END GENERATED Grants
 // BEGIN GENERATED Audit
-export type AuditResourceKind = "organization" | "invitation" | "membership" | "host" | "host_group" | "access_profile" | "route" | "trust_record" | "snippet" | "gateway_network" | "group" | "policy" | "certificate_authority" | "certificate";
+export type AuditResourceKind = "organization" | "invitation" | "membership" | "host" | "host_group" | "access_profile" | "route" | "trust_record" | "snippet" | "gateway_network" | "group" | "policy" | "grant" | "certificate_authority" | "certificate";
 export type AuditCategory = "authentication" | "authorization" | "account_change" | "scoplen" | "unknown";
 export type AuditOutcome = "success" | "failure" | "unknown";
 export interface AuditResource { kind: AuditResourceKind; id: string; [extension: string]: unknown; }
@@ -1199,6 +1220,46 @@ export const accountBrowserOperations = [
   {
     "method": "DELETE",
     "path": "/api/v1/orgs/{org}/policies/{id}",
+    "scopes": [
+      "policies:write"
+    ],
+    "writerReceipt": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/orgs/{org}/grants",
+    "scopes": [
+      "policies:read"
+    ],
+    "writerReceipt": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/orgs/{org}/grants/{id}",
+    "scopes": [
+      "policies:read"
+    ],
+    "writerReceipt": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/orgs/{org}/grants",
+    "scopes": [
+      "policies:write"
+    ],
+    "writerReceipt": true
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/orgs/{org}/grants/{id}",
+    "scopes": [
+      "policies:write"
+    ],
+    "writerReceipt": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/orgs/{org}/grants/{id}",
     "scopes": [
       "policies:write"
     ],

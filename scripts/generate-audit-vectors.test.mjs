@@ -14,4 +14,17 @@ test("independent D-144 vectors regenerate and retain exact calendar boundaries"
   assert.equal(vectors.filter(v => v.kind === "audit.checkpoint").length, 5);
   assert.ok(vectors.some(v => v.id === "audit-event-missing-actor_account_id-v1"));
   assert.ok(vectors.some(v => v.id === "audit-event-null-sequence-v1"));
+  for (const action of ["created", "updated", "deleted"]) {
+    const vector = vectors.find(v => v.id === `audit-grants_${action}-v1`);
+    const event = JSON.parse(vector.input);
+    assert.equal(event.category, "authorization");
+    assert.equal(event.resource.kind, "grant");
+    assert.equal(event.event_class, `organization.grants_${action}`);
+    assert.equal(vector.expected, vector.input);
+  }
+  assert.equal(vectors.find(v => v.id === "audit-grant-resource-filter-v1").expected, "accepted");
+  for (const kind of ["Grant", "grants", "grant-extra"]) {
+    assert.equal(vectors.find(v => v.id === `audit-grant-kind-${kind}-v1`).expected, "rejected");
+    assert.equal(vectors.find(v => v.id === `audit-grant-filter-${kind}-v1`).expected, "rejected");
+  }
 });
