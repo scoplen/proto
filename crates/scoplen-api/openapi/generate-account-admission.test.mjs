@@ -22,6 +22,26 @@ test("D-128 generates explicit submit/confirm and keeps uint64 values as strings
   assert.doesNotMatch(output, /access_token|refresh_token|invitation|pairing/);
 });
 
+test("D-152 adds one native credential ceremony with its own historical result", () => {
+  const output = generateAccountAdmissionTypes(document);
+  const schemas = document.components.schemas;
+  assert.deepEqual(schemas.AccountRequestChallengeRequest.properties.kind.enum, ["register", "admit", "password_change"]);
+  assert.deepEqual(schemas.AccountCommittedConfirmation.properties.kind.enum, ["register", "admit"]);
+  assert.equal(schemas.AccountPasswordChangeConfirmation.properties.kind.const, "password_change");
+  assert.equal(schemas.AccountPasswordChangeConfirmation.properties.credential_generation.type, "string");
+  assert.equal(schemas.AccountPasswordChangeConfirmation.properties.admitted_key_revision, undefined);
+  const operation = document.paths["/auth/accounts/password-changes"].post;
+  assert.deepEqual(operation.security, []);
+  assert.equal(operation["x-scoplen-request-max-bytes"], 16384);
+  assert.equal(operation["x-scoplen-response-max-bytes"], 1024);
+  assert.equal(schemas.AccountPasswordChangeRequest.properties.payload["x-scoplen-decoded-bytes"].maximum, 8192);
+  for (const status of [200, 201]) assert.equal(operation.responses[status].content["application/json"].schema.$ref, "#/components/schemas/AccountPasswordChangeConfirmation");
+  assert.equal(operation.responses[409].$ref, "#/components/responses/AccountEntryAdmissionConflict");
+  assert.equal(operation.responses[503].$ref, "#/components/responses/AccountEntryStorageFailure");
+  assert.match(output, /export type AccountPasswordChangeRequest =\n  \| \(AccountPasswordChangeFields & \{ intent: "submit"; admission_token: string \}\)\n  \| \(AccountPasswordChangeFields & \{ intent: "confirm"; admission_token: null \}\);/);
+  assert.match(output, /export interface AccountPasswordChangeConfirmation \{\n  outcome: "committed";\n  kind: "password_change";/);
+});
+
 for (const [name, mutate] of [
   ["request extension", d => { d.components.schemas.AccountPasswordOptionsRequest.additionalProperties = true; }],
   ["optional secret", d => { d.components.schemas.AccountPasswordLoginRequest.required.pop(); }],
@@ -38,4 +58,12 @@ for (const [name, mutate] of [
   ["lost-commit retry", d => { d.components.responses.AccountEntryStorageFailure.content["application/problem+json"].schema.oneOf[1].allOf[1].properties.retryable.const = true; }],
   ["retired pairing endpoint", d => { d.paths["/auth/pairings"] = { post: {} }; }],
   ["retired Personal endpoint", d => { d.paths["/admin/personal-invitations"] = { post: {} }; }],
+  ["password-change challenge kind missing", d => { d.components.schemas.AccountRequestChallengeRequest.properties.kind.enum.pop(); }],
+  ["password-change legacy result", d => { d.components.schemas.AccountCommittedConfirmation.properties.kind.enum.push("password_change"); }],
+  ["password-change payload overflow", d => { d.components.schemas.AccountPasswordChangeRequest.properties.payload["x-scoplen-decoded-bytes"].maximum++; }],
+  ["password-change non-null confirm capability", d => { d.components.schemas.AccountPasswordChangeRequest.allOf.pop(); }],
+  ["password-change key revision substitution", d => { const p = d.components.schemas.AccountPasswordChangeConfirmation.properties; p.admitted_key_revision = p.credential_generation; delete p.credential_generation; }],
+  ["password-change numeric generation", d => { d.components.schemas.AccountPasswordChangeConfirmation.properties.credential_generation.type = "integer"; }],
+  ["password-change body overflow", d => { d.paths["/auth/accounts/password-changes"].post["x-scoplen-request-max-bytes"]++; }],
+  ["password-change session authority", d => { d.paths["/auth/accounts/password-changes"].post.security = [{ accessToken: [] }]; }],
 ]) test(`D-128 rejects ${name}`, () => { const copy = structuredClone(document); mutate(copy); assert.throws(() => generateAccountAdmissionTypes(copy)); });

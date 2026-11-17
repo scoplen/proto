@@ -169,8 +169,12 @@ fn independent_vectors_cover_every_native_message_and_protected_map() {
             "login.response" => json_case!(AccountPasswordLoginResponse, v, reject),
             "register.request" => json_case!(AccountRegistrationRequest, v, reject),
             "admit.request" => json_case!(AccountDeviceAdmissionRequest, v, reject),
+            "password_change.request" => json_case!(AccountPasswordChangeRequest, v, reject),
+            "password_change.confirmation" => {
+                json_case!(AccountPasswordChangeConfirmation, v, reject);
+            }
             "confirmation" => json_case!(AccountCommittedConfirmation, v, reject),
-            "registration.cbor" | "admission.cbor" | "snapshot.cbor" => {
+            "registration.cbor" | "admission.cbor" | "snapshot.cbor" | "password_change.cbor" => {
                 let input = unhex(&v.input);
                 let output = match base {
                     "account.admission.registration.cbor" => {
@@ -178,6 +182,9 @@ fn independent_vectors_cover_every_native_message_and_protected_map() {
                     }
                     "account.admission.admission.cbor" => {
                         AccountDeviceAdmissionPayload::from_cbor(&input).and_then(|p| p.to_cbor())
+                    }
+                    "account.admission.password_change.cbor" => {
+                        AccountPasswordChangePayload::from_cbor(&input).and_then(|p| p.to_cbor())
                     }
                     _ => AccountBootstrapSnapshot::from_cbor(&input).and_then(|p| p.to_cbor()),
                 };
@@ -202,7 +209,7 @@ fn independent_vectors_cover_every_native_message_and_protected_map() {
             other => panic!("unknown D-128 vector kind {other}"),
         }
     }
-    assert_eq!(counts.len(), 16);
+    assert_eq!(counts.len(), 19);
 }
 
 #[test]
@@ -270,6 +277,49 @@ fn exact_signatures_and_intent_bind_original_business_material() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn independent_password_change_signatures_and_original_confirmation_bind() {
+    let document = vectors();
+    let proof_vector = document
+        .vectors
+        .iter()
+        .find(|v| v.id == "account-admission-password_change-submit-signature-input")
+        .unwrap();
+    let proof: Value = serde_json::from_str(&proof_vector.input).unwrap();
+    let root = unhex(proof["account_public_key"].as_str().unwrap());
+    let key = unhex(proof["signing_public_key"].as_str().unwrap());
+    for intent in ["submit", "confirm"] {
+        let vector = document
+            .vectors
+            .iter()
+            .find(|v| v.id == format!("account-admission-password_change-{intent}"))
+            .unwrap();
+        let mut request = AccountPasswordChangeRequest::from_json(vector.input.as_bytes()).unwrap();
+        request
+            .verify_proof("https://control.example.com", root.as_slice().try_into().unwrap(), &key)
+            .unwrap();
+        let vector = document
+            .vectors
+            .iter()
+            .find(|v| v.kind == "account.admission.password_change.confirmation")
+            .unwrap();
+        let confirmation =
+            AccountPasswordChangeConfirmation::from_json(vector.input.as_bytes()).unwrap();
+        confirmation
+            .validate_for_request(request.payload.as_bytes(), &request.account_signature)
+            .unwrap();
+        request.nonce = SecretBytes::new([0; 32]);
+        assert_eq!(
+            request.verify_proof(
+                "https://control.example.com",
+                root.as_slice().try_into().unwrap(),
+                &key
+            ),
+            Err(AccountAdmissionCodecError::Binding)
+        );
     }
 }
 

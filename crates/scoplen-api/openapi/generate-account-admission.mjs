@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// Exact D-128 native JSON surface; protected CBOR remains the Rust/public-vector boundary.
+// Exact D-128/D-152 native JSON surface; protected CBOR remains the Rust/public-vector boundary.
 import { isDeepStrictEqual } from "node:util";
 
 const uuid = { type: "string", format: "uuid", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" };
 const decimal = { type: "string", pattern: "^[1-9][0-9]*$", maxLength: 20, "x-scoplen-uint64-maximum": "18446744073709551615" };
 const bytes = (n, exact = true) => ({ type: "string", pattern: "^[A-Za-z0-9_-]+$", contentEncoding: "base64url", minLength: exact ? Math.ceil(4 * n / 3) : 1, maxLength: Math.ceil(4 * n / 3), "x-scoplen-decoded-bytes": { minimum: exact ? n : 1, maximum: n } });
 const object = (properties, request) => ({ type: "object", additionalProperties: !request, required: Object.keys(properties), properties });
-const kind = { type: "string", enum: ["register", "admit"] }, intent = { type: "string", enum: ["submit", "confirm"] };
+const kind = { type: "string", enum: ["register", "admit", "password_change"] }, intent = { type: "string", enum: ["submit", "confirm"] };
 const protectedBytes = n => ({ ...bytes(n, false), contentMediaType: "application/cbor", description: "Exact deterministic version-one protected CBOR; reject unknown/duplicate fields, nonshortest forms, indefinite lengths and trailing bytes. Sign the original decoded bytes." });
 const requestFields = limit => ({ intent, payload: protectedBytes(limit), account_signature: bytes(64), attempt_id: bytes(32), nonce: bytes(32), device_proof: bytes(64) });
 
@@ -26,7 +26,15 @@ export function accountAdmissionDefinitions() {
         { if: { properties: { intent: { const: "confirm" } }, required: ["intent"] }, then: { properties: { admission_token: { type: "null" } } } },
       ],
     },
-    AccountCommittedConfirmation: object({ outcome: { type: "string", const: "committed" }, kind, operation_id: uuid, request_digest: bytes(32), account_id: uuid, personal_vault_id: uuid, device_id: uuid, admitted_key_revision: decimal }, false),
+    AccountPasswordChangeRequest: {
+      ...object({ ...requestFields(8192), admission_token: { anyOf: [bytes(32), { type: "null" }] } }, true),
+      allOf: [
+        { if: { properties: { intent: { const: "submit" } }, required: ["intent"] }, then: { properties: { admission_token: bytes(32) } } },
+        { if: { properties: { intent: { const: "confirm" } }, required: ["intent"] }, then: { properties: { admission_token: { type: "null" } } } },
+      ],
+    },
+    AccountCommittedConfirmation: object({ outcome: { type: "string", const: "committed" }, kind: { type: "string", enum: ["register", "admit"] }, operation_id: uuid, request_digest: bytes(32), account_id: uuid, personal_vault_id: uuid, device_id: uuid, admitted_key_revision: decimal }, false),
+    AccountPasswordChangeConfirmation: object({ outcome: { type: "string", const: "committed" }, kind: { type: "string", const: "password_change" }, operation_id: uuid, request_digest: bytes(32), account_id: uuid, personal_vault_id: uuid, device_id: uuid, credential_generation: decimal }, false),
   };
   const headers = { "Cache-Control": { required: true, schema: { type: "string", const: "no-store" } }, Pragma: { required: true, schema: { type: "string", const: "no-cache" } } };
   const problem = name => ({ $ref: `#/components/responses/${name}` });
@@ -37,12 +45,13 @@ export function accountAdmissionDefinitions() {
     ["password/options", "accountPasswordOptions", "AccountPasswordOptionsRequest", "AccountPasswordOptionsResponse", 256, 1024],
     ["password/login", "accountPasswordLogin", "AccountPasswordLoginRequest", "AccountPasswordLoginResponse", 512, 12587008],
     ["device-admissions", "admitAccountDevice", "AccountDeviceAdmissionRequest", "AccountCommittedConfirmation", 6291456, 1024],
+    ["password-changes", "changeAccountPassword", "AccountPasswordChangeRequest", "AccountPasswordChangeConfirmation", 16384, 1024],
   ]) {
-    const terminal = response === "AccountCommittedConfirmation";
+    const terminal = ["AccountCommittedConfirmation", "AccountPasswordChangeConfirmation"].includes(response);
     const success = status => ({ description: `${status === 201 ? "New mutation committed" : terminal ? "Exact original receipt confirmed" : "Successful native response"}; at most ${responseLimit} complete encoded bytes.`, headers, content: { "application/json": { schema: { $ref: `#/components/schemas/${response}` } } } });
     paths[`/auth/accounts/${suffix}`] = { post: {
       operationId: id, security: [], tags: ["Account authentication"],
-      description: "Native HTTPS only; reject redirects, Authorization, DPoP, Cookie, Idempotency-Key, If-Match and every query parameter. Origin may be absent; when supplied it must exactly equal the trusted canonical origin. Require application/json optionally charset=utf-8, strict UTF-8 without BOM and absent/identity content encoding. Reject unknown request fields and duplicate names recursively. Canonical unpadded base64url, lowercase UUIDv7 and positive decimal uint64 strings. No cookies, CORS or ordinary session tokens. Confirm is receipt-only and never falls through to submit. Bind every returned confirmation to the retained original payload/signature; missing receipt leaves the previous outcome unknown.",
+      description: "Native HTTPS only; reject redirects, Authorization, DPoP, Cookie, Idempotency-Key, If-Match and every query parameter. Origin may be absent; when supplied it must exactly equal the trusted canonical origin. Require application/json optionally charset=utf-8, strict UTF-8 without BOM and absent/identity content encoding. Reject unknown request fields and duplicate names recursively. Canonical unpadded base64url, lowercase UUIDv7 and positive decimal uint64 strings. No cookies, CORS or ordinary session tokens. Confirm is receipt-only and never falls through to submit. Bind every returned confirmation to the retained original payload/signature; missing receipt leaves the previous outcome unknown." + (suffix === "password-changes" ? " D-152 submit requires a currently active enrolled Device proof, current Account signature and fresh native old-password capability, consumed once across admission and password change. Replace only the password salt/verifier/wrapper and checked successor generation, with receipt and deployment audit in the same transaction. Preserve Account, Personal data, K-4 artifacts and enrolled native Devices; older Account-browser credentials fail their existing generation checks. A confirmed historical credential_generation is not current authority. Raw passwords and opened keys never enter this request." : ""),
       "x-scoplen-request-max-bytes": requestLimit, "x-scoplen-response-max-bytes": responseLimit,
       "x-scoplen-request-attempt-lifetime-ms": 120000,
       ...(suffix === "password/login" ? { "x-scoplen-admission-lifetime-ms": 300000 } : {}),
@@ -89,11 +98,13 @@ export function generateAccountAdmissionTypes(document) {
   for (const path of Object.keys(document.paths)) if (path.startsWith("/auth/pairings") || ["/auth/personal-enroll", "/admin/personal-invitations"].includes(path)) throw new Error("retired Account entry route remains registered");
   const lines = [];
   for (const [name, schema] of Object.entries(expected.schemas).filter(([, value]) => value.properties)) {
-    if (name === "AccountDeviceAdmissionRequest") {
-      lines.push("export type AccountDeviceAdmissionRequest =", '  | (AccountDeviceAdmissionFields & { intent: "submit"; admission_token: string })', '  | (AccountDeviceAdmissionFields & { intent: "confirm"; admission_token: null });', "", "export interface AccountDeviceAdmissionFields {");
+    const capabilityRequest = ["AccountDeviceAdmissionRequest", "AccountPasswordChangeRequest"].includes(name);
+    if (capabilityRequest) {
+      const fields = name.replace(/Request$/, "Fields");
+      lines.push(`export type ${name} =`, `  | (${fields} & { intent: "submit"; admission_token: string })`, `  | (${fields} & { intent: "confirm"; admission_token: null });`, "", `export interface ${fields} {`);
     } else lines.push(`export interface ${name} {`);
     for (const [field, prop] of Object.entries(schema.properties)) {
-      if (name === "AccountDeviceAdmissionRequest" && ["intent", "admission_token"].includes(field)) continue;
+      if (capabilityRequest && ["intent", "admission_token"].includes(field)) continue;
       const type = prop.const !== undefined ? JSON.stringify(prop.const) : prop.enum ? prop.enum.map(v => JSON.stringify(v)).join(" | ") : prop.type === "integer" ? "number" : "string";
       lines.push(`  ${field}: ${type};`);
     }

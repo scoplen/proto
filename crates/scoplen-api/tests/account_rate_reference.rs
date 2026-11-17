@@ -19,12 +19,13 @@ use uuid::Uuid;
 
 const ORIGIN: &str = "https://control.example.com";
 const NOW: u64 = 1_800_000_000_000;
-const OPERATIONS: [Operation; 5] = [
+const OPERATIONS: [Operation; 6] = [
     Operation::RequestChallenge,
     Operation::Register,
     Operation::PasswordOptions,
     Operation::PasswordLogin,
     Operation::DeviceAdmission,
+    Operation::PasswordChange,
 ];
 
 fn peer() -> Peer {
@@ -73,13 +74,38 @@ fn each_post_has_an_independent_exact_source_window() {
         }
         assert_eq!(delay(peer.begin(operation, source(1), || NOW).unwrap_err()), 60);
     }
-    assert_eq!(peer.summary().unwrap().rows, 5);
+    assert_eq!(peer.summary().unwrap().rows, 6);
     for operation in OPERATIONS {
         assert_eq!(delay(peer.begin(operation, source(1), || NOW + 59_999).unwrap_err()), 1);
     }
     for operation in OPERATIONS {
         drop(peer.begin(operation, source(1), || NOW + 60_000).unwrap());
     }
+}
+
+#[test]
+fn password_change_requires_verified_account_and_preserves_cooldown_through_restart() {
+    let peer = peer();
+    let mut request = peer.begin(Operation::PasswordChange, source(1), || NOW).unwrap();
+    device(&mut request, 1, Intent::Submit, NOW).unwrap();
+    assert!(!request.verify_account(|| None, || NOW).unwrap());
+    assert_eq!(peer.summary().unwrap().rows, 2);
+    request.finish(Outcome::AuthenticationDenied, || NOW).unwrap();
+    let peer = Peer::restore(peer.checkpoint().unwrap());
+    let mut request = peer.begin(Operation::PasswordChange, source(2), || NOW).unwrap();
+    assert_eq!(delay(device(&mut request, 1, Intent::Confirm, NOW).unwrap_err()), 1);
+    let mut request = peer.begin(Operation::PasswordChange, source(2), || NOW + 1_000).unwrap();
+    device(&mut request, 1, Intent::Confirm, NOW + 1_000).unwrap();
+    assert!(request.verify_account(|| Some(id(2)), || NOW + 1_000).unwrap());
+    request.finish(Outcome::AuthenticationDenied, || NOW + 1_000).unwrap();
+    let mut request = peer.begin(Operation::PasswordChange, source(3), || NOW + 1_000).unwrap();
+    device(&mut request, 3, Intent::Submit, NOW + 1_000).unwrap();
+    assert_eq!(delay(request.verify_account(|| Some(id(2)), || NOW + 1_000).unwrap_err()), 1);
+    // A password-change denial does not consume another endpoint's quota or cooldown.
+    let mut request = peer.begin(Operation::DeviceAdmission, source(1), || NOW + 1_000).unwrap();
+    device(&mut request, 1, Intent::Submit, NOW + 1_000).unwrap();
+    assert!(request.verify_account(|| Some(id(2)), || NOW + 1_000).unwrap());
+    assert_eq!(peer.summary().unwrap().rows, peer.summary().unwrap().indexed_rows);
 }
 
 #[test]
@@ -153,8 +179,12 @@ fn username_windows_use_bound_attempts_and_have_no_existence_branch() {
 #[test]
 fn decoded_device_quota_is_per_endpoint_without_existence_lookup() {
     let peer = peer();
-    for operation in [Operation::RequestChallenge, Operation::Register, Operation::DeviceAdmission]
-    {
+    for operation in [
+        Operation::RequestChallenge,
+        Operation::Register,
+        Operation::DeviceAdmission,
+        Operation::PasswordChange,
+    ] {
         for index in 0..10 {
             let mut request = peer.begin(operation, source(index + 1), || NOW).unwrap();
             device(&mut request, 1, Intent::Submit, NOW).unwrap();
@@ -202,7 +232,12 @@ fn stages_reject_unverified_account_selection_and_repeated_admission() {
 #[test]
 fn only_verified_login_admission_and_confirmation_charge_account() {
     let peer = peer();
-    for operation in [Operation::PasswordLogin, Operation::DeviceAdmission, Operation::Register] {
+    for operation in [
+        Operation::PasswordLogin,
+        Operation::DeviceAdmission,
+        Operation::Register,
+        Operation::PasswordChange,
+    ] {
         for index in 0..11_u32 {
             let mut request = peer.begin(operation, source(index + 1), || NOW).unwrap();
             if operation == Operation::PasswordLogin {

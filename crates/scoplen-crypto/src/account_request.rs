@@ -106,6 +106,8 @@ pub enum AccountRequestKind {
     Register,
     /// One independently authenticated fresh Device admission.
     Admit,
+    /// Existing Device authorized replacement of the password credential.
+    PasswordChange,
 }
 
 impl AccountRequestKind {
@@ -115,6 +117,7 @@ impl AccountRequestKind {
         match self {
             Self::Register => "register",
             Self::Admit => "admit",
+            Self::PasswordChange => "password_change",
         }
     }
 
@@ -122,6 +125,7 @@ impl AccountRequestKind {
         match self {
             Self::Register => b"spl-account-register-v1",
             Self::Admit => b"spl-account-device-admit-v1",
+            Self::PasswordChange => b"spl-account-password-change-v1",
         }
     }
 
@@ -129,6 +133,7 @@ impl AccountRequestKind {
         match self {
             Self::Register => 1,
             Self::Admit => 2,
+            Self::PasswordChange => 3,
         }
     }
 }
@@ -180,6 +185,7 @@ impl AccountRequestSignatureInput {
         let limit = match kind {
             AccountRequestKind::Register => 262_144,
             AccountRequestKind::Admit => 4_325_376,
+            AccountRequestKind::PasswordChange => 8_192,
         };
         if payload.is_empty() || payload.len() > limit {
             return Err(AccountRequestError);

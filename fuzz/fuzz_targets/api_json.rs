@@ -10,7 +10,8 @@ use scoplen_api::access_request::{
 };
 use scoplen_api::account_admission::{
     AccountBootstrapSnapshot, AccountCommittedConfirmation, AccountDeviceAdmissionPayload,
-    AccountDeviceAdmissionRequest, AccountPasswordLoginRequest, AccountPasswordLoginResponse,
+    AccountDeviceAdmissionRequest, AccountPasswordChangeConfirmation, AccountPasswordChangePayload,
+    AccountPasswordChangeRequest, AccountPasswordLoginRequest, AccountPasswordLoginResponse,
     AccountPasswordOptionsRequest, AccountPasswordOptionsResponse, AccountRegistrationPayload,
     AccountRegistrationRequest, AccountRequestChallengeRequest, AccountRequestChallengeResponse,
     MAX_ACCOUNT_ENTRY_PROBLEM_BYTES,
@@ -214,6 +215,8 @@ fuzz_target!(|bytes: &[u8]| {
     }
     round_trip!(AccountRegistrationRequest, bytes);
     round_trip!(AccountDeviceAdmissionRequest, bytes);
+    round_trip!(AccountPasswordChangeRequest, bytes);
+    round_trip!(AccountPasswordChangeConfirmation, bytes);
     round_trip!(AccountCommittedConfirmation, bytes);
     if let Ok(request) = AccountPasswordLoginRequest::from_json(bytes) {
         let encoded = request.to_json().expect("validated secret request encodes");
@@ -224,6 +227,9 @@ fuzz_target!(|bytes: &[u8]| {
     }
     if let Ok(value) = AccountDeviceAdmissionPayload::from_cbor(bytes) {
         assert_eq!(value.to_cbor().expect("validated protected admission"), bytes);
+    }
+    if let Ok(value) = AccountPasswordChangePayload::from_cbor(bytes) {
+        assert_eq!(value.to_cbor().expect("validated protected password change"), bytes);
     }
     if let Ok(value) = AccountBootstrapSnapshot::from_cbor(bytes) {
         assert_eq!(value.to_cbor().expect("validated complete snapshot"), bytes);
