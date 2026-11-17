@@ -9,6 +9,7 @@ const event: AuditEvent = {
 };
 const page: AuditPage = { items: [event], next_cursor: null };
 const grant: AuditEvent = { ...event, category: "authorization", event_class: "organization.grants_created", resource: { kind: "grant", id: event.organization_id } };
+const request: AuditEvent = { ...event, category: "authorization", event_class: "organization.access_request_created", resource: { kind: "access_request", id: event.organization_id } };
 // @ts-expect-error Audit resource kinds remain a finite, exact registry.
 const unknownKind: AuditEvent = { ...event, resource: { kind: "grants", id: event.organization_id } };
 const component: components["schemas"]["AuditEvent"] = event;
@@ -23,4 +24,4 @@ const missing: AuditEvent = { organization_id: event.organization_id, sequence: 
 const numericCount: AuditVerification = { ...result, checked_events: 0 };
 // @ts-expect-error Descending sequence is the only accepted sort.
 const reordered: AuditListQuery = { sort: "occurred_at" };
-void [page, grant, unknownKind, component, query, range, result, rounded, missing, numericCount, reordered];
+void [page, grant, request, unknownKind, component, query, range, result, rounded, missing, numericCount, reordered];

@@ -2,7 +2,7 @@
 // D-140 reuses native password/browser DTOs while enforcing an independent endpoint profile.
 import { isDeepStrictEqual } from "node:util";
 
-export const initialAccountBrowserScope = "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+export const initialAccountBrowserScope = "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 export function accountBrowserOperations() {
   const operations = [];
@@ -31,6 +31,11 @@ export function accountBrowserOperations() {
       add(method, `/api/v1/orgs/{org}/${kind}${suffix}`, [scope], method === "POST");
     }
   }
+  for (const [method, suffix, scope, writerReceipt] of [
+    ["POST", "/check", "write", false], ["POST", "", "write", true],
+    ["GET", "", "read", false], ["GET", "/{id}", "read", false],
+    ["POST", "/{id}/decisions", "decide", true], ["POST", "/{id}/cancel", "write", true],
+  ]) add(method, `/api/v1/orgs/{org}/access-requests${suffix}`, [`access-requests:${scope}`], writerReceipt);
   return operations;
 }
 

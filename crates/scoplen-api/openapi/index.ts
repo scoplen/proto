@@ -2,6 +2,19 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  AccessRequestFields,
+  AccessRequestCheckRequest,
+  AccessRequestCheckResponse,
+  AccessRequestCreateRequest,
+  AccessRequestDecisionRequest,
+  AccessRequestStatus,
+  AccessRequestView,
+  AccessRequestDecision,
+  AccessRequestGrant,
+  AccessRequestResource,
+  AccessRequestPage,
+  AccessRequestListQuery,
+  AccessRequestBodyTooLargeProblem,
   GrantFields,
   GrantCreateRequest,
   GrantReplaceRequest,

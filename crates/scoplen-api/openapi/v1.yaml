@@ -119,7 +119,7 @@
     "/auth/device": {
       "post": {
         "operationId": "authenticateDevice",
-        "x-scoplen-initial-device-scope": "account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage",
+        "x-scoplen-initial-device-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage",
         "security": [],
         "requestBody": {
           "required": true,
@@ -134,7 +134,7 @@
         },
         "responses": {
           "200": {
-            "description": "DPoP-bound access and refresh tokens. The server issues exactly account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage after checking the current active account, enrolled device, and certificate. Request bodies cannot propose scopes. The refresh family records this initial permission ceiling. Scopes do not grant operator, browser, or service-principal rights and do not replace current-state or resource authorization.",
+            "description": "DPoP-bound access and refresh tokens. The server issues exactly access-requests:decide access-requests:read access-requests:write account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage after checking the current active account, enrolled device, and certificate. Request bodies cannot propose scopes. The refresh family records this initial permission ceiling. Scopes do not grant operator, browser, or service-principal rights and do not replace current-state or resource authorization.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9860,104 +9860,426 @@
     },
     "/orgs/{org}/access-requests": {
       "get": {
-        "operationId": "listAccess-Requests",
+        "operationId": "listOrganizationAccessRequests",
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/limit"
+            "name": "view",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AccessRequestView"
+            }
           },
           {
-            "$ref": "#/components/parameters/cursor"
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Page"
+            "$ref": "#/components/responses/AccessRequestPage"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "description": "Storage or evaluation failure is changed=false/retryable=true; never return a false eligibility answer or a partial success.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Shared complete problem <=4096 encoded bytes with no sensitive request payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
-      },
-      "post": {
-        "operationId": "createAccess-Requests",
-        "parameters": [
+        },
+        "x-scoplen-required-device-scope": "access-requests:read",
+        "x-scoplen-required-browser-scope": "access-requests:read",
+        "x-scoplen-response-max-bytes": 4194304,
+        "description": "Require HTTPS, current active Account and Device or real Account-browser family, exact operation scope, token-bound actual-method/trusted-URL DPoP with durable replay protection, and current active same-team Membership. JWT snapshots and historical requester ids grant no authority. Foreign, missing and unreadable resources share the static Organization 404 boundary. Browser credentials=omit; supplied Origin must match the trusted deployment origin. No cookie authentication, synthetic Device or refresh-cookie read/change. Current routing requires complete approve_access Allow on the trusted stored AccessRequest projection, independent Host view_inventory and caller inequality with the requester, including for Owner. No view_policy is required. Required view=mine selects only the current Account's requests. view=approvals selects only unexpired pending requests satisfying current routing. No directory/count leakage or generic filter/sort. Reject body, duplicate/unknown query names, If-Match and Idempotency-Key.",
+        "security": [
           {
-            "$ref": "#/components/parameters/org"
+            "accessToken": [],
+            "dpopProof": []
           },
           {
-            "$ref": "#/components/parameters/idempotency"
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-problem-max-bytes": 4096
+      },
+      "post": {
+        "operationId": "createOrganizationAccessRequest",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
+          "required": true,
+          "description": "Complete strict UTF-8 JSON <=4096 bytes including whitespace. Reject BOM, recursive duplicate names, unknown, missing, null and mistyped fields.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessRequestCreateRequest"
+              }
+            }
+          }
         },
         "responses": {
           "201": {
-            "$ref": "#/components/responses/Resource"
+            "$ref": "#/components/responses/AccessRequestResource"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccessRequestBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is organization.commit_outcome_unknown, changed=true/retryable=true, permitting only explicit original-key, original-payload and original-If-Match confirmation within 24 hours with fresh DPoP; no automatic retry, replacement ETag or success claim.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Shared complete problem <=4096 encoded bytes with no sensitive request payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
+        },
+        "x-scoplen-required-device-scope": "access-requests:write",
+        "x-scoplen-required-browser-scope": "access-requests:write",
+        "x-scoplen-response-max-bytes": 8192,
+        "description": "Require HTTPS, current active Account and Device or real Account-browser family, exact operation scope, token-bound actual-method/trusted-URL DPoP with durable replay protection, and current active same-team Membership. JWT snapshots and historical requester ids grant no authority. Foreign, missing and unreadable resources share the static Organization 404 boundary. Browser credentials=omit; supplied Origin must match the trusted deployment origin. No cookie authentication, synthetic Device or refresh-cookie read/change. Require one live same-team Host, independent current view_inventory and complete request_access evaluation with submitted duration/reason. Validate and bind the exact remote_user; the existing request_access schema has no remote_user context and does not constrain it. No connect decision, policy solver, other-principal evaluation, approver directory/count, reservation or authority is returned. Check current caller identity, scope and Organization authority before protected preconditions or receipt lookup. A 24-hour original UUIDv7 receipt binds trusted origin, Account, original Device or real browser family, actual method/path, id, canonical typed payload and original If-Match when required. Exact confirmation returns immutable original bytes without another request, decision, Grant or audit; changed binding/payload or reused id without its receipt conflicts. Never resurrect state, recreate a withdrawn Grant or issue/renew a certificate. New creation rechecks eligibility under its committing transaction; Deny is 403 policy.denied. Persist one pending request, original receipt and attributable authorization audit atomically. The fixed pending deadline is exactly creation +86400 seconds. Historical confirmation requires current requester read authority and does not recheck fresh creation eligibility or replace current status. No approver pre-discovery is required. Reject every query and If-Match.",
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          },
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-request-max-bytes": 4096,
+        "x-scoplen-cedar-action": "request_access"
       }
     },
     "/orgs/{org}/access-requests/{id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/org"
-        },
-        {
-          "$ref": "#/components/parameters/id"
-        }
-      ],
       "get": {
-        "operationId": "getAccess-Requests",
+        "operationId": "getOrganizationAccessRequest",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Resource"
+            "$ref": "#/components/responses/AccessRequestResource"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "description": "Storage or evaluation failure is changed=false/retryable=true; never return a false eligibility answer or a partial success.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Shared complete problem <=4096 encoded bytes with no sensitive request payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
-      },
-      "patch": {
-        "operationId": "updateAccess-Requests",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ifMatch"
-          }
-        ],
-        "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
         },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteAccess-Requests",
+        "x-scoplen-required-device-scope": "access-requests:read",
+        "x-scoplen-required-browser-scope": "access-requests:read",
+        "x-scoplen-response-max-bytes": 8192,
+        "description": "Require HTTPS, current active Account and Device or real Account-browser family, exact operation scope, token-bound actual-method/trusted-URL DPoP with durable replay protection, and current active same-team Membership. JWT snapshots and historical requester ids grant no authority. Foreign, missing and unreadable resources share the static Organization 404 boundary. Browser credentials=omit; supplied Origin must match the trusted deployment origin. No cookie authentication, synthetic Device or refresh-cookie read/change. Current routing requires complete approve_access Allow on the trusted stored AccessRequest projection, independent Host view_inventory and caller inequality with the requester, including for Owner. No view_policy is required. Return only to the current requester Account or a caller satisfying current routing. Historical requester Membership/id is not authority. Reject body, every query, If-Match and Idempotency-Key.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/ifMatch"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
-        "responses": {
-          "204": {
-            "description": "Deleted"
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
           },
-          "default": {
-            "$ref": "#/components/responses/Problem"
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
           }
-        }
+        ],
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-problem-max-bytes": 4096
       }
     },
     "/orgs/{org}/certificate-authorities": {
@@ -11540,16 +11862,49 @@
     },
     "/orgs/{org}/access-requests/{id}/decisions": {
       "post": {
-        "operationId": "decideAccessRequest",
+        "operationId": "decideOrganizationAccessRequest",
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/id"
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/idempotency"
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            },
+            "description": "Exactly one original strong ETag; reject weak validators, wildcard and multiple values. Never silently refresh or substitute it."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "requestBody": {
@@ -11557,19 +11912,135 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DecisionRequest"
+                "$ref": "#/components/schemas/AccessRequestDecisionRequest"
+              }
+            }
+          },
+          "description": "Complete strict UTF-8 JSON <=4096 bytes including whitespace. Reject BOM, recursive duplicate names, unknown, missing, null and mistyped fields."
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AccessRequestResource"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccessRequestBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is organization.commit_outcome_unknown, changed=true/retryable=true, permitting only explicit original-key, original-payload and original-If-Match confirmation within 24 hours with fresh DPoP; no automatic retry, replacement ETag or success claim.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Shared complete problem <=4096 encoded bytes with no sensitive request payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
               }
             }
           }
         },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
+        "x-scoplen-required-device-scope": "access-requests:decide",
+        "x-scoplen-required-browser-scope": "access-requests:decide",
+        "x-scoplen-response-max-bytes": 8192,
+        "description": "Require HTTPS, current active Account and Device or real Account-browser family, exact operation scope, token-bound actual-method/trusted-URL DPoP with durable replay protection, and current active same-team Membership. JWT snapshots and historical requester ids grant no authority. Foreign, missing and unreadable resources share the static Organization 404 boundary. Browser credentials=omit; supplied Origin must match the trusted deployment origin. No cookie authentication, synthetic Device or refresh-cookie read/change. Current routing requires complete approve_access Allow on the trusted stored AccessRequest projection, independent Host view_inventory and caller inequality with the requester, including for Owner. No view_policy is required. Check current caller identity, scope and Organization authority before protected preconditions or receipt lookup. A 24-hour original UUIDv7 receipt binds trusted origin, Account, original Device or real browser family, actual method/path, id, canonical typed payload and original If-Match when required. Exact confirmation returns immutable original bytes without another request, decision, Grant or audit; changed binding/payload or reused id without its receipt conflicts. Never resurrect state, recreate a withdrawn Grant or issue/renew a certificate. Recheck the requester's current active Account, exact original active Membership, live same-team Host, requester view_inventory and request_access with original duration/reason in the committing transaction. Never substitute the request tuple or allow self-approval. Only pending before its deadline can receive a first decision; stale eligibility, terminal state or deadline is 409 organization.conflict. Approve atomically creates exactly one finite D-147 Grant for original Membership/Host/remote_user, trusted approval time floored to a whole Unix second plus duration, view revision, receipt and both request-approved/Grant-created audit events. No manage_policy permission is needed. Deny creates no Grant or view revision. Required audit failure rolls back all changes. Exact confirmation still requires current routing and never reissues access. Reject every query.",
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
           },
-          "default": {
-            "$ref": "#/components/responses/Problem"
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
           }
-        }
+        ],
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-request-max-bytes": 4096,
+        "x-scoplen-cedar-action": "approve_access"
       }
     },
     "/orgs/{org}/certificate-authorities/{id}/krl": {
@@ -14541,7 +15012,7 @@
         "x-scoplen-response-max-bytes": 8192,
         "x-scoplen-problem-max-bytes": 4096,
         "x-scoplen-fetch-credentials": "same-origin",
-        "x-scoplen-initial-browser-scope": "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
         "parameters": [
           {
             "name": "Origin",
@@ -14647,7 +15118,7 @@
         "x-scoplen-response-max-bytes": 8192,
         "x-scoplen-problem-max-bytes": 4096,
         "x-scoplen-fetch-credentials": "same-origin",
-        "x-scoplen-initial-browser-scope": "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
         "parameters": [
           {
             "name": "Origin",
@@ -14834,6 +15305,305 @@
             "$ref": "#/components/responses/AccountEntryProblem"
           }
         }
+      }
+    },
+    "/orgs/{org}/access-requests/check": {
+      "post": {
+        "operationId": "checkOrganizationAccessRequest",
+        "x-scoplen-required-device-scope": "access-requests:write",
+        "x-scoplen-required-browser-scope": "access-requests:write",
+        "x-scoplen-response-max-bytes": 4096,
+        "description": "Require HTTPS, current active Account and Device or real Account-browser family, exact operation scope, token-bound actual-method/trusted-URL DPoP with durable replay protection, and current active same-team Membership. JWT snapshots and historical requester ids grant no authority. Foreign, missing and unreadable resources share the static Organization 404 boundary. Browser credentials=omit; supplied Origin must match the trusted deployment origin. No cookie authentication, synthetic Device or refresh-cookie read/change. Require one live same-team Host, independent current view_inventory and complete request_access evaluation with submitted duration/reason. Validate and bind the exact remote_user; the existing request_access schema has no remote_user context and does not constrain it. No connect decision, policy solver, other-principal evaluation, approver directory/count, reservation or authority is returned. A complete policy Deny returns allowed=false; evaluation/storage failure remains a problem. Creation rechecks eligibility. Reject every query, If-Match and Idempotency-Key.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AccessRequestCheckResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccessRequestBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "503": {
+            "description": "Storage or evaluation failure is changed=false/retryable=true; never return a false eligibility answer or a partial success.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Shared complete problem <=4096 encoded bytes with no sensitive request payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          },
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-request-max-bytes": 4096,
+        "requestBody": {
+          "required": true,
+          "description": "Complete strict UTF-8 JSON <=4096 bytes including whitespace. Reject BOM, recursive duplicate names, unknown, missing, null and mistyped fields.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessRequestCheckRequest"
+              }
+            }
+          }
+        },
+        "x-scoplen-cedar-action": "request_access"
+      }
+    },
+    "/orgs/{org}/access-requests/{id}/cancel": {
+      "post": {
+        "operationId": "cancelOrganizationAccessRequest",
+        "x-scoplen-required-device-scope": "access-requests:write",
+        "x-scoplen-required-browser-scope": "access-requests:write",
+        "x-scoplen-response-max-bytes": 8192,
+        "description": "Require HTTPS, current active Account and Device or real Account-browser family, exact operation scope, token-bound actual-method/trusted-URL DPoP with durable replay protection, and current active same-team Membership. JWT snapshots and historical requester ids grant no authority. Foreign, missing and unreadable resources share the static Organization 404 boundary. Browser credentials=omit; supplied Origin must match the trusted deployment origin. No cookie authentication, synthetic Device or refresh-cookie read/change. Check current caller identity, scope and Organization authority before protected preconditions or receipt lookup. A 24-hour original UUIDv7 receipt binds trusted origin, Account, original Device or real browser family, actual method/path, id, canonical typed payload and original If-Match when required. Exact confirmation returns immutable original bytes without another request, decision, Grant or audit; changed binding/payload or reused id without its receipt conflicts. Never resurrect state, recreate a withdrawn Grant or issue/renew a certificate. Only the current requester Account may cancel its own pending intent before the deadline; current request_access and Host visibility are not required. Terminal/deadline conflict is 409 organization.conflict. Commit cancellation, original receipt and one attributable audit atomically, with no Grant or view revision. Exact confirmation requires current requester authority. No request edit/delete, new notification event, immediate certificate revocation or session termination. Reject body and every query.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            },
+            "description": "Exactly one original strong ETag; reject weak validators, wildcard and multiple values. Never silently refresh or substitute it."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AccessRequestResource"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "503": {
+            "description": "Confirmed rollback is changed=false/retryable=true. Unconfirmed COMMIT is organization.commit_outcome_unknown, changed=true/retryable=true, permitting only explicit original-key, original-payload and original-If-Match confirmation within 24 hours with fresh DPoP; no automatic retry, replacement ETag or success claim.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Shared complete problem <=4096 encoded bytes with no sensitive request payload.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "accessToken": [],
+            "dpopProof": []
+          },
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-problem-max-bytes": 4096
       }
     }
   },
@@ -17315,6 +18085,148 @@
             }
           }
         }
+      },
+      "AccessRequestCheckResponse": {
+        "description": "Complete encoded UTF-8 JSON <=4096 bytes including whitespace and bounded extensions; reject recursive duplicate names.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AccessRequestCheckResponse"
+            }
+          }
+        }
+      },
+      "AccessRequestResource": {
+        "description": "Complete encoded UTF-8 JSON <=8192 bytes including whitespace and bounded extensions; reject recursive duplicate names. HTTP ETag exactly equals body etag; bind id to the captured request.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "ETag": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            },
+            "description": "Strong validator exactly equal to body etag."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AccessRequestResource"
+            }
+          }
+        }
+      },
+      "AccessRequestPage": {
+        "description": "Complete encoded UTF-8 JSON <=4194304 bytes including whitespace and bounded extensions; reject recursive duplicate names.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AccessRequestPage"
+            }
+          }
+        }
+      },
+      "AccessRequestBodyTooLarge": {
+        "description": "413 organization.invalid_request; changed=false/retryable=false. Complete problem <=4096 encoded bytes.",
+        "headers": {
+          "Cache-Control": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          },
+          "Pragma": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "no-cache"
+            }
+          },
+          "X-Request-ID": {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/AccessRequestBodyTooLargeProblem"
+            }
+          }
+        }
       }
     },
     "schemas": {
@@ -18153,25 +19065,6 @@
           }
         },
         "additionalProperties": true
-      },
-      "DecisionRequest": {
-        "type": "object",
-        "required": [
-          "decision"
-        ],
-        "properties": {
-          "decision": {
-            "type": "string",
-            "enum": [
-              "approve",
-              "deny"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 4096
-          }
-        }
       },
       "PolicyEvaluationRequest": {
         "type": "object",
@@ -21097,6 +21990,39 @@
             "additionalProperties": false,
             "required": [
               "organization",
+              "membership",
+              "request_access"
+            ],
+            "properties": {
+              "organization": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "membership": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "request_access": {
+                "type": "array",
+                "maxItems": 64,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "description": "Distinct explicit Host ids only; canonical encoders sort by UUID bytes. Generate only request_access with resource is Host && [Host::\"uuid\", ...].contains(resource); no HostGroups, remote username, conditions, view/connect/approval grants or built-in-role changes. Existing broader permits retain their authority.",
+                "minItems": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "organization",
               "group",
               "view"
             ],
@@ -21146,10 +22072,43 @@
                 "$ref": "#/components/schemas/SimpleRuleConnect"
               }
             }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "organization",
+              "group",
+              "request_access"
+            ],
+            "properties": {
+              "organization": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "group": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "request_access": {
+                "type": "array",
+                "maxItems": 64,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "description": "Distinct explicit Host ids only; canonical encoders sort by UUID bytes. Generate only request_access with resource is Host && [Host::\"uuid\", ...].contains(resource); no HostGroups, remote username, conditions, view/connect/approval grants or built-in-role changes. Existing broader permits retain their authority.",
+                "minItems": 1
+              }
+            }
           }
         ],
         "x-scoplen-max-bytes": 262144,
-        "description": "Pure shared generator input, not an HTTP authorization operation. Exactly one current Membership or Group subject and one independent view or connect rule. Produce one <=65536 UTF-8-byte schema-valid permit scoped to this Organization, with canonical sorting and escaping. View matches only selected typed resources; connect matches selected Hosts/current HostGroup members plus exact remote_user. Never synthesize time, approval, roles, wildcard action/entity or dependency-read grants. Preview grants no authority; persist through the normal policy route."
+        "description": "Pure shared generator input, not an HTTP authorization operation. Exactly one current Membership or Group subject and one independent view, connect or request_access rule. Produce one <=65536 UTF-8-byte schema-valid permit scoped to this Organization, with canonical sorting and escaping. View matches only selected typed resources; connect matches selected Hosts/current HostGroup members plus exact remote_user; request_access matches only 1..64 distinct explicit Hosts and grants neither visibility nor connect/approval. Its narrow permit does not restrict broader existing permits. Never synthesize time, approval, roles, wildcard action/entity or dependency-read grants. Preview grants no authority; persist through the normal policy route. The third finite generator variant is source-breaking; old strict readers reject it."
       },
       "GroupPolicyBodyTooLargeProblem": {
         "allOf": [
@@ -23439,6 +24398,7 @@
               "group",
               "policy",
               "grant",
+              "access_request",
               "certificate_authority",
               "certificate"
             ]
@@ -23995,6 +24955,357 @@
             }
           }
         ]
+      },
+      "AccessRequestFields": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "host",
+          "remote_user",
+          "duration_seconds",
+          "reason"
+        ],
+        "properties": {
+          "host": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "remote_user": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "x-scoplen-max-utf8-bytes": 255,
+            "description": "Exact SSH remote username, 1..255 UTF-8 bytes with no Unicode control characters; preserve without trimming or normalization."
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400,
+            "description": "Requested finite access interval, not a promise of one certificate of this length."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "x-scoplen-max-utf8-bytes": 2048,
+            "description": "1..2048 UTF-8 bytes with a non-whitespace character; reject Unicode control characters except LF/TAB. Preserve text without trimming or normalization; do not log it."
+          }
+        }
+      },
+      "AccessRequestCheckRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AccessRequestFields"
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "AccessRequestCheckResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "allowed"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "AccessRequestCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AccessRequestFields"
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "AccessRequestDecisionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "deny"
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "AccessRequestStatus": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Initial emitted states: pending, approved, denied, expired, cancelled. revoked is reserved for a later profile. Preserve bounded unknown text as Unknown with no mutation or authority; approved history does not establish current permission."
+      },
+      "AccessRequestView": {
+        "type": "string",
+        "enum": [
+          "mine",
+          "approvals"
+        ]
+      },
+      "AccessRequestDecision": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "outcome",
+          "actor_account_id",
+          "decided_at"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "deny"
+            ]
+          },
+          "actor_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp; preserve optional fractional seconds without rounding or truncation."
+          }
+        }
+      },
+      "AccessRequestGrant": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "valid_from",
+          "valid_until"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$",
+            "minLength": 20,
+            "maxLength": 20,
+            "description": "Valid whole-second UTC calendar timestamp with Unix seconds 0..253402300799; no fraction, offset or leap second."
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$",
+            "minLength": 20,
+            "maxLength": 20,
+            "description": "Valid whole-second UTC calendar timestamp with Unix seconds 0..253402300799; no fraction, offset or leap second."
+          }
+        },
+        "description": "Original finite D-147 Grant history. valid_from equals floor(decision.decided_at to a whole Unix second); valid_until equals valid_from + duration_seconds, with checked calendar arithmetic. Current Grant and certificate authority must still be reread before Connect."
+      },
+      "AccessRequestResource": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "etag",
+          "created_at",
+          "updated_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "etag": {
+            "type": "string",
+            "pattern": "^\"[!#-~]*\"$",
+            "minLength": 2,
+            "maxLength": 256
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp; preserve optional fractional seconds without rounding or truncation."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+            "description": "A valid UTC calendar timestamp; preserve optional fractional seconds without rounding or truncation."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "requester_account_id",
+              "requester_membership_id",
+              "host",
+              "remote_user",
+              "duration_seconds",
+              "reason",
+              "expires_at",
+              "status",
+              "decision",
+              "grant"
+            ],
+            "properties": {
+              "requester_account_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "requester_membership_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "host": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "remote_user": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "x-scoplen-max-utf8-bytes": 255,
+                "description": "Exact SSH remote username, 1..255 UTF-8 bytes with no Unicode control characters; preserve without trimming or normalization."
+              },
+              "duration_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 86400,
+                "description": "Requested finite access interval, not a promise of one certificate of this length."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048,
+                "x-scoplen-max-utf8-bytes": 2048,
+                "description": "1..2048 UTF-8 bytes with a non-whitespace character; reject Unicode control characters except LF/TAB. Preserve text without trimming or normalization; do not log it."
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$",
+                "description": "A valid UTC calendar timestamp; preserve optional fractional seconds without rounding or truncation."
+              },
+              "status": {
+                "$ref": "#/components/schemas/AccessRequestStatus"
+              },
+              "decision": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AccessRequestDecision"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "grant": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AccessRequestGrant"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "x-scoplen-max-bytes": 8192,
+        "description": "Require expires_at = created_at +86400 seconds, preserving the exact fractional instant without rounding/truncation. pending/expired/cancelled have null decision and grant; denied has a deny decision and null grant; approved has an approve decision and finite bound Grant. Readers and encoders enforce these cross-field invariants, including approval-time anchoring, not merely interval length. Unknown status is inert. Persisted pending status/ETag can remain after its deadline until worker expiry; deadline independently disables actions. Pending references guard Host deletion; terminal request history alone does not. An approved current Grant retains its independent lifecycle guards."
+      },
+      "AccessRequestPage": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/AccessRequestResource"
+            },
+            "description": "Distinct ascending UUIDv7 ids beyond the captured cursor; each original encoded item, including extensions and whitespace, is <=8192 bytes. A shorter nonempty prefix may satisfy the complete Page budget."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Non-null only when more eligible items exist and exactly equal to the nonempty Page's final id."
+          }
+        },
+        "x-scoplen-max-bytes": 4194304
+      },
+      "AccessRequestBodyTooLargeProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": 413
+              },
+              "code": {
+                "const": "organization.invalid_request"
+              },
+              "changed": {
+                "const": false
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        ]
       }
     }
   },
@@ -24416,6 +25727,54 @@
         "policies:write"
       ],
       "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/access-requests/check",
+      "scopes": [
+        "access-requests:write"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/access-requests",
+      "scopes": [
+        "access-requests:write"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/access-requests",
+      "scopes": [
+        "access-requests:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/access-requests/{id}",
+      "scopes": [
+        "access-requests:read"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/access-requests/{id}/decisions",
+      "scopes": [
+        "access-requests:decide"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/access-requests/{id}/cancel",
+      "scopes": [
+        "access-requests:write"
+      ],
+      "writerReceipt": true
     }
   ]
 }
