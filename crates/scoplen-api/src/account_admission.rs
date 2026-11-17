@@ -18,16 +18,20 @@ use thiserror::Error;
 use uuid::Uuid;
 
 pub use scoplen_crypto::{AccountRequestIntent, AccountRequestKind};
+mod password_change;
 mod protected;
+pub use password_change::{AccountPasswordChangeConfirmation, AccountPasswordChangeRequest};
 pub use protected::{
-    AccountBootstrapSnapshot, AccountDeviceAdmissionPayload, AccountPersonalBootstrap,
-    AccountPersonalEpoch, AccountRegistrationPayload,
+    AccountBootstrapSnapshot, AccountDeviceAdmissionPayload, AccountPasswordChangePayload,
+    AccountPersonalBootstrap, AccountPersonalEpoch, AccountRegistrationPayload,
 };
 
 /// Maximum complete protected registration bytes.
 pub const MAX_ACCOUNT_REGISTRATION_PAYLOAD_BYTES: usize = 262_144;
 /// Maximum complete protected admission bytes.
 pub const MAX_ACCOUNT_ADMISSION_PAYLOAD_BYTES: usize = 4_325_376;
+/// Maximum complete protected password-change bytes.
+pub const MAX_ACCOUNT_PASSWORD_CHANGE_PAYLOAD_BYTES: usize = 8_192;
 /// Maximum complete protected bootstrap snapshot bytes.
 pub const MAX_ACCOUNT_BOOTSTRAP_BYTES: usize = 9_437_184;
 /// Maximum complete encoded RFC 9457 failure body.
@@ -50,6 +54,8 @@ pub enum AccountEntryOperation {
     PasswordLogin,
     /// Fresh Device admission or its exact terminal confirmation.
     DeviceAdmission,
+    /// Existing Device password change or its exact historical confirmation.
+    PasswordChange,
 }
 
 impl AccountEntryOperation {
@@ -65,6 +71,7 @@ impl AccountEntryOperation {
             "/api/v1/auth/accounts/password/options" => Some(Self::PasswordOptions),
             "/api/v1/auth/accounts/password/login" => Some(Self::PasswordLogin),
             "/api/v1/auth/accounts/device-admissions" => Some(Self::DeviceAdmission),
+            "/api/v1/auth/accounts/password-changes" => Some(Self::PasswordChange),
             _ => None,
         }
     }
@@ -79,6 +86,7 @@ impl AccountEntryOperation {
             Self::Register => (524_288, 1_024),
             Self::PasswordOptions => (256, 1_024),
             Self::DeviceAdmission => (6_291_456, 1_024),
+            Self::PasswordChange => (16_384, 1_024),
         }
     }
 }
@@ -681,8 +689,12 @@ impl AccountCommittedConfirmation {
         if take_text(&mut f, "outcome")? != "committed" {
             return Err(AccountAdmissionCodecError::InvalidJson);
         }
+        let kind = take_kind(&mut f)?;
+        if kind == AccountRequestKind::PasswordChange {
+            return Err(AccountAdmissionCodecError::InvalidJson);
+        }
         Ok(Self {
-            kind: take_kind(&mut f)?,
+            kind,
             operation_id: take_uuid(&mut f, "operation_id")?,
             request_digest: take_fixed(&mut f, "request_digest")?,
             account_id: take_uuid(&mut f, "account_id")?,
@@ -695,6 +707,9 @@ impl AccountCommittedConfirmation {
     /// # Errors
     /// Rejects invalid ids/revision or a response beyond 1,024 bytes.
     pub fn to_json(&self) -> Result<Vec<u8>, AccountAdmissionCodecError> {
+        if self.kind == AccountRequestKind::PasswordChange {
+            return Err(AccountAdmissionCodecError::InvalidJson);
+        }
         for id in [self.operation_id, self.account_id, self.personal_vault_id, self.device_id] {
             valid_uuid(id)?;
         }
@@ -729,6 +744,9 @@ impl AccountCommittedConfirmation {
             AccountRequestKind::Admit => {
                 let p = AccountDeviceAdmissionPayload::from_cbor(payload)?;
                 (p.operation_id, p.account_id, p.personal_vault_id, p.device_id, p.key_bundle)
+            }
+            AccountRequestKind::PasswordChange => {
+                return Err(AccountAdmissionCodecError::Binding);
             }
         };
         let digest = AccountRequestSignatureInput::new(kind, payload)
@@ -774,7 +792,8 @@ http_response!(
     AccountRequestChallengeResponse,
     AccountPasswordOptionsResponse,
     AccountPasswordLoginResponse,
-    AccountCommittedConfirmation
+    AccountCommittedConfirmation,
+    AccountPasswordChangeConfirmation
 );
 
 macro_rules! redacted { ($($name:ty),+ $(,)?) => {$(impl fmt::Debug for $name { fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result { f.write_str(concat!(stringify!($name),"([REDACTED])")) } })+}; }
@@ -786,7 +805,9 @@ redacted!(
     AccountPasswordLoginResponse,
     AccountRegistrationRequest,
     AccountDeviceAdmissionRequest,
-    AccountCommittedConfirmation
+    AccountCommittedConfirmation,
+    AccountPasswordChangeRequest,
+    AccountPasswordChangeConfirmation
 );
 
 pub(super) fn validate_origin_username(
@@ -917,6 +938,7 @@ fn take_kind(f: &mut Map<String, Value>) -> Result<AccountRequestKind, AccountAd
     match take_text(f, "kind")?.as_str() {
         "register" => Ok(AccountRequestKind::Register),
         "admit" => Ok(AccountRequestKind::Admit),
+        "password_change" => Ok(AccountRequestKind::PasswordChange),
         _ => Err(AccountAdmissionCodecError::InvalidJson),
     }
 }
