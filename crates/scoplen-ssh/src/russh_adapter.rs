@@ -816,7 +816,7 @@ pub struct ClientConnection {
     connection_end: Arc<ConnectionEnd>,
     channel_slots: Arc<Semaphore>,
     channel_limit: usize,
-    forwarded_channels: mpsc::Receiver<ForwardedChannel>,
+    forwarded_channels: Option<ForwardedChannelReceiver>,
     agent_forwarding: Arc<AtomicUsize>,
     agent_sessions: Arc<Mutex<AgentSessionRegistry>>,
 }
@@ -1034,7 +1034,7 @@ impl ClientConnection {
             connection_end,
             channel_slots,
             channel_limit: config.channel_limit,
-            forwarded_channels,
+            forwarded_channels: Some(ForwardedChannelReceiver { receiver: forwarded_channels }),
             agent_forwarding,
             agent_sessions,
         })
@@ -1681,10 +1681,21 @@ impl ClientConnection {
     ///
     /// The queue is bounded by the configured channel limit.  When the caller does not drain
     /// it, new forwarded channels are rejected with `resource shortage` instead of accumulating
-    /// unbounded channel state in the event loop.  `None` means that the SSH event loop closed.
+    /// unbounded channel state in the event loop. `None` means that the queue closed or was
+    /// transferred through [`Self::take_forwarded_channels`], not that the network failed.
     pub async fn next_forwarded_channel(&mut self) -> Option<ForwardedChannel> {
         self.handle.as_ref()?;
-        self.forwarded_channels.recv().await
+        self.forwarded_channels.as_mut()?.recv().await
+    }
+
+    /// Transfer the existing incoming forwarding queue out of this connection exactly once.
+    ///
+    /// The receiver can wait independently while this connection opens or operates other
+    /// channels. Repeated extraction and [`Self::next_forwarded_channel`] return `None`
+    /// immediately after transfer. Dropping the receiver rejects later incoming channels
+    /// without disconnecting this connection.
+    pub fn take_forwarded_channels(&mut self) -> Option<ForwardedChannelReceiver> {
+        self.forwarded_channels.take()
     }
 
     fn channel_permit(&self) -> Result<OwnedSemaphorePermit, ClientError> {
@@ -1738,6 +1749,24 @@ impl ClientConnection {
 impl Drop for ClientConnection {
     fn drop(&mut self) {
         self.connection_end.record(ConnectionEndKind::Local);
+    }
+}
+
+/// The bounded incoming forwarding queue transferred from a [`ClientConnection`].
+///
+/// This receiver owns no connection handle or transport lifetime. Parent teardown eventually
+/// closes the queue; channels already queued are delivered in FIFO order before `None`.
+/// Dropping the receiver drops queued channels and rejects later incoming queue admission.
+pub struct ForwardedChannelReceiver {
+    receiver: mpsc::Receiver<ForwardedChannel>,
+}
+
+impl ForwardedChannelReceiver {
+    /// Wait for the next incoming channel, or return `None` after the queue closes and drains.
+    ///
+    /// Queue closure alone does not classify a network failure.
+    pub async fn recv(&mut self) -> Option<ForwardedChannel> {
+        self.receiver.recv().await
     }
 }
 

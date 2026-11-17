@@ -544,7 +544,14 @@ caller but cannot be correlated with a specific outstanding channel request.
 `ForwardedChannel::serve_agent` reassembles russh channel fragments, rechecks the live opt-in,
 applies the fail-closed forwarding policy to
 identity queries and signatures, and returns bounded agent responses; in-process russh round trips
-cover unsolicited opens, revocation, and the concrete lifecycle. The agent-backed signer
+cover unsolicited opens, revocation, and the concrete lifecycle.
+`ClientConnection::take_forwarded_channels` transfers the existing bounded incoming queue once
+to a public `ForwardedChannelReceiver`. Its asynchronous `recv` can wait while the parent opens
+sessions, SFTP or direct channels. The old `next_forwarded_channel` API remains available until
+extraction; after extraction it and repeated extraction return `None` immediately. Receiver
+drop discards queued channels and rejects later incoming admission without disconnecting the
+parent. The receiver owns no transport lifetime; parent teardown closes it after queued channels
+drain in FIFO order. Queue closure does not classify a network failure. The agent-backed signer
 also completes the concrete public-key authentication flow
 against the in-process russh server. `pwsh ./scripts/ssh-agent-interop.ps1` starts a disposable
 OpenSSH server and a real `ssh-agent` in one Alpine container. The `openssh_agent_interop` example
@@ -563,8 +570,9 @@ mounts the source read-only; its keys, socket, and build outputs are discarded. 
 per-case process timeout bounds a stalled test; it does not add a cancellation deadline to the
 production synchronous agent API. `pwsh ./scripts/ssh-agent-forwarded-interop.ps1` builds a
 separate disposable Linux fixture with two loopback-only OpenSSH servers and a real source
-`ssh-agent`. The public client requests forwarding on the first hop; a server-opened agent channel
-is served through `ForwardedChannel::serve_agent` and `AgentServer`. The remote OpenSSH client
+`ssh-agent`. The public client requests forwarding on the first hop and extracts its incoming
+receiver; a server-opened agent channel is served through `ForwardedChannel::serve_agent` and
+`AgentServer`. The remote OpenSSH client
 authenticates to the second server using the source agent's private key and checks exact command
 output and exit zero. Disabled and denied per-signature policies reject authentication without
 reaching the source agent's signing operation; a forwarded standard remove-all request receives
