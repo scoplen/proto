@@ -415,8 +415,7 @@ fn check_freshness(
     payload: &AccountDeviceAdmissionPayload,
     certificate: &DeviceCertificate,
 ) -> std::result::Result<(), Error> {
-    if state.devices.contains_key(&payload.device_id)
-        || state.receipts.contains_key(&payload.operation_id)
+    if state.devices.contains_key(&payload.device_id) || state.has_operation(&payload.operation_id)
     {
         return Err(Error::AdmissionConflict);
     }

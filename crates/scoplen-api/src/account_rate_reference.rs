@@ -61,7 +61,7 @@ pub enum ReferenceAccountRateSubject<'a> {
     OptionsUsername(&'a str),
     /// Login uses only its original stored attempt. `None` models an unusable unknown attempt.
     PasswordAttempt(Option<&'a ReferencePasswordAttempt>),
-    /// Challenge, registration or admission uses the structurally decoded Device and intent.
+    /// Challenge, registration, admission or change uses the decoded Device and intent.
     DecodedDevice { device_id: Uuid, intent: AccountRequestIntent },
 }
 
@@ -72,7 +72,7 @@ pub enum ReferenceAccountRateOutcome {
     Other,
     /// An admitted generic authentication denial adds cooldown with mandatory denial audit.
     AuthenticationDenied,
-    /// Confirmed authentication/registration/admission clears streaks, preserving counts.
+    /// Confirmed authentication or native Account mutation clears streaks, preserving counts.
     Authenticated,
 }
 
@@ -240,7 +240,7 @@ pub struct ReferenceAccountRateImage(State);
 /// Content-free owned-fixture inspection; this is not an authentication or HTTP result.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReferenceAccountRateSummary {
-    /// Retained source and private rows across all five Account endpoints.
+    /// Retained source and private rows across all six Account endpoints.
     pub rows: usize,
     /// Exactly one indexed expiry per retained row.
     pub indexed_rows: usize,
@@ -449,7 +449,8 @@ impl ReferenceAccountRateRequest {
             (
                 AccountEntryOperation::RequestChallenge
                 | AccountEntryOperation::Register
-                | AccountEntryOperation::DeviceAdmission,
+                | AccountEntryOperation::DeviceAdmission
+                | AccountEntryOperation::PasswordChange,
                 ReferenceAccountRateSubject::DecodedDevice { device_id, intent },
             ) => {
                 validate_uuid_v7(device_id)
@@ -457,6 +458,7 @@ impl ReferenceAccountRateRequest {
                 (
                     Identity::Device(device_id),
                     self.operation == AccountEntryOperation::DeviceAdmission
+                        || self.operation == AccountEntryOperation::PasswordChange
                         || self.operation == AccountEntryOperation::Register
                             && intent == AccountRequestIntent::Confirm,
                 )
@@ -574,5 +576,6 @@ fn endpoint(operation: AccountEntryOperation) -> u8 {
         AccountEntryOperation::PasswordOptions => 2,
         AccountEntryOperation::PasswordLogin => 3,
         AccountEntryOperation::DeviceAdmission => 4,
+        AccountEntryOperation::PasswordChange => 5,
     }
 }
