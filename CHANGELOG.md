@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-152's ordinary native Account password-change payload, request and historical
+  confirmation, third challenge/proof kind and bounded endpoint declarations. Preserve
+  existing registration/admission bytes and use a dedicated credential-generation result.
+  Add independent vectors, parser seeds and generated OpenAPI/TypeScript. Production
+  credential storage, native Settings and multi-device acceptance remain consumer work.
+
 - Add D-151's single bounded strict CSV parser, typed ordered Host/default-Login batches,
   exact result/request binding and InventoryImportCreate Device/browser operations under
   existing inventory:write. Add independent vectors, parser seeds and generated contracts.

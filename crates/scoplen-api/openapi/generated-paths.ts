@@ -11,6 +11,7 @@ export const controlPlanePaths = [
   "/auth/accounts/browser/password/options",
   "/auth/accounts/browser/refresh",
   "/auth/accounts/device-admissions",
+  "/auth/accounts/password-changes",
   "/auth/accounts/password/login",
   "/auth/accounts/password/options",
   "/auth/accounts/register",

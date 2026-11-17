@@ -168,6 +168,8 @@ export interface components {
     AccountBrowserLogoutResponse: AccountBrowserLogoutResponse;
     AccountRegistrationRequest: AccountRegistrationRequest;
     AccountDeviceAdmissionRequest: AccountDeviceAdmissionRequest;
+    AccountPasswordChangeRequest: AccountPasswordChangeRequest;
+    AccountPasswordChangeConfirmation: AccountPasswordChangeConfirmation;
     AccountCommittedConfirmation: AccountCommittedConfirmation;
     AccountEntryInvalidRequestProblem: AccountEntryInvalidRequestProblem;
     AccountEntryAuthenticationRequiredProblem: AccountEntryAuthenticationRequiredProblem;
@@ -588,7 +590,7 @@ export type OperatorLogoutStorageFailureProblem = AuthStorageUnavailableProblem 
 
 // BEGIN GENERATED AccountAdmission
 export interface AccountRequestChallengeRequest {
-  kind: "register" | "admit";
+  kind: "register" | "admit" | "password_change";
   intent: "submit" | "confirm";
   operation_id: string;
   device_id: string;
@@ -646,6 +648,18 @@ export interface AccountDeviceAdmissionFields {
   device_proof: string;
 }
 
+export type AccountPasswordChangeRequest =
+  | (AccountPasswordChangeFields & { intent: "submit"; admission_token: string })
+  | (AccountPasswordChangeFields & { intent: "confirm"; admission_token: null });
+
+export interface AccountPasswordChangeFields {
+  payload: string;
+  account_signature: string;
+  attempt_id: string;
+  nonce: string;
+  device_proof: string;
+}
+
 export interface AccountCommittedConfirmation {
   outcome: "committed";
   kind: "register" | "admit";
@@ -655,6 +669,18 @@ export interface AccountCommittedConfirmation {
   personal_vault_id: string;
   device_id: string;
   admitted_key_revision: string;
+  [extension: string]: unknown;
+}
+
+export interface AccountPasswordChangeConfirmation {
+  outcome: "committed";
+  kind: "password_change";
+  operation_id: string;
+  request_digest: string;
+  account_id: string;
+  personal_vault_id: string;
+  device_id: string;
+  credential_generation: string;
   [extension: string]: unknown;
 }
 

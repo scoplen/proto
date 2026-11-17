@@ -57,8 +57,10 @@ the exact domain label and raw UUID bytes, plus rejected UUID versions and varia
 timestamp fixture remains valid without a clock window. Run
 `node scripts/generate-account-used-id-vectors.mjs [--check]` to check the vectors and UUID seeds.
 
-`account-admission.json` contains independently generated D-128 native JSON, protected canonical
-CBOR and exact Account/fresh Device proof inputs for both kinds and submit/confirm intents.
+`account-admission.json` contains independently generated D-128/D-152 native JSON, protected
+canonical CBOR and exact Account/Device proof inputs for registration, admission and ordinary
+password change, each with submit/confirm intent. D-152 uses the existing enrolled Device and
+its separate credential-generation confirmation, including the full positive uint64 range.
 Its `account.admission.probe` known answers independently derive all three deployment-key HMAC
 domains, including different keys/origins and the canonical username length boundaries.
 Run `node scripts/generate-account-admission-vectors.mjs [--check]`. The Node producer uses
@@ -67,7 +69,9 @@ verified ECDSA proof for stable regeneration. Synthetic ciphertexts test public 
 signature binding; they do not establish successful local wrap opening. Failure vectors/seeds
 cover canonical username/origin/UUID/base64url/time, duplicate/unknown fields, protected version
 and trailing bytes, illegal intent/token pairs, full-body bounds and hostile declared CBOR
-counts. Production authorization, durable receipt state and current-snapshot CAS remain consumers.
+counts. The corresponding Node test checks stable proof retention, unique vector ids, exact
+binary-seed drift and password-change complete-body boundaries. Production authorization,
+durable receipt state and current-snapshot CAS remain consumer responsibilities.
 
 `account-devices.json` contains D-113 complete signed-statement snapshot JSON vectors. Valid
 inputs round-trip to exact canonical JSON; failure vectors identify redacted field or JSON

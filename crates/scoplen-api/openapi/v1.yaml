@@ -15681,6 +15681,111 @@
         "x-scoplen-fetch-credentials": "omit",
         "x-scoplen-problem-max-bytes": 4096
       }
+    },
+    "/auth/accounts/password-changes": {
+      "post": {
+        "operationId": "changeAccountPassword",
+        "security": [],
+        "tags": [
+          "Account authentication"
+        ],
+        "description": "Native HTTPS only; reject redirects, Authorization, DPoP, Cookie, Idempotency-Key, If-Match and every query parameter. Origin may be absent; when supplied it must exactly equal the trusted canonical origin. Require application/json optionally charset=utf-8, strict UTF-8 without BOM and absent/identity content encoding. Reject unknown request fields and duplicate names recursively. Canonical unpadded base64url, lowercase UUIDv7 and positive decimal uint64 strings. No cookies, CORS or ordinary session tokens. Confirm is receipt-only and never falls through to submit. Bind every returned confirmation to the retained original payload/signature; missing receipt leaves the previous outcome unknown. D-152 submit requires a currently active enrolled Device proof, current Account signature and fresh native old-password capability, consumed once across admission and password change. Replace only the password salt/verifier/wrapper and checked successor generation, with receipt and deployment audit in the same transaction. Preserve Account, Personal data, K-4 artifacts and enrolled native Devices; older Account-browser credentials fail their existing generation checks. A confirmed historical credential_generation is not current authority. Raw passwords and opened keys never enter this request.",
+        "x-scoplen-request-max-bytes": 16384,
+        "x-scoplen-response-max-bytes": 1024,
+        "x-scoplen-request-attempt-lifetime-ms": 120000,
+        "requestBody": {
+          "required": true,
+          "description": "At most 16384 complete encoded UTF-8 bytes, including whitespace.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPasswordChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exact original receipt confirmed; at most 1024 complete encoded bytes.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPasswordChangeConfirmation"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "New mutation committed; at most 1024 complete encoded bytes.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPasswordChangeConfirmation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/AccountEntryInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/AccountEntryAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/AccountEntryPolicyDenied"
+          },
+          "409": {
+            "$ref": "#/components/responses/AccountEntryAdmissionConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/AccountEntryTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/AccountEntryMediaType"
+          },
+          "429": {
+            "$ref": "#/components/responses/AccountEntryRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountEntryStorageFailure"
+          },
+          "default": {
+            "$ref": "#/components/responses/AccountEntryProblem"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -19793,7 +19898,8 @@
             "type": "string",
             "enum": [
               "register",
-              "admit"
+              "admit",
+              "password_change"
             ]
           },
           "intent": {
@@ -25546,6 +25652,212 @@
           }
         },
         "x-scoplen-max-bytes": 32768
+      },
+      "AccountPasswordChangeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intent",
+          "payload",
+          "account_signature",
+          "attempt_id",
+          "nonce",
+          "device_proof",
+          "admission_token"
+        ],
+        "properties": {
+          "intent": {
+            "type": "string",
+            "enum": [
+              "submit",
+              "confirm"
+            ]
+          },
+          "payload": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "contentEncoding": "base64url",
+            "minLength": 1,
+            "maxLength": 10923,
+            "x-scoplen-decoded-bytes": {
+              "minimum": 1,
+              "maximum": 8192
+            },
+            "contentMediaType": "application/cbor",
+            "description": "Exact deterministic version-one protected CBOR; reject unknown/duplicate fields, nonshortest forms, indefinite lengths and trailing bytes. Sign the original decoded bytes."
+          },
+          "account_signature": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "contentEncoding": "base64url",
+            "minLength": 86,
+            "maxLength": 86,
+            "x-scoplen-decoded-bytes": {
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          "attempt_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "contentEncoding": "base64url",
+            "minLength": 43,
+            "maxLength": 43,
+            "x-scoplen-decoded-bytes": {
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          "nonce": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "contentEncoding": "base64url",
+            "minLength": 43,
+            "maxLength": 43,
+            "x-scoplen-decoded-bytes": {
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          "device_proof": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "contentEncoding": "base64url",
+            "minLength": 86,
+            "maxLength": 86,
+            "x-scoplen-decoded-bytes": {
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          "admission_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "contentEncoding": "base64url",
+                "minLength": 43,
+                "maxLength": 43,
+                "x-scoplen-decoded-bytes": {
+                  "minimum": 32,
+                  "maximum": 32
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "intent": {
+                  "const": "submit"
+                }
+              },
+              "required": [
+                "intent"
+              ]
+            },
+            "then": {
+              "properties": {
+                "admission_token": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "contentEncoding": "base64url",
+                  "minLength": 43,
+                  "maxLength": 43,
+                  "x-scoplen-decoded-bytes": {
+                    "minimum": 32,
+                    "maximum": 32
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "intent": {
+                  "const": "confirm"
+                }
+              },
+              "required": [
+                "intent"
+              ]
+            },
+            "then": {
+              "properties": {
+                "admission_token": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AccountPasswordChangeConfirmation": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "outcome",
+          "kind",
+          "operation_id",
+          "request_digest",
+          "account_id",
+          "personal_vault_id",
+          "device_id",
+          "credential_generation"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "const": "committed"
+          },
+          "kind": {
+            "type": "string",
+            "const": "password_change"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "request_digest": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "contentEncoding": "base64url",
+            "minLength": 43,
+            "maxLength": 43,
+            "x-scoplen-decoded-bytes": {
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "personal_vault_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "credential_generation": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "maxLength": 20,
+            "x-scoplen-uint64-maximum": "18446744073709551615"
+          }
+        }
       }
     }
   },
