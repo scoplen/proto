@@ -97,3 +97,11 @@ pub fn team_invitation_verifier(
 pub fn simple_rule(input: &[u8]) -> Result<String, JsValue> {
     super::simple_rule(input).map_err(|error| JsValue::from_str(&error.to_string()))
 }
+
+/// Prepare CSV using the same bounded native parser, without identity allocation.
+/// # Errors
+/// Returns a JSON string containing only fixed kind/record/known-field diagnostics.
+#[wasm_bindgen(js_name = parseInventoryCsv)]
+pub fn inventory_csv(input: &[u8]) -> Result<String, JsValue> {
+    super::inventory_csv(input).map_err(|error| JsValue::from_str(&error.to_json()))
+}

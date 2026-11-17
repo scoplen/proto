@@ -145,7 +145,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 95);
+    assert_eq!(routes.len(), 96);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {
@@ -449,7 +449,7 @@ fn inventory_registry_matches_each_authored_method_route_and_scope() {
         );
         count += 1;
     }
-    assert_eq!(count, 35);
+    assert_eq!(count, 36);
 }
 
 #[test]

@@ -112,3 +112,12 @@ fn canonical_uuid(text: &str) -> Result<Uuid, TeamInvitationError> {
     }
     Ok(id)
 }
+
+/// Prepare an explicit CSV preview through the sole shared parser, without allocating ids.
+/// # Errors
+/// Returns fixed source-free CSV diagnostics; no normalization or network I/O occurs.
+pub fn inventory_csv(
+    input: &[u8],
+) -> Result<String, scoplen_api::inventory_import::InventoryCsvError> {
+    scoplen_api::inventory_import::inventory_csv_preview(input)
+}

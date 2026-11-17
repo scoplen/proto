@@ -8144,103 +8144,179 @@
       }
     },
     "/orgs/{org}/inventory/imports": {
-      "get": {
-        "operationId": "listInventoryImports",
-        "parameters": [
+      "post": {
+        "operationId": "createInventoryImport",
+        "security": [
           {
-            "$ref": "#/components/parameters/org"
-          },
-          {
-            "$ref": "#/components/parameters/limit"
-          },
-          {
-            "$ref": "#/components/parameters/cursor"
+            "accessToken": [],
+            "dpopProof": []
           }
         ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Page"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "post": {
-        "operationId": "createInventoryImports",
+        "x-scoplen-required-device-scope": "inventory:write",
+        "x-scoplen-cedar-action": "manage_inventory",
+        "x-scoplen-request-max-bytes": 2097152,
+        "x-scoplen-response-max-bytes": 32768,
+        "description": "D-151 synchronous atomic creation of 1..100 Direct Host/default-Login pairs. Require current Account/Device or Account-browser family, active same-Organization Membership and manage_inventory. Reject query and If-Match. Validate the entire prospective reciprocal pair graph and independent view_inventory on every referenced object; reject used/tombstoned ids and include all 2*N objects in the existing quota. Commit canonical K-1/projection/reference/history state with real writer origins, contiguous Host-then-Login sequences, one view revision, one existing attributable organization.inventory_created audit per object and the original receipt atomically; mandatory audit/encoding failure rolls back everything. Emit one changed-only hint after commit. A 24-hour receipt under spl-organization-inventory-import-v1 binds trusted origin/Account/real writer kind and id/POST/full Organization path/canonical ordered typed rows and ids. Check matching receipt before unused ids/quota/new-object checks; current Account/writer/Membership/manage_inventory remain required, without rebuilding the historical graph. Same-family browser refresh retains binding; another writer or payload conflicts. Original explicit confirmation returns only ordered ids without another mutation/audit/hint. Unknown COMMIT is organization.commit_outcome_unknown changed=true retryable=true; retain original intent, never regenerate ids/key or automatically replay. No job Resource, Location or polling.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/org"
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           },
           {
-            "$ref": "#/components/parameters/idempotency"
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
+          "required": true,
+          "description": "Complete UTF-8 JSON <=2097152 bytes including whitespace. Reject recursive duplicate names, unknown fields/null and integer aliases. Only login_name may be omitted. Each final K-1 object <=262144 bytes with actual committing clocks.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryImportRequest"
+              }
+            }
+          }
         },
         "responses": {
           "201": {
-            "$ref": "#/components/responses/Resource"
+            "description": "Confirmed original ordered identities, <=32768 complete bytes including response extensions. Read ordinary inventory for current Resources/ETags.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/InventoryBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "503": {
+            "description": "Confirmed rollback: organization.storage_unavailable changed=false retryable=true. Unconfirmed COMMIT: organization.commit_outcome_unknown changed=true retryable=true; only explicit original confirmation with a fresh proof within its original 24-hour window.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      }
-    },
-    "/orgs/{org}/inventory/imports/{id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/org"
-        },
-        {
-          "$ref": "#/components/parameters/id"
-        }
-      ],
-      "get": {
-        "operationId": "getInventoryImports",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "patch": {
-        "operationId": "updateInventoryImports",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ifMatch"
-          }
-        ],
-        "requestBody": {
-          "$ref": "#/components/requestBodies/Write"
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Resource"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteInventoryImports",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ifMatch"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Deleted"
-          },
-          "default": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Existing bounded Problem <=4096 bytes and authentication/admission headers; no partial success body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -25306,6 +25382,170 @@
             }
           }
         ]
+      },
+      "InventoryImportFields": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "address",
+          "port",
+          "username"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "x-scoplen-integer-token": true,
+            "description": "Exact JSON integer token, without decimal/exponent/string aliases."
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          },
+          "login_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          }
+        }
+      },
+      "InventoryImportRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "host_id",
+          "access_profile_id",
+          "name",
+          "address",
+          "port",
+          "username"
+        ],
+        "properties": {
+          "host_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "access_profile_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "x-scoplen-integer-token": true,
+            "description": "Exact JSON integer token, without decimal/exponent/string aliases."
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          },
+          "login_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "x-scoplen-max-utf8-bytes": 16384,
+            "description": "Nonempty NFC K-1 text, preserved without trimming or normalization; complete-object limits also apply."
+          }
+        }
+      },
+      "InventoryImportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rows"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/InventoryImportRow"
+            },
+            "description": "Preserve row order. All 2*N identities are distinct newly allocated canonical UUIDv7 values; duplicate names/endpoints are permitted."
+          }
+        },
+        "x-scoplen-max-bytes": 2097152
+      },
+      "InventoryImportPair": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "host_id",
+          "access_profile_id"
+        ],
+        "properties": {
+          "host_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "access_profile_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      },
+      "InventoryImportResult": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/InventoryImportPair"
+            },
+            "description": "Verify exact count, order and every submitted id against the original request before reporting success."
+          }
+        },
+        "x-scoplen-max-bytes": 32768
       }
     }
   },
@@ -25317,6 +25557,14 @@
         "account:read"
       ],
       "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/inventory/imports",
+      "scopes": [
+        "inventory:write"
+      ],
+      "writerReceipt": true
     },
     {
       "method": "GET",

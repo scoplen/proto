@@ -9,8 +9,8 @@ const authored = JSON.parse(await readFile(new URL("v1.yaml", import.meta.url), 
 test("D-140 exact four endpoints reuse shared shapes and independent principal", async () => {
   const expected = accountBrowserDefinitions();
   assert.equal(Object.keys(expected.paths).length, 4);
-  assert.equal(expected.operations.length, 58);
-  assert.equal(new Set(expected.operations.map(({ method, path }) => `${method} ${path}`)).size, 58);
+  assert.equal(expected.operations.length, 59);
+  assert.equal(new Set(expected.operations.map(({ method, path }) => `${method} ${path}`)).size, 59);
   const types = generateAccountBrowserTypes(authored);
   assert.match(types, /AccountBrowserPasswordLoginRequest = AccountPasswordLoginRequest/);
   assert.match(types, /AccountBrowserLogoutResponse = OperatorLogoutResponse/);
@@ -20,7 +20,7 @@ test("D-140 exact four endpoints reuse shared shapes and independent principal",
   for (const name of Object.keys(expected.schemas)) assert.ok(declarations.includes(`${name}: ${name};`), `components schema ${name}`);
   assert.equal(initialAccountBrowserScope.split(" ").length, 14);
   for (const kind of ["trust-records", "snippets", "gateway-networks", "certificate-authorities", "certificates", "/sync/", "/admin/", "devices"]) assert.ok(expected.operations.every(operation => !operation.path.includes(kind)));
-  assert.equal(expected.operations.filter(operation => operation.writerReceipt).length, 10);
+  assert.equal(expected.operations.filter(operation => operation.writerReceipt).length, 11);
 });
 
 test("D-140 generator rejects byte limits, profile, cookie, scopes and writer drift", () => {

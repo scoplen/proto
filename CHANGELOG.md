@@ -4,6 +4,15 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-151's single bounded strict CSV parser, typed ordered Host/default-Login batches,
+  exact result/request binding and InventoryImportCreate Device/browser operations under
+  existing inventory:write. Add independent vectors, parser seeds and generated contracts.
+  Add a real-Cedar
+  transaction reference with original writer receipts, atomic publication and scripted
+  rollback/uncertain outcomes. Production HTTP/storage and import-to-SSH remain consumer work.
+  Expose the same parser through the production thin browser package, with native and
+  browser-free packaged WebAssembly vector verification and separate browser Worker CI coverage.
+
 - Add D-150's bounded single-Host access-request codecs, exact Resource/Page/query bindings,
   fractional deadline and approval-time invariants, six Device/Account-browser operations and
   separate read/write/decide scopes, without widening old refresh ceilings. Add independent

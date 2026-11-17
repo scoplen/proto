@@ -62,7 +62,6 @@ export const controlPlanePaths = [
   "/orgs/{org}/integrations",
   "/orgs/{org}/integrations/{id}",
   "/orgs/{org}/inventory/imports",
-  "/orgs/{org}/inventory/imports/{id}",
   "/orgs/{org}/invitations",
   "/orgs/{org}/invitations/{invitation}",
   "/orgs/{org}/invitations/{invitation}/accept",
