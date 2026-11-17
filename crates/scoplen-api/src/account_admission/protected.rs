@@ -153,7 +153,7 @@ pub struct AccountPasswordChangePayload {
     pub capability_digest: [u8; 32],
     /// Fresh profile-one salt for the new credential.
     pub password_salt: [u8; 16],
-    /// SHA-256 of the new password's AuthSecret.
+    /// SHA-256 of the new password's `AuthSecret`.
     pub verifier: [u8; 32],
     /// New D-127 envelope containing the unchanged random ARK.
     pub password_ark: [u8; 73],
