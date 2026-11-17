@@ -19,7 +19,7 @@ use scoplen_ssh::{
 };
 use ssh_key::Algorithm;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf, copy_bidirectional},
     net::{TcpListener, TcpStream},
     task::JoinHandle,
     time::{sleep, timeout},
@@ -68,6 +68,7 @@ impl AsyncWrite for CountedStream {
 #[derive(Clone)]
 struct EchoServer {
     action: ServerDataAction,
+    session_channels: Vec<russh::ChannelId>,
 }
 
 #[derive(Clone, Copy)]
@@ -94,11 +95,47 @@ impl russh::server::Handler for EchoServer {
 
     async fn channel_open_session(
         &mut self,
-        _channel: russh::Channel<russh::server::Msg>,
+        channel: russh::Channel<russh::server::Msg>,
         reply: russh::server::ChannelOpenHandle,
         _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
+        self.session_channels.push(channel.id());
         reply.accept().await;
+        Ok(())
+    }
+
+    async fn channel_open_direct_tcpip(
+        &mut self,
+        channel: russh::Channel<russh::server::Msg>,
+        host: &str,
+        port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: russh::server::ChannelOpenHandle,
+        _session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        if host != "127.0.0.1" {
+            reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
+            return Ok(());
+        }
+        let port = u16::try_from(port).expect("fixture loopback port");
+        let mut target = TcpStream::connect((host, port)).await?;
+        reply.accept().await;
+        tokio::spawn(async move {
+            let mut stream = channel.into_stream();
+            let _ = copy_bidirectional(&mut stream, &mut target).await;
+        });
+        Ok(())
+    }
+
+    async fn channel_eof(
+        &mut self,
+        channel: russh::ChannelId,
+        session: &mut russh::server::Session,
+    ) -> Result<(), Self::Error> {
+        if self.session_channels.contains(&channel) {
+            session.data(channel, b"after-half-close".to_vec())?;
+        }
         Ok(())
     }
 
@@ -108,6 +145,9 @@ impl russh::server::Handler for EchoServer {
         data: &[u8],
         session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
+        if !self.session_channels.contains(&channel) {
+            return Ok(());
+        }
         match self.action {
             ServerDataAction::Echo => session.data(channel, data.to_vec()),
             ServerDataAction::Disconnect => {
@@ -167,6 +207,10 @@ async fn start_fixture() -> RelayFixture {
 }
 
 async fn start_fixture_with_action(action: ServerDataAction) -> RelayFixture {
+    start_fixture_with_reset(action, false).await
+}
+
+async fn start_fixture_with_reset(action: ServerDataAction, reset: bool) -> RelayFixture {
     let mut server_config = russh::server::Config::default();
     server_config.keys.push(
         PrivateKey::random(
@@ -179,8 +223,12 @@ async fn start_fixture_with_action(action: ServerDataAction) -> RelayFixture {
     let server_address = server_listener.local_addr().expect("SSH server address");
     let server = tokio::spawn(async move {
         let (stream, _) = server_listener.accept().await.expect("accept SSH relay");
-        let _ =
-            russh::server::run_stream(Arc::new(server_config), stream, EchoServer { action }).await;
+        let _ = russh::server::run_stream(
+            Arc::new(server_config),
+            stream,
+            EchoServer { action, session_channels: Vec::new() },
+        )
+        .await;
     });
 
     let relay_listener = TcpListener::bind("127.0.0.1:0").await.expect("bind relay");
@@ -191,6 +239,13 @@ async fn start_fixture_with_action(action: ServerDataAction) -> RelayFixture {
     let relay_client_bytes = Arc::clone(&client_bytes);
     let relay = tokio::spawn(async move {
         let (client, _) = relay_listener.accept().await.expect("accept SSH client");
+        let client = if reset {
+            let socket = socket2::Socket::from(client.into_std().expect("relay socket"));
+            socket.set_linger(Some(Duration::ZERO)).expect("reset on relay close");
+            TcpStream::from_std(socket.into()).expect("async relay socket")
+        } else {
+            client
+        };
         let server =
             tokio::net::TcpStream::connect(server_address).await.expect("connect SSH server");
         let (client_read, client_write) = client.into_split();
@@ -225,6 +280,24 @@ async fn connect_with_config(config: ClientConfig) -> ClientConnection {
         .expect("authentication completes")
         .expect("authenticate SSH client");
     connection
+}
+
+async fn connect_via(parent: &ClientConnection, target: &RelayFixture) -> ClientConnection {
+    let config =
+        ClientConfig::new("127.0.0.1", target.address.port(), |_: &str, _: &HostKey| Ok(()))
+            .expect("child config");
+    let mut child = timeout(
+        DEADLINE,
+        ClientConnection::connect_via_direct_tcpip(config, parent, "127.0.0.1", 1),
+    )
+    .await
+    .expect("child handshake deadline")
+    .expect("child handshake");
+    timeout(DEADLINE, child.authenticate_password("user", b"test-password"))
+        .await
+        .expect("child authentication deadline")
+        .expect("child authentication");
+    child
 }
 
 async fn echo(channel: &mut ClientChannel, data: &[u8]) {
@@ -470,4 +543,143 @@ async fn dropping_connection_does_not_report_network_loss() {
         .expect("dropping owner closes event stream")
         .expect("local drop is not a network loss");
     assert!(ended.is_none());
+}
+
+#[tokio::test]
+async fn composed_parent_eof_and_reset_report_network_loss_through_two_hops() {
+    for reset in [false, true] {
+        let parent_fixture = start_fixture_with_reset(ServerDataAction::Echo, reset).await;
+        let child_fixture = start_fixture().await;
+        let target_fixture = start_fixture().await;
+        let parent = connect(&parent_fixture, None).await;
+        let child = connect_via(&parent, &child_fixture).await;
+        let target = connect_via(&child, &target_fixture).await;
+        let mut child_channel = child.open_session().await.expect("child session");
+        let mut target_channel = target.open_session().await.expect("second composed session");
+        echo(&mut child_channel, b"first composed hop").await;
+        echo(&mut target_channel, b"second composed hop").await;
+
+        parent_fixture.relay.abort();
+        for (hop, channel) in [&mut child_channel, &mut target_channel].into_iter().enumerate() {
+            let result =
+                timeout(DEADLINE, channel.next_event()).await.expect("composed loss deadline");
+            assert!(
+                matches!(result, Err(ClientError::NetworkLost)),
+                "hop={}, reset={reset}: {result:?}",
+                hop + 1
+            );
+            assert!(channel.next_event().await.expect("loss is terminal").is_none());
+        }
+    }
+}
+
+#[tokio::test]
+async fn channel_stream_drains_bytes_before_confirmed_loss_and_ignores_empty_reads() {
+    let fixture = start_fixture().await;
+    let connection = connect(&fixture, None).await;
+    let mut stream = connection.open_session().await.expect("session").into_stream();
+    stream.write_all(b"prefix-and-queued-suffix").await.expect("send payload");
+    stream.flush().await.expect("flush payload");
+    let mut prefix = [0; 6];
+    stream.read_exact(&mut prefix).await.expect("read prefix");
+    assert_eq!(&prefix, b"prefix");
+    fixture.relay.abort();
+    assert_eq!(stream.read(&mut []).await.expect("zero-capacity read"), 0);
+    let mut rest = Vec::new();
+    let error = timeout(DEADLINE, stream.read_to_end(&mut rest))
+        .await
+        .expect("stream termination deadline")
+        .expect_err("confirmed parent loss is not normal EOF");
+    assert_eq!(rest, b"-and-queued-suffix");
+    assert_eq!(error.kind(), io::ErrorKind::ConnectionAborted);
+}
+
+#[tokio::test]
+async fn channel_stream_returned_eof_stays_normal_after_parent_loss() {
+    let fixture = start_fixture_with_action(ServerDataAction::Eof).await;
+    let connection = connect(&fixture, None).await;
+    let mut parent_monitor = connection.open_session().await.expect("parent loss monitor");
+    let mut stream = connection.open_session().await.expect("session").into_stream();
+    stream.write_all(b"send EOF").await.expect("request EOF");
+    let mut byte = [0];
+    assert_eq!(
+        timeout(DEADLINE, stream.read(&mut byte)).await.expect("EOF deadline").expect("EOF"),
+        0
+    );
+    fixture.relay.abort();
+    assert!(matches!(
+        timeout(DEADLINE, parent_monitor.next_event())
+            .await
+            .expect("confirmed parent loss deadline"),
+        Err(ClientError::NetworkLost)
+    ));
+    assert_eq!(stream.read(&mut byte).await.expect("returned EOF stays terminal"), 0);
+}
+
+#[tokio::test]
+async fn channel_stream_write_shutdown_keeps_read_half_and_loss_classification() {
+    let fixture = start_fixture().await;
+    let connection = connect(&fixture, None).await;
+    let mut stream = connection.open_session().await.expect("session").into_stream();
+    stream.shutdown().await.expect("send half-close");
+    let mut data = [0; 16];
+    timeout(DEADLINE, stream.read_exact(&mut data))
+        .await
+        .expect("half-close reply deadline")
+        .expect("read after half-close");
+    assert_eq!(&data, b"after-half-close");
+    fixture.relay.abort();
+    let error = timeout(DEADLINE, stream.read(&mut data))
+        .await
+        .expect("loss deadline")
+        .expect_err("write half-close does not suppress parent loss");
+    assert_eq!(error.kind(), io::ErrorKind::ConnectionAborted);
+}
+
+#[tokio::test]
+async fn cancelled_channel_stream_eof_wait_still_reports_parent_loss() {
+    let fixture = start_fixture_with_action(ServerDataAction::Eof).await;
+    let connection = connect(&fixture, None).await;
+    let mut stream = connection.open_session().await.expect("session").into_stream();
+    stream.write_all(b"send EOF").await.expect("request EOF");
+    let mut byte = [0];
+    assert!(timeout(Duration::from_millis(100), stream.read(&mut byte)).await.is_err());
+    fixture.relay.abort();
+    let error = timeout(DEADLINE, stream.read(&mut byte))
+        .await
+        .expect("loss deadline")
+        .expect_err("cancelled EOF wait retains parent loss");
+    assert_eq!(error.kind(), io::ErrorKind::ConnectionAborted);
+}
+
+#[tokio::test]
+async fn channel_stream_local_and_peer_disconnects_remain_normal() {
+    for drop_parent in [false, true] {
+        let fixture = start_fixture().await;
+        let connection = connect(&fixture, None).await;
+        let mut stream = connection.open_session().await.expect("session").into_stream();
+        if drop_parent {
+            drop(connection);
+        } else {
+            connection.disconnect().await.expect("local disconnect");
+        }
+        assert_eq!(
+            timeout(DEADLINE, stream.read(&mut [0]))
+                .await
+                .expect("local EOF deadline")
+                .expect("local EOF"),
+            0
+        );
+    }
+    let fixture = start_fixture_with_action(ServerDataAction::Disconnect).await;
+    let connection = connect(&fixture, None).await;
+    let mut stream = connection.open_session().await.expect("session").into_stream();
+    stream.write_all(b"disconnect").await.expect("request peer disconnect");
+    assert_eq!(
+        timeout(DEADLINE, stream.read(&mut [0]))
+            .await
+            .expect("peer EOF deadline")
+            .expect("peer EOF"),
+        0
+    );
 }

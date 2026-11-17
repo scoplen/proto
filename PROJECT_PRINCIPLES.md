@@ -39,6 +39,9 @@ after its contract is specified in `scoplen-docs` and covered by vectors and fai
   open. A mixed OpenSSH/Dropbear fixture checks one to three independent Jump hosts,
   per-hop trust/password refusal, exact output, cancellation and parent teardown;
   this does not establish the complete server/platform matrix.
+  D-148 preserves confirmed parent network loss through channel byte streams, including two-hop
+  composition, without changing returned normal EOF or write half-close. The shared public and
+  OpenSSH checks do not establish consumer Jump reconnect or attached-resource recreation.
   S6 has the error contract, K-3 device-auth JSON codecs, and K-4 sync codecs, while complete
   API and production endpoint behavior remain open. D-106 adds a bounded public-only JWKS
   codec, separate authentication rate headers, and documented failure/recovery responses with
