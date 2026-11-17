@@ -2,6 +2,8 @@
 //! D-147 named-Membership Host Grant wire contracts.
 //! Parsing establishes syntax and request binding, not current tenant ownership or authority.
 
+pub mod reference;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};

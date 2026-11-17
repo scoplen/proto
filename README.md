@@ -167,6 +167,12 @@ certificate receipts, production storage/signing/audit, Console and actual HTTPS
 Withdrawal stops future issuance under that authority; already issued certificates expire
 normally. Syntax and reference-peer success establish none of those production outcomes.
 
+`grant::reference` models current Device/browser management authority, immutable original create
+receipts, strong preconditions, equal-field replacement, atomic audit/revision outcomes and
+uncertain commits. Its trusted lifecycle snapshots retain withdrawal through restoration and
+rejoining; current rows feed the public connect helper and participate in Host deletion guards.
+It provides no HTTP authentication, durable database transaction or production audit chain.
+
 D-140's independent `account_browser` module supplies four bounded endpoint wrappers over the
 existing password/options, transient login, browser-session and true-only logout shapes.
 It rejects recursive duplicate names and native bootstrap/admission/refresh fields, validates
