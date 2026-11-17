@@ -161,7 +161,7 @@ for (const vector of vectors.filter(v => !["inventory.bound", "inventory.model"]
 const expectedSeeds = new Set(outputs.slice(1).map(([path]) => path.split("/").at(-1)));
 const corpus = new URL("fuzz/corpus/api_json/", root);
 for (const entry of await readdir(corpus, { withFileTypes: true })) {
-  if (!entry.isFile() || !entry.name.startsWith("seed-inventory-") || expectedSeeds.has(entry.name)) continue;
+  if (!entry.isFile() || !entry.name.startsWith("seed-inventory-") || entry.name.startsWith("seed-inventory-import-") || expectedSeeds.has(entry.name)) continue;
   if (process.argv.includes("--check")) throw new Error(`D-137 inventory output stale: ${entry.name}`);
   await unlink(new URL(entry.name, corpus));
 }
