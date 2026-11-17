@@ -406,7 +406,7 @@ fn password_change_requests_enforce_token_intent_and_strict_json() {
                 }
                 "unknown" => value["extra"] = Value::Null,
                 "padded" => {
-                    value["nonce"] = format!("{}=", value["nonce"].as_str().unwrap()).into()
+                    value["nonce"] = format!("{}=", value["nonce"].as_str().unwrap()).into();
                 }
                 "signature-width" => value["device_proof"] = URL_SAFE_NO_PAD.encode([0; 63]).into(),
                 _ => unreachable!(),
