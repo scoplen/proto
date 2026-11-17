@@ -173,13 +173,22 @@ uncertain commits. Its trusted lifecycle snapshots retain withdrawal through res
 rejoining; current rows feed the public connect helper and participate in Host deletion guards.
 It provides no HTTP authentication, durable database transaction or production audit chain.
 
-D-150 registers six exact access-request operations with independent read, write and decide
-scopes in the Device and Account-browser profiles. Older session families cannot gain them
-through refresh. The ordinary rule generator accepts a separate `request_access` Host array
-for a Membership or Group; it grants neither inventory visibility nor connection authority,
-and changes no built-in role or Cedar schema. The closed Audit primary-kind registry includes
-`access_request`. These finite-enum extensions require consumer upgrades before Stable;
-the vocabulary and generator alone provide no production request, approval or SSH workflow.
+D-150's `access_request` module supplies bounded exact-input check/create/decision codecs,
+Resource/Page/query readers and original-response binding. It preserves fractional metadata
+instants, the exact one-day pending deadline and approval-anchored finite Grant interval.
+Unknown statuses remain inert. Six exact operations use independent read, write and decide
+scopes in the Device and Account-browser profiles; refresh cannot widen an older family.
+The ordinary rule generator accepts a separate `request_access` Host array for a Membership
+or Group, granting neither visibility nor connection authority and changing no built-in role
+or Cedar schema. The closed Audit primary-kind registry includes `access_request`.
+
+`access_request::reference` evaluates current requester eligibility and non-self approval
+routing through real Cedar, retains original writer/payload/precondition receipts, and models
+atomic request/Grant/revision/audit publication, pending expiry, lifecycle changes and uncertain
+outcomes. Its original approval history cannot restore a withdrawn Grant. Independent vectors,
+public tests, generated OpenAPI/TypeScript and parser seeds cover this shared boundary. These
+finite-enum extensions require consumer upgrades before Stable. The reference peer supplies
+no HTTP authentication, durable database, audit chain or production request/approval/SSH flow.
 
 D-140's independent `account_browser` module supplies four bounded endpoint wrappers over the
 existing password/options, transient login, browser-session and true-only logout shapes.
