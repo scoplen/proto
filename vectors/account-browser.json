@@ -462,7 +462,7 @@
       "id": "account-browser-scope-v1",
       "kind": "account.browser.scope",
       "input": "initial",
-      "expected": "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage"
+      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage"
     },
     {
       "id": "account-browser-operation-77-v1",
@@ -783,61 +783,133 @@
       "expected": "{\"scopes\":[\"audit:read\"],\"writerReceipt\":false}"
     },
     {
-      "id": "account-browser-operation-denied-130-v1",
-      "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/accounts/me/devices\"}",
-      "expected": "rejected"
+      "id": "account-browser-operation-130-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/access-requests/check\"}",
+      "expected": "{\"scopes\":[\"access-requests:write\"],\"writerReceipt\":false}"
     },
     {
-      "id": "account-browser-operation-denied-131-v1",
-      "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"GET\",\"path\":\"/sync/v1/keys\"}",
-      "expected": "rejected"
+      "id": "account-browser-operation-131-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/access-requests\"}",
+      "expected": "{\"scopes\":[\"access-requests:write\"],\"writerReceipt\":true}"
     },
     {
-      "id": "account-browser-operation-denied-132-v1",
-      "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/certificates\"}",
-      "expected": "rejected"
+      "id": "account-browser-operation-132-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/access-requests\"}",
+      "expected": "{\"scopes\":[\"access-requests:read\"],\"writerReceipt\":false}"
     },
     {
-      "id": "account-browser-operation-denied-133-v1",
-      "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/operator/logout\"}",
-      "expected": "rejected"
+      "id": "account-browser-operation-133-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
+      "expected": "{\"scopes\":[\"access-requests:read\"],\"writerReceipt\":false}"
     },
     {
-      "id": "account-browser-operation-denied-134-v1",
-      "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/trust-records\"}",
-      "expected": "rejected"
+      "id": "account-browser-operation-134-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}/decisions\"}",
+      "expected": "{\"scopes\":[\"access-requests:decide\"],\"writerReceipt\":true}"
     },
     {
-      "id": "account-browser-operation-denied-135-v1",
-      "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
-      "expected": "rejected"
+      "id": "account-browser-operation-135-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}/cancel\"}",
+      "expected": "{\"scopes\":[\"access-requests:write\"],\"writerReceipt\":true}"
     },
     {
       "id": "account-browser-operation-denied-136-v1",
       "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/gateway-networks\"}",
+      "input": "{\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
       "expected": "rejected"
     },
     {
       "id": "account-browser-operation-denied-137-v1",
       "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/admin/accounts\"}",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
       "expected": "rejected"
     },
     {
       "id": "account-browser-operation-denied-138-v1",
       "kind": "account.browser.operation.reject",
-      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/\"}",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
       "expected": "rejected"
     },
     {
       "id": "account-browser-operation-denied-139-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/access-requests/check\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-140-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}/decisions\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-141-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/access-requests/{id}/cancel\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-142-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/accounts/me/devices\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-143-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/sync/v1/keys\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-144-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/certificates\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-145-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/operator/logout\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-146-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/trust-records\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-147-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-148-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/gateway-networks\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-149-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/admin/accounts\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-150-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-denied-151-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"get\",\"path\":\"/api/v1/accounts/me\"}",
       "expected": "rejected"

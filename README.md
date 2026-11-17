@@ -173,6 +173,14 @@ uncertain commits. Its trusted lifecycle snapshots retain withdrawal through res
 rejoining; current rows feed the public connect helper and participate in Host deletion guards.
 It provides no HTTP authentication, durable database transaction or production audit chain.
 
+D-150 registers six exact access-request operations with independent read, write and decide
+scopes in the Device and Account-browser profiles. Older session families cannot gain them
+through refresh. The ordinary rule generator accepts a separate `request_access` Host array
+for a Membership or Group; it grants neither inventory visibility nor connection authority,
+and changes no built-in role or Cedar schema. The closed Audit primary-kind registry includes
+`access_request`. These finite-enum extensions require consumer upgrades before Stable;
+the vocabulary and generator alone provide no production request, approval or SSH workflow.
+
 D-140's independent `account_browser` module supplies four bounded endpoint wrappers over the
 existing password/options, transient login, browser-session and true-only logout shapes.
 It rejects recursive duplicate names and native bootstrap/admission/refresh fields, validates

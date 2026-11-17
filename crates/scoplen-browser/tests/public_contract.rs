@@ -158,5 +158,5 @@ fn rule_export_preserves_the_public_strict_input_and_exact_source_vectors() {
             _ => {}
         }
     }
-    assert_eq!(checked, 28);
+    assert_eq!(checked, 45);
 }

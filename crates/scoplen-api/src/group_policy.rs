@@ -744,7 +744,7 @@ pub struct SimpleRuleSelector {
     pub id: Uuid,
 }
 
-/// Exactly one independent view or connect rule.
+/// Exactly one independent view, connect or access-request rule.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SimpleRule {
     /// Explicit read access to the selected typed resources, without dependency grants.
@@ -761,6 +761,11 @@ pub enum SimpleRule {
         /// Exact bounded remote SSH username.
         remote_user: String,
     },
+    /// Permission to request temporary access, without visibility or connection authority.
+    RequestAccess {
+        /// One through 64 distinct Host ids.
+        hosts: Vec<Uuid>,
+    },
 }
 
 /// Public input to the shared pure Cedar generator used by both consumers.
@@ -770,7 +775,7 @@ pub struct SimpleRuleInput {
     pub organization: Uuid,
     /// Exactly one current Membership or local Group subject.
     pub subject: SimpleRuleSubject,
-    /// One separate view or connect permission.
+    /// One separate view, connect or access-request permission.
     pub rule: SimpleRule,
 }
 
@@ -788,8 +793,12 @@ impl SimpleRuleInput {
             (None, Some(Value::String(id))) => SimpleRuleSubject::Group(parse_uuid(&id, "group")?),
             _ => return Err(invalid("subject")),
         };
-        let rule = match (fields.remove("view"), fields.remove("connect")) {
-            (Some(Value::Array(items)), None) => {
+        let rule = match (
+            fields.remove("view"),
+            fields.remove("connect"),
+            fields.remove("request_access"),
+        ) {
+            (Some(Value::Array(items)), None, None) => {
                 let resources = items
                     .into_iter()
                     .map(|item| {
@@ -808,12 +817,22 @@ impl SimpleRuleInput {
                     .collect::<Result<_, Error>>()?;
                 SimpleRule::View { resources }
             }
-            (None, Some(Value::Object(mut data))) => {
+            (None, Some(Value::Object(mut data)), None) => {
                 let hosts = take_ids(&mut data, "hosts")?;
                 let host_groups = take_ids(&mut data, "host_groups")?;
                 let remote_user = take_string(&mut data, "remote_user")?;
                 reject_remaining(&data)?;
                 SimpleRule::Connect { hosts, host_groups, remote_user }
+            }
+            (None, None, Some(Value::Array(items))) => {
+                let hosts = items
+                    .into_iter()
+                    .map(|item| match item {
+                        Value::String(id) => parse_uuid(&id, "host"),
+                        _ => Err(invalid("host")),
+                    })
+                    .collect::<Result<_, Error>>()?;
+                SimpleRule::RequestAccess { hosts }
             }
             _ => return Err(invalid("rule")),
         };
@@ -851,6 +870,12 @@ impl SimpleRuleInput {
                     return Err(invalid("connect"));
                 }
             }
+            SimpleRule::RequestAccess { hosts } => {
+                validate_ids(hosts, MAX_SIMPLE_RULE_SELECTORS, "hosts")?;
+                if hosts.is_empty() {
+                    return Err(invalid("request_access"));
+                }
+            }
         }
         Ok(())
     }
@@ -878,6 +903,9 @@ impl SimpleRuleInput {
             }
             SimpleRule::Connect { hosts, host_groups, remote_user } => {
                 fields.insert("connect".into(), serde_json::json!({"hosts": sorted_ids(hosts), "host_groups": sorted_ids(host_groups), "remote_user": remote_user}));
+            }
+            SimpleRule::RequestAccess { hosts } => {
+                fields.insert("request_access".into(), serde_json::json!(sorted_ids(hosts)));
             }
         }
         let mut fields = Value::Object(fields);
@@ -942,6 +970,16 @@ impl SimpleRuleInput {
                 (
                     "connect",
                     format!("({}) && context.remote_user == {user}", selectors.join(" || ")),
+                )
+            }
+            SimpleRule::RequestAccess { hosts } => {
+                let hosts = sorted_ids(hosts)
+                    .iter()
+                    .map(|id| format!("Host::\"{id}\""))
+                    .collect::<Vec<_>>();
+                (
+                    "request_access",
+                    format!("resource is Host && [{}].contains(resource)", hosts.join(", ")),
                 )
             }
         };

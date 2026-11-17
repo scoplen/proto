@@ -4,6 +4,12 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-150's six exact Device/Account-browser access-request operation mappings and separate
+  read/write/decide scopes, without widening old refresh ceilings. Extend the ordinary rule
+  generator with a distinct Host-only `request_access` rule and the closed Audit resource-kind
+  registry with `access_request`. Existing view/connect bytes, built-in roles and Cedar schema
+  remain unchanged. Production request, approval and SSH workflows are separate consumer work.
+
 - Add D-147's typed named-member Host Grants, exact Device/Account-browser policy-scope
   operations and generated API declarations. Add canonical Cedar template linking and a
   connect result with the applicable exclusive Grant expiry while retaining ordinary permits,

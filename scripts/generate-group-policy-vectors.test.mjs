@@ -24,6 +24,14 @@ test("D-137 group/policy producer independently fixes sorted typed rules and che
     assert.match(connect.expected, /context.membership.groups.contains\(Group::/);
     assert.match(connect.expected, /resource.host_groups.contains\(HostGroup::/);
     assert.doesNotMatch(connect.expected, /Action::"view_inventory"/);
+    const request = vectors.find(value => value.id === "group-policy-source-member-request-v1");
+    assert.match(request.expected, /Action::"request_access"/);
+    assert.match(request.expected, /resource is Host && \[Host::/);
+    assert.doesNotMatch(request.expected, /remote_user|host_groups|view_inventory|Action::"connect"/);
+    assert.equal(JSON.parse(vectors.find(value => value.id === "group-policy-simple-member-request-v1").expected).request_access.length, 2);
+    for (const name of ["request-and-view", "request-and-connect", "empty-request", "duplicate-request", "excess-request", "request-object", "request-host-group", "request-username", "request-null", "request-uuid-case", "duplicate-request-key"]) {
+      assert.equal(vectors.find(value => value.id === `group-policy-simple-${name}-v1`).expected, "rejected");
+    }
     assert.equal(vectors.find(value => value.id === "group-policy-profile-view-forbid-time-v1").expected, "rejected");
     assert.equal(vectors.find(value => value.id === "group-policy-profile-connect-time-v1").expected, "accepted");
     await writeFile(path, text.replaceAll("\n", "\r\n"));
