@@ -245,6 +245,16 @@ pub enum DeviceAccessOperation {
     OrganizationPolicyReplace,
     /// Delete one current Organization's custom policy.
     OrganizationPolicyDelete,
+    /// Create one named-Membership Host Grant.
+    OrganizationGrantCreate,
+    /// List current, unwithdrawn Grants, including expired intervals.
+    OrganizationGrantList,
+    /// Read one current Grant projection.
+    OrganizationGrantRead,
+    /// Completely replace one current Grant's desired fields.
+    OrganizationGrantReplace,
+    /// Withdraw one Grant without revoking disclosed direct certificates.
+    OrganizationGrantDelete,
     /// List public user-CA metadata under current Organization membership.
     UserCaList,
     /// Read one current Organization's public user CA.
@@ -291,7 +301,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 84] = [
+    pub const ALL: [Self; 89] = [
         Self::AccountProfileRead,
         Self::AccountDevicesRead,
         Self::AuditEventList,
@@ -355,6 +365,11 @@ impl DeviceAccessOperation {
         Self::OrganizationPolicyRead,
         Self::OrganizationPolicyReplace,
         Self::OrganizationPolicyDelete,
+        Self::OrganizationGrantCreate,
+        Self::OrganizationGrantList,
+        Self::OrganizationGrantRead,
+        Self::OrganizationGrantReplace,
+        Self::OrganizationGrantDelete,
         Self::UserCaList,
         Self::UserCaRead,
         Self::UserCaKrlRead,
@@ -411,10 +426,15 @@ impl DeviceAccessOperation {
             Self::OrganizationGroupList
             | Self::OrganizationGroupRead
             | Self::OrganizationPolicyList
-            | Self::OrganizationPolicyRead => &[DeviceAccessScope::PoliciesRead],
+            | Self::OrganizationPolicyRead
+            | Self::OrganizationGrantList
+            | Self::OrganizationGrantRead => &[DeviceAccessScope::PoliciesRead],
             Self::OrganizationPolicyCreate
             | Self::OrganizationPolicyReplace
-            | Self::OrganizationPolicyDelete => &[DeviceAccessScope::PoliciesWrite],
+            | Self::OrganizationPolicyDelete
+            | Self::OrganizationGrantCreate
+            | Self::OrganizationGrantReplace
+            | Self::OrganizationGrantDelete => &[DeviceAccessScope::PoliciesWrite],
             Self::InventoryHostList
             | Self::InventoryHostRead
             | Self::InventoryAccessProfileList
@@ -520,6 +540,8 @@ impl DeviceAccessOperation {
             | Self::OrganizationGroupRead
             | Self::OrganizationPolicyList
             | Self::OrganizationPolicyRead
+            | Self::OrganizationGrantList
+            | Self::OrganizationGrantRead
             | Self::UserCaList
             | Self::UserCaRead
             | Self::UserCaKrlRead
@@ -527,6 +549,7 @@ impl DeviceAccessOperation {
             Self::AccountKeysWrite
             | Self::OrganizationGroupReplace
             | Self::OrganizationPolicyReplace
+            | Self::OrganizationGrantReplace
             | Self::InventoryHostReplace
             | Self::InventoryAccessProfileReplace
             | Self::InventoryRouteReplace
@@ -540,6 +563,7 @@ impl DeviceAccessOperation {
             | Self::TeamMemberRemove
             | Self::OrganizationGroupDelete
             | Self::OrganizationPolicyDelete
+            | Self::OrganizationGrantDelete
             | Self::InventoryHostDelete
             | Self::InventoryAccessProfileDelete
             | Self::InventoryRouteDelete
@@ -556,6 +580,7 @@ impl DeviceAccessOperation {
             | Self::UserCertificateIssue
             | Self::OrganizationGroupCreate
             | Self::OrganizationPolicyCreate
+            | Self::OrganizationGrantCreate
             | Self::InventoryHostCreate
             | Self::InventoryAccessProfileCreate
             | Self::InventoryRouteCreate
@@ -644,6 +669,12 @@ impl DeviceAccessOperation {
             Self::OrganizationPolicyRead
             | Self::OrganizationPolicyReplace
             | Self::OrganizationPolicyDelete => "/api/v1/orgs/{org}/policies/{id}",
+            Self::OrganizationGrantCreate | Self::OrganizationGrantList => {
+                "/api/v1/orgs/{org}/grants"
+            }
+            Self::OrganizationGrantRead
+            | Self::OrganizationGrantReplace
+            | Self::OrganizationGrantDelete => "/api/v1/orgs/{org}/grants/{id}",
             Self::UserCaList | Self::UserCaCreate => "/api/v1/orgs/{org}/certificate-authorities",
             Self::UserCaRead => "/api/v1/orgs/{org}/certificate-authorities/{id}",
             Self::UserCaKrlRead => "/api/v1/orgs/{org}/certificate-authorities/{id}/krl",

@@ -177,6 +177,16 @@ pub enum AccountBrowserAccessOperation {
     OrganizationPolicyReplace,
     /// `DELETE /api/v1/orgs/{org}/policies/{id}`.
     OrganizationPolicyDelete,
+    /// `GET /api/v1/orgs/{org}/grants`.
+    OrganizationGrantList,
+    /// `GET /api/v1/orgs/{org}/grants/{id}`.
+    OrganizationGrantRead,
+    /// `POST /api/v1/orgs/{org}/grants`.
+    OrganizationGrantCreate,
+    /// `PUT /api/v1/orgs/{org}/grants/{id}`.
+    OrganizationGrantReplace,
+    /// `DELETE /api/v1/orgs/{org}/grants/{id}`.
+    OrganizationGrantDelete,
     /// Authenticated self-family termination, never anonymous access.
     Logout,
 }
@@ -192,7 +202,7 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 48] = [
+    pub const ALL: [Self; 53] = [
         Self::AccountProfileRead,
         Self::AuditEventList,
         Self::AuditRangeVerify,
@@ -240,6 +250,11 @@ impl AccountBrowserAccessOperation {
         Self::OrganizationPolicyCreate,
         Self::OrganizationPolicyReplace,
         Self::OrganizationPolicyDelete,
+        Self::OrganizationGrantList,
+        Self::OrganizationGrantRead,
+        Self::OrganizationGrantCreate,
+        Self::OrganizationGrantReplace,
+        Self::OrganizationGrantDelete,
         Self::Logout,
     ];
     /// Exact authenticated requirement; neither branch establishes authority.
@@ -311,12 +326,17 @@ impl AccountBrowserAccessOperation {
             Self::OrganizationGroupList
             | Self::OrganizationGroupRead
             | Self::OrganizationPolicyList
-            | Self::OrganizationPolicyRead => AccountBrowserAccessRequirement::AnyScope(&[
+            | Self::OrganizationPolicyRead
+            | Self::OrganizationGrantList
+            | Self::OrganizationGrantRead => AccountBrowserAccessRequirement::AnyScope(&[
                 AccountBrowserAccessScope::PoliciesRead,
             ]),
             Self::OrganizationPolicyCreate
             | Self::OrganizationPolicyReplace
-            | Self::OrganizationPolicyDelete => AccountBrowserAccessRequirement::AnyScope(&[
+            | Self::OrganizationPolicyDelete
+            | Self::OrganizationGrantCreate
+            | Self::OrganizationGrantReplace
+            | Self::OrganizationGrantDelete => AccountBrowserAccessRequirement::AnyScope(&[
                 AccountBrowserAccessScope::PoliciesWrite,
             ]),
             Self::Logout => AccountBrowserAccessRequirement::SelfSessionTermination,
@@ -346,7 +366,9 @@ impl AccountBrowserAccessOperation {
             | Self::OrganizationGroupList
             | Self::OrganizationGroupRead
             | Self::OrganizationPolicyList
-            | Self::OrganizationPolicyRead => "GET",
+            | Self::OrganizationPolicyRead
+            | Self::OrganizationGrantList
+            | Self::OrganizationGrantRead => "GET",
             Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
@@ -357,6 +379,7 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryRouteCreate
             | Self::OrganizationGroupCreate
             | Self::OrganizationPolicyCreate
+            | Self::OrganizationGrantCreate
             | Self::Logout => "POST",
             Self::OrganizationUpdate | Self::TeamMemberUpdate => "PATCH",
             Self::TeamInvitationRevoke
@@ -366,13 +389,15 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryAccessProfileDelete
             | Self::InventoryRouteDelete
             | Self::OrganizationGroupDelete
-            | Self::OrganizationPolicyDelete => "DELETE",
+            | Self::OrganizationPolicyDelete
+            | Self::OrganizationGrantDelete => "DELETE",
             Self::InventoryHostReplace
             | Self::InventoryHostGroupReplace
             | Self::InventoryAccessProfileReplace
             | Self::InventoryRouteReplace
             | Self::OrganizationGroupReplace
-            | Self::OrganizationPolicyReplace => "PUT",
+            | Self::OrganizationPolicyReplace
+            | Self::OrganizationGrantReplace => "PUT",
         }
     }
     /// Canonical router template, never an untrusted URL.
@@ -428,6 +453,12 @@ impl AccountBrowserAccessOperation {
             Self::OrganizationPolicyRead
             | Self::OrganizationPolicyReplace
             | Self::OrganizationPolicyDelete => "/api/v1/orgs/{org}/policies/{id}",
+            Self::OrganizationGrantList | Self::OrganizationGrantCreate => {
+                "/api/v1/orgs/{org}/grants"
+            }
+            Self::OrganizationGrantRead
+            | Self::OrganizationGrantReplace
+            | Self::OrganizationGrantDelete => "/api/v1/orgs/{org}/grants/{id}",
             Self::Logout => "/api/v1/auth/accounts/browser/logout",
         }
     }
@@ -450,6 +481,7 @@ impl AccountBrowserAccessOperation {
                 | Self::InventoryRouteCreate
                 | Self::OrganizationGroupCreate
                 | Self::OrganizationPolicyCreate
+                | Self::OrganizationGrantCreate
         )
     }
 }

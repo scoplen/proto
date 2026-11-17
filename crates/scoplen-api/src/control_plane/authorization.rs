@@ -4,13 +4,16 @@
 use std::{collections::HashSet, str::FromStr};
 
 use cedar_policy::{
-    Authorizer, Decision, Entities, Entity, EntityUid, EvalResult, PolicySet, Request, Schema,
-    ValidationMode, Validator,
+    Authorizer, Decision, Entities, Entity, EntityUid, EvalResult, PolicySet, Request, Response,
+    Schema, ValidationMode, Validator,
 };
 use scoplen_model::validate_uuid_v7;
 use uuid::Uuid;
 
 use super::{BUILT_IN_POLICIES, CEDAR_SCHEMA};
+
+mod grants;
+pub use grants::{ConnectAuthorization, OrganizationHostGrant};
 
 /// A current authenticated Account and selected Organization membership.
 ///
@@ -116,6 +119,17 @@ impl OrganizationAuthorizer {
         request: &Request,
         entities: &Entities,
     ) -> Result<Decision, OrganizationAuthorizationError> {
+        self.evaluate(trusted, request, entities, &self.policies)
+            .map(|response| response.decision())
+    }
+
+    fn evaluate(
+        &self,
+        trusted: &OrganizationAuthorizationContext,
+        request: &Request,
+        entities: &Entities,
+        policies: &PolicySet,
+    ) -> Result<Response, OrganizationAuthorizationError> {
         if trusted.organization != self.organization {
             return Err(OrganizationAuthorizationError::BoundaryViolation);
         }
@@ -176,11 +190,11 @@ impl OrganizationAuthorizer {
             }
             _ => {}
         }
-        let response = Authorizer::new().is_authorized(&request, &self.policies, &entities);
+        let response = Authorizer::new().is_authorized(&request, policies, &entities);
         if response.diagnostics().errors().next().is_some() {
             return Err(OrganizationAuthorizationError::Evaluation);
         }
-        Ok(response.decision())
+        Ok(response)
     }
 }
 

@@ -735,79 +735,109 @@
       "expected": "{\"scopes\":[\"policies:write\"],\"writerReceipt\":false}"
     },
     {
+      "id": "account-browser-operation-122-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/grants\"}",
+      "expected": "{\"scopes\":[\"policies:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-123-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/grants\"}",
+      "expected": "{\"scopes\":[\"policies:write\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-124-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/grants/{id}\"}",
+      "expected": "{\"scopes\":[\"policies:read\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-125-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"PUT\",\"path\":\"/api/v1/orgs/{org}/grants/{id}\"}",
+      "expected": "{\"scopes\":[\"policies:write\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-126-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/grants/{id}\"}",
+      "expected": "{\"scopes\":[\"policies:write\"],\"writerReceipt\":false}"
+    },
+    {
       "id": "account-browser-operation-logout-v1",
       "kind": "account.browser.operation.logout",
       "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/accounts/browser/logout\"}",
       "expected": "self-session-termination"
     },
     {
-      "id": "account-browser-operation-123-v1",
+      "id": "account-browser-operation-128-v1",
       "kind": "account.browser.operation",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events\"}",
       "expected": "{\"scopes\":[\"audit:read\"],\"writerReceipt\":false}"
     },
     {
-      "id": "account-browser-operation-124-v1",
+      "id": "account-browser-operation-129-v1",
       "kind": "account.browser.operation",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/audit-events/verify\"}",
       "expected": "{\"scopes\":[\"audit:read\"],\"writerReceipt\":false}"
     },
     {
-      "id": "account-browser-operation-denied-125-v1",
+      "id": "account-browser-operation-denied-130-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/accounts/me/devices\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-126-v1",
+      "id": "account-browser-operation-denied-131-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"GET\",\"path\":\"/sync/v1/keys\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-127-v1",
+      "id": "account-browser-operation-denied-132-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/certificates\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-128-v1",
+      "id": "account-browser-operation-denied-133-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"POST\",\"path\":\"/api/v1/auth/operator/logout\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-129-v1",
+      "id": "account-browser-operation-denied-134-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/trust-records\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-130-v1",
+      "id": "account-browser-operation-denied-135-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/snippets\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-131-v1",
+      "id": "account-browser-operation-denied-136-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/gateway-networks\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-132-v1",
+      "id": "account-browser-operation-denied-137-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/admin/accounts\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-133-v1",
+      "id": "account-browser-operation-denied-138-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/\"}",
       "expected": "rejected"
     },
     {
-      "id": "account-browser-operation-denied-134-v1",
+      "id": "account-browser-operation-denied-139-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"get\",\"path\":\"/api/v1/accounts/me\"}",
       "expected": "rejected"

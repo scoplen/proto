@@ -13,7 +13,8 @@ mod authorization;
 
 pub use crate::ProblemDetails;
 pub use authorization::{
-    OrganizationAuthorizationContext, OrganizationAuthorizationError, OrganizationAuthorizer,
+    ConnectAuthorization, OrganizationAuthorizationContext, OrganizationAuthorizationError,
+    OrganizationAuthorizer, OrganizationHostGrant,
 };
 
 /// Canonical Cedar entity/action schema for the control plane.
