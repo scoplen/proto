@@ -9,8 +9,8 @@ const authored = JSON.parse(await readFile(new URL("v1.yaml", import.meta.url), 
 test("D-140 exact four endpoints reuse shared shapes and independent principal", async () => {
   const expected = accountBrowserDefinitions();
   assert.equal(Object.keys(expected.paths).length, 4);
-  assert.equal(expected.operations.length, 52);
-  assert.equal(new Set(expected.operations.map(({ method, path }) => `${method} ${path}`)).size, 52);
+  assert.equal(expected.operations.length, 58);
+  assert.equal(new Set(expected.operations.map(({ method, path }) => `${method} ${path}`)).size, 58);
   const types = generateAccountBrowserTypes(authored);
   assert.match(types, /AccountBrowserPasswordLoginRequest = AccountPasswordLoginRequest/);
   assert.match(types, /AccountBrowserLogoutResponse = OperatorLogoutResponse/);
@@ -18,9 +18,9 @@ test("D-140 exact four endpoints reuse shared shapes and independent principal",
   const declarations = await readFile(new URL("types.ts", import.meta.url), "utf8");
   for (const name of ["AccountBrowserPasswordOptionsRequest", "AccountBrowserPasswordOptionsResponse", "AccountBrowserPasswordLoginRequest", "AccountBrowserPasswordLoginResponse", "AccountBrowserRefreshRequest", "AccountBrowserRefreshResponse", "AccountBrowserLogoutRequest", "AccountBrowserLogoutResponse", "initialAccountBrowserScope", "accountBrowserOperations"]) assert.ok(index.includes(name), `public export ${name}`);
   for (const name of Object.keys(expected.schemas)) assert.ok(declarations.includes(`${name}: ${name};`), `components schema ${name}`);
-  assert.equal(initialAccountBrowserScope.split(" ").length, 11);
+  assert.equal(initialAccountBrowserScope.split(" ").length, 14);
   for (const kind of ["trust-records", "snippets", "gateway-networks", "certificate-authorities", "certificates", "/sync/", "/admin/", "devices"]) assert.ok(expected.operations.every(operation => !operation.path.includes(kind)));
-  assert.equal(expected.operations.filter(operation => operation.writerReceipt).length, 7);
+  assert.equal(expected.operations.filter(operation => operation.writerReceipt).length, 10);
 });
 
 test("D-140 generator rejects byte limits, profile, cookie, scopes and writer drift", () => {

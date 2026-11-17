@@ -14,6 +14,7 @@ import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
 import { generateAccountBrowserTypes } from "./generate-account-browser.mjs";
 import { generateAuditTypes } from "./generate-audit.mjs";
 import { generateGrantTypes } from "./generate-grants.mjs";
+import { generateAccessRequestTypes } from "./generate-access-requests.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -614,7 +615,14 @@ const grantFinish = completeAuditTypes.indexOf(grantEnd, grantBegin + grantStart
 if (grantBegin < 0 || grantFinish < 0) throw new Error("types.ts lacks Grants markers");
 const completeGrantTypes = completeAuditTypes.slice(0, grantBegin + grantStart.length) +
   generateGrantTypes(document) + completeAuditTypes.slice(grantFinish);
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeGrantTypes]];
+const accessRequestStart = "// BEGIN GENERATED AccessRequests\n";
+const accessRequestEnd = "// END GENERATED AccessRequests";
+const accessRequestBegin = completeGrantTypes.indexOf(accessRequestStart);
+const accessRequestFinish = completeGrantTypes.indexOf(accessRequestEnd, accessRequestBegin + accessRequestStart.length);
+if (accessRequestBegin < 0 || accessRequestFinish < 0) throw new Error("types.ts lacks AccessRequests markers");
+const completeAccessRequestTypes = completeGrantTypes.slice(0, accessRequestBegin + accessRequestStart.length) +
+  generateAccessRequestTypes(document) + completeGrantTypes.slice(accessRequestFinish);
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeAccessRequestTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");
