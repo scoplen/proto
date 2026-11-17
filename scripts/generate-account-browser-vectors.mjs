@@ -35,8 +35,8 @@ const operation = (method, path, scopes, writerReceipt = false) => add(`operatio
 operation("GET", "/api/v1/accounts/me", ["account:read"]);
 for (const [method, suffix, scopes] of [["POST", "", ["orgs:create"]], ["GET", "", ["orgs:read"]], ["GET", "/{org}", ["orgs:read"]], ["PATCH", "/{org}", ["orgs:write"]]]) operation(method, `/api/v1/orgs${suffix}`, scopes);
 for (const [method, path, scopes] of [["GET", "invitations", ["teams:manage"]], ["POST", "invitations", ["teams:manage"]], ["GET", "invitations/{invitation}", ["teams:join", "teams:manage"]], ["DELETE", "invitations/{invitation}", ["teams:manage"]], ["POST", "invitations/{invitation}/accept", ["teams:join"]], ["GET", "members", ["teams:manage"]], ["GET", "members/{membership}", ["teams:manage"]], ["PATCH", "members/{membership}", ["teams:manage"]], ["DELETE", "members/{membership}", ["teams:join", "teams:manage"]], ["POST", "dissolve", ["teams:manage"]]]) operation(method, `/api/v1/orgs/{org}/${path}`, scopes);
-for (const kind of ["hosts", "host-groups", "access-profiles", "routes", "groups", "policies"]) for (const [method, suffix] of [["GET", ""], ["POST", ""], ["GET", "/{id}"], ["PUT", "/{id}"], ["DELETE", "/{id}"]]) {
-  const scope = kind === "groups" ? method === "GET" ? "policies:read" : "teams:manage" : kind === "policies" ? method === "GET" ? "policies:read" : "policies:write" : method === "GET" ? "inventory:read" : "inventory:write";
+for (const kind of ["hosts", "host-groups", "access-profiles", "routes", "groups", "policies", "grants"]) for (const [method, suffix] of [["GET", ""], ["POST", ""], ["GET", "/{id}"], ["PUT", "/{id}"], ["DELETE", "/{id}"]]) {
+  const scope = kind === "groups" ? method === "GET" ? "policies:read" : "teams:manage" : ["policies", "grants"].includes(kind) ? method === "GET" ? "policies:read" : "policies:write" : method === "GET" ? "inventory:read" : "inventory:write";
   operation(method, `/api/v1/orgs/{org}/${kind}${suffix}`, [scope], method === "POST");
 }
 add("operation-logout", "operation.logout", { method: "POST", path: "/api/v1/auth/accounts/browser/logout" }, "self-session-termination");

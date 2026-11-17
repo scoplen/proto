@@ -22,6 +22,7 @@ pub mod certificate_reference;
 pub mod control_plane;
 pub mod gateway;
 pub mod gateway_ticket;
+pub mod grant;
 pub mod group_policy;
 #[cfg(feature = "internal-grpc")]
 pub mod internal_grpc;
