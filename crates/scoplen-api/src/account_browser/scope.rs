@@ -7,11 +7,17 @@ use uuid::Uuid;
 use super::AccountBrowserCodecError;
 
 /// Exact initial browser ceiling in byte order; never current membership or Cedar authority.
-pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 /// Registered coarse browser permissions, independent of Device/Operator registries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccountBrowserAccessScope {
+    /// Decide a currently routed non-self access request.
+    AccessRequestsDecide,
+    /// Read own or currently routed access requests.
+    AccessRequestsRead,
+    /// Check, create or cancel the caller's access request.
+    AccessRequestsWrite,
     /// Exact `account:read` browser permission.
     AccountRead,
     /// Exact `audit:read` browser permission; current `view_audit` remains mandatory.
@@ -38,7 +44,10 @@ pub enum AccountBrowserAccessScope {
 
 impl AccountBrowserAccessScope {
     /// Every scope in canonical byte order.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 14] = [
+        Self::AccessRequestsDecide,
+        Self::AccessRequestsRead,
+        Self::AccessRequestsWrite,
         Self::AccountRead,
         Self::AuditRead,
         Self::InventoryRead,
@@ -55,6 +64,9 @@ impl AccountBrowserAccessScope {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::AccessRequestsDecide => "access-requests:decide",
+            Self::AccessRequestsRead => "access-requests:read",
+            Self::AccessRequestsWrite => "access-requests:write",
             Self::AccountRead => "account:read",
             Self::AuditRead => "audit:read",
             Self::InventoryRead => "inventory:read",
@@ -83,6 +95,18 @@ impl AccountBrowserAccessScope {
 /// The explicit initial browser operation whitelist; a scope alone cannot add routes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccountBrowserAccessOperation {
+    /// `POST /api/v1/orgs/{org}/access-requests/check`.
+    AccessRequestCheck,
+    /// `POST /api/v1/orgs/{org}/access-requests`.
+    AccessRequestCreate,
+    /// `GET /api/v1/orgs/{org}/access-requests`.
+    AccessRequestList,
+    /// `GET /api/v1/orgs/{org}/access-requests/{id}`.
+    AccessRequestRead,
+    /// `POST /api/v1/orgs/{org}/access-requests/{id}/decisions`.
+    AccessRequestDecide,
+    /// `POST /api/v1/orgs/{org}/access-requests/{id}/cancel`.
+    AccessRequestCancel,
     /// `GET /api/v1/accounts/me`.
     AccountProfileRead,
     /// `GET /api/v1/orgs/{org}/audit-events`.
@@ -202,7 +226,13 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 53] = [
+    pub const ALL: [Self; 59] = [
+        Self::AccessRequestCheck,
+        Self::AccessRequestCreate,
+        Self::AccessRequestList,
+        Self::AccessRequestRead,
+        Self::AccessRequestDecide,
+        Self::AccessRequestCancel,
         Self::AccountProfileRead,
         Self::AuditEventList,
         Self::AuditRangeVerify,
@@ -261,6 +291,19 @@ impl AccountBrowserAccessOperation {
     #[must_use]
     pub const fn requirement(self) -> AccountBrowserAccessRequirement {
         match self {
+            Self::AccessRequestCheck | Self::AccessRequestCreate | Self::AccessRequestCancel => {
+                AccountBrowserAccessRequirement::AnyScope(&[
+                    AccountBrowserAccessScope::AccessRequestsWrite,
+                ])
+            }
+            Self::AccessRequestList | Self::AccessRequestRead => {
+                AccountBrowserAccessRequirement::AnyScope(&[
+                    AccountBrowserAccessScope::AccessRequestsRead,
+                ])
+            }
+            Self::AccessRequestDecide => AccountBrowserAccessRequirement::AnyScope(&[
+                AccountBrowserAccessScope::AccessRequestsDecide,
+            ]),
             Self::AuditEventList | Self::AuditRangeVerify => {
                 AccountBrowserAccessRequirement::AnyScope(&[AccountBrowserAccessScope::AuditRead])
             }
@@ -346,7 +389,9 @@ impl AccountBrowserAccessOperation {
     #[must_use]
     pub const fn http_method(self) -> &'static str {
         match self {
-            Self::AuditEventList
+            Self::AccessRequestList
+            | Self::AccessRequestRead
+            | Self::AuditEventList
             | Self::AuditRangeVerify
             | Self::AccountProfileRead
             | Self::OrganizationList
@@ -369,7 +414,11 @@ impl AccountBrowserAccessOperation {
             | Self::OrganizationPolicyRead
             | Self::OrganizationGrantList
             | Self::OrganizationGrantRead => "GET",
-            Self::OrganizationCreate
+            Self::AccessRequestCheck
+            | Self::AccessRequestCreate
+            | Self::AccessRequestDecide
+            | Self::AccessRequestCancel
+            | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
             | Self::TeamDissolve
@@ -404,6 +453,13 @@ impl AccountBrowserAccessOperation {
     #[must_use]
     pub const fn route_template(self) -> &'static str {
         match self {
+            Self::AccessRequestCheck => "/api/v1/orgs/{org}/access-requests/check",
+            Self::AccessRequestCreate | Self::AccessRequestList => {
+                "/api/v1/orgs/{org}/access-requests"
+            }
+            Self::AccessRequestRead => "/api/v1/orgs/{org}/access-requests/{id}",
+            Self::AccessRequestDecide => "/api/v1/orgs/{org}/access-requests/{id}/decisions",
+            Self::AccessRequestCancel => "/api/v1/orgs/{org}/access-requests/{id}/cancel",
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AuditEventList => "/api/v1/orgs/{org}/audit-events",
             Self::AuditRangeVerify => "/api/v1/orgs/{org}/audit-events/verify",
@@ -475,7 +531,10 @@ impl AccountBrowserAccessOperation {
     pub const fn uses_browser_writer_receipt(self) -> bool {
         matches!(
             self,
-            Self::InventoryHostCreate
+            Self::AccessRequestCreate
+                | Self::AccessRequestDecide
+                | Self::AccessRequestCancel
+                | Self::InventoryHostCreate
                 | Self::InventoryHostGroupCreate
                 | Self::InventoryAccessProfileCreate
                 | Self::InventoryRouteCreate

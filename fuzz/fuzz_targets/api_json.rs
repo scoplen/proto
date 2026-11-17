@@ -3,6 +3,11 @@
 
 use libfuzzer_sys::fuzz_target;
 use scoplen_api::ProblemDetails;
+use scoplen_api::access_request::{
+    AccessRequestCheckRequest, AccessRequestCheckResponse, AccessRequestCreateRequest,
+    AccessRequestDecisionRequest, AccessRequestFields, AccessRequestListQuery, AccessRequestPage,
+    AccessRequestResource,
+};
 use scoplen_api::account_admission::{
     AccountBootstrapSnapshot, AccountCommittedConfirmation, AccountDeviceAdmissionPayload,
     AccountDeviceAdmissionRequest, AccountPasswordLoginRequest, AccountPasswordLoginResponse,
@@ -105,6 +110,13 @@ fuzz_target!(|bytes: &[u8]| {
         );
     }
     round_trip!(AccountProfile, bytes);
+    round_trip!(AccessRequestFields, bytes);
+    round_trip!(AccessRequestCheckRequest, bytes);
+    round_trip!(AccessRequestCheckResponse, bytes);
+    round_trip!(AccessRequestCreateRequest, bytes);
+    round_trip!(AccessRequestDecisionRequest, bytes);
+    round_trip!(AccessRequestResource, bytes);
+    round_trip!(AccessRequestPage, bytes);
     round_trip!(UserCaCreateRequest, bytes);
     round_trip!(UserCaResource, bytes);
     round_trip!(UserCaPage, bytes);
@@ -159,6 +171,9 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(AuditPage, bytes);
     round_trip!(AuditVerification, bytes);
     if let Ok(parameters) = serde_json::from_slice::<Vec<(String, String)>>(bytes) {
+        let _ = AccessRequestListQuery::from_parameters(
+            parameters.iter().map(|(name, value)| (name.as_str(), value.as_str())),
+        );
         let _ = AuditListQuery::from_parameters(
             parameters.iter().map(|(name, value)| (name.as_str(), value.as_str())),
         );

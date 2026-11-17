@@ -12,7 +12,7 @@
       "id": "auth-scope-initial-v1",
       "kind": "auth.scope.initial",
       "input": "first-party-device",
-      "expected": "account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
+      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
     },
     {
       "id": "auth-scope-token-account-read-v1",
@@ -1393,6 +1393,126 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/grants/\"}",
       "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-jit-token-access-requests-decide-v1",
+      "kind": "auth.scope.token",
+      "input": "access-requests:decide",
+      "expected": "access-requests:decide"
+    },
+    {
+      "id": "auth-scope-jit-token-access-requests-read-v1",
+      "kind": "auth.scope.token",
+      "input": "access-requests:read",
+      "expected": "access-requests:read"
+    },
+    {
+      "id": "auth-scope-jit-token-access-requests-write-v1",
+      "kind": "auth.scope.token",
+      "input": "access-requests:write",
+      "expected": "access-requests:write"
+    },
+    {
+      "id": "auth-scope-jit-route-235-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/check\"}",
+      "expected": "access-requests:write"
+    },
+    {
+      "id": "auth-scope-jit-route-236-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/access-requests\"}",
+      "expected": "access-requests:write"
+    },
+    {
+      "id": "auth-scope-jit-route-237-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/access-requests\"}",
+      "expected": "access-requests:read"
+    },
+    {
+      "id": "auth-scope-jit-route-238-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
+      "expected": "access-requests:read"
+    },
+    {
+      "id": "auth-scope-jit-route-239-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/{id}/decisions\"}",
+      "expected": "access-requests:decide"
+    },
+    {
+      "id": "auth-scope-jit-route-240-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/{id}/cancel\"}",
+      "expected": "access-requests:write"
+    },
+    {
+      "id": "auth-scope-jit-refuse-241-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-jit-refuse-242-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-jit-refuse-243-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/check\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-jit-refuse-244-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-jit-refuse-245-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/access-requests/{id}/cancel\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-jit-present-access-requests-decide-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"access-requests:decide access-requests:read access-requests:write\",\"required\":\"access-requests:decide\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-jit-old-family-access-requests-decide-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read policies:write teams:manage\",\"required\":\"access-requests:decide\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-jit-present-access-requests-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"access-requests:decide access-requests:read access-requests:write\",\"required\":\"access-requests:read\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-jit-old-family-access-requests-read-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read policies:write teams:manage\",\"required\":\"access-requests:read\"}",
+      "expected": "missing"
+    },
+    {
+      "id": "auth-scope-jit-present-access-requests-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"access-requests:decide access-requests:read access-requests:write\",\"required\":\"access-requests:write\"}",
+      "expected": "present"
+    },
+    {
+      "id": "auth-scope-jit-old-family-access-requests-write-v1",
+      "kind": "auth.scope.contains",
+      "input": "{\"scope\":\"account:read policies:write teams:manage\",\"required\":\"access-requests:write\"}",
+      "expected": "missing"
     }
   ]
 }

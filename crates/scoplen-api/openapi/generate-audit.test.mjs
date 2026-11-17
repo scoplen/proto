@@ -19,6 +19,7 @@ test("D-144 has only two read-only audit routes and immutable sequence schemas",
   }
   assert.equal(document.components.schemas.Verification, undefined);
   assert.ok(document.components.schemas.AuditResource.properties.kind.enum.includes("grant"));
+  assert.ok(document.components.schemas.AuditResource.properties.kind.enum.includes("access_request"));
   assert.deepEqual(document.components.schemas.AuditEvent.required, ["organization_id", "sequence", "occurred_at", "category", "event_class", "outcome", "actor_account_id", "actor_device_id", "actor_browser_family_id", "resource", "previous_hash", "event_hash"]);
   assert.deepEqual(document.components.schemas.AuditVerification.required, ["organization_id", "from_sequence", "to_sequence", "checked_events", "valid", "failure_sequence", "previous_hash", "head_hash", "checkpoint", "uncheckpointed_from_sequence"]);
   assert.equal(document.components.schemas.AuditEvent.properties.id, undefined);
@@ -35,6 +36,7 @@ test("D-144 generator rejects syntax, scope, byte, coverage and mutable surface 
     d => { d.paths["/orgs/{org}/audit-events/{id}"] = { get: {} }; },
     d => { d.components.schemas.Verification = { type: "boolean" }; },
     d => { d.components.schemas.AuditResource.properties.kind.enum = d.components.schemas.AuditResource.properties.kind.enum.filter(kind => kind !== "grant"); },
+    d => { d.components.schemas.AuditResource.properties.kind.enum = d.components.schemas.AuditResource.properties.kind.enum.filter(kind => kind !== "access_request"); },
     d => { d.components.schemas.AuditEvent.properties.sequence.type = "number"; },
     d => { d.components.schemas.AuditEvent.required.pop(); },
     d => { d.components.schemas.AuditCheckpoint.properties.signature.maxLength = 88; },

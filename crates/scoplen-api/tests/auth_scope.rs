@@ -98,6 +98,9 @@ fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
     assert_eq!(
         tokens,
         [
+            "access-requests:decide",
+            "access-requests:read",
+            "access-requests:write",
             "account:read",
             "audit:read",
             "ca:read",
@@ -142,7 +145,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 89);
+    assert_eq!(routes.len(), 95);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {
@@ -153,6 +156,43 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
         assert!(!operation.has_accepted_scope("teams:* orgs:write owner"));
         assert!(operation.has_accepted_scope("teams:join"));
         assert!(operation.has_accepted_scope("teams:manage"));
+    }
+}
+
+#[test]
+fn access_request_operations_have_separate_exact_permissions_without_legacy_crud() {
+    for (operation, scope) in [
+        (DeviceAccessOperation::AccessRequestCheck, DeviceAccessScope::AccessRequestsWrite),
+        (DeviceAccessOperation::AccessRequestCreate, DeviceAccessScope::AccessRequestsWrite),
+        (DeviceAccessOperation::AccessRequestList, DeviceAccessScope::AccessRequestsRead),
+        (DeviceAccessOperation::AccessRequestRead, DeviceAccessScope::AccessRequestsRead),
+        (DeviceAccessOperation::AccessRequestDecide, DeviceAccessScope::AccessRequestsDecide),
+        (DeviceAccessOperation::AccessRequestCancel, DeviceAccessScope::AccessRequestsWrite),
+    ] {
+        assert_eq!(operation.accepted_scopes(), &[scope]);
+        assert!(!operation.has_accepted_scope("policies:write teams:manage inventory:read"));
+        for other in [
+            DeviceAccessScope::AccessRequestsRead,
+            DeviceAccessScope::AccessRequestsWrite,
+            DeviceAccessScope::AccessRequestsDecide,
+        ] {
+            assert_eq!(operation.has_accepted_scope(other.as_str()), other == scope);
+        }
+    }
+    for (method, suffix) in [
+        ("PATCH", "/{id}"),
+        ("DELETE", "/{id}"),
+        ("GET", "/check"),
+        ("POST", "/{id}"),
+        ("DELETE", "/{id}/cancel"),
+    ] {
+        assert!(
+            DeviceAccessOperation::from_route(
+                method,
+                &format!("/api/v1/orgs/{{org}}/access-requests{suffix}")
+            )
+            .is_none()
+        );
     }
 }
 

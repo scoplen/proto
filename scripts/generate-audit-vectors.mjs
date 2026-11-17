@@ -94,6 +94,18 @@ export function auditVectors() {
     reject(`grant-kind-${kind}`, "event", { ...grantEvents[0], resource: { kind, id: grantId } });
     reject(`grant-filter-${kind}`, "query", JSON.stringify([["filter", `resource eq "${kind}:${grantId}"`]]));
   }
+  const requestEvents = ["created", "approved", "denied", "cancelled", "expired"].map((action, index) => ({ ...event,
+    sequence: String(BigInt(event.sequence) - BigInt(index)), category: "authorization",
+    event_class: `organization.access_request_${action}`, resource: { kind: "access_request", id: grantId },
+    ...(action === "expired" ? { actor_account_id: null, actor_browser_family_id: null } : {}),
+  }));
+  requestEvents.forEach(value => json(value.event_class.replace("organization.", ""), "event", value));
+  json("access-request-page", "page", { items: requestEvents, next_cursor: null });
+  add("access-request-resource-filter", "query", JSON.stringify([["filter", `resource eq "access_request:${grantId}"`]]), "accepted");
+  for (const kind of ["AccessRequest", "access-requests", "access_request_extra"]) {
+    reject(`access-request-kind-${kind}`, "event", { ...requestEvents[0], resource: { kind, id: grantId } });
+    reject(`access-request-filter-${kind}`, "query", JSON.stringify([["filter", `resource eq "${kind}:${grantId}"`]]));
+  }
   return vectors;
 }
 

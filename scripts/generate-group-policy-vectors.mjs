@@ -92,6 +92,7 @@ const canonical = value => {
   if (value.group) result.group = value.group;
   if (value.membership) result.membership = value.membership;
   result.organization = value.organization;
+  if (value.request_access) result.request_access = sorted(value.request_access);
   if (value.view) result.view = [...value.view].sort((a, b) => a.type - b.type || a.id.localeCompare(b.id)).map(item => ({ id: item.id, type: item.type }));
   return result;
 };
@@ -102,6 +103,9 @@ const generate = value => {
     action = "view_inventory";
     const selectors = canonical(value).view;
     target = `(${Object.keys(kinds).map(Number).filter(type => selectors.some(item => item.type === type)).map(type => `(resource is ${kinds[type]} && [${selectors.filter(item => item.type === type).map(item => `${kinds[type]}::"${item.id}"`).join(", ")}].contains(resource))`).join(" || ")})`;
+  } else if (value.request_access) {
+    action = "request_access";
+    target = `resource is Host && [${sorted(value.request_access).map(value => `Host::"${value}"`).join(", ")}].contains(resource)`;
   } else {
     action = "connect";
     const selectors = [];
@@ -120,6 +124,9 @@ const simple = [
   ["escaped-connect", { organization: id(1), group: id(3), connect: { hosts: [id(5)], host_groups: [id(8)], remote_user: 'deploy\\"é' } }],
   ["maximum-view", { organization: id(1), membership: id(2), view: Array.from({ length: 64 }, (_, i) => ({ type: 1, id: id(i + 10) })) }],
   ["maximum-connect", { organization: id(1), group: id(3), connect: { hosts: Array.from({ length: 64 }, (_, i) => id(i + 10)), host_groups: Array.from({ length: 64 }, (_, i) => id(i + 100)), remote_user: "x".repeat(255) } }],
+  ["member-request", { organization: id(1), membership: id(2), request_access: [id(6), id(5)] }],
+  ["group-request", { organization: id(1), group: id(3), request_access: [id(5)] }],
+  ["maximum-request", { organization: id(1), membership: id(2), request_access: Array.from({ length: 64 }, (_, i) => id(i + 10)) }],
 ];
 for (const [name, value] of simple) {
   add(`simple-${name}`, "simple_input", value, json(canonical(value)));
@@ -134,8 +141,19 @@ for (const [name, value] of [
   ["empty-connect", { organization: id(1), group: id(3), connect: { hosts: [], host_groups: [], remote_user: "deploy" } }],
   ["control-user", { organization: id(1), group: id(3), connect: { hosts: [id(5)], host_groups: [], remote_user: "bad\nuser" } }],
   ["excess-view", { ...base, view: Array.from({ length: 65 }, (_, i) => ({ type: 1, id: id(i + 10) })) }],
+  ["request-and-view", { ...base, request_access: [id(5)] }],
+  ["request-and-connect", { ...simple[3][1], request_access: [id(5)] }],
+  ["empty-request", { organization: id(1), membership: id(2), request_access: [] }],
+  ["duplicate-request", { organization: id(1), membership: id(2), request_access: [id(5), id(5)] }],
+  ["excess-request", { organization: id(1), membership: id(2), request_access: Array.from({ length: 65 }, (_, i) => id(i + 10)) }],
+  ["request-object", { organization: id(1), membership: id(2), request_access: { hosts: [id(5)] } }],
+  ["request-host-group", { organization: id(1), membership: id(2), request_access: [{ type: 5, id: id(5) }] }],
+  ["request-username", { organization: id(1), membership: id(2), request_access: [id(5)], remote_user: "operator" }],
+  ["request-null", { organization: id(1), membership: id(2), request_access: null }],
+  ["request-uuid-case", { organization: id(1), membership: id(2), request_access: [id(5).toUpperCase()] }],
 ]) add(`simple-${name}`, "simple_input", value);
 add("simple-float-type", "simple_input", json(base).replace('"type":7', '"type":7.0'));
+add("simple-duplicate-request-key", "simple_input", json(simple[8][1]).replace(/}$/, `,"request_access":["${id(5)}"]}`));
 
 const outputs = [["vectors/group-policy.json", json({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2) + "\n"]];
 for (const vector of vectors.filter(value => !["group_policy.profile", "group_policy.connect_source_ip"].includes(value.kind))) outputs.push([`fuzz/corpus/api_json/seed-${vector.id}`, vector.input]);

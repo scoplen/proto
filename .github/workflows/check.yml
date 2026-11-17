@@ -35,13 +35,14 @@ jobs:
         run: node --test crates/scoplen-api/openapi/generate-account-admission.test.mjs
       - name: Test Account browser OpenAPI contract checks
         run: node --test crates/scoplen-api/openapi/generate-account-browser.test.mjs
-      - name: Test browser, audit, Grant and user-CA public TypeScript contracts
+      - name: Test browser, audit, Grant, access request and user-CA public TypeScript contracts
         run: >-
           npm exec --yes --package typescript@5.9.3 --
           tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler
           crates/scoplen-api/openapi/account-browser.types.test.ts
           crates/scoplen-api/openapi/audit.types.test.ts
           crates/scoplen-api/openapi/grants.types.test.ts
+          crates/scoplen-api/openapi/access-requests.types.test.ts
           crates/scoplen-api/openapi/user-ca-krl.types.test.ts
       - name: Check Account browser vectors and parser bounds
         run: node scripts/generate-account-browser-vectors.mjs --check
@@ -67,6 +68,12 @@ jobs:
         run: node scripts/generate-grant-vectors.mjs --check
       - name: Test independent Grant vector producer
         run: node --test scripts/generate-grant-vectors.test.mjs
+      - name: Test single-Host access request OpenAPI contract checks
+        run: node --test crates/scoplen-api/openapi/generate-access-requests.test.mjs
+      - name: Check single-Host access request vectors and parser bounds
+        run: node scripts/generate-access-request-vectors.mjs --check
+      - name: Test independent access request vector producer
+        run: node --test scripts/generate-access-request-vectors.test.mjs
       - name: Check group and policy vectors
         run: node scripts/generate-group-policy-vectors.mjs --check
       - name: Test independent group and policy vector producer
