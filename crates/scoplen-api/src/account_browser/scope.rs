@@ -143,6 +143,8 @@ pub enum AccountBrowserAccessOperation {
     TeamDissolve,
     /// `GET /api/v1/orgs/{org}/hosts`.
     InventoryHostList,
+    /// Atomic initial Organization Host/default-Login CSV batch.
+    InventoryImportCreate,
     /// `GET /api/v1/orgs/{org}/hosts/{id}`.
     InventoryHostRead,
     /// `POST /api/v1/orgs/{org}/hosts`.
@@ -226,7 +228,7 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 59] = [
+    pub const ALL: [Self; 60] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -251,6 +253,7 @@ impl AccountBrowserAccessOperation {
         Self::TeamMemberRemove,
         Self::TeamDissolve,
         Self::InventoryHostList,
+        Self::InventoryImportCreate,
         Self::InventoryHostRead,
         Self::InventoryHostCreate,
         Self::InventoryHostReplace,
@@ -352,7 +355,8 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryRouteRead => AccountBrowserAccessRequirement::AnyScope(&[
                 AccountBrowserAccessScope::InventoryRead,
             ]),
-            Self::InventoryHostCreate
+            Self::InventoryImportCreate
+            | Self::InventoryHostCreate
             | Self::InventoryHostReplace
             | Self::InventoryHostDelete
             | Self::InventoryHostGroupCreate
@@ -422,6 +426,7 @@ impl AccountBrowserAccessOperation {
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
             | Self::TeamDissolve
+            | Self::InventoryImportCreate
             | Self::InventoryHostCreate
             | Self::InventoryHostGroupCreate
             | Self::InventoryAccessProfileCreate
@@ -477,6 +482,7 @@ impl AccountBrowserAccessOperation {
                 "/api/v1/orgs/{org}/members/{membership}"
             }
             Self::TeamDissolve => "/api/v1/orgs/{org}/dissolve",
+            Self::InventoryImportCreate => "/api/v1/orgs/{org}/inventory/imports",
             Self::InventoryHostList | Self::InventoryHostCreate => "/api/v1/orgs/{org}/hosts",
             Self::InventoryHostRead | Self::InventoryHostReplace | Self::InventoryHostDelete => {
                 "/api/v1/orgs/{org}/hosts/{id}"
@@ -534,6 +540,7 @@ impl AccountBrowserAccessOperation {
             Self::AccessRequestCreate
                 | Self::AccessRequestDecide
                 | Self::AccessRequestCancel
+                | Self::InventoryImportCreate
                 | Self::InventoryHostCreate
                 | Self::InventoryHostGroupCreate
                 | Self::InventoryAccessProfileCreate

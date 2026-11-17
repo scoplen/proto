@@ -181,6 +181,8 @@ pub enum DeviceAccessOperation {
     TeamDissolve,
     /// Host List in the current Organization.
     InventoryHostList,
+    /// Atomic initial Organization Host/default-Login CSV batch.
+    InventoryImportCreate,
     /// Host Read in the current Organization.
     InventoryHostRead,
     /// Host Create in the current Organization.
@@ -325,7 +327,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 95] = [
+    pub const ALL: [Self; 96] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -351,6 +353,7 @@ impl DeviceAccessOperation {
         Self::TeamMemberRemove,
         Self::TeamDissolve,
         Self::InventoryHostList,
+        Self::InventoryImportCreate,
         Self::InventoryHostRead,
         Self::InventoryHostCreate,
         Self::InventoryHostReplace,
@@ -428,6 +431,10 @@ impl DeviceAccessOperation {
     /// The matching scope does not select a role or establish authority. For example, the
     /// `teams:join` read path still requires the invitation's fixed recipient Account.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Keep the exact operation/scope registry in one exhaustive match."
+    )]
     pub const fn accepted_scopes(self) -> &'static [DeviceAccessScope] {
         match self {
             Self::AccessRequestCheck | Self::AccessRequestCreate | Self::AccessRequestCancel => {
@@ -486,7 +493,8 @@ impl DeviceAccessOperation {
             | Self::InventorySnippetRead
             | Self::InventoryGatewayNetworkList
             | Self::InventoryGatewayNetworkRead => &[DeviceAccessScope::InventoryRead],
-            Self::InventoryHostCreate
+            Self::InventoryImportCreate
+            | Self::InventoryHostCreate
             | Self::InventoryHostReplace
             | Self::InventoryHostDelete
             | Self::InventoryAccessProfileCreate
@@ -624,6 +632,7 @@ impl DeviceAccessOperation {
             | Self::OrganizationGroupCreate
             | Self::OrganizationPolicyCreate
             | Self::OrganizationGrantCreate
+            | Self::InventoryImportCreate
             | Self::InventoryHostCreate
             | Self::InventoryAccessProfileCreate
             | Self::InventoryRouteCreate
@@ -673,6 +682,7 @@ impl DeviceAccessOperation {
                 "/api/v1/orgs/{org}/members/{membership}"
             }
             Self::TeamDissolve => "/api/v1/orgs/{org}/dissolve",
+            Self::InventoryImportCreate => "/api/v1/orgs/{org}/inventory/imports",
             Self::InventoryHostList | Self::InventoryHostCreate => "/api/v1/orgs/{org}/hosts",
             Self::InventoryHostRead | Self::InventoryHostReplace | Self::InventoryHostDelete => {
                 "/api/v1/orgs/{org}/hosts/{id}"

@@ -39,6 +39,7 @@ for (const kind of ["hosts", "host-groups", "access-profiles", "routes", "groups
   const scope = kind === "groups" ? method === "GET" ? "policies:read" : "teams:manage" : ["policies", "grants"].includes(kind) ? method === "GET" ? "policies:read" : "policies:write" : method === "GET" ? "inventory:read" : "inventory:write";
   operation(method, `/api/v1/orgs/{org}/${kind}${suffix}`, [scope], method === "POST");
 }
+operation("POST", "/api/v1/orgs/{org}/inventory/imports", ["inventory:write"], true);
 add("operation-logout", "operation.logout", { method: "POST", path: "/api/v1/auth/accounts/browser/logout" }, "self-session-termination");
 for (const suffix of ["", "/verify"]) operation("GET", `/api/v1/orgs/{org}/audit-events${suffix}`, ["audit:read"]);
 for (const [method, suffix, scope, receipt] of [

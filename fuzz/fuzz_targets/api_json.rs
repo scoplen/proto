@@ -44,6 +44,7 @@ use scoplen_api::inventory::{
     InventoryResource, InventoryType,
 };
 use scoplen_api::krl::UserCaKrl;
+use scoplen_api::inventory_import::{InventoryImportRequest, InventoryImportResult, parse_inventory_csv};
 use scoplen_api::operator_auth::{
     OperatorLoginFinishRequest, OperatorLoginOptionsRequest, OperatorLoginOptionsResponse,
     OperatorLogoutRequest, OperatorLogoutResponse, OperatorSetupFinishRequest,
@@ -95,6 +96,9 @@ macro_rules! canonical_round_trip {
 }
 
 fuzz_target!(|bytes: &[u8]| {
+    let _ = parse_inventory_csv(bytes);
+    round_trip!(InventoryImportRequest, bytes);
+    round_trip!(InventoryImportResult, bytes);
     let ca = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea";
     if let Ok(snapshot) = UserCaKrl::from_bytes(bytes, ca) {
         let encoded = snapshot.to_bytes().expect("validated KRL encodes");

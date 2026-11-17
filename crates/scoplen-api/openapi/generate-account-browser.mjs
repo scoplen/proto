@@ -8,6 +8,7 @@ export function accountBrowserOperations() {
   const operations = [];
   const add = (method, path, scopes, writerReceipt = false) => operations.push({ method, path, scopes, writerReceipt });
   add("GET", "/api/v1/accounts/me", ["account:read"]);
+  add("POST", "/api/v1/orgs/{org}/inventory/imports", ["inventory:write"], true);
   for (const suffix of ["", "/verify"]) add("GET", `/api/v1/orgs/{org}/audit-events${suffix}`, ["audit:read"]);
   add("POST", "/api/v1/orgs", ["orgs:create"]);
   add("GET", "/api/v1/orgs", ["orgs:read"]);

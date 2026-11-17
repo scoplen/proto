@@ -28,6 +28,7 @@ pub mod group_policy;
 #[cfg(feature = "internal-grpc")]
 pub mod internal_grpc;
 pub mod inventory;
+pub mod inventory_import;
 pub mod krl;
 pub mod operator_auth;
 pub mod operator_logout_reference;

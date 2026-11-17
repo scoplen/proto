@@ -8,6 +8,14 @@ under Apache-2.0.
 
 ## Status
 
+D-151 adds `scoplen_api::inventory_import`: one bounded strict CSV parser, flat ordered
+Host/default-Login batch messages, conversion to the existing typed inventory creates and
+request-bound result validation. Its independent reference peer models current Device/browser
+writers, real Cedar authority, atomic objects/sequences/revision/audit/receipt publication and
+explicit original confirmation after uncertain outcomes. The shared preview JSON invokes that
+same parser and allocates no identities. These shared
+checks do not establish production HTTP/storage, Console interaction or import-to-SSH acceptance.
+
 Maturity: Exploration. Maintenance: Active. The repository baseline (roadmap gate S1) and K-1 object
 model (S2) are complete. K-2 gate S3 remains Incomplete under D-125 through D-127; the password
 bootstrap implementation below does not complete the pending scoped recovery and retirement work.
