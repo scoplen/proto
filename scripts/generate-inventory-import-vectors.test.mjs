@@ -20,6 +20,13 @@ test("D-151 independent producer is deterministic and checks drift/stale parser 
     for (const kind of ["csv", "request", "result", "binding", "bound"]) assert.ok(vectors.some(value => value.kind === `inventory.import.${kind}`));
     const utf8 = await readFile(join(root, "fuzz/corpus/api_json/seed-inventory-import-utf8-v1")); assert.deepEqual(utf8, Buffer.from([255]));
     result = run("--check"); assert.equal(result.status, 0, result.stderr);
+    await writeFile(path, original.replaceAll("\n", "\r\n"));
+    result = run("--check"); assert.equal(result.status, 0, result.stderr);
+    const rawCsv = join(root, "fuzz/corpus/api_json/seed-inventory-import-csv-crlf-bom-v1");
+    const originalCsv = await readFile(rawCsv);
+    await writeFile(rawCsv, originalCsv.toString("utf8").replaceAll("\r\n", "\n"));
+    result = run("--check"); assert.notEqual(result.status, 0); assert.match(result.stderr, /D-151 stale output/);
+    await writeFile(rawCsv, originalCsv);
     const stale = join(root, "fuzz/corpus/api_json/seed-inventory-import-stale"); await writeFile(stale, "{}");
     assert.notEqual(run("--check").status, 0); assert.equal(run().status, 0); await assert.rejects(readFile(stale), { code: "ENOENT" });
     await writeFile(path, original + " "); assert.notEqual(run("--check").status, 0);

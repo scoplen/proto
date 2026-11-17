@@ -73,7 +73,11 @@ for (const entry of await readdir(new URL("fuzz/corpus/api_json/", root), { with
 }
 for (const [path, expected] of outputs) {
   const url = new URL(path, root);
-  if (process.argv.includes("--check")) { const actual = await readFile(url); if (!actual.equals(expected)) throw new Error(`D-151 stale output: ${path}`); }
+  if (process.argv.includes("--check")) {
+    const bytes = await readFile(url);
+    const actual = path.endsWith(".json") ? Buffer.from(bytes.toString("utf8").replaceAll("\r\n", "\n")) : bytes;
+    if (!actual.equals(expected)) throw new Error(`D-151 stale output: ${path}`);
+  }
   else await writeFile(url, expected);
 }
 console.log(`validated ${vectors.length} independent D-151 vectors and ${outputs.length - 1} seeds`);
