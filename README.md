@@ -88,6 +88,14 @@ per Account lifetime, including registration. Public submission fixtures exercis
 with an explicitly lower owned-fixture ceiling; they do not run 65,536 successful admissions.
 The multi-owner fixture deliberately repeats keys under the existing registration reference
 behavior; compliant clients still generate independent fresh keys.
+Password change shares that Account lock, operation uniqueness and receipt ceiling with
+registration and admission; its one-use password capability is shared with admission. It checks
+current certified Device possession and the complete snapshot before replacing only the credential
+and password wrapper. Scripted rollback, stale-state denial, unknown commits, restart and repeated
+changes preserve K-4 artifacts
+and enrolled Devices. Its original-key confirmation remains historical after later credential,
+root, Account-status or Device changes. The separate rate peer includes the sixth endpoint's
+source, decoded-Device and verified-Account admission without joining the two storage images.
 Exact confirmation checks only the original receipt, Account root and fresh original-Device proof,
 including after current credentials, roots, status or revocations changed. It grants no new Device
 authority and can never fall through to submission after deletion. Audit/commit faults and restart
@@ -117,8 +125,8 @@ with no atomic combined restore.
 strictly decodes the username before keyed private admission, then reuses the existing current
 salt/synthetic-salt and one-use attempt transaction. Existing, unknown, inactive and retired
 usernames share the same shape and quotas; neither issuance entry clears failure streaks.
-Registration, password login and Device admission still require caller admission through their
-original low-level reference APIs. These entries supply no native HTTP or production
+Registration, password login, Device admission and password change still require caller admission
+through their original low-level reference APIs. These entries supply no native HTTP or production
 authentication integration.
 Production retention, migration and operator warning delivery remain consumer work.
 The codecs check complete body/decoded bounds, canonical values, public K-2/K-4 signatures,
