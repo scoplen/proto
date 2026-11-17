@@ -1339,6 +1339,60 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/certificate-authorities/{id}/krl?all=true\"}",
       "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-grants-list-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/grants\"}",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-operation-grants-read-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/grants/{id}\"}",
+      "expected": "policies:read"
+    },
+    {
+      "id": "auth-scope-operation-grants-create-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/grants\"}",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-operation-grants-replace-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/grants/{id}\"}",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-operation-grants-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/grants/{id}\"}",
+      "expected": "policies:write"
+    },
+    {
+      "id": "auth-scope-operation-grants-patch-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/grants/{id}\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-grants-case-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"get\",\"route_template\":\"/api/v1/orgs/{org}/grants\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-grants-query-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/grants?limit=1\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-operation-grants-trailing-slash-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/grants/\"}",
+      "expected": "unmapped"
     }
   ]
 }
