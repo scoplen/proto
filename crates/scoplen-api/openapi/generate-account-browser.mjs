@@ -23,9 +23,9 @@ export function accountBrowserOperations() {
     ["DELETE", "members/{membership}", ["teams:join", "teams:manage"]],
     ["POST", "dissolve", ["teams:manage"]],
   ]) add(method, `/api/v1/orgs/{org}/${path}`, scopes);
-  for (const kind of ["hosts", "host-groups", "access-profiles", "routes", "groups", "policies"]) {
+  for (const kind of ["hosts", "host-groups", "access-profiles", "routes", "groups", "policies", "grants"]) {
     for (const [method, suffix] of [["GET", ""], ["GET", "/{id}"], ["POST", ""], ["PUT", "/{id}"], ["DELETE", "/{id}"]]) {
-      const scope = ["groups", "policies"].includes(kind)
+      const scope = ["groups", "policies", "grants"].includes(kind)
         ? method === "GET" ? "policies:read" : kind === "groups" ? "teams:manage" : "policies:write"
         : method === "GET" ? "inventory:read" : "inventory:write";
       add(method, `/api/v1/orgs/{org}/${kind}${suffix}`, [scope], method === "POST");

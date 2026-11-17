@@ -147,6 +147,32 @@ it supplies no production projection, database or chain verifier. Production
 query projection, current authorization, bounded original-chain verification, storage and the
 Console workflow remain consumer outcomes.
 
+D-147's `grant` module defines named-Membership, single-Host Grants with an exact remote user
+and explicit whole-second UTC start/end, including mandatory null for no expiry. Typed
+POST/PUT, Resource and Page codecs preserve the 4 KiB item and 2 MiB page boundaries. Device
+and Account-browser operations reuse policy scopes; no Grant establishes asset visibility.
+Generic Grant writes and PATCH are replaced before Stable. The closed Audit resource-kind
+registry gains `grant`, which older readers reject; this is a breaking finite-enum extension.
+
+`OrganizationHostGrant::policy_set` creates the canonical Cedar template and linked permit
+through typed JSON values. `OrganizationAuthorizer::authorize_connect` preserves the existing
+tenant, identity, graph and error boundary and returns an optional exclusive Grant cutoff.
+Independent ordinary permits have no Grant-specific cap; applicable Grants are alternatives,
+so the latest expiry wins, and a nonexpiring match has no Grant-specific cap. Explicit forbids
+and evaluation errors still deny. Consumers use this helper only for explicit `hosts`, require
+every target and take the earliest per-Host cap alongside existing request/CA limits.
+`host_groups` stays on the ordinary-policy path, without Host Grants. The consumer still owns
+transaction-current rows, irreversible withdrawal on member departure, original create and
+certificate receipts, production storage/signing/audit, Console and actual HTTPS/SSH acceptance.
+Withdrawal stops future issuance under that authority; already issued certificates expire
+normally. Syntax and reference-peer success establish none of those production outcomes.
+
+`grant::reference` models current Device/browser management authority, immutable original create
+receipts, strong preconditions, equal-field replacement, atomic audit/revision outcomes and
+uncertain commits. Its trusted lifecycle snapshots retain withdrawal through restoration and
+rejoining; current rows feed the public connect helper and participate in Host deletion guards.
+It provides no HTTP authentication, durable database transaction or production audit chain.
+
 D-140's independent `account_browser` module supplies four bounded endpoint wrappers over the
 existing password/options, transient login, browser-session and true-only logout shapes.
 It rejects recursive duplicate names and native bootstrap/admission/refresh fields, validates

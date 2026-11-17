@@ -186,7 +186,7 @@ fn profiles_are_separate_and_secrets_are_redacted() {
     ] {
         assert!(AccountBrowserAccessScope::from_token(forbidden).is_none());
     }
-    assert_eq!(DeviceAccessOperation::ALL.len(), 84);
+    assert_eq!(DeviceAccessOperation::ALL.len(), 89);
     let krl = DeviceAccessOperation::UserCaKrlRead;
     assert!(
         AccountBrowserAccessOperation::from_route(krl.http_method(), krl.route_template())

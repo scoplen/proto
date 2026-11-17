@@ -82,6 +82,18 @@ export function auditVectors() {
   for (const key of Object.keys(checkpoints[0])) { const missing = { ...checkpoints[0] }; delete missing[key]; reject(`checkpoint-missing-${key}`, "verification", { ...verification, checkpoint: missing }); }
   for (const [key, value] of [["checked_events", "0"], ["failure_sequence", "1"], ["previous_hash", null], ["head_hash", "1".repeat(64)], ["uncheckpointed_from_sequence", "1"]]) reject(`verification-${key}`, "verification", { ...verification, [key]: value });
   reject("verification-signature-padding", "verification", { ...verification, checkpoint: { ...checkpoints[0], signature: checkpoints[0].signature + "==" } });
+  const grantId = "0191d3e0-8000-7000-8000-000000000004";
+  const grantEvents = ["deleted", "updated", "created"].map((action, index) => ({ ...event,
+    sequence: String(BigInt(event.sequence) - BigInt(index)), category: "authorization",
+    event_class: `organization.grants_${action}`, resource: { kind: "grant", id: grantId },
+  }));
+  grantEvents.forEach(value => json(value.event_class.replace("organization.", ""), "event", value));
+  json("grant-page", "page", { items: grantEvents, next_cursor: null });
+  add("grant-resource-filter", "query", JSON.stringify([["filter", `resource eq "grant:${grantId}"`]]), "accepted");
+  for (const kind of ["Grant", "grants", "grant-extra"]) {
+    reject(`grant-kind-${kind}`, "event", { ...grantEvents[0], resource: { kind, id: grantId } });
+    reject(`grant-filter-${kind}`, "query", JSON.stringify([["filter", `resource eq "${kind}:${grantId}"`]]));
+  }
   return vectors;
 }
 

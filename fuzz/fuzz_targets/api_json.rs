@@ -29,6 +29,7 @@ use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceRe
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
 };
+use scoplen_api::grant::{GrantCreateRequest, GrantPage, GrantReplaceRequest, GrantResource};
 use scoplen_api::group_policy::{
     GroupCreateRequest, GroupPage, GroupReplaceRequest, GroupResource, PolicyCreateRequest,
     PolicyPage, PolicyReplaceRequest, PolicyResource, SimpleRuleInput,
@@ -120,6 +121,10 @@ fuzz_target!(|bytes: &[u8]| {
     canonical_round_trip!(PolicyResource, bytes);
     canonical_round_trip!(PolicyPage, bytes);
     canonical_round_trip!(SimpleRuleInput, bytes);
+    round_trip!(GrantCreateRequest, bytes);
+    round_trip!(GrantReplaceRequest, bytes);
+    round_trip!(GrantResource, bytes);
+    round_trip!(GrantPage, bytes);
     if let Ok(input) = SimpleRuleInput::from_json(bytes) {
         let source = input.generate().expect("validated simple rule generates");
         let canonical = SimpleRuleInput::from_json(&input.to_json().expect("rule encodes"))

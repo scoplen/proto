@@ -13,6 +13,7 @@ import { generateInventoryTypes } from "./generate-inventory.mjs";
 import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
 import { generateAccountBrowserTypes } from "./generate-account-browser.mjs";
 import { generateAuditTypes } from "./generate-audit.mjs";
+import { generateGrantTypes } from "./generate-grants.mjs";
 
 const root = new URL(".", import.meta.url);
 const document = JSON.parse(await readFile(new URL("v1.yaml", root), "utf8"));
@@ -606,7 +607,14 @@ const auditFinish = completeBrowserTypes.indexOf(auditEnd, auditBegin + auditSta
 if (auditBegin < 0 || auditFinish < 0) throw new Error("types.ts lacks Audit markers");
 const completeAuditTypes = completeBrowserTypes.slice(0, auditBegin + auditStart.length) +
   generateAuditTypes(document) + completeBrowserTypes.slice(auditFinish);
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeAuditTypes]];
+const grantStart = "// BEGIN GENERATED Grants\n";
+const grantEnd = "// END GENERATED Grants";
+const grantBegin = completeAuditTypes.indexOf(grantStart);
+const grantFinish = completeAuditTypes.indexOf(grantEnd, grantBegin + grantStart.length);
+if (grantBegin < 0 || grantFinish < 0) throw new Error("types.ts lacks Grants markers");
+const completeGrantTypes = completeAuditTypes.slice(0, grantBegin + grantStart.length) +
+  generateGrantTypes(document) + completeAuditTypes.slice(grantFinish);
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeGrantTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

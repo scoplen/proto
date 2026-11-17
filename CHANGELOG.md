@@ -4,6 +4,16 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-147's typed named-member Host Grants, exact Device/Account-browser policy-scope
+  operations and generated API declarations. Add canonical Cedar template linking and a
+  connect result with the applicable exclusive Grant expiry while retaining ordinary permits,
+  mandatory guards, explicit forbids and evaluation errors. Host Grants apply only to explicit
+  Host issuance. Replace provisional generic Grant/PATCH declarations and extend the closed
+  Audit resource-kind registry with `grant` before Stable. Add reference behavior for original
+  receipts, irreversible withdrawal, current authority and uncertain mutation outcomes.
+  Production Grant storage, lifecycle, bounded signing and Console workflows remain separate
+  consumer outcomes.
+
 - Add D-144's bounded immutable Organization audit Event/Page/query/range/result codecs,
   exact decimal sequences, reversible millisecond timestamps and request/response binding.
   Preserve the existing checkpoint payload and interval-only signature coverage; validate

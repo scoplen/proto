@@ -40,6 +40,9 @@ pub enum OrganizationReferenceError {
     /// The request or supplied fixture metadata is invalid.
     #[error("invalid organization request")]
     InvalidRequest,
+    /// Complete encoded request or response exceeds its endpoint-specific byte bound.
+    #[error("organization message exceeds its byte bound")]
+    TooLarge,
     /// Caller is not the current eligible Account/Device/key binding.
     #[error("organization authentication required")]
     AuthenticationRequired,
@@ -67,7 +70,7 @@ pub enum OrganizationReferenceError {
     /// No confirmed commit outcome.
     #[error("organization commit outcome unknown")]
     CommitOutcomeUnknown,
-    /// A name update may have committed; refresh before making another decision.
+    /// A replacement, update or withdrawal may have committed; refresh before another decision.
     #[error("organization update commit outcome unknown")]
     UpdateCommitOutcomeUnknown,
     /// No response arrived.
@@ -91,19 +94,26 @@ impl OrganizationReferenceError {
                 false,
                 "The team request is invalid. No team data changed. Correct the request before trying again.",
             ),
+            Self::TooLarge => (
+                413,
+                "organization.invalid_request",
+                false,
+                false,
+                "The message exceeds its byte bound. No team data changed. Reduce the request before trying again.",
+            ),
             Self::AuthenticationRequired => (
                 401,
                 "auth.authentication_required",
                 false,
                 false,
-                "The current Device could not be authenticated. No team data changed. Authenticate again.",
+                "The current session could not be authenticated. No team data changed. Authenticate again.",
             ),
             Self::Denied => (
                 403,
                 "policy.denied",
                 false,
                 false,
-                "The team operation is not permitted. No team data changed. Obtain a fresh permitted Device session or contact the deployment administrator.",
+                "The team operation is not permitted. No team data changed. Obtain a fresh permitted session or contact the deployment administrator.",
             ),
             Self::NotFound => (
                 404,
@@ -138,21 +148,21 @@ impl OrganizationReferenceError {
                 "organization.precondition_required",
                 false,
                 false,
-                "The team update requires its current entity tag. No team data changed. Refresh the team before editing.",
+                "The operation requires its current entity tag. No team data changed. Refresh the resource before editing.",
             ),
             Self::PreconditionFailed => (
                 412,
                 "organization.precondition_failed",
                 false,
                 false,
-                "The team changed since it was loaded. No team data changed. Refresh and review the current name before editing again.",
+                "The resource changed since it was loaded. No team data changed. Refresh and review it before editing again.",
             ),
             Self::UpdateCommitOutcomeUnknown => (
                 503,
                 "organization.commit_outcome_unknown",
                 true,
                 false,
-                "The team update could not be confirmed and may have changed data. Refresh and review the current team before deciding whether to submit another update.",
+                "The operation could not be confirmed and may have changed data. Refresh and review the current resource before deciding whether to submit another change.",
             ),
             Self::CommitOutcomeUnknown => (
                 503,
