@@ -219,6 +219,8 @@ PY"#;
         require_source_key(&socket, &user_key)?;
 
         let (mut connection, mut session) = first_hop(port, host_key).await?;
+        let mut forwarded_channels =
+            connection.take_forwarded_channels().ok_or("incoming forwarding queue was taken")?;
         let command = if case == Case::RemoveAll { REMOVE_ALL } else { SECOND_HOP };
         timeout(STEP_TIMEOUT, session.exec(true, command))
             .await
@@ -230,7 +232,7 @@ PY"#;
         let mut channels = 0;
         loop {
             tokio::select! {
-                forwarded = connection.next_forwarded_channel() => {
+                forwarded = forwarded_channels.recv() => {
                     let forwarded = forwarded.ok_or("forwarded channel queue closed")?;
                     channels += 1;
                     let store = source_agent(&socket, Arc::clone(&signs), Arc::clone(&removals))?;
