@@ -199,6 +199,43 @@ fn filters_and_pages_bind_exact_recorded_context() {
 }
 
 #[test]
+fn grant_audit_producers_and_filters_use_the_exact_recorded_resource() {
+    for action in ["created", "updated", "deleted"] {
+        let vector = vectors()
+            .vectors
+            .into_iter()
+            .find(|vector| vector.id == format!("audit-grants_{action}-v1"))
+            .unwrap();
+        let item = AuditEvent::from_json(vector.input.as_bytes()).unwrap();
+        assert_eq!(item.category, AuditCategory::Authorization);
+        assert_eq!(
+            item.event_class.as_deref(),
+            Some(format!("organization.grants_{action}").as_str())
+        );
+        assert_eq!(item.resource.as_ref().unwrap().kind, AuditResourceKind::Grant);
+        assert_eq!(item.to_json().unwrap(), vector.expected.as_bytes());
+        let target = item.resource.as_ref().unwrap().id;
+        let query = AuditListQuery::from_parameters([(
+            "filter",
+            format!("resource eq \"grant:{target}\"").as_str(),
+        )])
+        .unwrap();
+        assert!(query.filter.matches(&item).unwrap());
+        let mut changed = item.clone();
+        changed.resource.as_mut().unwrap().kind = AuditResourceKind::Policy;
+        assert!(!query.filter.matches(&changed).unwrap());
+        changed = item.clone();
+        changed.resource.as_mut().unwrap().id = Uuid::from_u128(target.as_u128() + 1);
+        assert!(!query.filter.matches(&changed).unwrap());
+        for kind in ["Grant", "grants", "grant-extra"] {
+            assert!(AuditFilter::parse(&format!("resource eq \"{kind}:{target}\"")).is_err());
+        }
+    }
+    assert_eq!("grant".parse::<AuditResourceKind>().unwrap(), AuditResourceKind::Grant);
+    assert_eq!(AuditResourceKind::Grant.as_str(), "grant");
+}
+
+#[test]
 fn complete_byte_budgets_include_ignored_extensions_and_original_item_whitespace() {
     let base = String::from_utf8(event().to_json().unwrap()).unwrap();
     let prefix = format!("{},\"extension\":\"", &base[..base.len() - 1]);

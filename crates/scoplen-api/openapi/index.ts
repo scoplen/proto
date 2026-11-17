@@ -2,6 +2,13 @@
 // Generated from v1.yaml by the Scoplen OpenAPI generator.
 export type { components, paths } from "./types";
 export type {
+  GrantFields,
+  GrantCreateRequest,
+  GrantReplaceRequest,
+  GrantResource,
+  GrantPage,
+  GrantListQuery,
+  GrantBodyTooLargeProblem,
   AuditResourceKind,
   AuditCategory,
   AuditOutcome,
