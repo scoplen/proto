@@ -1,0 +1,1338 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "access-request-fields-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}"
+    },
+    {
+      "id": "access-request-fields-whitespace-v1",
+      "kind": "access_request.fields",
+      "input": " \t{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}\n",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}"
+    },
+    {
+      "id": "access-request-fields-missing-v1",
+      "kind": "access_request.fields",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-null-v1",
+      "kind": "access_request.fields",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-duplicate-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"future\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-extension-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"future\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-check_request-whitespace-v1",
+      "kind": "access_request.check_request",
+      "input": " \t{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}\n",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-check_request-missing-v1",
+      "kind": "access_request.check_request",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-null-v1",
+      "kind": "access_request.check_request",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-duplicate-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"},\"future\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-extension-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"},\"future\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_response-v1",
+      "kind": "access_request.check_response",
+      "input": "{\"allowed\":true}",
+      "expected": "{\"allowed\":true}"
+    },
+    {
+      "id": "access-request-check_response-whitespace-v1",
+      "kind": "access_request.check_response",
+      "input": " \t{\"allowed\":true}\n",
+      "expected": "{\"allowed\":true}"
+    },
+    {
+      "id": "access-request-check_response-missing-v1",
+      "kind": "access_request.check_response",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_response-null-v1",
+      "kind": "access_request.check_response",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_response-duplicate-v1",
+      "kind": "access_request.check_response",
+      "input": "{\"allowed\":true,\"future\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_response-extension-v1",
+      "kind": "access_request.check_response",
+      "input": "{\"allowed\":true,\"future\":true}",
+      "expected": "{\"allowed\":true}"
+    },
+    {
+      "id": "access-request-create-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-create-whitespace-v1",
+      "kind": "access_request.create",
+      "input": " \t{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}\n",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-create-missing-v1",
+      "kind": "access_request.create",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-null-v1",
+      "kind": "access_request.create",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-duplicate-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"},\"future\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-extension-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"},\"future\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":\"approve\"}",
+      "expected": "{\"decision\":\"approve\"}"
+    },
+    {
+      "id": "access-request-decision-whitespace-v1",
+      "kind": "access_request.decision",
+      "input": " \t{\"decision\":\"approve\"}\n",
+      "expected": "{\"decision\":\"approve\"}"
+    },
+    {
+      "id": "access-request-decision-missing-v1",
+      "kind": "access_request.decision",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-null-v1",
+      "kind": "access_request.decision",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-duplicate-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":\"approve\",\"future\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-extension-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":\"approve\",\"future\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-whitespace-v1",
+      "kind": "access_request.resource",
+      "input": " \t{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}\n",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-missing-v1",
+      "kind": "access_request.resource",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-null-v1",
+      "kind": "access_request.resource",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-duplicate-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null},\"future\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-extension-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null},\"future\":true}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-page-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null}",
+      "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null}"
+    },
+    {
+      "id": "access-request-page-whitespace-v1",
+      "kind": "access_request.page",
+      "input": " \t{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null}\n",
+      "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null}"
+    },
+    {
+      "id": "access-request-page-missing-v1",
+      "kind": "access_request.page",
+      "input": "{}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-null-v1",
+      "kind": "access_request.page",
+      "input": "null",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-duplicate-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null,\"future\":{\"x\":1,\"x\":2}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-extension-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null,\"future\":true}",
+      "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null}"
+    },
+    {
+      "id": "access-request-fields-exact-user-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}"
+    },
+    {
+      "id": "access-request-fields-max-user-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}"
+    },
+    {
+      "id": "access-request-fields-long-user-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-empty-user-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-control-user-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"ab\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-min-duration-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\"}",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\"}"
+    },
+    {
+      "id": "access-request-fields-max-duration-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\"}",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\"}"
+    },
+    {
+      "id": "access-request-fields-zero-duration-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":0,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-long-duration-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86401,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-fraction-duration-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1.5,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-string-duration-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":\"300\",\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-exact-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \"}",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \"}"
+    },
+    {
+      "id": "access-request-fields-max-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}",
+      "expected": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}"
+    },
+    {
+      "id": "access-request-fields-long-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-empty-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-whitespace-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\" \\t\\n \"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-cr-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"go\\rnow\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-control-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"gonow\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-bad-host-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019BDAD6-B800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-wrong-host-version-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-4000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-missing-host-v1",
+      "kind": "access_request.fields",
+      "input": "{\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-null-host-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":null,\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-missing-remote_user-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-null-remote_user-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":null,\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-missing-duration_seconds-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-null-duration_seconds-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":null,\"reason\":\"Routine maintenance\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-missing-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-null-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-nested-extension-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"future\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-fields-duplicate-reason-v1",
+      "kind": "access_request.fields",
+      "input": "{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"reason\":\"other\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-exact-user-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-check_request-max-user-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-check_request-long-user-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-empty-user-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-control-user-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"ab\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-min-duration-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-check_request-max-duration-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-check_request-zero-duration-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":0,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-long-duration-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86401,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-fraction-duration-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1.5,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-string-duration-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":\"300\",\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-exact-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \"}}",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \"}}"
+    },
+    {
+      "id": "access-request-check_request-max-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}",
+      "expected": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}"
+    },
+    {
+      "id": "access-request-check_request-long-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-empty-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-whitespace-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\" \\t\\n \"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-cr-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"go\\rnow\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-control-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"gonow\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-bad-host-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019BDAD6-B800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-wrong-host-version-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-4000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-missing-host-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-null-host-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":null,\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-missing-remote_user-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-null-remote_user-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":null,\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-missing-duration_seconds-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-null-duration_seconds-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":null,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-missing-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-null-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-nested-extension-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"future\":true}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check_request-duplicate-reason-v1",
+      "kind": "access_request.check_request",
+      "input": "{\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"reason\":\"other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-exact-user-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-create-max-user-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-create-long-user-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-empty-user-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-control-user-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"ab\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-min-duration-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-create-max-duration-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\"}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\"}}"
+    },
+    {
+      "id": "access-request-create-zero-duration-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":0,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-long-duration-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86401,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-fraction-duration-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1.5,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-string-duration-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":\"300\",\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-exact-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \"}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \"}}"
+    },
+    {
+      "id": "access-request-create-max-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}"
+    },
+    {
+      "id": "access-request-create-long-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-empty-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-whitespace-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\" \\t\\n \"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-cr-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"go\\rnow\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-control-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"gonow\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-bad-host-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019BDAD6-B800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-wrong-host-version-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-4000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-missing-host-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-null-host-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":null,\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-missing-remote_user-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-null-remote_user-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":null,\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-missing-duration_seconds-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-null-duration_seconds-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":null,\"reason\":\"Routine maintenance\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-missing-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-null-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-nested-extension-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"future\":true}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-duplicate-reason-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"reason\":\"other\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-exact-user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\" é \",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-max-user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-long-user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-empty-user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-control-user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"ab\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-min-duration-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-max-duration-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86400,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-zero-duration-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":0,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-long-duration-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":86401,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-fraction-duration-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":1.5,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-string-duration-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":\"300\",\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-exact-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"  é\\n\\tgo  \",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-max-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-long-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-empty-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-whitespace-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\" \\t\\n \",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-cr-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"go\\rnow\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-control-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"gonow\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-bad-host-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019BDAD6-B800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-wrong-host-version-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-4000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-missing-host-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-null-host-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":null,\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-missing-remote_user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-null-remote_user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":null,\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-missing-duration_seconds-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-null-duration_seconds-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":null,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-missing-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-null-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":null,\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-nested-extension-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null,\"future\":true}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-duplicate-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"reason\":\"other\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-deny-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":\"deny\"}",
+      "expected": "{\"decision\":\"deny\"}"
+    },
+    {
+      "id": "access-request-decision-bad-null-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-bad-approved-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":\"approved\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-bad-Approve-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":\"Approve\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-bad-true-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":true}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-decision-reason-v1",
+      "kind": "access_request.decision",
+      "input": "{\"decision\":\"approve\",\"reason\":\"extra\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-check-response-false-v1",
+      "kind": "access_request.check_response",
+      "input": "{\"allowed\":false}",
+      "expected": "{\"allowed\":false}"
+    },
+    {
+      "id": "access-request-check-response-null-v1",
+      "kind": "access_request.check_response",
+      "input": "{\"allowed\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-expired-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"expired\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"expired\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-cancelled-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"cancelled\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"cancelled\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-revoked-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"revoked\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"revoked\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-future_state_2-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"future_state_2\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"future_state_2\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-denied-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"denied\",\"decision\":{\"outcome\":\"deny\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"denied\",\"decision\":{\"outcome\":\"deny\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-approved-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00Z\",\"valid_until\":\"2026-11-01T01:05:00Z\"}}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00Z\",\"valid_until\":\"2026-11-01T01:05:00Z\"}}}"
+    },
+    {
+      "id": "access-request-resource-pending-decision-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":{\"outcome\":\"deny\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-denied-grant-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"denied\",\"decision\":{\"outcome\":\"deny\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00Z\",\"valid_until\":\"2026-11-01T01:05:00Z\"}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-approved-no-grant-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-approved-deny-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"deny\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00Z\",\"valid_until\":\"2026-11-01T01:05:00Z\"}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-wrong-grant-start-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:01Z\",\"valid_until\":\"2026-11-01T01:05:01Z\"}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-wrong-grant-length-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00Z\",\"valid_until\":\"2026-11-01T01:05:01Z\"}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-fractional-grant-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00.0Z\",\"valid_until\":\"2026-11-01T01:05:00Z\"}}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-wrong-deadline-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456788Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-rounded-deadline-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-bad-status-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"Pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-long-status-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-weak-etag-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"W/\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-leap-day-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2000-02-28T23:59:59.123Z\",\"updated_at\":\"2000-02-28T23:59:59.123Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2000-02-29T23:59:59.1230Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2000-02-28T23:59:59.123Z\",\"updated_at\":\"2000-02-28T23:59:59.123Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2000-02-29T23:59:59.1230Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-century-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2100-02-28T00:00:00Z\",\"updated_at\":\"2100-02-28T00:00:00Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2100-03-01T00:00:00Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2100-02-28T00:00:00Z\",\"updated_at\":\"2100-02-28T00:00:00Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2100-03-01T00:00:00Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-year-zero-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"0000-02-28T00:00:00Z\",\"updated_at\":\"0000-02-28T00:00:00Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"0000-02-29T00:00:00Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"0000-02-28T00:00:00Z\",\"updated_at\":\"0000-02-28T00:00:00Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"0000-02-29T00:00:00Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-year-bound-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"9999-12-30T00:00:00Z\",\"updated_at\":\"9999-12-30T00:00:00Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"9999-12-31T00:00:00Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"9999-12-30T00:00:00Z\",\"updated_at\":\"9999-12-30T00:00:00Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"9999-12-31T00:00:00Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}"
+    },
+    {
+      "id": "access-request-resource-data-missing-requester_account_id-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-requester_membership_id-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-host-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-remote_user-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-duration_seconds-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-reason-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-expires_at-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-status-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"decision\":null,\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-decision-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"grant\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-data-missing-grant-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-decision-grant-extension-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\",\"future\":true},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00Z\",\"valid_until\":\"2026-11-01T01:05:00Z\",\"future\":true}}}",
+      "expected": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"approved\",\"decision\":{\"outcome\":\"approve\",\"actor_account_id\":\"019bdad6-b800-7000-8000-000000000009\",\"decided_at\":\"2026-11-01T01:00:00.987654321Z\"},\"grant\":{\"id\":\"019bdad6-b800-7000-8000-000000000010\",\"valid_from\":\"2026-11-01T01:00:00Z\",\"valid_until\":\"2026-11-01T01:05:00Z\"}}}"
+    },
+    {
+      "id": "access-request-page-empty-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[],\"next_cursor\":null}",
+      "expected": "{\"items\":[],\"next_cursor\":null}"
+    },
+    {
+      "id": "access-request-page-continuation-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000004\"}",
+      "expected": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000004\"}"
+    },
+    {
+      "id": "access-request-page-duplicate-items-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}},{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-reversed-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000005\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}},{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-wrong-cursor-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000099\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-empty-cursor-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[],\"next_cursor\":\"019bdad6-b800-7000-8000-000000000004\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-missing-cursor-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[]}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-create-original-overflow-v1",
+      "kind": "access_request.create",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"data\":{\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\"}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-resource-original-overflow-v1",
+      "kind": "access_request.resource",
+      "input": "{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-page-original-item-overflow-v1",
+      "kind": "access_request.page",
+      "input": "{\"items\":[{\"id\":\"019bdad6-b800-7000-8000-000000000004\",\"etag\":\"\\\"current\\\"\",\"created_at\":\"2026-11-01T00:00:00.123456789Z\",\"updated_at\":\"2026-11-01T00:00:00.123456789Z\",\"data\":{\"requester_account_id\":\"019bdad6-b800-7000-8000-000000000001\",\"requester_membership_id\":\"019bdad6-b800-7000-8000-000000000002\",\"host\":\"019bdad6-b800-7000-8000-000000000003\",\"remote_user\":\"deploy\",\"duration_seconds\":300,\"reason\":\"Routine maintenance\",\"expires_at\":\"2026-11-02T00:00:00.123456789Z\",\"status\":\"pending\",\"decision\":null,\"grant\":null},\"future\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}],\"next_cursor\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-query-mine-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"mine\"]]",
+      "expected": "{\"view\":\"mine\",\"limit\":50,\"cursor\":null}"
+    },
+    {
+      "id": "access-request-query-approvals-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"approvals\"],[\"limit\",\"1\"],[\"cursor\",\"019bdad6-b800-7000-8000-000000000004\"]]",
+      "expected": "{\"view\":\"approvals\",\"limit\":1,\"cursor\":\"019bdad6-b800-7000-8000-000000000004\"}"
+    },
+    {
+      "id": "access-request-query-missing-view-v1",
+      "kind": "access_request.query",
+      "input": "[]",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-query-duplicate-view-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"mine\"],[\"view\",\"mine\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-query-unknown-view-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"all\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-query-sort-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"mine\"],[\"sort\",\"id\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-query-bad-limit-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"mine\"],[\"limit\",\"501\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-query-duplicate-limit-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"mine\"],[\"limit\",\"1\"],[\"limit\",\"2\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "access-request-query-bad-cursor-v1",
+      "kind": "access_request.query",
+      "input": "[[\"view\",\"mine\"],[\"cursor\",\"opaque\"]]",
+      "expected": "rejected"
+    }
+  ]
+}
