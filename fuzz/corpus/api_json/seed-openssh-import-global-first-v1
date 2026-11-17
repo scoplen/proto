@@ -1,0 +1,7 @@
+User global
+HostName GLOBAL
+Port 2200
+Host a b
+User local
+HostName LOCAL
+Port 2201

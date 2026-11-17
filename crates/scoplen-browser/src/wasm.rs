@@ -105,3 +105,11 @@ pub fn simple_rule(input: &[u8]) -> Result<String, JsValue> {
 pub fn inventory_csv(input: &[u8]) -> Result<String, JsValue> {
     super::inventory_csv(input).map_err(|error| JsValue::from_str(&error.to_json()))
 }
+
+/// Prepare every Direct OpenSSH candidate without I/O or identity allocation.
+/// # Errors
+/// Throws only fixed file-error JSON; successful previews retain all blocked diagnostics.
+#[wasm_bindgen(js_name = parseInventoryOpenSsh)]
+pub fn inventory_openssh(input: &[u8]) -> Result<String, JsValue> {
+    super::inventory_openssh(input).map_err(|error| JsValue::from_str(&error.to_json()))
+}

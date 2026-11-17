@@ -1,0 +1,6 @@
+Host a axyb
+User op
+Host a*b
+Port 2201
+Host a*
+HostName STAR

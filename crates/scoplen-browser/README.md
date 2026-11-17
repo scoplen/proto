@@ -13,6 +13,26 @@ is omitted. Failures throw a JSON string containing fixed `kind` and optional on
 build; it verifies shared vectors and asset hashes without browser interaction. The browser
 Worker KAT independently covers this export in CI.
 
+D-153's `parseInventoryOpenSsh(Uint8Array): string` invokes the pure shared bounded
+`parse_inventory_openssh` preparer. Successful JSON is `{candidates:[...]}`, retaining every
+deduplicated literal alias in source order. Each entry is either
+`{status:"ready",candidate:1,fields:{name,address,port,username}}` or
+`{status:"blocked",diagnostic:{kind,line?,candidate,field?}}`; ordinals are one-based.
+File failures throw fixed JSON `{kind,line?}` and expose no selectable rows. Diagnostics
+contain no source values, keyword, filename or path, and Rust Debug also redacts Ready fields.
+Preview JSON intentionally contains successful typed fields. No identities, paths, environment,
+commands, DNS or network are accessed. Consumers must show every outcome and retain source
+order in an explicitly reviewed selection of Ready rows before creating D-151's unchanged
+atomic request. The existing CSV export and interpretation remain unchanged.
+
+Run `node scripts/check-browser-openssh.mjs` after building to test the actual web-target
+package in Node against independent positive/negative/boundary vectors. For an exact source
+archive, use `node scripts/check-browser-openssh.mjs --source-revision <full-proto-revision>
+--require-archive`; it verifies the source metadata, pinned tools, asset sizes and hashes.
+`node --test scripts/openssh-import-interop.test.mjs` compares representative supported
+synthetic inputs with installed `ssh -G -F` and records its version without connecting.
+These checks establish preparation, not rendered UI or independent consumer acceptance.
+
 ## Build
 
 The fixed tools are Rust **1.99.0**, target **wasm32-unknown-unknown** and **wasm-bindgen-cli
@@ -105,9 +125,11 @@ there is no weaker KDF, JavaScript crypto/template fallback or automatic passwor
 
 ```text
 cargo test --locked -p scoplen-browser --test public_contract
+cargo test --locked -p scoplen-browser --test openssh_contract
 cargo test --locked -p scoplen-api --no-default-features --lib
 node scripts/build-browser.mjs
 node scripts/check-browser.mjs
+node scripts/check-browser-openssh.mjs
 ```
 
 The native facade and packaged module use the public independent password, invitation and

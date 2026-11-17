@@ -4,6 +4,13 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-153's pure bounded Direct OpenSSH preparer, ordered typed Ready/Blocked candidates
+  and fixed source-free diagnostics. Reuse D-151 fields, complete typed-pair validation and
+  unchanged atomic request/receipt behavior. Add independent vectors/raw parser seeds,
+  installed nonconnecting OpenSSH comparisons and the thin `parseInventoryOpenSsh` WASM
+  export with public-facade and packaged Node checks. Production consumers and rendered
+  interaction remain separate acceptance work.
+
 - Add D-152's ordinary native Account password-change payload, request and historical
   confirmation, third challenge/proof kind and bounded endpoint declarations. Preserve
   existing registration/admission bytes and use a dedicated credential-generation result.

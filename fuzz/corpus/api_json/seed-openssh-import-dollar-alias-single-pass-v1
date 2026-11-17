@@ -1,0 +1,3 @@
+Host Cash$X
+HostName prefix-%h
+User op
