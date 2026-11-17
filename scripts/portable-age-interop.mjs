@@ -62,8 +62,9 @@ if (mode[0] === "--write-vectors") {
   console.log("Checked 3 standard Go age fixtures.");
 
   if (mode.length === 0) {
+    // age calibrates its cost bound at runtime; interop must measure optimized production code.
     const artifacts = invoke("cargo", [
-      "build", "--locked", "-p", "scoplen-crypto", "--features", "portable-export",
+      "build", "--release", "--locked", "-p", "scoplen-crypto", "--features", "portable-export",
       "--example", "portable_age_interop", "--message-format=json",
     ]).toString("utf8").trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
     const executable = artifacts.findLast((artifact) =>

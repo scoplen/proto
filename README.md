@@ -37,7 +37,9 @@ streams through the maintained age 0.11.5 library. Readers must validate JSON EO
 the complete age payload before a consumer commits imported state; writers must finish before
 publishing output. Neither codec supplies destination authorization, reference remapping,
 receipts, imported-trust consent or native import/export interaction. Independent portable
-vectors and Go age 1.3.2 interoperability cover the shared boundary.
+vectors and Go age 1.3.2 interoperability cover the shared boundary. The interoperability
+script builds its native helper in release mode so age calibrates its normal work factor and
+decryption bound on optimized code. Neither implementation lowers its production defaults.
 
 Historical whole-Account escrow exports do not implement D-126 Organization-scoped recovery;
 their removal remains roadmap work.
