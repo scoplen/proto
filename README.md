@@ -8,6 +8,12 @@ under Apache-2.0.
 
 ## Status
 
+D-166 adds one untested issuer draft per Organization. The shared `auth_connection_draft`
+module validates the exact HTTPS issuer, request conditions, response metadata and Organization
+binding. Its reference peer exercises current Device and Account-browser authority,
+create/cancel races in their serialized order, original-writer confirmations and atomic audit.
+Activation requires a separate, explicitly reviewed enterprise connection operation.
+
 D-153 adds `parse_inventory_openssh` and `inventory_openssh_preview` to the same shared
 `inventory_import` module. One explicitly selected bounded UTF-8 source produces every
 ordered Ready or Blocked candidate; the new `parseInventoryOpenSsh` browser export forwards
@@ -977,7 +983,7 @@ response continues to treat the token as opaque.
 
 `scoplen-api::auth` publishes D-107's `DeviceAccessScope`, `INITIAL_DEVICE_ACCESS_SCOPE`,
 and `DeviceAccessOperation`. Initial first-party device issuance uses exactly
-`account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage`; refresh may preserve or narrow its
+`access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage`. Refresh may preserve or narrow its
 recorded ceiling, never widen it. The operation registry requires router-owned canonical
 methods and route templates. Unknown protected routes fail closed for this device profile.
 `accepted_scopes()` exposes exact any-of scope alternatives and `has_accepted_scope()` checks

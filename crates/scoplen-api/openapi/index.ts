@@ -171,6 +171,8 @@ export type {
   AccountProfile,
   AccountDeviceStatements,
   AccountProfileData,
+  AuthConnectionDraftCreate,
+  AuthConnectionDraftResource,
   AuthChallengeRequest,
   AuthChallengeResponse,
   AuthDeviceRequest,

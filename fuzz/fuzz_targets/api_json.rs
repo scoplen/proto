@@ -31,6 +31,7 @@ use scoplen_api::auth::{
     AuthChallengeRequest, AuthChallengeResponse, AuthDeviceRequest, AuthJwks, AuthRefreshRequest,
     AuthTokenResponse, BrowserAuthRefreshRequest, BrowserAuthTokenResponse,
 };
+use scoplen_api::auth_connection_draft::{DraftCreate, DraftResource};
 use scoplen_api::certificate::{CertificateIssuanceRequest, CertificateIssuanceResponse};
 use scoplen_api::gateway_ticket::{
     GatewayTicketCodecError, GatewayTicketRequest, GatewayTicketResponse,
@@ -137,6 +138,21 @@ fuzz_target!(|bytes: &[u8]| {
     round_trip!(UserCaResource, bytes);
     round_trip!(UserCaPage, bytes);
     round_trip!(OrganizationCreateRequest, bytes);
+    round_trip!(DraftCreate, bytes);
+    let draft_org = "0191d3e0-8000-7000-8000-000000000001".parse().unwrap();
+    let draft_tag = Some("\"0191d3e0-8000-7000-8000-000000000002\"");
+    let read_draft = |body: &[u8]| {
+        DraftResource::from_http_json(
+            body,
+            draft_org,
+            draft_tag,
+            Some("no-store"),
+            Some("no-cache"),
+        )
+    };
+    if let Ok(draft) = read_draft(bytes) {
+        assert_eq!(read_draft(&draft.to_json().unwrap()), Ok(draft));
+    }
     round_trip!(OrganizationUpdateRequest, bytes);
     round_trip!(OrganizationResource, bytes);
     round_trip!(OrganizationPage, bytes);

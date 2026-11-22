@@ -40,6 +40,7 @@ jobs:
           npm exec --yes --package typescript@5.9.3 --
           tsc --strict --noEmit --target es2022 --module esnext --moduleResolution bundler
           crates/scoplen-api/openapi/account-browser.types.test.ts
+          crates/scoplen-api/openapi/auth-connection-draft.types.test.ts
           crates/scoplen-api/openapi/account-password-change.types.test.ts
           crates/scoplen-api/openapi/audit.types.test.ts
           crates/scoplen-api/openapi/grants.types.test.ts
@@ -48,6 +49,10 @@ jobs:
           crates/scoplen-api/openapi/user-ca-krl.types.test.ts
       - name: Check Account browser vectors and parser bounds
         run: node scripts/generate-account-browser-vectors.mjs --check
+      - name: Check Organization draft contracts and independent vectors
+        run: |
+          node scripts/generate-auth-connection-draft-vectors.mjs --check
+          node --test crates/scoplen-api/openapi/generate-auth-connection-draft.test.mjs
       - name: Check Organization audit vectors and parser bounds
         run: node scripts/generate-audit-vectors.mjs --check
       - name: Test Organization audit contracts and independent vector producer

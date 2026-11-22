@@ -138,8 +138,8 @@ fn snippet_browser_operations_reuse_inventory_scopes_and_preserve_device_routes(
     use AccountBrowserAccessScope as Scope;
     use DeviceAccessOperation as Device;
 
-    assert_eq!(Browser::ALL.len(), 65);
-    assert_eq!(Scope::ALL.len(), 14);
+    assert_eq!(Browser::ALL.len(), 68);
+    assert_eq!(Scope::ALL.len(), 15);
     let collection = "/api/v1/orgs/{org}/snippets";
     let item = "/api/v1/orgs/{org}/snippets/{id}";
     for (browser, device, method, path, scope, receipt) in [
@@ -272,7 +272,7 @@ fn profiles_are_separate_and_secrets_are_redacted() {
     ] {
         assert!(AccountBrowserAccessScope::from_token(forbidden).is_none());
     }
-    assert_eq!(DeviceAccessOperation::ALL.len(), 96);
+    assert_eq!(DeviceAccessOperation::ALL.len(), 99);
     let krl = DeviceAccessOperation::UserCaKrlRead;
     assert!(
         AccountBrowserAccessOperation::from_route(krl.http_method(), krl.route_template())

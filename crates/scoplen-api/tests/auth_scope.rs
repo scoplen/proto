@@ -103,6 +103,7 @@ fn initial_scope_ceiling_is_exact_sorted_and_unambiguous() {
             "access-requests:write",
             "account:read",
             "audit:read",
+            "auth-drafts:manage",
             "ca:read",
             "ca:write",
             "certificates:issue",
@@ -145,7 +146,7 @@ fn every_registered_operation_has_a_unique_canonical_route_and_exact_alternative
             );
         }
     }
-    assert_eq!(routes.len(), 96);
+    assert_eq!(routes.len(), 99);
     for operation in
         [DeviceAccessOperation::TeamInvitationRead, DeviceAccessOperation::TeamMemberRemove]
     {

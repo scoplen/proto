@@ -30,7 +30,7 @@ add("logout-extension", "logout.response.reject", { revoked: true, extra: null }
 add("options-extension", "options.response", { ...options, extra: 1 }, options);
 add("options-request-field", "options.request.reject", { username: "alice", family_id: "chosen" });
 add("login-request-field", "login.request.reject", { ...login, device_id: "chosen" });
-add("scope", "scope", "initial", "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
+add("scope", "scope", "initial", "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
 const operation = (method, path, scopes, writerReceipt = false) => add(`operation-${vectors.length}`, "operation", { method, path }, { scopes, writerReceipt });
 operation("GET", "/api/v1/accounts/me", ["account:read"]);
 for (const [method, suffix, scopes] of [["POST", "", ["orgs:create"]], ["GET", "", ["orgs:read"]], ["GET", "/{org}", ["orgs:read"]], ["PATCH", "/{org}", ["orgs:write"]]]) operation(method, `/api/v1/orgs${suffix}`, scopes);
@@ -60,6 +60,8 @@ for (const [method, suffix, scope, receipt] of [
 for (const [method, suffix] of [["POST", "/{id}"], ["PUT", ""], ["DELETE", ""], ["get", ""], ["GET", "/"], ["GET", "/{id}?"], ["POST", "/{id}/execute"]]) {
   add(`operation-snippet-denied-${vectors.length}`, "operation.reject", { method, path: `/api/v1/orgs/{org}/snippets${suffix}` });
 }
+for (const method of ["POST", "GET", "DELETE"]) operation(method, "/api/v1/orgs/{org}/auth-connection-draft", ["auth-drafts:manage"], method !== "GET");
+
 const output = `${JSON.stringify({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2)}\n`;
 const outputs = [["vectors/account-browser.json", output]];
 for (const [kind, limit] of [["options.request", 256], ["options.response", 1024], ["login.request", 512], ["login.response", 8192], ["refresh.request", 256], ["refresh.response", 8192], ["logout.request", 256], ["logout.response", 256]]) {

@@ -1,0 +1,288 @@
+{
+  "format": "scoplen-test-vectors",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "draft-tenant-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\"}}",
+      "expected": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\"}}"
+    },
+    {
+      "id": "draft-bare-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example\"}}",
+      "expected": "{\"data\":{\"issuer\":\"https://issuer.example\"}}"
+    },
+    {
+      "id": "draft-slash-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/\"}}",
+      "expected": "{\"data\":{\"issuer\":\"https://issuer.example/\"}}"
+    },
+    {
+      "id": "draft-case-port-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"HTTPS://ISSUER.example:443/Case\"}}",
+      "expected": "{\"data\":{\"issuer\":\"HTTPS://ISSUER.example:443/Case\"}}"
+    },
+    {
+      "id": "draft-ipv6-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://[2001:db8::1]:8443/path/\"}}",
+      "expected": "{\"data\":{\"issuer\":\"https://[2001:db8::1]:8443/path/\"}}"
+    },
+    {
+      "id": "draft-unicode-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/é\"}}",
+      "expected": "{\"data\":{\"issuer\":\"https://issuer.example/é\"}}"
+    },
+    {
+      "id": "draft-max-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}",
+      "expected": "{\"data\":{\"issuer\":\"https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}"
+    },
+    {
+      "id": "draft-escaped-v1",
+      "kind": "auth.draft.create",
+      "input": " { \"data\" : { \"issuer\": \"https://issuer.example/\\u0074enant/\" } } ",
+      "expected": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\"}}"
+    },
+    {
+      "id": "draft-http-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"http://issuer.example/tenant\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-missing-host-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https:///tenant\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-relative-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"/tenant\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-fragment-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/#\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-query-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/?\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-empty-user-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://@issuer.example\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-user-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://name@issuer.example\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-password-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://:value@issuer.example\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-backslash-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\\\\x\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-space-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/ x\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-control-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\\u0000\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-nonbreaking-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/ \"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-c1-control-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\u009f\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-line-separator-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\u2028\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-userinfo-port-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://@:443/\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-port-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example:90000/\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-oversize-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://example.com/ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-activation-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\",\"active\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-secret-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\",\"client_secret\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-client-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\",\"client_id\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-account-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\",\"account_id\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-callback-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\",\"callback_url\":null}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-duplicate-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://one.example/\",\"issuer\":\"https://two.example/\"}}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-root-extra-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\"},\"role\":\"owner\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-size-exact-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\"}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            ",
+      "expected": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\"}}"
+    },
+    {
+      "id": "draft-size-overflow-v1",
+      "kind": "auth.draft.create",
+      "input": "{\"data\":{\"issuer\":\"https://issuer.example/tenant/\"}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-generation-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "{\"id\":\"0191d3e0-8000-7000-8000-000000000002\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"created_at\":\"2026-10-26T00:00:00.123Z\",\"updated_at\":\"2026-10-26T00:00:00.123Z\",\"data\":{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"issuer\":\"https://issuer.example/tenant/\"}}"
+    },
+    {
+      "id": "draft-extension-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\",\\\"extra\\\":1},\\\"extension\\\":{\\\"safe\\\":true}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "{\"id\":\"0191d3e0-8000-7000-8000-000000000002\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"created_at\":\"2026-10-26T00:00:00.123Z\",\"updated_at\":\"2026-10-26T00:00:00.123Z\",\"data\":{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"issuer\":\"https://issuer.example/tenant/\"}}"
+    },
+    {
+      "id": "draft-wrong-org-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000002\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-wrong-tag-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"other\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-weak-tag-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"W/\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-wrong-body-tag-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"other\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"other\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-wrong-time-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-wrong-generation-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-cache-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"public\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-missing-pragma-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":null}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-nested-duplicate-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"},\\\"ext\\\":{\\\"x\\\":1,\\\"x\\\":2}}\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "draft-resource-exact-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     \",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "{\"id\":\"0191d3e0-8000-7000-8000-000000000002\",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"created_at\":\"2026-10-26T00:00:00.123Z\",\"updated_at\":\"2026-10-26T00:00:00.123Z\",\"data\":{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"issuer\":\"https://issuer.example/tenant/\"}}"
+    },
+    {
+      "id": "draft-resource-overflow-v1",
+      "kind": "auth.draft.resource",
+      "input": "{\"body\":\"{\\\"id\\\":\\\"0191d3e0-8000-7000-8000-000000000002\\\",\\\"etag\\\":\\\"\\\\\\\"0191d3e0-8000-7000-8000-000000000002\\\\\\\"\\\",\\\"created_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"updated_at\\\":\\\"2026-10-26T00:00:00.123Z\\\",\\\"data\\\":{\\\"organization_id\\\":\\\"0191d3e0-8000-7000-8000-000000000001\\\",\\\"issuer\\\":\\\"https://issuer.example/tenant/\\\"}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \",\"etag\":\"\\\"0191d3e0-8000-7000-8000-000000000002\\\"\",\"organization\":\"0191d3e0-8000-7000-8000-000000000001\",\"cache\":\"no-store\",\"pragma\":\"no-cache\"}",
+      "expected": "rejected"
+    }
+  ]
+}

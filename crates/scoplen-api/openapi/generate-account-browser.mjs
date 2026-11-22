@@ -2,7 +2,7 @@
 // D-140 reuses native password/browser DTOs while enforcing an independent endpoint profile.
 import { isDeepStrictEqual } from "node:util";
 
-export const initialAccountBrowserScope = "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+export const initialAccountBrowserScope = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 export function accountBrowserOperations() {
   const operations = [];
@@ -37,6 +37,7 @@ export function accountBrowserOperations() {
     ["GET", "", "read", false], ["GET", "/{id}", "read", false],
     ["POST", "/{id}/decisions", "decide", true], ["POST", "/{id}/cancel", "write", true],
   ]) add(method, `/api/v1/orgs/{org}/access-requests${suffix}`, [`access-requests:${scope}`], writerReceipt);
+  for (const method of ["POST", "GET", "DELETE"]) add(method, "/api/v1/orgs/{org}/auth-connection-draft", ["auth-drafts:manage"], method !== "GET");
   return operations;
 }
 
@@ -75,7 +76,8 @@ export function accountBrowserDefinitions() {
       description: `D-140 independent current Account/browser family, never a Device or Operator. Exact trusted Origin and one fresh bounded ES256 DPoP proof are required; ${logout ? "token-bound ath over the exact ab1_ credential" : "no ath and no Authorization"}. Reject query, If-Match, Idempotency-Key, redirects, BOM, compression except identity, unknown request fields and recursive duplicate names. JSON/UTF-8 only. Browser credentials=${credentials}. ${stem === "Refresh" ? "Exactly one ar1_ Account refresh cookie; reject mixed native/Operator credentials; no cookie/body fallback. Rotate once without widening scope or extending absolute family expiry." : "Ignore cookies for authentication and identity selection."} ${session ? "Only confirmed COMMIT discloses credentials; uncertain COMMIT is changed=true, retryable=false and returns no credentials/cookie. Never automatically replay." : logout ? "Confirmed-only true terminal result; already-revoked fresh-proof confirmation grants no general authorization. Unknown revocation permits explicit retained-token/fresh-proof retry while eligible; no cookie is read, set or cleared." : "Attempt purpose/JKT/origin is browser-bound; native/browser attempts never cross. Share native password admission debt and stable synthetic salt behavior."}`,
       "x-scoplen-request-max-bytes": requestLimit, "x-scoplen-response-max-bytes": responseLimit,
       "x-scoplen-problem-max-bytes": 4096, "x-scoplen-fetch-credentials": credentials,
-      ...(session ? { "x-scoplen-initial-browser-scope": initialAccountBrowserScope } : {}),
+      ...(stem === "PasswordLogin" ? { "x-scoplen-initial-browser-scope": initialAccountBrowserScope } : {}),
+      ...(stem === "Refresh" ? { "x-scoplen-refresh-scope-ceiling": "original-family" } : {}),
       parameters: [{ name: "Origin", in: "header", required: true, schema: { type: "string", format: "uri", minLength: 1 } }],
       requestBody: { required: true, description: `At most ${requestLimit} complete encoded UTF-8 bytes including whitespace.`, content: { "application/json": { schema: ref(`AccountBrowser${stem}Request`) } } },
       responses: {

@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::AccountBrowserCodecError;
 
 /// Exact initial browser ceiling in byte order; never current membership or Cedar authority.
-pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 /// Registered coarse browser permissions, independent of Device/Operator registries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -22,6 +22,8 @@ pub enum AccountBrowserAccessScope {
     AccountRead,
     /// Exact `audit:read` browser permission; current `view_audit` remains mandatory.
     AuditRead,
+    /// Manage the untested issuer draft of an authorized Organization.
+    AuthDraftsManage,
     /// Exact `inventory:read` browser permission.
     InventoryRead,
     /// Exact `inventory:write` browser permission.
@@ -44,12 +46,13 @@ pub enum AccountBrowserAccessScope {
 
 impl AccountBrowserAccessScope {
     /// Every scope in canonical byte order.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::AccessRequestsDecide,
         Self::AccessRequestsRead,
         Self::AccessRequestsWrite,
         Self::AccountRead,
         Self::AuditRead,
+        Self::AuthDraftsManage,
         Self::InventoryRead,
         Self::InventoryWrite,
         Self::OrganizationCreate,
@@ -69,6 +72,7 @@ impl AccountBrowserAccessScope {
             Self::AccessRequestsWrite => "access-requests:write",
             Self::AccountRead => "account:read",
             Self::AuditRead => "audit:read",
+            Self::AuthDraftsManage => "auth-drafts:manage",
             Self::InventoryRead => "inventory:read",
             Self::InventoryWrite => "inventory:write",
             Self::OrganizationCreate => "orgs:create",
@@ -113,6 +117,12 @@ pub enum AccountBrowserAccessOperation {
     AuditEventList,
     /// `GET /api/v1/orgs/{org}/audit-events/verify`.
     AuditRangeVerify,
+    /// Create the Organization issuer draft when the slot is empty.
+    AuthDraftCreate,
+    /// Read the current Organization issuer draft.
+    AuthDraftRead,
+    /// Cancel the current generation of the Organization issuer draft.
+    AuthDraftCancel,
     /// `POST /api/v1/orgs`.
     OrganizationCreate,
     /// `GET /api/v1/orgs`.
@@ -238,7 +248,7 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 65] = [
+    pub const ALL: [Self; 68] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -248,6 +258,9 @@ impl AccountBrowserAccessOperation {
         Self::AccountProfileRead,
         Self::AuditEventList,
         Self::AuditRangeVerify,
+        Self::AuthDraftCreate,
+        Self::AuthDraftRead,
+        Self::AuthDraftCancel,
         Self::OrganizationCreate,
         Self::OrganizationList,
         Self::OrganizationRead,
@@ -308,37 +321,24 @@ impl AccountBrowserAccessOperation {
     /// Exact authenticated requirement; neither branch establishes authority.
     #[must_use]
     pub const fn requirement(self) -> AccountBrowserAccessRequirement {
+        use AccountBrowserAccessRequirement::AnyScope;
+        use AccountBrowserAccessScope as Scope;
         match self {
             Self::AccessRequestCheck | Self::AccessRequestCreate | Self::AccessRequestCancel => {
-                AccountBrowserAccessRequirement::AnyScope(&[
-                    AccountBrowserAccessScope::AccessRequestsWrite,
-                ])
+                AnyScope(&[Scope::AccessRequestsWrite])
             }
             Self::AccessRequestList | Self::AccessRequestRead => {
-                AccountBrowserAccessRequirement::AnyScope(&[
-                    AccountBrowserAccessScope::AccessRequestsRead,
-                ])
+                AnyScope(&[Scope::AccessRequestsRead])
             }
-            Self::AccessRequestDecide => AccountBrowserAccessRequirement::AnyScope(&[
-                AccountBrowserAccessScope::AccessRequestsDecide,
-            ]),
-            Self::AuditEventList | Self::AuditRangeVerify => {
-                AccountBrowserAccessRequirement::AnyScope(&[AccountBrowserAccessScope::AuditRead])
+            Self::AccessRequestDecide => AnyScope(&[Scope::AccessRequestsDecide]),
+            Self::AuditEventList | Self::AuditRangeVerify => AnyScope(&[Scope::AuditRead]),
+            Self::AccountProfileRead => AnyScope(&[Scope::AccountRead]),
+            Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
+                AnyScope(&[Scope::AuthDraftsManage])
             }
-            Self::AccountProfileRead => {
-                AccountBrowserAccessRequirement::AnyScope(&[AccountBrowserAccessScope::AccountRead])
-            }
-            Self::OrganizationCreate => AccountBrowserAccessRequirement::AnyScope(&[
-                AccountBrowserAccessScope::OrganizationCreate,
-            ]),
-            Self::OrganizationList | Self::OrganizationRead => {
-                AccountBrowserAccessRequirement::AnyScope(&[
-                    AccountBrowserAccessScope::OrganizationRead,
-                ])
-            }
-            Self::OrganizationUpdate => AccountBrowserAccessRequirement::AnyScope(&[
-                AccountBrowserAccessScope::OrganizationWrite,
-            ]),
+            Self::OrganizationCreate => AnyScope(&[Scope::OrganizationCreate]),
+            Self::OrganizationList | Self::OrganizationRead => AnyScope(&[Scope::OrganizationRead]),
+            Self::OrganizationUpdate => AnyScope(&[Scope::OrganizationWrite]),
             Self::TeamInvitationCreate
             | Self::TeamInvitationList
             | Self::TeamInvitationRevoke
@@ -348,18 +348,11 @@ impl AccountBrowserAccessOperation {
             | Self::TeamDissolve
             | Self::OrganizationGroupCreate
             | Self::OrganizationGroupReplace
-            | Self::OrganizationGroupDelete => {
-                AccountBrowserAccessRequirement::AnyScope(&[AccountBrowserAccessScope::TeamsManage])
-            }
+            | Self::OrganizationGroupDelete => AnyScope(&[Scope::TeamsManage]),
             Self::TeamInvitationRead | Self::TeamMemberRemove => {
-                AccountBrowserAccessRequirement::AnyScope(&[
-                    AccountBrowserAccessScope::TeamsJoin,
-                    AccountBrowserAccessScope::TeamsManage,
-                ])
+                AnyScope(&[Scope::TeamsJoin, Scope::TeamsManage])
             }
-            Self::TeamInvitationAccept => {
-                AccountBrowserAccessRequirement::AnyScope(&[AccountBrowserAccessScope::TeamsJoin])
-            }
+            Self::TeamInvitationAccept => AnyScope(&[Scope::TeamsJoin]),
             Self::InventoryHostList
             | Self::InventoryHostRead
             | Self::InventoryHostGroupList
@@ -369,9 +362,7 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryRouteList
             | Self::InventoryRouteRead
             | Self::InventorySnippetList
-            | Self::InventorySnippetRead => AccountBrowserAccessRequirement::AnyScope(&[
-                AccountBrowserAccessScope::InventoryRead,
-            ]),
+            | Self::InventorySnippetRead => AnyScope(&[Scope::InventoryRead]),
             Self::InventoryImportCreate
             | Self::InventoryHostCreate
             | Self::InventoryHostReplace
@@ -387,25 +378,19 @@ impl AccountBrowserAccessOperation {
             | Self::InventoryRouteDelete
             | Self::InventorySnippetCreate
             | Self::InventorySnippetReplace
-            | Self::InventorySnippetDelete => AccountBrowserAccessRequirement::AnyScope(&[
-                AccountBrowserAccessScope::InventoryWrite,
-            ]),
+            | Self::InventorySnippetDelete => AnyScope(&[Scope::InventoryWrite]),
             Self::OrganizationGroupList
             | Self::OrganizationGroupRead
             | Self::OrganizationPolicyList
             | Self::OrganizationPolicyRead
             | Self::OrganizationGrantList
-            | Self::OrganizationGrantRead => AccountBrowserAccessRequirement::AnyScope(&[
-                AccountBrowserAccessScope::PoliciesRead,
-            ]),
+            | Self::OrganizationGrantRead => AnyScope(&[Scope::PoliciesRead]),
             Self::OrganizationPolicyCreate
             | Self::OrganizationPolicyReplace
             | Self::OrganizationPolicyDelete
             | Self::OrganizationGrantCreate
             | Self::OrganizationGrantReplace
-            | Self::OrganizationGrantDelete => AccountBrowserAccessRequirement::AnyScope(&[
-                AccountBrowserAccessScope::PoliciesWrite,
-            ]),
+            | Self::OrganizationGrantDelete => AnyScope(&[Scope::PoliciesWrite]),
             Self::Logout => AccountBrowserAccessRequirement::SelfSessionTermination,
         }
     }
@@ -415,6 +400,7 @@ impl AccountBrowserAccessOperation {
         match self {
             Self::AccessRequestList
             | Self::AccessRequestRead
+            | Self::AuthDraftRead
             | Self::AuditEventList
             | Self::AuditRangeVerify
             | Self::AccountProfileRead
@@ -444,6 +430,7 @@ impl AccountBrowserAccessOperation {
             | Self::AccessRequestCreate
             | Self::AccessRequestDecide
             | Self::AccessRequestCancel
+            | Self::AuthDraftCreate
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
@@ -468,6 +455,7 @@ impl AccountBrowserAccessOperation {
             | Self::InventorySnippetDelete
             | Self::OrganizationGroupDelete
             | Self::OrganizationPolicyDelete
+            | Self::AuthDraftCancel
             | Self::OrganizationGrantDelete => "DELETE",
             Self::InventoryHostReplace
             | Self::InventoryHostGroupReplace
@@ -491,6 +479,9 @@ impl AccountBrowserAccessOperation {
             Self::AccessRequestDecide => "/api/v1/orgs/{org}/access-requests/{id}/decisions",
             Self::AccessRequestCancel => "/api/v1/orgs/{org}/access-requests/{id}/cancel",
             Self::AccountProfileRead => "/api/v1/accounts/me",
+            Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
+                "/api/v1/orgs/{org}/auth-connection-draft"
+            }
             Self::AuditEventList => "/api/v1/orgs/{org}/audit-events",
             Self::AuditRangeVerify => "/api/v1/orgs/{org}/audit-events/verify",
             Self::OrganizationCreate | Self::OrganizationList => "/api/v1/orgs",
@@ -562,7 +553,7 @@ impl AccountBrowserAccessOperation {
             operation.http_method() == method && operation.route_template() == template
         })
     }
-    /// Whether this POST's exact receipt binds the real browser writer/family.
+    /// Whether this mutation's exact receipt binds the real browser writer/family.
     /// Team receipts remain Account-scoped and return false.
     #[must_use]
     pub const fn uses_browser_writer_receipt(self) -> bool {
@@ -571,6 +562,8 @@ impl AccountBrowserAccessOperation {
             Self::AccessRequestCreate
                 | Self::AccessRequestDecide
                 | Self::AccessRequestCancel
+                | Self::AuthDraftCreate
+                | Self::AuthDraftCancel
                 | Self::InventoryImportCreate
                 | Self::InventoryHostCreate
                 | Self::InventoryHostGroupCreate

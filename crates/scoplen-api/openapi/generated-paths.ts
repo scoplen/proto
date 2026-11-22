@@ -37,6 +37,7 @@ export const controlPlanePaths = [
   "/orgs/{org}/audit-events/verify",
   "/orgs/{org}/audit-exports",
   "/orgs/{org}/audit-exports/{id}",
+  "/orgs/{org}/auth-connection-draft",
   "/orgs/{org}/certificate-authorities",
   "/orgs/{org}/certificate-authorities/{id}",
   "/orgs/{org}/certificate-authorities/{id}/krl",
