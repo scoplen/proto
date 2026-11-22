@@ -183,7 +183,6 @@ export interface components {
     Account: Resource;
     Device: Resource;
     Organization: Resource;
-    IdentityProvider: Resource;
     ServicePrincipal: Resource;
     Role: Resource;
     GrantFields: GrantFields;

@@ -58,8 +58,6 @@ export const controlPlanePaths = [
   "/orgs/{org}/host-groups/{id}",
   "/orgs/{org}/hosts",
   "/orgs/{org}/hosts/{id}",
-  "/orgs/{org}/identity-providers",
-  "/orgs/{org}/identity-providers/{id}",
   "/orgs/{org}/integrations",
   "/orgs/{org}/integrations/{id}",
   "/orgs/{org}/inventory/imports",

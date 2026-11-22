@@ -3,7 +3,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { generateOrganizationTypes } from "./generate-organizations.mjs";
+import { controlPlanePaths } from "./generated-paths.ts";
 const document = JSON.parse(await readFile(new URL("v1.yaml", import.meta.url), "utf8"));
+test("D-164 omits direct IdP administration and SCIM from the public API", async () => {
+  for (const paths of [Object.keys(document.paths), controlPlanePaths]) {
+    assert.deepEqual(paths.filter(path => /\/(?:identity-providers|scim)(?:\/|$)/i.test(path)), []);
+    assert.ok(paths.includes("/orgs/{org}/groups"));
+    assert.ok(paths.includes("/orgs/{org}/certificates"));
+  }
+  const types = await readFile(new URL("types.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(types, /\bIdentityProvider\b/);
+  assert.deepEqual(document.components.schemas.GroupSource.enum, ["local", "IdP"]);
+});
 test("D-130 authored contract generates caller-specific types", () => {
   const types = generateOrganizationTypes(document);
   for (const name of ["OrganizationCreateRequest", "OrganizationUpdateRequest", "OrganizationResource", "OrganizationMembership", "OrganizationPage"]) assert.match(types, new RegExp(`interface ${name}`));
