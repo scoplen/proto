@@ -5,6 +5,11 @@ version = 2
 # upgrade; remove this existing exception with that coordinated update.
 ignore = [
     "RUSTSEC-2023-0071",
+    # Chrono is pulled by Cedar's required datetime feature and russh-util's
+    # wasm target support. Cedar 4.15.0 still depends on chrono, russh-util
+    # has no newer release, and RUSTSEC-2026-0543 has no safe upgrade. Keep
+    # this exception visible until those upstream dependencies replace it.
+    { id = "RUSTSEC-2026-0543", reason = "chrono is an unavoidable transitive dependency of cedar-policy-core and russh-util; no safe upstream upgrade is available" },
     # age's translation proc macros use these only for build configuration/diagnostics.
     # Neither advisory reports a vulnerability; remove when age replaces these macros.
     { id = "RUSTSEC-2026-0374", reason = "unmaintained basic-toml is used only by age's translation proc-macro build configuration" },
