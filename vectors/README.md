@@ -5,6 +5,11 @@ Each vector has a stable `id`, a contract-specific `kind`, and opaque `input` an
 The loader in `scoplen-test-vectors` validates the envelope and identifiers; the contract crate that
 owns a kind validates its encoding and interprets the values.
 
+`auth-connection-draft.json` covers the exact HTTPS issuer spelling, forbidden fields and
+URL components, request and response byte limits, recursive duplicate rejection, and
+Organization and generation ETag binding. Regenerate it with
+`node scripts/generate-auth-connection-draft-vectors.mjs` or verify it with `--check`.
+
 `audit.json` contains D-144's independent immutable Event/Page and contiguous Verification
 known answers, missing/null/encoding failures, typed query/range cases and exact UTC calendar
 boundaries. Its Node author uses built-in Date and crypto without Rust or schema helpers;

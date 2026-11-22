@@ -41,6 +41,9 @@ pub enum ReferenceAccountBrowserError {
     /// Current identity, lifetime, token or trusted binding is unavailable.
     #[error("Account browser authentication required")]
     AuthenticationRequired,
+    /// Authenticated family lacks the operation's registered scope.
+    #[error("Account browser operation denied")]
+    Denied,
     /// A verified proof id is empty, reused or exceeds the fixture bound.
     #[error("invalid Account browser proof")]
     InvalidProof,
@@ -68,6 +71,7 @@ impl ReferenceAccountBrowserError {
             Self::InvalidRequest => (400, "auth.invalid_request", false, false),
             Self::TooLarge => (413, "auth.invalid_request", false, false),
             Self::AuthenticationRequired => (401, "auth.authentication_required", false, false),
+            Self::Denied => (403, "policy.denied", false, false),
             Self::InvalidProof => (400, "auth.invalid_dpop_proof", false, false),
             Self::StorageUnavailable => (503, "auth.storage_unavailable", false, true),
             Self::CommitOutcomeUnknown => (
@@ -96,6 +100,7 @@ pub struct ReferenceAccountBrowserPeer {
     writer: AccountBrowserWriter,
     origin: String,
     jkt: String,
+    scope: String,
     generation: u64,
     current_generation: u64,
     account_active: bool,
@@ -142,6 +147,7 @@ impl ReferenceAccountBrowserPeer {
             writer,
             origin: origin.into(),
             jkt: jkt.into(),
+            scope: INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.into(),
             generation,
             current_generation: generation,
             account_active: true,
@@ -158,6 +164,27 @@ impl ReferenceAccountBrowserPeer {
             events: 1,
             fault: None,
         })
+    }
+
+    /// Restore a family's stored scope ceiling, including one issued before new scopes existed.
+    /// # Errors
+    /// Rejects widening, duplicate or noncanonical tokens.
+    pub fn retain_scope_ceiling(
+        &mut self,
+        stored_scope: &str,
+    ) -> Result<(), AccountBrowserCodecError> {
+        let mut previous = None;
+        for token in stored_scope.split(' ') {
+            if previous.is_some_and(|last| last >= token)
+                || !super::AccountBrowserAccessScope::from_token(token)
+                    .is_some_and(|s| s.is_present_in(&self.scope))
+            {
+                return Err(AccountBrowserCodecError::Invalid);
+            }
+            previous = Some(token);
+        }
+        self.scope = stored_scope.into();
+        Ok(())
     }
 
     /// Script current Account/password facts; never a Device or Operator identity.
@@ -195,11 +222,16 @@ impl ReferenceAccountBrowserPeer {
             || !self.eligible(token, jkt, now)
             || origin.is_some_and(|origin| origin != self.origin)
             || (operation.http_method() != "GET" && origin != Some(self.origin.as_str()))
-            || !matches!(operation.requirement(), AccountBrowserAccessRequirement::AnyScope(scopes) if scopes.iter().any(|scope| scope.is_present_in(INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE)))
         {
             return Err(Error::AuthenticationRequired);
         }
+        let AccountBrowserAccessRequirement::AnyScope(required) = operation.requirement() else {
+            return Err(Error::AuthenticationRequired);
+        };
         self.claim_proof(proof_id)?;
+        if !required.iter().any(|scope| scope.is_present_in(&self.scope)) {
+            return Err(Error::Denied);
+        }
         Ok(self.writer)
     }
 

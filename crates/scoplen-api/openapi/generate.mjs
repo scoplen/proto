@@ -14,6 +14,7 @@ import { generateGroupPolicyTypes } from "./generate-group-policy.mjs";
 import { generateAccountBrowserTypes } from "./generate-account-browser.mjs";
 import { generateAuditTypes } from "./generate-audit.mjs";
 import { generateGrantTypes } from "./generate-grants.mjs";
+import { generateAuthDraftTypes } from "./generate-auth-connection-draft.mjs";
 import { generateAccessRequestTypes } from "./generate-access-requests.mjs";
 
 const root = new URL(".", import.meta.url);
@@ -622,7 +623,14 @@ const accessRequestFinish = completeGrantTypes.indexOf(accessRequestEnd, accessR
 if (accessRequestBegin < 0 || accessRequestFinish < 0) throw new Error("types.ts lacks AccessRequests markers");
 const completeAccessRequestTypes = completeGrantTypes.slice(0, accessRequestBegin + accessRequestStart.length) +
   generateAccessRequestTypes(document) + completeGrantTypes.slice(accessRequestFinish);
-const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeAccessRequestTypes]];
+const draftStart = "// BEGIN GENERATED AuthConnectionDraft\n";
+const draftEnd = "// END GENERATED AuthConnectionDraft";
+const draftBegin = completeAccessRequestTypes.indexOf(draftStart);
+const draftFinish = completeAccessRequestTypes.indexOf(draftEnd, draftBegin + draftStart.length);
+if (draftBegin < 0 || draftFinish < 0) throw new Error("types.ts lacks AuthConnectionDraft markers");
+const completeTypes = completeAccessRequestTypes.slice(0, draftBegin + draftStart.length) +
+  generateAuthDraftTypes(document) + completeAccessRequestTypes.slice(draftFinish);
+const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {
     const actual = (await readFile(url, "utf8")).replaceAll("\r\n", "\n");

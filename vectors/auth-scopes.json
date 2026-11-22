@@ -12,7 +12,7 @@
       "id": "auth-scope-initial-v1",
       "kind": "auth.scope.initial",
       "input": "first-party-device",
-      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
+      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage"
     },
     {
       "id": "auth-scope-token-account-read-v1",
@@ -1513,6 +1513,42 @@
       "kind": "auth.scope.contains",
       "input": "{\"scope\":\"account:read policies:write teams:manage\",\"required\":\"access-requests:write\"}",
       "expected": "missing"
+    },
+    {
+      "id": "auth-scope-token-auth-drafts-manage-v1",
+      "kind": "auth.scope.token",
+      "input": "auth-drafts:manage",
+      "expected": "auth-drafts:manage"
+    },
+    {
+      "id": "auth-scope-draft-post-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"POST\",\"route_template\":\"/api/v1/orgs/{org}/auth-connection-draft\"}",
+      "expected": "auth-drafts:manage"
+    },
+    {
+      "id": "auth-scope-draft-get-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/api/v1/orgs/{org}/auth-connection-draft\"}",
+      "expected": "auth-drafts:manage"
+    },
+    {
+      "id": "auth-scope-draft-delete-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"DELETE\",\"route_template\":\"/api/v1/orgs/{org}/auth-connection-draft\"}",
+      "expected": "auth-drafts:manage"
+    },
+    {
+      "id": "auth-scope-draft-put-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PUT\",\"route_template\":\"/api/v1/orgs/{org}/auth-connection-draft\"}",
+      "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-draft-patch-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/auth-connection-draft\"}",
+      "expected": "unmapped"
     }
   ]
 }

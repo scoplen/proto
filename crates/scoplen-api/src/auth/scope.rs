@@ -5,7 +5,7 @@
 ///
 /// Refresh may preserve or narrow its family's original ceiling, never expand it. These
 /// coarse permissions do not replace identity, `DPoP`, replay, membership, or policy checks.
-pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
+pub const INITIAL_DEVICE_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage ca:read ca:write certificates:issue inventory:read inventory:write keys:read keys:write orgs:create orgs:read orgs:write policies:read policies:write sync:read sync:write teams:join teams:manage";
 
 /// Known initial enrolled-device scopes. Unknown valid JWT scope tokens remain parseable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20,6 +20,8 @@ pub enum DeviceAccessScope {
     AccountRead,
     /// Read Organization audit projections and contiguous verification under current policy.
     AuditRead,
+    /// Manage the untested issuer draft of an authorized Organization.
+    AuthDraftsManage,
     /// Read current Organization user-CA public trust.
     CaRead,
     /// Provision an Organization local user CA under current policy.
@@ -56,12 +58,13 @@ pub enum DeviceAccessScope {
 
 impl DeviceAccessScope {
     /// Every initial scope in canonical byte order.
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::AccessRequestsDecide,
         Self::AccessRequestsRead,
         Self::AccessRequestsWrite,
         Self::AccountRead,
         Self::AuditRead,
+        Self::AuthDraftsManage,
         Self::CaRead,
         Self::CaWrite,
         Self::CertificatesIssue,
@@ -89,6 +92,7 @@ impl DeviceAccessScope {
             Self::AccessRequestsWrite => "access-requests:write",
             Self::AccountRead => "account:read",
             Self::AuditRead => "audit:read",
+            Self::AuthDraftsManage => "auth-drafts:manage",
             Self::CaRead => "ca:read",
             Self::CaWrite => "ca:write",
             Self::CertificatesIssue => "certificates:issue",
@@ -151,6 +155,12 @@ pub enum DeviceAccessOperation {
     AuditEventList,
     /// Verify a contiguous unfiltered Organization audit interval.
     AuditRangeVerify,
+    /// Create the Organization issuer draft when the slot is empty.
+    AuthDraftCreate,
+    /// Read the current Organization issuer draft.
+    AuthDraftRead,
+    /// Cancel the current generation of the Organization issuer draft.
+    AuthDraftCancel,
     /// Create an Organization with the current Account as its initial owner.
     OrganizationCreate,
     /// List the current Account's own active Organization memberships.
@@ -327,7 +337,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 96] = [
+    pub const ALL: [Self; 99] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -338,6 +348,9 @@ impl DeviceAccessOperation {
         Self::AccountDevicesRead,
         Self::AuditEventList,
         Self::AuditRangeVerify,
+        Self::AuthDraftCreate,
+        Self::AuthDraftRead,
+        Self::AuthDraftCancel,
         Self::OrganizationCreate,
         Self::OrganizationList,
         Self::OrganizationRead,
@@ -448,6 +461,9 @@ impl DeviceAccessOperation {
             Self::AccountProfileRead | Self::AccountDevicesRead => {
                 &[DeviceAccessScope::AccountRead]
             }
+            Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
+                &[DeviceAccessScope::AuthDraftsManage]
+            }
             Self::OrganizationCreate => &[DeviceAccessScope::OrganizationCreate],
             Self::OrganizationList | Self::OrganizationRead => {
                 &[DeviceAccessScope::OrganizationRead]
@@ -553,6 +569,7 @@ impl DeviceAccessOperation {
         match self {
             Self::AccessRequestList
             | Self::AccessRequestRead
+            | Self::AuthDraftRead
             | Self::AuditEventList
             | Self::AuditRangeVerify
             | Self::AccountProfileRead
@@ -617,12 +634,14 @@ impl DeviceAccessOperation {
             | Self::InventoryHostGroupDelete
             | Self::InventoryTrustRecordDelete
             | Self::InventorySnippetDelete
+            | Self::AuthDraftCancel
             | Self::InventoryGatewayNetworkDelete => "DELETE",
             Self::AccessRequestCheck
             | Self::AccessRequestCreate
             | Self::AccessRequestDecide
             | Self::AccessRequestCancel
             | Self::SyncSession
+            | Self::AuthDraftCreate
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
@@ -666,6 +685,9 @@ impl DeviceAccessOperation {
             Self::AccessRequestCancel => "/api/v1/orgs/{org}/access-requests/{id}/cancel",
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AccountDevicesRead => "/api/v1/accounts/me/devices",
+            Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
+                "/api/v1/orgs/{org}/auth-connection-draft"
+            }
             Self::AuditEventList => "/api/v1/orgs/{org}/audit-events",
             Self::AuditRangeVerify => "/api/v1/orgs/{org}/audit-events/verify",
             Self::OrganizationCreate | Self::OrganizationList => "/api/v1/orgs",

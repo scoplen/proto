@@ -4,6 +4,10 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Add D-166 Organization issuer draft codecs, exact Device and Account-browser scopes,
+  conditional writes, original-writer receipt and audit reference behavior, public test
+  vectors, and OpenAPI and TypeScript declarations.
+
 - Add D-155's five exact Account-browser Snippet operations using the existing inventory
   scopes and original browser-family create receipt. Preserve the fourteen-scope ceiling,
   typed Snippet fields, native Device operations and all other browser exclusions. Extend

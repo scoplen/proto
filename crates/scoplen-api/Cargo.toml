@@ -33,6 +33,7 @@ thiserror = "2.0.12"
 tokio-stream = { version = "=0.1.19", features = ["net"], optional = true }
 tonic = { version = "=0.13.1", features = ["transport", "tls-ring"], optional = true }
 uuid.workspace = true
+url = "2.5"
 
 [build-dependencies]
 prost-build = { version = "=0.13.5", optional = true }
