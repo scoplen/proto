@@ -15,6 +15,8 @@ fn account(last: u8) -> Uuid {
 fn request() -> SyncAddVaultMemberRequest {
     SyncAddVaultMemberRequest {
         account_id: account(3),
+        membership_id: account(5),
+        recipient_key_revision: 7,
         wrapped_keys: vec![
             SyncVaultKey { epoch: 1, wrapped_vault_key: vec![1, 2] },
             SyncVaultKey { epoch: 2, wrapped_vault_key: vec![3, 4] },
@@ -27,7 +29,7 @@ fn shared_vault_member_codecs_round_trip_and_accept_response_extensions() {
     let source = request();
     let encoded = source.to_cbor().expect("encode request");
     assert_eq!(SyncAddVaultMemberRequest::from_cbor(&encoded).expect("decode request"), source);
-    let response = SyncAddVaultMemberResponse { account_id: account(3) };
+    let response = SyncAddVaultMemberResponse { account_id: account(3), membership_id: account(5) };
     let encoded = response.to_cbor().expect("encode response");
     let Value::Map(mut fields) = cbor::decode(&encoded).expect("response map") else {
         panic!("response must be a map");
@@ -62,16 +64,19 @@ fn shared_vault_member_codecs_round_trip_and_accept_response_extensions() {
 
 #[test]
 fn shared_vault_member_responses_bind_to_request_and_path() {
-    let added = SyncAddVaultMemberResponse { account_id: account(3) };
+    let added = SyncAddVaultMemberResponse { account_id: account(3), membership_id: account(5) };
     added.validate_for_request(&request()).expect("matching added account");
     let mut different = request();
     different.account_id = account(4);
     assert!(added.validate_for_request(&different).is_err(), "different valid account");
+    different = request();
+    different.membership_id = account(6);
+    assert!(added.validate_for_request(&different).is_err(), "different valid Membership");
     let mut invalid = request();
     invalid.wrapped_keys.clear();
     assert!(added.validate_for_request(&invalid).is_err(), "invalid request");
     assert!(
-        SyncAddVaultMemberResponse { account_id: Uuid::nil() }
+        SyncAddVaultMemberResponse { account_id: Uuid::nil(), membership_id: account(5) }
             .validate_for_request(&request())
             .is_err(),
         "invalid addition response"
@@ -103,14 +108,20 @@ fn shared_vault_member_codecs_reject_invalid_order_fields_and_bounds() {
     invalid = request();
     invalid.account_id = Uuid::nil();
     assert!(invalid.to_cbor().is_err(), "invalid account");
+    invalid = request();
+    invalid.membership_id = Uuid::nil();
+    assert!(invalid.to_cbor().is_err(), "invalid Membership");
+    invalid = request();
+    invalid.recipient_key_revision = 0;
+    assert!(invalid.to_cbor().is_err(), "zero revision");
     let invalid_removal =
         SyncRemoveVaultMemberResponse { account_id: account(3), rotation_pending: false };
     assert!(invalid_removal.to_cbor().is_err(), "false rotation marker");
     invalid = SyncAddVaultMemberRequest {
-        account_id: account(3),
         wrapped_keys: (1..=MAX_SYNC_VAULT_MEMBER_EPOCHS as u64 + 1)
             .map(|epoch| SyncVaultKey { epoch, wrapped_vault_key: vec![1] })
             .collect(),
+        ..request()
     };
     assert!(invalid.to_cbor().is_err(), "too many epochs");
     assert!(
@@ -128,6 +139,29 @@ fn shared_vault_member_codecs_reject_invalid_order_fields_and_bounds() {
             .is_err(),
         "unknown request field"
     );
+}
+
+#[test]
+fn admission_requires_reviewed_membership_and_rejects_nested_extensions() {
+    let encoded = request().to_cbor().expect("encode request");
+    let Value::Map(mut fields) = cbor::decode(&encoded).expect("request map") else {
+        panic!("request must be a map");
+    };
+    for required in ["membership_id", "recipient_key_revision"] {
+        let mut missing = fields.clone();
+        missing.retain(|(key, _)| key != &Value::Text(required.into()));
+        let missing = cbor::encode(&Value::Map(missing)).expect("request omission");
+        assert!(SyncAddVaultMemberRequest::from_cbor(&missing).is_err(), "missing {required}");
+    }
+    let (_, Value::Array(wraps)) =
+        fields.iter_mut().find(|(key, _)| key == &Value::Text("wrapped_keys".into())).unwrap()
+    else {
+        panic!("request wraps");
+    };
+    let Value::Map(first) = &mut wraps[0] else { panic!("epoch wrap") };
+    first.push((Value::Text("future".into()), Value::UInt(1)));
+    let extended = cbor::encode(&Value::Map(fields)).expect("nested extension");
+    assert!(SyncAddVaultMemberRequest::from_cbor(&extended).is_err());
 }
 
 #[test]
@@ -203,6 +237,13 @@ fn published_shared_vault_member_vectors_match_public_codecs() {
                 let source = SyncAddVaultMemberRequest {
                     account_id: Uuid::parse_str(input["account_id"].as_str().expect("account"))
                         .expect("account UUID"),
+                    membership_id: Uuid::parse_str(
+                        input["membership_id"].as_str().expect("Membership"),
+                    )
+                    .expect("Membership UUID"),
+                    recipient_key_revision: input["recipient_key_revision"]
+                        .as_u64()
+                        .expect("revision"),
                     wrapped_keys: input["wrapped_keys"]
                         .as_array()
                         .expect("wrapped keys")
@@ -222,7 +263,10 @@ fn published_shared_vault_member_vectors_match_public_codecs() {
                 );
             }
             "sync.vaults.members.add.response" => {
-                let source = SyncAddVaultMemberResponse { account_id: account(3) };
+                let source = SyncAddVaultMemberResponse {
+                    account_id: account(3),
+                    membership_id: account(5),
+                };
                 assert_eq!(source.to_cbor().expect("encode"), expected, "{}", vector.id);
                 let decoded = SyncAddVaultMemberResponse::from_cbor(&expected).expect("decode");
                 assert_eq!(decoded, source);

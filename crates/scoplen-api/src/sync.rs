@@ -16,9 +16,14 @@ use uuid::Uuid;
 use crate::ProblemDetails;
 
 mod organization_view;
+mod shared_vault_recipients;
 pub use organization_view::{
     SyncOrganizationAckRequest, SyncOrganizationAckResponse, SyncOrganizationViewQuery,
     SyncOrganizationViewResponse,
+};
+pub use shared_vault_recipients::{
+    MAX_SYNC_VAULT_RECIPIENTS, MAX_SYNC_VAULT_RECIPIENTS_BODY_BYTES, SyncVaultRecipient,
+    SyncVaultRecipientsResponse,
 };
 
 /// Default maximum number of writes accepted in one atomic batch.
@@ -331,18 +336,26 @@ impl SyncReadLimits {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VaultKind {
     Personal,
-    Shared,
+    /// An encrypted Shared vault owned by this Organization.
+    Shared {
+        organization: Uuid,
+    },
     Organization,
     /// An additive future kind that this version must not write to.
     Unknown(String),
 }
 
 impl VaultKind {
-    fn parse(value: String) -> Result<Self, SyncCodecError> {
+    fn parse(value: String, fields: &mut BTreeMap<String, Value>) -> Result<Self, SyncCodecError> {
         nonempty(&value, "kind")?;
         Ok(match value.as_str() {
             "personal" => Self::Personal,
-            "shared" => Self::Shared,
+            "shared" => {
+                if fields.contains_key("view_revision") {
+                    return Err(invalid("Shared vault cannot carry an inventory view revision"));
+                }
+                Self::Shared { organization: take_uuid(fields, "organization")? }
+            }
             "organization" => Self::Organization,
             _ => Self::Unknown(value),
         })
@@ -351,7 +364,7 @@ impl VaultKind {
     fn as_str(&self) -> &str {
         match self {
             Self::Personal => "personal",
-            Self::Shared => "shared",
+            Self::Shared { .. } => "shared",
             Self::Organization => "organization",
             Self::Unknown(value) => value,
         }
@@ -366,7 +379,8 @@ pub struct SessionVault {
     pub seq: u64,
     pub key_epoch: u64,
     pub rotation_pending: bool,
-    /// Required for Organization vaults; absent for encrypted or unknown vault kinds.
+    /// Inventory view context, required only for Organization vaults.
+    /// A Shared vault's owner is carried by its kind.
     pub organization: Option<OrganizationVaultContext>,
 }
 
@@ -393,6 +407,12 @@ impl SessionVault {
             (VaultKind::Organization, Some(context)) => context.validate(),
             (VaultKind::Organization, None) => Err(invalid("missing Organization vault context")),
             (_, Some(_)) => Err(invalid("Organization context requires organization kind")),
+            (VaultKind::Shared { organization }, None) => valid_uuid(*organization, "organization"),
+            (VaultKind::Unknown(kind), None)
+                if matches!(kind.as_str(), "personal" | "shared" | "organization") =>
+            {
+                Err(invalid("known vault kind requires its typed descriptor"))
+            }
             (_, None) => Ok(()),
         }
     }
@@ -408,13 +428,15 @@ impl SessionVault {
         if let Some(context) = self.organization {
             fields.push(("organization", Value::Bytes(context.organization.as_bytes().to_vec())));
             fields.push(("view_revision", Value::UInt(context.view_revision)));
+        } else if let VaultKind::Shared { organization } = self.kind {
+            fields.push(("organization", Value::Bytes(organization.as_bytes().to_vec())));
         }
         map(fields)
     }
 
     fn from_value(value: Value) -> Result<Self, SyncCodecError> {
         let mut fields = expect_map(value)?;
-        let kind = VaultKind::parse(take_text(&mut fields, "kind")?)?;
+        let kind = VaultKind::parse(take_text(&mut fields, "kind")?, &mut fields)?;
         let organization = if kind == VaultKind::Organization {
             Some(OrganizationVaultContext {
                 organization: take_uuid(&mut fields, "organization")?,
@@ -439,20 +461,26 @@ impl SessionVault {
 /// Request body for `POST /sync/v1/vaults`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyncCreateVaultRequest {
+    /// Explicit owning Organization.
+    pub organization: Uuid,
     /// Client-chosen shared-vault identifier.
     pub vault_id: Uuid,
+    /// Reviewed revision of the creator's Account key publication.
+    pub creator_key_revision: u64,
     /// Opaque account-bound wrap of the epoch-1 vault key.
     pub wrapped_vault_key: Vec<u8>,
 }
 
 impl SyncCreateVaultRequest {
-    /// Validate the UUID and bounded opaque key wrap.
+    /// Validate the identifiers, key revision and bounded opaque key wrap.
     ///
     /// # Errors
     ///
-    /// Returns an error for a non-UUIDv7 identifier, an empty wrap, or an oversized wrap.
+    /// Returns an error for a non-UUIDv7 identifier, zero revision or invalid wrap size.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.organization, "organization")?;
         valid_uuid(self.vault_id, "vault id")?;
+        positive(self.creator_key_revision, "creator_key_revision")?;
         if self.wrapped_vault_key.is_empty() {
             return Err(invalid("wrapped_vault_key must not be empty"));
         }
@@ -472,7 +500,9 @@ impl SyncCreateVaultRequest {
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
         self.validate()?;
         let encoded = encode_map(vec![
+            ("organization", Value::Bytes(self.organization.as_bytes().to_vec())),
             ("vault_id", Value::Bytes(self.vault_id.as_bytes().to_vec())),
+            ("creator_key_revision", Value::UInt(self.creator_key_revision)),
             ("wrapped_vault_key", Value::Bytes(self.wrapped_vault_key.clone())),
         ])?;
         enforce_vault_create_body_limit(&encoded)?;
@@ -488,7 +518,9 @@ impl SyncCreateVaultRequest {
         enforce_vault_create_body_limit(input)?;
         let mut fields = decode_map(input)?;
         let request = Self {
+            organization: take_uuid(&mut fields, "organization")?,
             vault_id: take_uuid(&mut fields, "vault_id")?,
+            creator_key_revision: take_uint(&mut fields, "creator_key_revision")?,
             wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
         };
         if !fields.is_empty() {
@@ -514,7 +546,7 @@ impl SyncCreateVaultResponse {
     /// Returns an error when the descriptor is not the required epoch-1 shared-vault state.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
         self.vault.validate()?;
-        if !matches!(self.vault.kind, VaultKind::Shared)
+        if !matches!(self.vault.kind, VaultKind::Shared { .. })
             || self.vault.seq != 0
             || self.vault.key_epoch != 1
             || self.vault.rotation_pending
@@ -528,7 +560,7 @@ impl SyncCreateVaultResponse {
     ///
     /// # Errors
     ///
-    /// Returns an error when either message is invalid or the vault ids differ.
+    /// Returns an error when either message is invalid or its vault or owner differs.
     pub fn validate_for_request(
         &self,
         request: &SyncCreateVaultRequest,
@@ -537,6 +569,10 @@ impl SyncCreateVaultResponse {
         self.validate()?;
         if self.vault.id != request.vault_id {
             return Err(invalid("created vault id does not match request"));
+        }
+        if !matches!(self.vault.kind, VaultKind::Shared { organization } if organization == request.organization)
+        {
+            return Err(invalid("created vault owner does not match request"));
         }
         Ok(())
     }
@@ -590,12 +626,15 @@ impl SyncVaultKey {
         ])
     }
 
-    fn from_value(value: Value) -> Result<Self, SyncCodecError> {
+    fn from_value(value: Value, strict: bool) -> Result<Self, SyncCodecError> {
         let mut fields = expect_map(value)?;
         let key = Self {
             epoch: take_uint(&mut fields, "epoch")?,
             wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
         };
+        if strict && !fields.is_empty() {
+            return Err(invalid("unknown shared-vault epoch key request field"));
+        }
         key.validate()?;
         Ok(key)
     }
@@ -663,7 +702,7 @@ impl SyncVaultKeysResponse {
         let keys = match fields.remove("keys") {
             Some(Value::Array(values)) => values
                 .into_iter()
-                .map(SyncVaultKey::from_value)
+                .map(|value| SyncVaultKey::from_value(value, false))
                 .collect::<Result<Vec<_>, SyncCodecError>>()?,
             Some(_) => return Err(invalid("keys must be an array")),
             None => return Err(invalid("missing keys")),
@@ -679,19 +718,29 @@ impl SyncVaultKeysResponse {
 pub struct SyncVaultEpochWrap {
     /// Current member account identifier.
     pub account_id: Uuid,
+    /// Exact current Organization Membership of the recipient.
+    pub membership_id: Uuid,
+    /// Reviewed Account key publication for the recipient.
+    pub recipient_key_revision: u64,
     /// Account-bound opaque wrap of the new vault key.
     pub wrapped_vault_key: Vec<u8>,
 }
 
 impl SyncVaultEpochWrap {
     fn validate(&self) -> Result<(), SyncCodecError> {
-        valid_uuid(self.account_id, "account_id")?;
+        validate_recipient_binding(
+            self.account_id,
+            self.membership_id,
+            self.recipient_key_revision,
+        )?;
         validate_key_artifact(&self.wrapped_vault_key, "wrapped_vault_key")
     }
 
     fn into_value(self) -> Value {
         map(vec![
             ("account_id", Value::Bytes(self.account_id.as_bytes().to_vec())),
+            ("membership_id", Value::Bytes(self.membership_id.as_bytes().to_vec())),
+            ("recipient_key_revision", Value::UInt(self.recipient_key_revision)),
             ("wrapped_vault_key", Value::Bytes(self.wrapped_vault_key)),
         ])
     }
@@ -700,6 +749,8 @@ impl SyncVaultEpochWrap {
         let mut fields = expect_map(value)?;
         let wrap = Self {
             account_id: take_uuid(&mut fields, "account_id")?,
+            membership_id: take_uuid(&mut fields, "membership_id")?,
+            recipient_key_revision: take_uint(&mut fields, "recipient_key_revision")?,
             wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
         };
         if !fields.is_empty() {
@@ -725,7 +776,8 @@ impl SyncPublishVaultEpochRequest {
     /// # Errors
     ///
     /// Returns an error for a zero epoch, an empty or oversized wrap list, invalid wraps, or
-    /// duplicate or unsorted account identifiers.
+    /// unsorted Account identifiers, duplicate Account or Membership identifiers, or invalid
+    /// reviewed key revisions.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
         positive(self.epoch, "epoch")?;
         if self.wrapped_keys.is_empty() {
@@ -737,6 +789,7 @@ impl SyncPublishVaultEpochRequest {
             )));
         }
         let mut previous = None;
+        let mut memberships = BTreeSet::new();
         for wrap in &self.wrapped_keys {
             wrap.validate()?;
             if let Some(previous) = previous {
@@ -749,6 +802,9 @@ impl SyncPublishVaultEpochRequest {
                         return Err(invalid("wrapped_keys must be sorted by account_id"));
                     }
                 }
+            }
+            if !memberships.insert(wrap.membership_id) {
+                return Err(invalid("wrapped_keys contains duplicate membership_id"));
             }
             previous = Some(wrap.account_id.as_bytes());
         }
@@ -924,19 +980,27 @@ impl SyncRetireVaultEpochResponse {
 pub struct SyncAddVaultMemberRequest {
     /// Account being added to the vault.
     pub account_id: Uuid,
+    /// Exact reviewed Organization Membership of the recipient.
+    pub membership_id: Uuid,
+    /// Reviewed Account key publication for the recipient.
+    pub recipient_key_revision: u64,
     /// One wrap for every currently served epoch, sorted by epoch.
     pub wrapped_keys: Vec<SyncVaultKey>,
 }
 
 impl SyncAddVaultMemberRequest {
-    /// Validate the target account and exact-shape epoch list.
+    /// Validate the reviewed recipient and exact-shape epoch list.
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid account, an empty or oversized list, invalid wraps, or
-    /// duplicate or unsorted epochs.
+    /// Returns an error for an invalid Account or Membership, zero key revision, invalid wraps or
+    /// invalid epoch count or order.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
-        valid_uuid(self.account_id, "account_id")?;
+        validate_recipient_binding(
+            self.account_id,
+            self.membership_id,
+            self.recipient_key_revision,
+        )?;
         if self.wrapped_keys.is_empty() || self.wrapped_keys.len() > MAX_SYNC_VAULT_MEMBER_EPOCHS {
             return Err(invalid(format!(
                 "wrapped_keys must contain 1..{MAX_SYNC_VAULT_MEMBER_EPOCHS} entries"
@@ -963,6 +1027,8 @@ impl SyncAddVaultMemberRequest {
         self.validate()?;
         let encoded = encode_map(vec![
             ("account_id", Value::Bytes(self.account_id.as_bytes().to_vec())),
+            ("membership_id", Value::Bytes(self.membership_id.as_bytes().to_vec())),
+            ("recipient_key_revision", Value::UInt(self.recipient_key_revision)),
             (
                 "wrapped_keys",
                 Value::Array(
@@ -983,10 +1049,12 @@ impl SyncAddVaultMemberRequest {
         enforce_vault_member_body_limit(input)?;
         let mut fields = decode_map(input)?;
         let account_id = take_uuid(&mut fields, "account_id")?;
+        let membership_id = take_uuid(&mut fields, "membership_id")?;
+        let recipient_key_revision = take_uint(&mut fields, "recipient_key_revision")?;
         let wrapped_keys = match fields.remove("wrapped_keys") {
             Some(Value::Array(values)) => values
                 .into_iter()
-                .map(SyncVaultKey::from_value)
+                .map(|value| SyncVaultKey::from_value(value, true))
                 .collect::<Result<Vec<_>, SyncCodecError>>()?,
             Some(_) => return Err(invalid("wrapped_keys must be an array")),
             None => return Err(invalid("missing wrapped_keys")),
@@ -994,7 +1062,7 @@ impl SyncAddVaultMemberRequest {
         if !fields.is_empty() {
             return Err(invalid("unknown shared-vault member field"));
         }
-        let request = Self { account_id, wrapped_keys };
+        let request = Self { account_id, membership_id, recipient_key_revision, wrapped_keys };
         request.validate()?;
         Ok(request)
     }
@@ -1005,23 +1073,26 @@ impl SyncAddVaultMemberRequest {
 pub struct SyncAddVaultMemberResponse {
     /// Account added to the vault.
     pub account_id: Uuid,
+    /// Exact Organization Membership added to the vault.
+    pub membership_id: Uuid,
 }
 
 impl SyncAddVaultMemberResponse {
-    /// Validate the added account identifier.
+    /// Validate the added Account and Membership identifiers.
     ///
     /// # Errors
     ///
     /// Returns an error for a non-UUIDv7 identifier.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
-        valid_uuid(self.account_id, "account_id")
+        valid_uuid(self.account_id, "account_id")?;
+        valid_uuid(self.membership_id, "membership_id")
     }
 
-    /// Validate the added account against its request.
+    /// Validate the added Account and Membership against the request.
     ///
     /// # Errors
     ///
-    /// Returns an error when either message is invalid or the account ids differ.
+    /// Returns an error when either message is invalid or either identifier differs.
     pub fn validate_for_request(
         &self,
         request: &SyncAddVaultMemberRequest,
@@ -1031,18 +1102,23 @@ impl SyncAddVaultMemberResponse {
         if self.account_id != request.account_id {
             return Err(invalid("added account_id does not match request"));
         }
+        if self.membership_id != request.membership_id {
+            return Err(invalid("added membership_id does not match request"));
+        }
         Ok(())
     }
 
-    /// Encode the deterministic `{account_id}` response map.
+    /// Encode the deterministic `{account_id, membership_id}` response map.
     ///
     /// # Errors
     ///
     /// Returns an error when validation or canonical encoding fails.
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
         self.validate()?;
-        let encoded =
-            encode_map(vec![("account_id", Value::Bytes(self.account_id.as_bytes().to_vec()))])?;
+        let encoded = encode_map(vec![
+            ("account_id", Value::Bytes(self.account_id.as_bytes().to_vec())),
+            ("membership_id", Value::Bytes(self.membership_id.as_bytes().to_vec())),
+        ])?;
         enforce_vault_member_body_limit(&encoded)?;
         Ok(encoded)
     }
@@ -1051,11 +1127,14 @@ impl SyncAddVaultMemberResponse {
     ///
     /// # Errors
     ///
-    /// Returns an error for malformed CBOR, a missing or invalid account id, or an oversized body.
+    /// Returns an error for malformed CBOR, missing or invalid ids, or an oversized body.
     pub fn from_cbor(input: &[u8]) -> Result<Self, SyncCodecError> {
         enforce_vault_member_body_limit(input)?;
         let mut fields = decode_map(input)?;
-        let response = Self { account_id: take_uuid(&mut fields, "account_id")? };
+        let response = Self {
+            account_id: take_uuid(&mut fields, "account_id")?,
+            membership_id: take_uuid(&mut fields, "membership_id")?,
+        };
         response.validate()?;
         Ok(response)
     }
@@ -1663,15 +1742,14 @@ fn session_response_body_bytes(response: &SyncSessionResponse) -> Result<usize, 
     for vault in &response.vaults {
         let entry =
             session_vault_body_bytes(vault.kind.as_str().len(), vault.seq, vault.key_epoch)?;
-        let entry = if let Some(context) = vault.organization {
-            entry
-                .checked_add(44 + argument_bytes(context.view_revision))
-                .ok_or_else(|| invalid("session vault encoded size overflows this platform"))?
-        } else {
-            entry
+        let owner_bytes = match (&vault.kind, vault.organization) {
+            (_, Some(context)) => 44 + argument_bytes(context.view_revision),
+            (VaultKind::Shared { .. }, None) => 30,
+            (_, None) => 0,
         };
         size = size
             .checked_add(entry)
+            .and_then(|size| size.checked_add(owner_bytes))
             .ok_or_else(|| invalid("session response encoded size overflows this platform"))?;
     }
     Ok(size)
@@ -3331,6 +3409,16 @@ fn validate_page(
         return Err(invalid(format!("non-final {label} cursor must equal its last entry")));
     }
     Ok(())
+}
+
+fn validate_recipient_binding(
+    account_id: Uuid,
+    membership_id: Uuid,
+    recipient_key_revision: u64,
+) -> Result<(), SyncCodecError> {
+    valid_uuid(account_id, "account_id")?;
+    valid_uuid(membership_id, "membership_id")?;
+    positive(recipient_key_revision, "recipient_key_revision")
 }
 
 fn invalid(message: impl Into<String>) -> SyncCodecError {

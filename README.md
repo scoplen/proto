@@ -8,6 +8,13 @@ under Apache-2.0.
 
 ## Status
 
+D-171 adds Organization-owned Shared vault creation and descriptors, two administrator
+recipient reads, and member and epoch messages bound to exact Memberships and reviewed Account
+key revisions. The shared codecs require the owning team and check recipient order, uniqueness
+and response binding. Both recipient reads require the existing `sync:write` Device scope. The K-2 wrap
+proof and production authorization, rotation and recovery are separate contracts and consumer
+work.
+
 D-170 adds the eight browser-only member-link operations and separate self and Owner
 withdrawal scopes. The `member_link` module validates empty requests, reviewed tags,
 original-writer confirmation keys and response binding to the Organization, Membership

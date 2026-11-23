@@ -7,7 +7,8 @@ use scoplen_api::sync::{
     SyncAccountKeyBundleUpdate, SyncAddVaultMemberRequest, SyncAddVaultMemberResponse,
     SyncCreateVaultRequest, SyncCreateVaultResponse, SyncPublishVaultEpochRequest,
     SyncPublishVaultEpochResponse, SyncRemoveVaultMemberResponse, SyncRetireVaultEpochResponse,
-    SyncSessionRequest, SyncSessionResponse, SyncVaultKeysResponse,
+    SyncSessionRequest, SyncSessionResponse, SyncVaultKeysResponse, SyncVaultRecipient,
+    SyncVaultRecipientsResponse,
 };
 
 macro_rules! round_trip {
@@ -25,7 +26,7 @@ fuzz_target!(|bytes: &[u8]| {
     let Some((&selector, input)) = bytes.split_first() else {
         return;
     };
-    match selector % 15 {
+    match selector % 17 {
         0 => round_trip!(SyncSessionRequest, input),
         1 => round_trip!(SyncSessionResponse, input),
         2 => {
@@ -60,6 +61,8 @@ fuzz_target!(|bytes: &[u8]| {
         12 => round_trip!(SyncAccountKeyBundle, input),
         13 => round_trip!(SyncAccountKeyBundleUpdate, input),
         14 => round_trip!(SyncAccountKeyBundlePutResponse, input),
+        15 => round_trip!(SyncVaultRecipient, input),
+        16 => round_trip!(SyncVaultRecipientsResponse, input),
         _ => unreachable!(),
     }
 });

@@ -1549,6 +1549,18 @@
       "kind": "auth.scope.operation",
       "input": "{\"method\":\"PATCH\",\"route_template\":\"/api/v1/orgs/{org}/auth-connection-draft\"}",
       "expected": "unmapped"
+    },
+    {
+      "id": "auth-scope-d171-vault-recipient-roster-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/recipients\"}",
+      "expected": "sync:write"
+    },
+    {
+      "id": "auth-scope-d171-vault-recipient-lookup-v1",
+      "kind": "auth.scope.operation",
+      "input": "{\"method\":\"GET\",\"route_template\":\"/sync/v1/vaults/{vault}/recipients/{membership}\"}",
+      "expected": "sync:write"
     }
   ]
 }

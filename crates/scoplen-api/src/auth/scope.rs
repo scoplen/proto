@@ -321,6 +321,10 @@ pub enum DeviceAccessOperation {
     Notifications,
     /// Create a shared vault.
     VaultCreate,
+    /// Read the current Shared vault recipient roster as an administrator.
+    VaultRecipientRosterRead,
+    /// Read one prospective or admitted Shared vault recipient's public key publication.
+    VaultRecipientRead,
     /// Write a vault's object batch.
     VaultObjectsWrite,
     /// Advance the device's acknowledged vault cursor.
@@ -337,7 +341,7 @@ pub enum DeviceAccessOperation {
 
 impl DeviceAccessOperation {
     /// Every operation in the D-107 registry.
-    pub const ALL: [Self; 99] = [
+    pub const ALL: [Self; 101] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -431,6 +435,8 @@ impl DeviceAccessOperation {
         Self::ObjectVersionsRead,
         Self::Notifications,
         Self::VaultCreate,
+        Self::VaultRecipientRosterRead,
+        Self::VaultRecipientRead,
         Self::VaultObjectsWrite,
         Self::VaultAcknowledge,
         Self::VaultEpochPublish,
@@ -546,6 +552,8 @@ impl DeviceAccessOperation {
             | Self::ObjectVersionsRead
             | Self::Notifications => &[DeviceAccessScope::SyncRead],
             Self::VaultCreate
+            | Self::VaultRecipientRosterRead
+            | Self::VaultRecipientRead
             | Self::VaultObjectsWrite
             | Self::VaultAcknowledge
             | Self::VaultEpochPublish
@@ -565,6 +573,10 @@ impl DeviceAccessOperation {
     /// Notifications return the classic handshake's `GET`; [`Self::from_route`] also recognizes
     /// the defined HTTP/2 `CONNECT`. Bind `DPoP` to the actual opening method in either case.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Keep the finite operation-to-method registry exhaustive in one table."
+    )]
     pub const fn http_method(self) -> &'static str {
         match self {
             Self::AccessRequestList
@@ -582,6 +594,8 @@ impl DeviceAccessOperation {
             | Self::TeamMemberRead
             | Self::AccountKeysRead
             | Self::VaultKeysRead
+            | Self::VaultRecipientRosterRead
+            | Self::VaultRecipientRead
             | Self::VaultChangesRead
             | Self::VaultSnapshotRead
             | Self::OrganizationViewRead
@@ -774,6 +788,8 @@ impl DeviceAccessOperation {
             Self::ObjectVersionsRead => "/sync/v1/vaults/{vault}/objects/{object}/versions",
             Self::Notifications => "/sync/v1/notify",
             Self::VaultCreate => "/sync/v1/vaults",
+            Self::VaultRecipientRosterRead => "/sync/v1/vaults/{vault}/recipients",
+            Self::VaultRecipientRead => "/sync/v1/vaults/{vault}/recipients/{membership}",
             Self::VaultObjectsWrite => "/sync/v1/vaults/{vault}/objects",
             Self::VaultAcknowledge => "/sync/v1/vaults/{vault}/ack",
             Self::VaultEpochPublish => "/sync/v1/vaults/{vault}/epochs",
