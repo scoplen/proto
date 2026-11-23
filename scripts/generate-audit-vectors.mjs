@@ -106,6 +106,33 @@ export function auditVectors() {
     reject(`access-request-kind-${kind}`, "event", { ...requestEvents[0], resource: { kind, id: grantId } });
     reject(`access-request-filter-${kind}`, "query", JSON.stringify([["filter", `resource eq "${kind}:${grantId}"`]]));
   }
+  const device = "0191d3e0-8000-7000-8000-000000000005";
+  const firstDraft = "0191d3e0-8000-7000-8000-000000000006";
+  const nextDraft = "0191d3e0-8000-7000-8000-000000000007";
+  let previous = Buffer.alloc(32);
+  const draftEvents = [
+    ["created", firstDraft, { device_id: device }],
+    ["cancelled", firstDraft, { browser_family_id: family }],
+    ["created", nextDraft, { device_id: device }],
+  ].map(([verb, generation, writer], index) => {
+    const action = `organization.auth_draft_${verb}`;
+    const original = Buffer.from(JSON.stringify({ action, account_id: account, organization_id: org, generation, ...writer }));
+    const digest = hash(Buffer.concat([previous, original]));
+    const projection = { ...event, sequence: String(index + 1), category: "scoplen", event_class: action,
+      actor_device_id: writer.device_id ?? null, actor_browser_family_id: writer.browser_family_id ?? null,
+      resource: { kind: "auth_connection_draft", id: generation },
+      previous_hash: previous.toString("hex"), event_hash: digest.toString("hex") };
+    previous = digest;
+    return projection;
+  });
+  json("auth-draft-device-create", "event", draftEvents[0]);
+  json("auth-draft-browser-cancel", "event", draftEvents[1]);
+  json("auth-draft-history", "page", { items: draftEvents.toReversed(), next_cursor: null });
+  add("auth-draft-generation-filter", "query", JSON.stringify([["filter", `resource eq "auth_connection_draft:${firstDraft}" and event_class eq "organization.auth_draft_created"`]]), "accepted");
+  for (const kind of ["AuthConnectionDraft", "auth-connection-draft", "auth_connection_drafts"]) {
+    reject(`auth-draft-kind-${kind}`, "event", { ...draftEvents[0], resource: { kind, id: firstDraft } });
+    reject(`auth-draft-filter-${kind}`, "query", JSON.stringify([["filter", `resource eq "${kind}:${firstDraft}"`]]));
+  }
   return vectors;
 }
 

@@ -4,6 +4,11 @@ All notable changes to the `proto` repository will be recorded here.
 
 ## Unreleased
 
+- Register `auth_connection_draft` as a pre-Stable Audit resource kind. Older strict
+  readers can reject a page containing it. Upgrade readers before enabling the server
+  projection. The resource ID identifies the recorded generation across cancellation and
+  recreation.
+
 - Add D-166 Organization issuer draft codecs, exact Device and Account-browser scopes,
   conditional writes, original-writer receipt and audit reference behavior, public test
   vectors, and OpenAPI and TypeScript declarations.

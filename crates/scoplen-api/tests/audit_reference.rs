@@ -5,8 +5,8 @@ use cedar_policy::PolicySet;
 use scoplen_api::{
     account_browser::{AccountBrowserWriter, INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE},
     audit::{
-        AuditCategory, AuditPage, AuditResourceKind, AuditVerification, MAX_AUDIT_PAGE_BYTES,
-        MAX_AUDIT_VERIFICATION_BYTES, MAX_AUDIT_VERIFY_EVENT_BYTES,
+        AuditCategory, AuditListQuery, AuditPage, AuditResourceKind, AuditVerification,
+        MAX_AUDIT_PAGE_BYTES, MAX_AUDIT_VERIFICATION_BYTES, MAX_AUDIT_VERIFY_EVENT_BYTES,
         reference::{
             AuditReferenceCaller as Caller, AuditReferenceError as Error, AuditReferencePeer,
         },
@@ -117,6 +117,43 @@ fn grant_history_is_readable_by_both_profiles_with_exact_resource_filters() {
             Err(Error::InvalidRequest)
         );
     }
+}
+
+#[test]
+fn draft_audit_filters_distinguish_recreated_generations_and_retain_recorded_writers() {
+    let mut f = fixture();
+    let history = AuditPage::from_json(&body("audit-auth-draft-history-v1")).unwrap();
+    let [replacement, cancelled, created] = history.items.as_slice() else {
+        panic!("expected three retained draft events");
+    };
+    let original = created.resource.as_ref().unwrap();
+    assert_eq!(original.kind, AuditResourceKind::AuthConnectionDraft);
+    assert_eq!(cancelled.resource.as_ref(), Some(original));
+    assert_ne!(replacement.resource.as_ref(), Some(original));
+    assert!(created.actor_device_id.is_some() && created.actor_browser_family_id.is_none());
+    assert!(cancelled.actor_device_id.is_none() && cancelled.actor_browser_family_id.is_some());
+    let filter = format!(
+        "resource eq \"auth_connection_draft:{}\" and event_class eq \"organization.auth_draft_created\"",
+        original.id
+    );
+    let query = AuditListQuery::from_parameters([("filter", filter.as_str())]).unwrap();
+    assert!(query.filter.matches(created).unwrap());
+    assert!(!query.filter.matches(cancelled).unwrap());
+    assert!(!query.filter.matches(replacement).unwrap());
+    let exact = AuditPage { items: vec![created.clone()], next_cursor: None }.to_json().unwrap();
+    f.peer.set_page_response(&exact);
+    for caller in [Caller::Device(&f.device), Caller::AccountBrowser(f.browser)] {
+        assert_eq!(f.peer.list(caller, id(1), [("filter", filter.as_str())], 101).unwrap(), exact);
+        assert_eq!(
+            f.peer.list(caller, id(99), [("filter", filter.as_str())], 101),
+            Err(Error::NotFound)
+        );
+    }
+    f.peer.set_page_response(&history.to_json().unwrap());
+    assert_eq!(
+        f.peer.list(Caller::Device(&f.device), id(1), [("filter", filter.as_str())], 101),
+        Err(Error::StorageUnavailable)
+    );
 }
 
 #[test]
