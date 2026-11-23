@@ -7,14 +7,15 @@ import { generateAuthConnectionTypes } from "./generate-auth-connection.mjs";
 import { generateMemberLinkTypes } from "./generate-member-link.mjs";
 
 const doc = JSON.parse(await readFile(new URL("v1.yaml", import.meta.url), "utf8"));
+const browserVectors = JSON.parse(await readFile(new URL("../../../vectors/account-browser.json", import.meta.url), "utf8")).vectors;
 test("D-170 declares eight browser-only link operations with distinct self and withdrawal scopes", () => {
   const root = "/orgs/{org}/auth-link";
   const named = "/orgs/{org}/members/{membership}/auth-link";
   const attempt = root + "/attempts/{attempt}";
   const expected = [
-    [root, "get"], [root, "delete"], [root + "/attempts", "post"],
+    [root, "get"], [root + "/attempts", "post"],
     [attempt, "get"], [attempt, "delete"], [attempt + "/confirm", "post"],
-    [named, "get"], [named, "delete"],
+    [root, "delete"], [named, "get"], [named, "delete"],
   ];
   assert.match(generateMemberLinkTypes(doc), /interface OrganizationSelfLinkStatus/);
   for (const [path, method] of expected) {
@@ -29,6 +30,15 @@ test("D-170 declares eight browser-only link operations with distinct self and w
     assert.equal(op["x-scoplen-required-browser-scope"], path === named ? "auth-links:withdraw" : "auth-links:self");
     assert.deepEqual(op["x-scoplen-required-membership-roles-any"], path === named ? ["owner"] : undefined);
   }
+  const vectors = browserVectors.filter(vector => vector.kind === "account.browser.operation")
+    .map(vector => ({ ...JSON.parse(vector.input), ...JSON.parse(vector.expected) }))
+    .filter(vector => vector.path.includes("/auth-link"));
+  assert.deepEqual(vectors, expected.map(([path, method]) => ({
+    method: method.toUpperCase(), path: "/api/v1" + path,
+    scopes: [doc.paths[path][method]["x-scoplen-required-browser-scope"]],
+    writerReceipt: doc.paths[path][method].parameters.some(parameter => parameter.name === "Idempotency-Key"),
+    fetchCredentials: doc.paths[path][method]["x-scoplen-fetch-credentials"],
+  })));
   for (const mutate of [
     d => { d.paths[named].delete["x-scoplen-cedar-action"] = "manage_organization"; },
     d => { delete d.paths[attempt + "/confirm"].post.responses[201].headers.ETag; },

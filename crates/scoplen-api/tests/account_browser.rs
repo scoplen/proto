@@ -110,6 +110,22 @@ fn independent_wire_digest_operation_and_writer_vectors() {
                     operation.uses_browser_writer_receipt(),
                     expected["writerReceipt"].as_bool().unwrap()
                 );
+                if let Some(credentials) = expected["fetchCredentials"].as_str() {
+                    let actual = match operation.fetch_credentials() {
+                        AccountBrowserFetchCredentials::SameOrigin => "same-origin",
+                        AccountBrowserFetchCredentials::Omit => "omit",
+                    };
+                    assert_eq!(actual, credentials, "{}", vector.id);
+                    assert!(
+                        DeviceAccessOperation::from_route(
+                            operation.http_method(),
+                            operation.route_template()
+                        )
+                        .is_none(),
+                        "{}",
+                        vector.id
+                    );
+                }
             }
             _ => {
                 let rejected = kind.ends_with(".reject");
@@ -138,8 +154,8 @@ fn snippet_browser_operations_reuse_inventory_scopes_and_preserve_device_routes(
     use AccountBrowserAccessScope as Scope;
     use DeviceAccessOperation as Device;
 
-    assert_eq!(Browser::ALL.len(), 76);
-    assert_eq!(Scope::ALL.len(), 17);
+    assert_eq!(Browser::ALL.len(), 84);
+    assert_eq!(Scope::ALL.len(), 19);
     let collection = "/api/v1/orgs/{org}/snippets";
     let item = "/api/v1/orgs/{org}/snippets/{id}";
     for (browser, device, method, path, scope, receipt) in [
