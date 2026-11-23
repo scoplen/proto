@@ -13,14 +13,19 @@ fn id(last: u8) -> Uuid {
 }
 
 fn request() -> SyncCreateVaultRequest {
-    SyncCreateVaultRequest { vault_id: id(1), wrapped_vault_key: vec![1, 2, 3, 4] }
+    SyncCreateVaultRequest {
+        organization: id(2),
+        vault_id: id(1),
+        creator_key_revision: 7,
+        wrapped_vault_key: vec![1, 2, 3, 4],
+    }
 }
 
 fn response() -> SyncCreateVaultResponse {
     SyncCreateVaultResponse {
         vault: SessionVault {
             id: id(1),
-            kind: VaultKind::Shared,
+            kind: VaultKind::Shared { organization: id(2) },
             seq: 0,
             key_epoch: 1,
             rotation_pending: false,
@@ -53,11 +58,14 @@ fn shared_vault_codecs_round_trip_and_accept_response_extensions() {
 #[test]
 fn shared_vault_creation_response_binds_to_valid_request() {
     let response = response();
-    response.validate_for_request(&request()).expect("matching vault id");
+    response.validate_for_request(&request()).expect("matching vault and owner");
 
     let mut different = request();
     different.vault_id = id(2);
     assert!(response.validate_for_request(&different).is_err(), "different valid vault id");
+    different = request();
+    different.organization = id(3);
+    assert!(response.validate_for_request(&different).is_err(), "different valid owner");
 
     let mut invalid_request = request();
     invalid_request.wrapped_vault_key.clear();
@@ -74,6 +82,12 @@ fn shared_vault_codecs_reject_invalid_and_ambiguous_inputs() {
     invalid.vault_id = Uuid::nil();
     assert!(invalid.to_cbor().is_err(), "non-UUIDv7 id");
     invalid = request();
+    invalid.organization = Uuid::nil();
+    assert!(invalid.to_cbor().is_err(), "non-UUIDv7 owner");
+    invalid = request();
+    invalid.creator_key_revision = 0;
+    assert!(invalid.to_cbor().is_err(), "zero key revision");
+    invalid = request();
     invalid.wrapped_vault_key.clear();
     assert!(invalid.to_cbor().is_err(), "empty key wrap");
     invalid = request();
@@ -88,6 +102,12 @@ fn shared_vault_codecs_reject_invalid_and_ambiguous_inputs() {
     let Value::Map(mut fields) = cbor::decode(&encoded).expect("request map") else {
         panic!("request must be a map");
     };
+    for key in ["organization", "creator_key_revision"] {
+        let mut missing = fields.clone();
+        missing.retain(|(field, _)| field != &Value::Text(key.into()));
+        let missing = cbor::encode(&Value::Map(missing)).expect("omitted field");
+        assert!(SyncCreateVaultRequest::from_cbor(&missing).is_err(), "missing {key}");
+    }
     fields.push((Value::Text("future".into()), Value::UInt(1)));
     assert!(
         SyncCreateVaultRequest::from_cbor(&cbor::encode(&Value::Map(fields)).expect("unknown"))
@@ -116,8 +136,11 @@ fn published_shared_vault_vectors_match_public_codecs() {
             "sync.vaults.create.request" => {
                 let value: JsonValue = serde_json::from_str(&vector.input).expect("request JSON");
                 let source = SyncCreateVaultRequest {
+                    organization: Uuid::parse_str(value["organization"].as_str().expect("owner"))
+                        .expect("UUID"),
                     vault_id: Uuid::parse_str(value["vault_id"].as_str().expect("id"))
                         .expect("UUID"),
+                    creator_key_revision: value["creator_key_revision"].as_u64().expect("revision"),
                     wrapped_vault_key: decode_hex(
                         value["wrapped_vault_key"].as_str().expect("wrapped key"),
                     ),

@@ -288,6 +288,41 @@ fn organization_descriptors_require_owner_and_positive_revision_in_exact_budget(
 }
 
 #[test]
+fn shared_descriptors_require_owner_and_reject_inventory_revision_in_exact_budget() {
+    let value = session(VaultKind::Shared { organization: id(1) }, None);
+    let bytes = value.to_cbor().unwrap();
+    assert_eq!(value.to_cbor_with_body_limit(bytes.len()).unwrap(), bytes);
+    assert!(value.to_cbor_with_body_limit(bytes.len() - 1).is_err());
+    assert_eq!(SyncSessionResponse::from_cbor_with_body_limit(&bytes, bytes.len()), Ok(value));
+    assert!(session(VaultKind::Shared { organization: Uuid::nil() }, None).to_cbor().is_err());
+    assert!(session(VaultKind::Unknown("shared".into()), None).to_cbor().is_err());
+    assert!(session(VaultKind::Shared { organization: id(1) }, Some(source())).to_cbor().is_err());
+
+    let Value::Map(mut fields) = cbor::decode(&bytes).unwrap() else { panic!("session map") };
+    let (_, Value::Array(vaults)) =
+        fields.iter_mut().find(|(key, _)| key == &Value::Text("vaults".into())).unwrap()
+    else {
+        panic!("vault list")
+    };
+    let Value::Map(descriptor) = &mut vaults[0] else { panic!("descriptor") };
+    descriptor.push((Value::Text("view_revision".into()), Value::UInt(1)));
+    assert!(
+        SyncSessionResponse::from_cbor(&cbor::encode(&Value::Map(fields.clone())).unwrap())
+            .is_err()
+    );
+    let (_, Value::Array(vaults)) =
+        fields.iter_mut().find(|(key, _)| key == &Value::Text("vaults".into())).unwrap()
+    else {
+        panic!("vault list")
+    };
+    let Value::Map(descriptor) = &mut vaults[0] else { panic!("descriptor") };
+    descriptor.retain(|(key, _)| {
+        key != &Value::Text("organization".into()) && key != &Value::Text("view_revision".into())
+    });
+    assert!(SyncSessionResponse::from_cbor(&cbor::encode(&Value::Map(fields)).unwrap()).is_err());
+}
+
+#[test]
 fn team_hints_have_exact_fields_and_cannot_mix_notification_states() {
     for event in [
         SyncNotification::MembershipsChanged,

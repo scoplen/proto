@@ -331,18 +331,26 @@ impl SyncReadLimits {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VaultKind {
     Personal,
-    Shared,
+    /// An encrypted Shared vault owned by this Organization.
+    Shared {
+        organization: Uuid,
+    },
     Organization,
     /// An additive future kind that this version must not write to.
     Unknown(String),
 }
 
 impl VaultKind {
-    fn parse(value: String) -> Result<Self, SyncCodecError> {
+    fn parse(value: String, fields: &mut BTreeMap<String, Value>) -> Result<Self, SyncCodecError> {
         nonempty(&value, "kind")?;
         Ok(match value.as_str() {
             "personal" => Self::Personal,
-            "shared" => Self::Shared,
+            "shared" => {
+                if fields.contains_key("view_revision") {
+                    return Err(invalid("Shared vault cannot carry an inventory view revision"));
+                }
+                Self::Shared { organization: take_uuid(fields, "organization")? }
+            }
             "organization" => Self::Organization,
             _ => Self::Unknown(value),
         })
@@ -351,7 +359,7 @@ impl VaultKind {
     fn as_str(&self) -> &str {
         match self {
             Self::Personal => "personal",
-            Self::Shared => "shared",
+            Self::Shared { .. } => "shared",
             Self::Organization => "organization",
             Self::Unknown(value) => value,
         }
@@ -366,7 +374,8 @@ pub struct SessionVault {
     pub seq: u64,
     pub key_epoch: u64,
     pub rotation_pending: bool,
-    /// Required for Organization vaults; absent for encrypted or unknown vault kinds.
+    /// Inventory view context, required only for Organization vaults.
+    /// A Shared vault's owner is carried by its kind.
     pub organization: Option<OrganizationVaultContext>,
 }
 
@@ -393,6 +402,12 @@ impl SessionVault {
             (VaultKind::Organization, Some(context)) => context.validate(),
             (VaultKind::Organization, None) => Err(invalid("missing Organization vault context")),
             (_, Some(_)) => Err(invalid("Organization context requires organization kind")),
+            (VaultKind::Shared { organization }, None) => valid_uuid(*organization, "organization"),
+            (VaultKind::Unknown(kind), None)
+                if matches!(kind.as_str(), "personal" | "shared" | "organization") =>
+            {
+                Err(invalid("known vault kind requires its typed descriptor"))
+            }
             (_, None) => Ok(()),
         }
     }
@@ -408,13 +423,15 @@ impl SessionVault {
         if let Some(context) = self.organization {
             fields.push(("organization", Value::Bytes(context.organization.as_bytes().to_vec())));
             fields.push(("view_revision", Value::UInt(context.view_revision)));
+        } else if let VaultKind::Shared { organization } = self.kind {
+            fields.push(("organization", Value::Bytes(organization.as_bytes().to_vec())));
         }
         map(fields)
     }
 
     fn from_value(value: Value) -> Result<Self, SyncCodecError> {
         let mut fields = expect_map(value)?;
-        let kind = VaultKind::parse(take_text(&mut fields, "kind")?)?;
+        let kind = VaultKind::parse(take_text(&mut fields, "kind")?, &mut fields)?;
         let organization = if kind == VaultKind::Organization {
             Some(OrganizationVaultContext {
                 organization: take_uuid(&mut fields, "organization")?,
@@ -439,20 +456,26 @@ impl SessionVault {
 /// Request body for `POST /sync/v1/vaults`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyncCreateVaultRequest {
+    /// Explicit owning Organization.
+    pub organization: Uuid,
     /// Client-chosen shared-vault identifier.
     pub vault_id: Uuid,
+    /// Reviewed revision of the creator's Account key publication.
+    pub creator_key_revision: u64,
     /// Opaque account-bound wrap of the epoch-1 vault key.
     pub wrapped_vault_key: Vec<u8>,
 }
 
 impl SyncCreateVaultRequest {
-    /// Validate the UUID and bounded opaque key wrap.
+    /// Validate the identifiers, key revision and bounded opaque key wrap.
     ///
     /// # Errors
     ///
-    /// Returns an error for a non-UUIDv7 identifier, an empty wrap, or an oversized wrap.
+    /// Returns an error for a non-UUIDv7 identifier, zero revision or invalid wrap size.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
+        valid_uuid(self.organization, "organization")?;
         valid_uuid(self.vault_id, "vault id")?;
+        positive(self.creator_key_revision, "creator_key_revision")?;
         if self.wrapped_vault_key.is_empty() {
             return Err(invalid("wrapped_vault_key must not be empty"));
         }
@@ -472,7 +495,9 @@ impl SyncCreateVaultRequest {
     pub fn to_cbor(&self) -> Result<Vec<u8>, SyncCodecError> {
         self.validate()?;
         let encoded = encode_map(vec![
+            ("organization", Value::Bytes(self.organization.as_bytes().to_vec())),
             ("vault_id", Value::Bytes(self.vault_id.as_bytes().to_vec())),
+            ("creator_key_revision", Value::UInt(self.creator_key_revision)),
             ("wrapped_vault_key", Value::Bytes(self.wrapped_vault_key.clone())),
         ])?;
         enforce_vault_create_body_limit(&encoded)?;
@@ -488,7 +513,9 @@ impl SyncCreateVaultRequest {
         enforce_vault_create_body_limit(input)?;
         let mut fields = decode_map(input)?;
         let request = Self {
+            organization: take_uuid(&mut fields, "organization")?,
             vault_id: take_uuid(&mut fields, "vault_id")?,
+            creator_key_revision: take_uint(&mut fields, "creator_key_revision")?,
             wrapped_vault_key: take_bytes(&mut fields, "wrapped_vault_key")?,
         };
         if !fields.is_empty() {
@@ -514,7 +541,7 @@ impl SyncCreateVaultResponse {
     /// Returns an error when the descriptor is not the required epoch-1 shared-vault state.
     pub fn validate(&self) -> Result<(), SyncCodecError> {
         self.vault.validate()?;
-        if !matches!(self.vault.kind, VaultKind::Shared)
+        if !matches!(self.vault.kind, VaultKind::Shared { .. })
             || self.vault.seq != 0
             || self.vault.key_epoch != 1
             || self.vault.rotation_pending
@@ -528,7 +555,7 @@ impl SyncCreateVaultResponse {
     ///
     /// # Errors
     ///
-    /// Returns an error when either message is invalid or the vault ids differ.
+    /// Returns an error when either message is invalid or its vault or owner differs.
     pub fn validate_for_request(
         &self,
         request: &SyncCreateVaultRequest,
@@ -537,6 +564,10 @@ impl SyncCreateVaultResponse {
         self.validate()?;
         if self.vault.id != request.vault_id {
             return Err(invalid("created vault id does not match request"));
+        }
+        if !matches!(self.vault.kind, VaultKind::Shared { organization } if organization == request.organization)
+        {
+            return Err(invalid("created vault owner does not match request"));
         }
         Ok(())
     }
@@ -1663,15 +1694,14 @@ fn session_response_body_bytes(response: &SyncSessionResponse) -> Result<usize, 
     for vault in &response.vaults {
         let entry =
             session_vault_body_bytes(vault.kind.as_str().len(), vault.seq, vault.key_epoch)?;
-        let entry = if let Some(context) = vault.organization {
-            entry
-                .checked_add(44 + argument_bytes(context.view_revision))
-                .ok_or_else(|| invalid("session vault encoded size overflows this platform"))?
-        } else {
-            entry
+        let owner_bytes = match (&vault.kind, vault.organization) {
+            (_, Some(context)) => 44 + argument_bytes(context.view_revision),
+            (VaultKind::Shared { .. }, None) => 30,
+            (_, None) => 0,
         };
         size = size
             .checked_add(entry)
+            .and_then(|size| size.checked_add(owner_bytes))
             .ok_or_else(|| invalid("session response encoded size overflows this platform"))?;
     }
     Ok(size)

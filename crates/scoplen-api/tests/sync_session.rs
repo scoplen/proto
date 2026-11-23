@@ -46,7 +46,7 @@ fn published_session_vectors_match_public_codec() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/sync-session.json");
     let document = scoplen_test_vectors::VectorDocument::from_path(path).expect("vectors");
-    assert_eq!(document.vectors.len(), 2);
+    assert_eq!(document.vectors.len(), 3);
     for vector in &document.vectors {
         let expected = decode_hex(&vector.expected);
         match vector.kind.as_str() {
@@ -191,7 +191,10 @@ fn response_from_json(input: &str) -> SyncSessionResponse {
                 id: Uuid::parse_str(&string(vault, "id")).expect("UUID"),
                 kind: match string(vault, "kind").as_str() {
                     "personal" => VaultKind::Personal,
-                    "shared" => VaultKind::Shared,
+                    "shared" => VaultKind::Shared {
+                        organization: Uuid::parse_str(&string(vault, "organization"))
+                            .expect("Organization UUID"),
+                    },
                     "organization" => VaultKind::Organization,
                     other => VaultKind::Unknown(other.into()),
                 },
