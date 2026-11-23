@@ -1,0 +1,1 @@
+[["filter","resource eq \"auth_connection_draft:0191d3e0-8000-7000-8000-000000000006\" and event_class eq \"organization.auth_draft_created\""]]

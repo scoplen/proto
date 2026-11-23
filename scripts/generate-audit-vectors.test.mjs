@@ -44,3 +44,23 @@ test("independent D-144 vectors regenerate and retain exact calendar boundaries"
     assert.equal(vectors.find(v => v.id === `audit-access-request-filter-${kind}-v1`).expected, "rejected");
   }
 });
+
+test("D-166 audit examples bind exact draft generations and both recorded writer kinds", async () => {
+  const { vectors } = JSON.parse(await readFile(new URL("../vectors/audit.json", import.meta.url), "utf8"));
+  const page = JSON.parse(vectors.find(v => v.id === "audit-auth-draft-history-v1").input);
+  const [replacement, cancellation, creation] = page.items;
+  assert.equal(creation.resource.kind, "auth_connection_draft");
+  assert.deepEqual(cancellation.resource, creation.resource);
+  assert.notEqual(replacement.resource.id, creation.resource.id);
+  assert.deepEqual(page.items.map(event => event.event_class), ["organization.auth_draft_created", "organization.auth_draft_cancelled", "organization.auth_draft_created"]);
+  assert.ok(creation.actor_device_id && cancellation.actor_browser_family_id);
+  assert.equal(creation.actor_browser_family_id, null);
+  assert.equal(cancellation.actor_device_id, null);
+  for (const event of page.items) {
+    assert.equal(event.category, "scoplen");
+    assert.equal(event.outcome, "success");
+    assert.ok(event.actor_account_id);
+    assert.notEqual(event.resource.id, event.organization_id);
+    assert.doesNotMatch(JSON.stringify(event), /issuer|https:\/\//i);
+  }
+});

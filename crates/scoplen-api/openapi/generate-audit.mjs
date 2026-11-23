@@ -11,7 +11,7 @@ const hash = { type: "string", pattern: "^[0-9a-f]{64}$", minLength: 64, maxLeng
 const timestamp = { type: "string", format: "date-time", pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]{0,2}[1-9])?Z$", maxLength: 24, description: "Valid UTC calendar; exact integer Unix milliseconds. Omit zero fraction; otherwise trim only trailing zeroes from three millisecond digits. No rounding, offsets, leap seconds or sub-millisecond precision. Stored event and checkpoint instants are positive." };
 const eventClass = { type: "string", minLength: 1, maxLength: 128, pattern: "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$" };
 const outcomes = ["success", "failure", "unknown"];
-const kinds = ["organization", "invitation", "membership", "host", "host_group", "access_profile", "route", "trust_record", "snippet", "gateway_network", "group", "policy", "grant", "access_request", "certificate_authority", "certificate"];
+const kinds = ["organization", "invitation", "membership", "host", "host_group", "access_profile", "route", "trust_record", "snippet", "gateway_network", "group", "policy", "grant", "access_request", "auth_connection_draft", "certificate_authority", "certificate"];
 const headers = {
   "Cache-Control": { required: true, schema: { type: "string", const: "no-store" } },
   Pragma: { required: true, schema: { type: "string", const: "no-cache" } },

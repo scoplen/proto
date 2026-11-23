@@ -76,7 +76,7 @@ labels!(AuditResourceKind, "Registered primary resource kinds; no current target
     Host => "host", HostGroup => "host_group", AccessProfile => "access_profile", Route => "route",
     TrustRecord => "trust_record", Snippet => "snippet", GatewayNetwork => "gateway_network",
     Group => "group", Policy => "policy", Grant => "grant", AccessRequest => "access_request",
-    CertificateAuthority => "certificate_authority",
+    AuthConnectionDraft => "auth_connection_draft", CertificateAuthority => "certificate_authority",
     Certificate => "certificate"
 });
 

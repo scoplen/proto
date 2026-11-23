@@ -281,7 +281,7 @@ export interface AccessRequestListQuery { view: AccessRequestView; limit?: numbe
 export type AccessRequestBodyTooLargeProblem = ProblemDetails & { status: 413; code: "organization.invalid_request"; changed: false; retryable: false; };
 // END GENERATED AccessRequests
 // BEGIN GENERATED Audit
-export type AuditResourceKind = "organization" | "invitation" | "membership" | "host" | "host_group" | "access_profile" | "route" | "trust_record" | "snippet" | "gateway_network" | "group" | "policy" | "grant" | "access_request" | "certificate_authority" | "certificate";
+export type AuditResourceKind = "organization" | "invitation" | "membership" | "host" | "host_group" | "access_profile" | "route" | "trust_record" | "snippet" | "gateway_network" | "group" | "policy" | "grant" | "access_request" | "auth_connection_draft" | "certificate_authority" | "certificate";
 export type AuditCategory = "authentication" | "authorization" | "account_change" | "scoplen" | "unknown";
 export type AuditOutcome = "success" | "failure" | "unknown";
 export interface AuditResource { kind: AuditResourceKind; id: string; [extension: string]: unknown; }

@@ -1081,6 +1081,66 @@
       "kind": "audit.query",
       "input": "[[\"filter\",\"resource eq \\\"access_request_extra:0191d3e0-8000-7000-8000-000000000004\\\"\"]]",
       "expected": "rejected"
+    },
+    {
+      "id": "audit-auth-draft-device-create-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\"}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\"}"
+    },
+    {
+      "id": "audit-auth-draft-browser-cancel-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"2\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_cancelled\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\",\"event_hash\":\"9d09e7761ec5c1cdeb6dd68135d6cd831b545c5fa6241d3b6966eb03aef00ca2\"}",
+      "expected": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"2\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_cancelled\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\",\"event_hash\":\"9d09e7761ec5c1cdeb6dd68135d6cd831b545c5fa6241d3b6966eb03aef00ca2\"}"
+    },
+    {
+      "id": "audit-auth-draft-history-v1",
+      "kind": "audit.page",
+      "input": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"3\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000007\"},\"previous_hash\":\"9d09e7761ec5c1cdeb6dd68135d6cd831b545c5fa6241d3b6966eb03aef00ca2\",\"event_hash\":\"69ffb5287ba07525b4ab670aa266c9b1a39ac0518986ab541efe093d840b5385\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"2\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_cancelled\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\",\"event_hash\":\"9d09e7761ec5c1cdeb6dd68135d6cd831b545c5fa6241d3b6966eb03aef00ca2\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\"}],\"next_cursor\":null}",
+      "expected": "{\"items\":[{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"3\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000007\"},\"previous_hash\":\"9d09e7761ec5c1cdeb6dd68135d6cd831b545c5fa6241d3b6966eb03aef00ca2\",\"event_hash\":\"69ffb5287ba07525b4ab670aa266c9b1a39ac0518986ab541efe093d840b5385\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"2\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_cancelled\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":null,\"actor_browser_family_id\":\"0191d3e0-8000-7000-8000-000000000003\",\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\",\"event_hash\":\"9d09e7761ec5c1cdeb6dd68135d6cd831b545c5fa6241d3b6966eb03aef00ca2\"},{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth_connection_draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\"}],\"next_cursor\":null}"
+    },
+    {
+      "id": "audit-auth-draft-generation-filter-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"resource eq \\\"auth_connection_draft:0191d3e0-8000-7000-8000-000000000006\\\" and event_class eq \\\"organization.auth_draft_created\\\"\"]]",
+      "expected": "accepted"
+    },
+    {
+      "id": "audit-auth-draft-kind-AuthConnectionDraft-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"AuthConnectionDraft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-auth-draft-filter-AuthConnectionDraft-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"resource eq \\\"AuthConnectionDraft:0191d3e0-8000-7000-8000-000000000006\\\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-auth-draft-kind-auth-connection-draft-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth-connection-draft\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-auth-draft-filter-auth-connection-draft-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"resource eq \\\"auth-connection-draft:0191d3e0-8000-7000-8000-000000000006\\\"\"]]",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-auth-draft-kind-auth_connection_drafts-v1",
+      "kind": "audit.event",
+      "input": "{\"organization_id\":\"0191d3e0-8000-7000-8000-000000000001\",\"sequence\":\"1\",\"occurred_at\":\"2026-11-17T00:00:00.001Z\",\"category\":\"scoplen\",\"event_class\":\"organization.auth_draft_created\",\"outcome\":\"success\",\"actor_account_id\":\"0191d3e0-8000-7000-8000-000000000002\",\"actor_device_id\":\"0191d3e0-8000-7000-8000-000000000005\",\"actor_browser_family_id\":null,\"resource\":{\"kind\":\"auth_connection_drafts\",\"id\":\"0191d3e0-8000-7000-8000-000000000006\"},\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"event_hash\":\"8091b459e6de76725f33db7596c0612ca7b0bcb20a8bc5fff55ed526a6a6d937\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "audit-auth-draft-filter-auth_connection_drafts-v1",
+      "kind": "audit.query",
+      "input": "[[\"filter\",\"resource eq \\\"auth_connection_drafts:0191d3e0-8000-7000-8000-000000000006\\\"\"]]",
+      "expected": "rejected"
     }
   ]
 }

@@ -12,6 +12,8 @@ D-166 adds one untested issuer draft per Organization. The shared `auth_connecti
 module validates the exact HTTPS issuer, request conditions, response metadata and Organization
 binding. Its reference peer exercises current Device and Account-browser authority,
 create/cancel races in their serialized order, original-writer confirmations and atomic audit.
+Audit readers can filter its create and cancel events by the recorded draft generation using
+`auth_connection_draft`. Upgrade readers before enabling this projection on the server.
 Activation requires a separate, explicitly reviewed enterprise connection operation.
 
 D-153 adds `parse_inventory_openssh` and `inventory_openssh_preview` to the same shared
