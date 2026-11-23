@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //! D-170 wire codecs for an existing Organization Membership's identity link.
 
+pub mod reference;
+
 use scoplen_crypto::SecretVec;
 use serde::Serialize;
 use serde_json::{Map, Value};

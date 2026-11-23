@@ -161,6 +161,10 @@ fn only_oidc_starts_accept_browser_business_cookie_delivery() {
             .into_iter()
             .filter(|op| op.fetch_credentials() == AccountBrowserFetchCredentials::SameOrigin)
             .collect::<Vec<_>>(),
-        [AccountBrowserAccessOperation::AuthActivationStart, AuthDraftTestStart]
+        [
+            AccountBrowserAccessOperation::AuthActivationStart,
+            AccountBrowserAccessOperation::AuthLinkStart,
+            AuthDraftTestStart,
+        ]
     );
 }
