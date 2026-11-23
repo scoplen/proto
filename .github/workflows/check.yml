@@ -191,6 +191,8 @@ jobs:
         run: node scripts/check-browser-csv.mjs
       - name: Check production OpenSSH WebAssembly without a browser
         run: node scripts/check-browser-openssh.mjs
+      - name: Test Chromium startup diagnostics
+        run: node --test scripts/browser-startup.test.mjs
       - name: Check packaged module in Chromium
         run: node scripts/check-browser.mjs
 

@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
+import { BrowserStartupError, waitForBrowserPort } from "./browser-startup.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const crate = join(root, "crates/scoplen-browser");
@@ -96,22 +97,13 @@ async function runBrowser(mode, extraArguments = []) {
   const profile = await mkdtemp(join(temporaryRoot, "scoplen-browser-kat-"));
   let child;
   let cdp;
-  let launchError;
   try {
     child = spawn(await chromeExecutable(), [
       "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`,
       "--no-first-run", "--no-default-browser-check", "--disable-background-networking", "--disable-component-update",
       "--disable-sync", "--disable-extensions", ...extraArguments, "about:blank",
-    ], { stdio: "ignore", windowsHide: true });
-    child.once("error", error => { launchError = error; });
-    let port;
-    for (let attempt = 0; attempt < 400; attempt += 1) {
-      if (launchError) throw new Error("Chromium is unavailable; set CHROME_BIN to an installed Chrome/Edge executable", { cause: launchError });
-      try { port = Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]); break; }
-      catch { if (child.exitCode !== null) throw new Error("Chromium exited before opening its test endpoint"); }
-      await delay(50);
-    }
-    assert.ok(port, "Chromium test endpoint did not start");
+    ], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+    const port = await waitForBrowserPort(child, profile, mode);
     const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
     cdp = await connectCdp(targets.find(target => target.type === "page").webSocketDebuggerUrl);
     const version = await cdp.call("Browser.getVersion");
@@ -128,9 +120,9 @@ async function runBrowser(mode, extraArguments = []) {
     await cdp.call("Browser.close").catch(() => {});
   } finally {
     cdp?.close();
-    if (child && child.exitCode === null) {
+    if (child?.pid && child.exitCode === null && child.signalCode === null) {
       await Promise.race([new Promise(resolve => child.once("exit", resolve)), delay(3000)]);
-      if (child.exitCode === null) child.kill();
+      if (child.exitCode === null && child.signalCode === null) child.kill();
     }
     assert.equal(dirname(resolve(profile)), temporaryRoot);
     assert.ok(basename(profile).startsWith("scoplen-browser-kat-"));
@@ -145,5 +137,9 @@ if (process.argv.includes("--serve")) {
     await runBrowser("full");
     await runBrowser("randomness");
     await runBrowser("resource", ["--js-flags=--wasm-max-mem-pages=1024"]);
+  } catch (error) {
+    if (!(error instanceof BrowserStartupError)) throw error;
+    console.error(error.message);
+    process.exitCode = 1;
   } finally { await new Promise(resolve => server.close(resolve)); }
 }
