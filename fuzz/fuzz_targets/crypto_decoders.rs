@@ -71,6 +71,9 @@ fuzz_target!(|bytes: &[u8]| {
     if let Ok(wrap) = scoplen_crypto::PersonalVaultKeyWrap::decode(bytes) {
         assert_eq!(wrap.encode().as_slice(), bytes);
     }
+    if let Ok(wrap) = scoplen_crypto::SharedVaultKeyWrap::decode(bytes) {
+        assert_eq!(wrap.encode().as_slice(), bytes);
+    }
     let _ = scoplen_crypto::DeviceCertificate::decode(bytes);
     let _ = scoplen_crypto::LocalDatabaseKeyEnvelope::decode(bytes);
     let _ = scoplen_crypto::ObjectEnvelope::decode(bytes);

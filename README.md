@@ -11,9 +11,12 @@ under Apache-2.0.
 D-171 adds Organization-owned Shared vault creation and descriptors, two administrator
 recipient reads, and member and epoch messages bound to exact Memberships and reviewed Account
 key revisions. The shared codecs require the owning team and check recipient order, uniqueness
-and response binding. Both recipient reads require the existing `sync:write` Device scope. The K-2 wrap
-proof and production authorization, rotation and recovery are separate contracts and consumer
-work.
+and response binding. Both recipient reads require the existing `sync:write` Device scope.
+`scoplen_crypto::SharedVaultKeyWrap` seals, verifies and opens the D-171 K-2 artifact using
+independently reviewed author and recipient facts. Run
+`node scripts/generate-shared-vault-wrap-vectors.mjs --check` to check the independently
+generated known-answer vector. Production use requires historical authority delivery,
+authorization and rotation in the consumers.
 
 D-170 adds the eight browser-only member-link operations and separate self and Owner
 withdrawal scopes. The `member_link` module validates empty requests, reviewed tags,

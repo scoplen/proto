@@ -129,6 +129,8 @@ jobs:
         run: node scripts/generate-password-bootstrap-vectors.mjs --check
       - name: Test independent password bootstrap vector producer
         run: node --test scripts/generate-password-bootstrap-vectors.test.mjs
+      - name: Check authenticated Shared vault wrap vector
+        run: node scripts/generate-shared-vault-wrap-vectors.mjs --check
       - name: Test
         run: cargo test --workspace --all-targets
       - name: Test optional native portable export
