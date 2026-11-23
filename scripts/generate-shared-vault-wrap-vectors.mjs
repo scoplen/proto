@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
-import { createCipheriv, createHmac, createPrivateKey, createPublicKey, diffieHellman, sign } from "node:crypto";
+import { createCipheriv, createHash, createHmac, createPrivateKey, createPublicKey, diffieHellman, sign } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
 const hex = value => Buffer.from(value, "hex");
@@ -64,6 +64,13 @@ const context = join(
 const { enc, ct } = hpke(context, recipient, plaintext, ephemeral);
 const signature = sign(null, join(ascii("spl-shared-vault-wrap-signature-v1"), context, enc, ct), author);
 const bytes = join(Buffer.of(1), enc, ct, signature);
+const audit = privateKey("70", Buffer.alloc(32, 16));
+const authorKem = publicBytes(createPublicKey(privateKey("6e", Buffer.alloc(32, 17))));
+const admission = uuid(7);
+const header = join(Buffer.of(1), integer(8, 42));
+const digest = createHash("sha256").update(bytes).digest();
+const authority = join(ascii("spl-shared-vault-authority-v1"), header, uuidBytes(admission), context, authorKem, digest);
+const receipt = join(header, sign(null, authority, audit));
 const document = {
   format: "scoplen-test-vectors",
   version: 1,
@@ -73,12 +80,20 @@ const document = {
     input: [organization, vault, 8, authorAccount, authorMember, 11, toHex(authorSigning), recipientAccount,
       recipientMember, 12, toHex(recipientSigningBytes), toHex(recipientSecret), toHex(bytes)].join("|"),
     expected: toHex(plaintext),
+  }, {
+    id: "crypto-shared-vault-authority-receipt-v1",
+    kind: "crypto.shared-vault-authority-open",
+    input: [admission, toHex(authorKem), toHex(publicBytes(createPublicKey(audit))), toHex(receipt)].join("|"),
+    expected: toHex(digest),
   }],
 };
 const output = `${JSON.stringify(document, null, 2)}\n`;
 const path = new URL("../vectors/shared-vault-wrap.json", import.meta.url);
+const receiptSeed = new URL("../fuzz/corpus/crypto_decoders/seed-shared-vault-authority-receipt", import.meta.url);
 if (process.argv.includes("--check")) {
   assert.equal((await readFile(path, "utf8")).replaceAll("\r\n", "\n"), output);
+  assert.deepEqual(await readFile(receiptSeed), receipt);
 } else {
   await writeFile(path, output);
+  await writeFile(receiptSeed, receipt);
 }

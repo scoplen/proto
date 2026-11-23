@@ -25,6 +25,7 @@ mod primitives;
 mod recovery;
 mod secret;
 mod shamir;
+mod shared_vault_authority;
 mod shared_vault_wrap;
 mod signature;
 mod team_invitation;
@@ -92,6 +93,9 @@ pub use recovery::{RecoveryBlob, RecoveryKey};
 pub use recovery::{safety_fingerprint, safety_number, safety_qr, verify_safety_qr};
 pub use secret::{SecretBytes, SecretVec, SymmetricKey, XChaChaNonce};
 pub use shamir::{ShamirShare, combine_shamir, split_shamir, split_shamir_with_randomness};
+pub use shared_vault_authority::{
+    SharedVaultAuthorityContext, SharedVaultAuthorityReceipt, SharedVaultReceiptPin,
+};
 pub use shared_vault_wrap::{
     SharedVaultKeyWrap, SharedVaultWrapContext, SharedVaultWrapOperation, SharedVaultWrapParty,
 };

@@ -61,7 +61,7 @@ pub struct SharedVaultWrapContext {
 }
 
 impl SharedVaultWrapContext {
-    fn encode(self) -> Result<Vec<u8>, PrimitiveError> {
+    pub(super) fn encode(self) -> Result<Vec<u8>, PrimitiveError> {
         for id in [
             self.organization,
             self.vault,
@@ -197,7 +197,7 @@ impl SharedVaultKeyWrap {
     }
 }
 
-fn verification_key(bytes: &[u8; 32]) -> Result<VerifyingKey, PrimitiveError> {
+pub(super) fn verification_key(bytes: &[u8; 32]) -> Result<VerifyingKey, PrimitiveError> {
     let key = VerifyingKey::from_bytes(bytes).map_err(|_| PrimitiveError::InvalidKey)?;
     if key.is_weak() {
         return Err(PrimitiveError::InvalidKey);
