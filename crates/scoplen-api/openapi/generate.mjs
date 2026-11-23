@@ -15,6 +15,7 @@ import { generateAccountBrowserTypes } from "./generate-account-browser.mjs";
 import { generateAuditTypes } from "./generate-audit.mjs";
 import { generateGrantTypes } from "./generate-grants.mjs";
 import { generateAuthDraftTypes } from "./generate-auth-connection-draft.mjs";
+import { generateAuthConnectionTypes } from "./generate-auth-connection.mjs";
 import { generateAccessRequestTypes } from "./generate-access-requests.mjs";
 
 const root = new URL(".", import.meta.url);
@@ -628,8 +629,15 @@ const draftEnd = "// END GENERATED AuthConnectionDraft";
 const draftBegin = completeAccessRequestTypes.indexOf(draftStart);
 const draftFinish = completeAccessRequestTypes.indexOf(draftEnd, draftBegin + draftStart.length);
 if (draftBegin < 0 || draftFinish < 0) throw new Error("types.ts lacks AuthConnectionDraft markers");
-const completeTypes = completeAccessRequestTypes.slice(0, draftBegin + draftStart.length) +
+const completeDraftTypes = completeAccessRequestTypes.slice(0, draftBegin + draftStart.length) +
   generateAuthDraftTypes(document) + completeAccessRequestTypes.slice(draftFinish);
+const connectionStart = "// BEGIN GENERATED AuthConnection\n";
+const connectionEnd = "// END GENERATED AuthConnection";
+const connectionBegin = completeDraftTypes.indexOf(connectionStart);
+const connectionFinish = completeDraftTypes.indexOf(connectionEnd, connectionBegin + connectionStart.length);
+if (connectionBegin < 0 || connectionFinish < 0) throw new Error("types.ts lacks AuthConnection markers");
+const completeTypes = completeDraftTypes.slice(0, connectionBegin + connectionStart.length) +
+  generateAuthConnectionTypes(document) + completeDraftTypes.slice(connectionFinish);
 const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {

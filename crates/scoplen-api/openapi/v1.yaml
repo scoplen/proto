@@ -14986,7 +14986,7 @@
         "x-scoplen-response-max-bytes": 8192,
         "x-scoplen-problem-max-bytes": 4096,
         "x-scoplen-fetch-credentials": "same-origin",
-        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
         "parameters": [
           {
             "name": "Origin",
@@ -16530,6 +16530,1098 @@
           },
           "default": {
             "description": "Bounded Organization problem without issuer or draft metadata.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-connection": {
+      "get": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-connection:manage",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "getOrganizationAuthConnection",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          }
+        ],
+        "description": "Require a live Account-browser family, DPoP for the actual request, current Owner membership and Cedar manage_organization. Recheck before examining any slot, attempt or receipt. No query parameters. Read the current revision; an empty slot returns 404. Validate Origin when supplied.",
+        "responses": {
+          "200": {
+            "description": "Immutable revision. HTTP and body ETags both quote its id. Both timestamps equal revision creation time.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConnectionResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OrganizationStorageUnavailable"
+          },
+          "default": {
+            "description": "Bounded Organization problem without connection data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-connection/activations": {
+      "post": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-connection:manage",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-fetch-credentials": "same-origin",
+        "x-scoplen-request-max-bytes": 4096,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-exactly-one-header": [
+          "If-None-Match",
+          "If-Match"
+        ],
+        "x-scoplen-original-password-max-age-seconds": 300,
+        "operationId": "startOrganizationAuthConnectionActivation",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "const": "*"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+            }
+          }
+        ],
+        "description": "Require a live Account-browser family, DPoP for the actual request, current Owner membership and Cedar manage_organization. Recheck before examining any slot, attempt or receipt. No query parameters. Send exactly one If-None-Match: * for an empty slot or a strong If-Match for the quoted current revision. Require the original family's recent password authentication at start and commit. Check the selected draft and current head before issuer contact. A lost start must not be replayed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthConnectionCandidate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pending activation with its one-time authorization URL.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "Set-Cookie": {
+                "required": true,
+                "schema": {
+                  "type": "string"
+                },
+                "description": "__Host-spl-auth-activate-<state_digest>, using lowercase hex SHA-256 of the 32 decoded state bytes. Path=/; HttpOnly; Secure; SameSite=Lax; no Domain. Its expiry is bounded by the attempt."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConnectionActivationStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "413": {
+            "$ref": "#/components/responses/GrantBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "Rollback, provider failure or unconfirmed start. No navigation or cookie is issued.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationAuthProviderUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded Organization problem without connection data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-connection/activations/{attempt}": {
+      "get": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-connection:manage",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "getOrganizationAuthConnectionActivation",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          }
+        ],
+        "description": "Require a live Account-browser family, DPoP for the actual request, current Owner membership and Cedar manage_organization. Recheck before examining any slot, attempt or receipt. No query parameters. Read the original family's current attempt. A claimed exchange remains pending. Validate Origin when supplied.",
+        "responses": {
+          "200": {
+            "description": "Attempt status in the original browser family.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConnectionActivation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OrganizationStorageUnavailable"
+          },
+          "default": {
+            "description": "Bounded Organization problem without connection data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-connection:manage",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 0,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "abandonOrganizationAuthConnectionActivation",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          }
+        ],
+        "description": "Require a live Account-browser family, DPoP for the actual request, current Owner membership and Cedar manage_organization. Recheck before examining any slot, attempt or receipt. No query parameters. Abandon the original family's attempt and retire the proposed credential, including during exchange.",
+        "responses": {
+          "204": {
+            "description": "Attempt abandoned. Empty body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "A failed or unconfirmed abandonment grants no authority.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded Organization problem without connection data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-connection/activations/{attempt}/confirm": {
+      "post": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-connection:manage",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-exactly-one-header": [
+          "If-None-Match",
+          "If-Match"
+        ],
+        "x-scoplen-original-password-max-age-seconds": 300,
+        "operationId": "confirmOrganizationAuthConnectionActivation",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "const": "*"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+            }
+          }
+        ],
+        "description": "Require a live Account-browser family, DPoP for the actual request, current Owner membership and Cedar manage_organization. Recheck before examining any slot, attempt or receipt. No query parameters. Send exactly one If-None-Match: * for an empty slot or a strong If-Match for the quoted current revision. Confirm the verified, unexpired candidate in its original fresh family. Bind the exact request to a 24-hour writer receipt.",
+        "responses": {
+          "200": {
+            "description": "Immutable revision. HTTP and body ETags both quote its id. Both timestamps equal revision creation time.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConnectionActiveResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "On an uncertain commit use only the 24-hour original writer receipt.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded Organization problem without connection data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-connection/suspend": {
+      "post": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-connection:manage",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "suspendOrganizationAuthConnection",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+            }
+          }
+        ],
+        "description": "Require a live Account-browser family, DPoP for the actual request, current Owner membership and Cedar manage_organization. Recheck before examining any slot, attempt or receipt. No query parameters. Suspend the active revision locally. Verify the exact original writer and intent on receipt confirmation.",
+        "responses": {
+          "200": {
+            "description": "Immutable revision. HTTP and body ETags both quote its id. Both timestamps equal revision creation time.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConnectionSuspendedResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "On an uncertain commit use only the 24-hour original writer receipt.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded Organization problem without connection data.",
             "headers": {
               "Cache-Control": {
                 "required": true,
@@ -26855,6 +27947,452 @@
             }
           }
         ]
+      },
+      "AuthConnectionCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "draft_generation",
+          "client_id",
+          "client_secret",
+          "space_id"
+        ],
+        "properties": {
+          "draft_generation": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "x-scoplen-max-utf8-bytes": 512,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "client_secret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "x-scoplen-max-utf8-bytes": 512,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+            "writeOnly": true
+          },
+          "space_id": {
+            "type": "string",
+            "pattern": "^spc_[A-Za-z0-9_-]{1,92}$",
+            "minLength": 5,
+            "maxLength": 96
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "AuthConnectionResource": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "etag",
+          "created_at",
+          "updated_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "etag": {
+            "type": "string",
+            "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "organization_id",
+              "status",
+              "issuer",
+              "client_id",
+              "space_id"
+            ],
+            "properties": {
+              "organization_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "suspended"
+                ]
+              },
+              "issuer": {
+                "type": "string",
+                "format": "iri",
+                "pattern": "^[Hh][Tt][Tt][Pp][Ss]://",
+                "maxLength": 2048,
+                "x-scoplen-max-utf8-bytes": 2048,
+                "description": "Exact approved HTTPS issuer, including its path and trailing slash."
+              },
+              "client_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "x-scoplen-max-utf8-bytes": 512,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+              },
+              "space_id": {
+                "type": "string",
+                "pattern": "^spc_[A-Za-z0-9_-]{1,92}$",
+                "minLength": 5,
+                "maxLength": 96
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "client_secret"
+                  ]
+                },
+                {
+                  "required": [
+                    "access_token"
+                  ]
+                },
+                {
+                  "required": [
+                    "refresh_token"
+                  ]
+                },
+                {
+                  "required": [
+                    "id_token"
+                  ]
+                },
+                {
+                  "required": [
+                    "claims"
+                  ]
+                },
+                {
+                  "required": [
+                    "authorization_url"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "authorization_url"
+              ]
+            }
+          ]
+        },
+        "x-scoplen-max-bytes": 8192
+      },
+      "AuthConnectionActivation": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "organization_id",
+          "draft_generation",
+          "expected_revision",
+          "issuer",
+          "client_id",
+          "space_id",
+          "status",
+          "expires_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "draft_generation": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "iri",
+            "pattern": "^[Hh][Tt][Tt][Pp][Ss]://",
+            "maxLength": 2048,
+            "x-scoplen-max-utf8-bytes": 2048,
+            "description": "Exact approved HTTPS issuer, including its path and trailing slash."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "x-scoplen-max-utf8-bytes": 512,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "space_id": {
+            "type": "string",
+            "pattern": "^spc_[A-Za-z0-9_-]{1,92}$",
+            "minLength": 5,
+            "maxLength": 96
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified",
+              "failed"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "authorization_url"
+              ]
+            }
+          ]
+        },
+        "x-scoplen-max-bytes": 8192
+      },
+      "AuthConnectionActivationStarted": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "organization_id",
+          "draft_generation",
+          "expected_revision",
+          "issuer",
+          "client_id",
+          "space_id",
+          "status",
+          "expires_at",
+          "authorization_url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "draft_generation": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "iri",
+            "pattern": "^[Hh][Tt][Tt][Pp][Ss]://",
+            "maxLength": 2048,
+            "x-scoplen-max-utf8-bytes": 2048,
+            "description": "Exact approved HTTPS issuer, including its path and trailing slash."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "x-scoplen-max-utf8-bytes": 512,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "space_id": {
+            "type": "string",
+            "pattern": "^spc_[A-Za-z0-9_-]{1,92}$",
+            "minLength": 5,
+            "maxLength": 96
+          },
+          "status": {
+            "type": "string",
+            "const": "pending"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          },
+          "authorization_url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^[Hh][Tt][Tt][Pp][Ss]://",
+            "description": "One-time navigation at the approved provider origin."
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            }
+          ]
+        },
+        "x-scoplen-max-bytes": 8192
+      },
+      "AuthConnectionActiveResource": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AuthConnectionResource"
+          },
+          {
+            "properties": {
+              "data": {
+                "properties": {
+                  "status": {
+                    "const": "active"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AuthConnectionSuspendedResource": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AuthConnectionResource"
+          },
+          {
+            "properties": {
+              "data": {
+                "properties": {
+                  "status": {
+                    "const": "suspended"
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   },
@@ -27412,6 +28950,54 @@
         "auth-test:run"
       ],
       "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/auth-connection",
+      "scopes": [
+        "auth-connection:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/auth-connection/activations",
+      "scopes": [
+        "auth-connection:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/auth-connection/activations/{attempt}",
+      "scopes": [
+        "auth-connection:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/auth-connection/activations/{attempt}",
+      "scopes": [
+        "auth-connection:manage"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/auth-connection/activations/{attempt}/confirm",
+      "scopes": [
+        "auth-connection:manage"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/auth-connection/suspend",
+      "scopes": [
+        "auth-connection:manage"
+      ],
+      "writerReceipt": true
     }
   ]
 }
