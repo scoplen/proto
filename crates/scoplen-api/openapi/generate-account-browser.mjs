@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // D-140 reuses native password/browser DTOs while enforcing an independent endpoint profile.
 import { isDeepStrictEqual } from "node:util";
+import { memberLinkBrowserOperations } from "./generate-member-link.mjs";
 
-export const initialAccountBrowserScope = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+export const initialAccountBrowserScope = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-links:self auth-links:withdraw auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 export function accountBrowserOperations() {
   const operations = [];
@@ -45,7 +46,7 @@ export function accountBrowserOperations() {
     ["GET", ""], ["POST", "/activations"], ["GET", "/activations/{attempt}"],
     ["DELETE", "/activations/{attempt}"], ["POST", "/activations/{attempt}/confirm"], ["POST", "/suspend"],
   ]) add(method, connection + suffix, ["auth-connection:manage"], suffix.endsWith("/confirm") || suffix === "/suspend");
-  return operations;
+  return [...operations, ...memberLinkBrowserOperations()];
 }
 
 export function accountBrowserDefinitions() {

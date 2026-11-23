@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::{AccountBrowserCodecError, AccountBrowserFetchCredentials};
 
 /// Exact initial browser ceiling in byte order; never current membership or Cedar authority.
-pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-links:self auth-links:withdraw auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 /// Registered coarse browser permissions, independent of Device/Operator registries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -26,6 +26,10 @@ pub enum AccountBrowserAccessScope {
     AuthConnectionManage,
     /// Manage the untested issuer draft of an authorized Organization.
     AuthDraftsManage,
+    /// Read or change the authenticated member's own identity link.
+    AuthLinksSelf,
+    /// Read or withdraw a named member's link with current Owner authority.
+    AuthLinksWithdraw,
     /// Run a draft login test and read its status in the original browser family.
     AuthTestRun,
     /// Exact `inventory:read` browser permission.
@@ -50,7 +54,7 @@ pub enum AccountBrowserAccessScope {
 
 impl AccountBrowserAccessScope {
     /// Every scope in canonical byte order.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 19] = [
         Self::AccessRequestsDecide,
         Self::AccessRequestsRead,
         Self::AccessRequestsWrite,
@@ -58,6 +62,8 @@ impl AccountBrowserAccessScope {
         Self::AuditRead,
         Self::AuthConnectionManage,
         Self::AuthDraftsManage,
+        Self::AuthLinksSelf,
+        Self::AuthLinksWithdraw,
         Self::AuthTestRun,
         Self::InventoryRead,
         Self::InventoryWrite,
@@ -80,6 +86,8 @@ impl AccountBrowserAccessScope {
             Self::AuditRead => "audit:read",
             Self::AuthConnectionManage => "auth-connection:manage",
             Self::AuthDraftsManage => "auth-drafts:manage",
+            Self::AuthLinksSelf => "auth-links:self",
+            Self::AuthLinksWithdraw => "auth-links:withdraw",
             Self::AuthTestRun => "auth-test:run",
             Self::InventoryRead => "inventory:read",
             Self::InventoryWrite => "inventory:write",
@@ -137,6 +145,22 @@ pub enum AccountBrowserAccessOperation {
     AuthActivationConfirm,
     /// Suspend the exact current active revision.
     AuthConnectionSuspend,
+    /// Read the authenticated member's own link and the active connection.
+    AuthLinkSelfRead,
+    /// Start a link attempt for the authenticated member.
+    AuthLinkStart,
+    /// Read a link attempt in its original browser family.
+    AuthLinkAttemptRead,
+    /// Abandon a link attempt in its original browser family.
+    AuthLinkAbandon,
+    /// Confirm a verified link attempt in its original browser family.
+    AuthLinkConfirm,
+    /// Unlink the authenticated member's current identity association.
+    AuthLinkSelfUnlink,
+    /// Read the link of a named member in the selected Organization.
+    AuthLinkNamedRead,
+    /// Withdraw the link of a named member in the selected Organization.
+    AuthLinkNamedWithdraw,
     /// Create the Organization issuer draft when the slot is empty.
     AuthDraftCreate,
     /// Read the current Organization issuer draft.
@@ -272,7 +296,7 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 76] = [
+    pub const ALL: [Self; 84] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -288,6 +312,14 @@ impl AccountBrowserAccessOperation {
         Self::AuthActivationAbandon,
         Self::AuthActivationConfirm,
         Self::AuthConnectionSuspend,
+        Self::AuthLinkSelfRead,
+        Self::AuthLinkStart,
+        Self::AuthLinkAttemptRead,
+        Self::AuthLinkAbandon,
+        Self::AuthLinkConfirm,
+        Self::AuthLinkSelfUnlink,
+        Self::AuthLinkNamedRead,
+        Self::AuthLinkNamedWithdraw,
         Self::AuthDraftCreate,
         Self::AuthDraftRead,
         Self::AuthDraftCancel,
@@ -371,6 +403,15 @@ impl AccountBrowserAccessOperation {
             | Self::AuthActivationAbandon
             | Self::AuthActivationConfirm
             | Self::AuthConnectionSuspend => AnyScope(&[Scope::AuthConnectionManage]),
+            Self::AuthLinkSelfRead
+            | Self::AuthLinkStart
+            | Self::AuthLinkAttemptRead
+            | Self::AuthLinkAbandon
+            | Self::AuthLinkConfirm
+            | Self::AuthLinkSelfUnlink => AnyScope(&[Scope::AuthLinksSelf]),
+            Self::AuthLinkNamedRead | Self::AuthLinkNamedWithdraw => {
+                AnyScope(&[Scope::AuthLinksWithdraw])
+            }
             Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
                 AnyScope(&[Scope::AuthDraftsManage])
             }
@@ -443,6 +484,9 @@ impl AccountBrowserAccessOperation {
             | Self::AuthDraftTestRead
             | Self::AuthConnectionRead
             | Self::AuthActivationRead
+            | Self::AuthLinkSelfRead
+            | Self::AuthLinkAttemptRead
+            | Self::AuthLinkNamedRead
             | Self::AuditEventList
             | Self::AuditRangeVerify
             | Self::AccountProfileRead
@@ -477,6 +521,8 @@ impl AccountBrowserAccessOperation {
             | Self::AuthActivationStart
             | Self::AuthActivationConfirm
             | Self::AuthConnectionSuspend
+            | Self::AuthLinkStart
+            | Self::AuthLinkConfirm
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
@@ -503,6 +549,9 @@ impl AccountBrowserAccessOperation {
             | Self::OrganizationPolicyDelete
             | Self::AuthDraftCancel
             | Self::AuthActivationAbandon
+            | Self::AuthLinkAbandon
+            | Self::AuthLinkSelfUnlink
+            | Self::AuthLinkNamedWithdraw
             | Self::OrganizationGrantDelete => "DELETE",
             Self::InventoryHostReplace
             | Self::InventoryHostGroupReplace
@@ -535,6 +584,15 @@ impl AccountBrowserAccessOperation {
                 "/api/v1/orgs/{org}/auth-connection/activations/{attempt}/confirm"
             }
             Self::AuthConnectionSuspend => "/api/v1/orgs/{org}/auth-connection/suspend",
+            Self::AuthLinkSelfRead | Self::AuthLinkSelfUnlink => "/api/v1/orgs/{org}/auth-link",
+            Self::AuthLinkStart => "/api/v1/orgs/{org}/auth-link/attempts",
+            Self::AuthLinkAttemptRead | Self::AuthLinkAbandon => {
+                "/api/v1/orgs/{org}/auth-link/attempts/{attempt}"
+            }
+            Self::AuthLinkConfirm => "/api/v1/orgs/{org}/auth-link/attempts/{attempt}/confirm",
+            Self::AuthLinkNamedRead | Self::AuthLinkNamedWithdraw => {
+                "/api/v1/orgs/{org}/members/{membership}/auth-link"
+            }
             Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
                 "/api/v1/orgs/{org}/auth-connection-draft"
             }
@@ -617,7 +675,7 @@ impl AccountBrowserAccessOperation {
     #[must_use]
     pub const fn fetch_credentials(self) -> AccountBrowserFetchCredentials {
         match self {
-            Self::AuthDraftTestStart | Self::AuthActivationStart => {
+            Self::AuthDraftTestStart | Self::AuthActivationStart | Self::AuthLinkStart => {
                 AccountBrowserFetchCredentials::SameOrigin
             }
             _ => AccountBrowserFetchCredentials::Omit,
@@ -636,6 +694,7 @@ impl AccountBrowserAccessOperation {
                 | Self::AuthDraftCancel
                 | Self::AuthActivationConfirm
                 | Self::AuthConnectionSuspend
+                | Self::AuthLinkConfirm
                 | Self::InventoryImportCreate
                 | Self::InventoryHostCreate
                 | Self::InventoryHostGroupCreate

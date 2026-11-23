@@ -30,6 +30,44 @@ fn canonical(kind: &str, input: &[u8]) -> Result<Vec<u8>, AccountBrowserCodecErr
     }
 }
 
+fn assert_operation_vector(kind: &str, input: &str, expected: &str, id: &str) -> bool {
+    let input: Value = serde_json::from_str(input).unwrap();
+    let method = input["method"].as_str().unwrap();
+    let path = input["path"].as_str().unwrap();
+    let operation = AccountBrowserAccessOperation::from_route(method, path);
+    if kind.ends_with("reject") {
+        assert!(operation.is_none(), "{id}");
+        return false;
+    }
+    let operation = operation.unwrap();
+    if kind.ends_with("logout") {
+        assert_eq!(
+            operation.requirement(),
+            AccountBrowserAccessRequirement::SelfSessionTermination
+        );
+        return true;
+    }
+    let expected: Value = serde_json::from_str(expected).unwrap();
+    let AccountBrowserAccessRequirement::AnyScope(scopes) = operation.requirement() else {
+        panic!("business operation has scopes")
+    };
+    let actual: Vec<_> = scopes.iter().map(|scope| scope.as_str()).collect();
+    assert_eq!(serde_json::to_value(actual).unwrap(), expected["scopes"], "{id}");
+    assert_eq!(
+        operation.uses_browser_writer_receipt(),
+        expected["writerReceipt"].as_bool().unwrap()
+    );
+    if let Some(credentials) = expected["fetchCredentials"].as_str() {
+        let actual = match operation.fetch_credentials() {
+            AccountBrowserFetchCredentials::SameOrigin => "same-origin",
+            AccountBrowserFetchCredentials::Omit => "omit",
+        };
+        assert_eq!(actual, credentials, "{id}");
+        assert!(DeviceAccessOperation::from_route(method, path).is_none(), "{id}");
+    }
+    true
+}
+
 #[test]
 fn independent_wire_digest_operation_and_writer_vectors() {
     let mut operations = 0;
@@ -76,40 +114,12 @@ fn independent_wire_digest_operation_and_writer_vectors() {
                 );
             }
             "operation" | "operation.logout" | "operation.reject" => {
-                let input: Value = serde_json::from_str(&vector.input).unwrap();
-                let operation = AccountBrowserAccessOperation::from_route(
-                    input["method"].as_str().unwrap(),
-                    input["path"].as_str().unwrap(),
-                );
-                if kind.ends_with("reject") {
-                    assert!(operation.is_none(), "{}", vector.id);
-                    continue;
-                }
-                let operation = operation.unwrap();
-                operations += 1;
-                if kind.ends_with("logout") {
-                    assert_eq!(
-                        operation.requirement(),
-                        AccountBrowserAccessRequirement::SelfSessionTermination
-                    );
-                    continue;
-                }
-                let expected: Value = serde_json::from_str(&vector.expected).unwrap();
-                let AccountBrowserAccessRequirement::AnyScope(scopes) = operation.requirement()
-                else {
-                    panic!("business operation has scopes")
-                };
-                let actual: Vec<_> = scopes.iter().map(|scope| scope.as_str()).collect();
-                assert_eq!(
-                    serde_json::to_value(actual).unwrap(),
-                    expected["scopes"],
-                    "{}",
-                    vector.id
-                );
-                assert_eq!(
-                    operation.uses_browser_writer_receipt(),
-                    expected["writerReceipt"].as_bool().unwrap()
-                );
+                operations += usize::from(assert_operation_vector(
+                    kind,
+                    &vector.input,
+                    &vector.expected,
+                    &vector.id,
+                ));
             }
             _ => {
                 let rejected = kind.ends_with(".reject");
@@ -138,8 +148,8 @@ fn snippet_browser_operations_reuse_inventory_scopes_and_preserve_device_routes(
     use AccountBrowserAccessScope as Scope;
     use DeviceAccessOperation as Device;
 
-    assert_eq!(Browser::ALL.len(), 76);
-    assert_eq!(Scope::ALL.len(), 17);
+    assert_eq!(Browser::ALL.len(), 84);
+    assert_eq!(Scope::ALL.len(), 19);
     let collection = "/api/v1/orgs/{org}/snippets";
     let item = "/api/v1/orgs/{org}/snippets/{id}";
     for (browser, device, method, path, scope, receipt) in [

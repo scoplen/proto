@@ -4,8 +4,54 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { generateAuthDraftTypes } from "./generate-auth-connection-draft.mjs";
 import { generateAuthConnectionTypes } from "./generate-auth-connection.mjs";
+import { generateMemberLinkTypes } from "./generate-member-link.mjs";
 
 const doc = JSON.parse(await readFile(new URL("v1.yaml", import.meta.url), "utf8"));
+const browserVectors = JSON.parse(await readFile(new URL("../../../vectors/account-browser.json", import.meta.url), "utf8")).vectors;
+test("D-170 declares eight browser-only link operations with distinct self and withdrawal scopes", () => {
+  const root = "/orgs/{org}/auth-link";
+  const named = "/orgs/{org}/members/{membership}/auth-link";
+  const attempt = root + "/attempts/{attempt}";
+  const expected = [
+    [root, "get"], [root + "/attempts", "post"],
+    [attempt, "get"], [attempt, "delete"], [attempt + "/confirm", "post"],
+    [root, "delete"], [named, "get"], [named, "delete"],
+  ];
+  assert.match(generateMemberLinkTypes(doc), /interface OrganizationSelfLinkStatus/);
+  for (const [path, method] of expected) {
+    const op = doc.paths[path][method];
+    const start = path.endsWith("/attempts"), confirm = path.endsWith("/confirm");
+    assert.deepEqual(op.security, [{ accountBrowserAccess: [], dpopProof: [] }]);
+    assert.equal(op["x-scoplen-request-max-bytes"], 0);
+    assert.equal(op.requestBody, undefined);
+    assert.equal(op["x-scoplen-fetch-credentials"], start ? "same-origin" : "omit");
+    assert.equal(op.parameters.some(p => p.name === "Idempotency-Key"), confirm);
+    assert.equal(op["x-scoplen-original-password-max-age-seconds"], start || confirm ? 300 : undefined);
+    assert.equal(op["x-scoplen-required-browser-scope"], path === named ? "auth-links:withdraw" : "auth-links:self");
+    assert.deepEqual(op["x-scoplen-required-membership-roles-any"], path === named ? ["owner"] : undefined);
+  }
+  const vectors = browserVectors.filter(vector => vector.kind === "account.browser.operation")
+    .map(vector => ({ ...JSON.parse(vector.input), ...JSON.parse(vector.expected) }))
+    .filter(vector => vector.path.includes("/auth-link"));
+  assert.deepEqual(vectors, expected.map(([path, method]) => ({
+    method: method.toUpperCase(), path: "/api/v1" + path,
+    scopes: [doc.paths[path][method]["x-scoplen-required-browser-scope"]],
+    writerReceipt: doc.paths[path][method].parameters.some(parameter => parameter.name === "Idempotency-Key"),
+    fetchCredentials: doc.paths[path][method]["x-scoplen-fetch-credentials"],
+  })));
+  for (const mutate of [
+    d => { d.paths[named].delete["x-scoplen-cedar-action"] = "manage_organization"; },
+    d => { delete d.paths[attempt + "/confirm"].post.responses[201].headers.ETag; },
+    d => { d.paths[root + "/attempts"].post["x-scoplen-request-max-bytes"] = 512; },
+    d => { d.components.schemas.OrganizationLinkAttempt.not.anyOf = []; },
+    d => { d.paths[root + "/extra"] = { post: {} }; },
+  ]) {
+    const changed = structuredClone(doc);
+    mutate(changed);
+    assert.throws(() => generateMemberLinkTypes(changed), /D-170/);
+  }
+});
+
 const path = "/orgs/{org}/auth-connection-draft";
 test("only the three role- and scope-bound draft operations are published", () => {
   assert.match(generateAuthDraftTypes(doc), /AuthConnectionDraftResource/);

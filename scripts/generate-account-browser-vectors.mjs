@@ -30,8 +30,8 @@ add("logout-extension", "logout.response.reject", { revoked: true, extra: null }
 add("options-extension", "options.response", { ...options, extra: 1 }, options);
 add("options-request-field", "options.request.reject", { username: "alice", family_id: "chosen" });
 add("login-request-field", "login.request.reject", { ...login, device_id: "chosen" });
-add("scope", "scope", "initial", "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
-const operation = (method, path, scopes, writerReceipt = false) => add(`operation-${vectors.length}`, "operation", { method, path }, { scopes, writerReceipt });
+add("scope", "scope", "initial", "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-links:self auth-links:withdraw auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
+const operation = (method, path, scopes, writerReceipt = false, fetchCredentials) => add(`operation-${vectors.length}`, "operation", { method, path }, { scopes, writerReceipt, fetchCredentials });
 operation("GET", "/api/v1/accounts/me", ["account:read"]);
 for (const [method, suffix, scopes] of [["POST", "", ["orgs:create"]], ["GET", "", ["orgs:read"]], ["GET", "/{org}", ["orgs:read"]], ["PATCH", "/{org}", ["orgs:write"]]]) operation(method, `/api/v1/orgs${suffix}`, scopes);
 for (const [method, path, scopes] of [["GET", "invitations", ["teams:manage"]], ["POST", "invitations", ["teams:manage"]], ["GET", "invitations/{invitation}", ["teams:join", "teams:manage"]], ["DELETE", "invitations/{invitation}", ["teams:manage"]], ["POST", "invitations/{invitation}/accept", ["teams:join"]], ["GET", "members", ["teams:manage"]], ["GET", "members/{membership}", ["teams:manage"]], ["PATCH", "members/{membership}", ["teams:manage"]], ["DELETE", "members/{membership}", ["teams:join", "teams:manage"]], ["POST", "dissolve", ["teams:manage"]]]) operation(method, `/api/v1/orgs/{org}/${path}`, scopes);
@@ -77,6 +77,23 @@ for (const [method, suffix] of [
   ["POST", ""], ["DELETE", ""], ["GET", "/activations"],
   ["PATCH", "/activations/{attempt}"], ["POST", "/activations/{id}/confirm"], ["GET", "/suspend"],
 ]) add(`operation-connection-denied-${vectors.length}`, "operation.reject", { method, path: connection + suffix });
+const selfLink = "/api/v1/orgs/{org}/auth-link";
+const namedLink = "/api/v1/orgs/{org}/members/{membership}/auth-link";
+for (const [method, path, scope, receipt, credentials] of [
+  ["GET", selfLink, "self", false, "omit"],
+  ["POST", selfLink + "/attempts", "self", false, "same-origin"],
+  ["GET", selfLink + "/attempts/{attempt}", "self", false, "omit"],
+  ["DELETE", selfLink + "/attempts/{attempt}", "self", false, "omit"],
+  ["POST", selfLink + "/attempts/{attempt}/confirm", "self", true, "omit"],
+  ["DELETE", selfLink, "self", false, "omit"],
+  ["GET", namedLink, "withdraw", false, "omit"],
+  ["DELETE", namedLink, "withdraw", false, "omit"],
+]) operation(method, path, [`auth-links:${scope}`], receipt, credentials);
+for (const [method, path] of [
+  ["POST", selfLink], ["GET", selfLink + "/attempts"],
+  ["GET", selfLink + "/attempts/{id}"], ["DELETE", selfLink + "/attempts/{attempt}/confirm"],
+  ["POST", namedLink], ["GET", namedLink + "/attempts"], ["GET", namedLink + "/"],
+]) add(`operation-link-denied-${vectors.length}`, "operation.reject", { method, path });
 
 const output = `${JSON.stringify({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2)}\n`;
 const outputs = [["vectors/account-browser.json", output]];

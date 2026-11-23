@@ -122,7 +122,7 @@ fn snippet_operations_keep_the_real_family_through_refresh_and_check_current_acc
 fn older_family_refresh_retains_its_scope_ceiling_and_fresh_login_acquires_draft_operations() {
     let mut previous = peer();
     let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE
-        .replace(" auth-connection:manage auth-drafts:manage auth-test:run", "");
+        .replace(" auth-connection:manage auth-drafts:manage auth-links:self auth-links:withdraw auth-test:run", "");
     previous.retain_scope_ceiling(&old).unwrap();
     assert!(previous.retain_scope_ceiling(INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE).is_err());
     previous
@@ -197,6 +197,31 @@ fn draft_scope_cannot_activate_connections_after_refresh() {
             Err(ReferenceAccountBrowserError::Denied)
         );
         current.authorize(&access(1), JKT, Some(ORIGIN), operation, &proof, 1101).unwrap();
+    }
+}
+
+#[test]
+fn member_link_scopes_are_distinct_and_refresh_preserves_older_family_ceilings() {
+    use AccountBrowserAccessOperation as Operation;
+    for scope in [" auth-links:self auth-links:withdraw", " auth-links:withdraw"] {
+        let mut previous = peer();
+        let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.replace(scope, "");
+        previous.retain_scope_ceiling(&old).unwrap();
+        previous
+            .rotate(b"{}", &refresh(2), &access(3), &refresh(4), JKT, ORIGIN, "rotation", 1100)
+            .unwrap();
+        let mut current = peer();
+        for (operation, proof) in
+            [(Operation::AuthLinkSelfRead, "self"), (Operation::AuthLinkNamedWithdraw, "named")]
+        {
+            let result = previous.authorize(&access(3), JKT, Some(ORIGIN), operation, proof, 1101);
+            if scope.contains("auth-links:self") || operation == Operation::AuthLinkNamedWithdraw {
+                assert_eq!(result, Err(ReferenceAccountBrowserError::Denied));
+            } else {
+                assert!(result.is_ok());
+            }
+            current.authorize(&access(1), JKT, Some(ORIGIN), operation, proof, 1101).unwrap();
+        }
     }
 }
 
