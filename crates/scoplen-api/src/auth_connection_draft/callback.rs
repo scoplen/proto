@@ -57,6 +57,35 @@ pub fn callback_path(issuer: &str) -> Result<String, InvalidCallback> {
     Ok(format!("{PATH_PREFIX}{hash:x}{PATH_SUFFIX}"))
 }
 
+/// Name the distinct D-169 activation cookie for a fresh state value.
+#[must_use]
+pub fn activation_cookie_name(state: &SecretBytes<32>) -> String {
+    let digest = Sha256::digest(state.as_bytes());
+    format!("__Host-spl-auth-activate-{digest:x}")
+}
+
+/// Select the activation cookie name from exactly one canonical state parameter.
+/// The receiver still verifies the durable attempt's purpose, browser binding, and callback.
+///
+/// # Errors
+/// Rejects oversized queries or a missing, ambiguous, or invalid state.
+pub fn activation_cookie_name_from_query(query: &str) -> Result<String, InvalidCallback> {
+    if query.len() > MAX_QUERY_BYTES {
+        return Err(InvalidCallback);
+    }
+    let mut state = None;
+    for pair in query.split('&') {
+        let (name, value) = pair.split_once('=').ok_or(InvalidCallback)?;
+        if decode_form(name)?.as_bytes() == b"state" {
+            if state.is_some() {
+                return Err(InvalidCallback);
+            }
+            state = Some(random_value(decode_form(value)?.as_bytes())?);
+        }
+    }
+    state.as_ref().map(activation_cookie_name).ok_or(InvalidCallback)
+}
+
 impl<'a> Callback<'a> {
     /// Parse the raw request target and matching callback cookie values. The receiver
     /// verifies the trusted HTTPS origin and preserves cookie multiplicity.

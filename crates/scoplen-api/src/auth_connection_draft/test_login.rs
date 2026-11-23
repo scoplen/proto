@@ -35,11 +35,16 @@ impl DraftLoginCredentials {
     /// Rejects malformed JSON, additional fields or invalid credentials.
     pub fn from_json(bytes: &[u8]) -> Result<Self, Error> {
         let mut data = object(bytes, MAX_START_BYTES)?;
-        let client_id = SecretVec::new(take_string(&mut data, "client_id")?.into_bytes());
-        let client_secret = SecretVec::new(take_string(&mut data, "client_secret")?.into_bytes());
+        let credentials = Self::take(&mut data)?;
         if !data.is_empty() {
             return Err(Error::InvalidField("request members"));
         }
+        Ok(credentials)
+    }
+
+    pub(crate) fn take(data: &mut Map<String, Value>) -> Result<Self, Error> {
+        let client_id = SecretVec::new(take_string(data, "client_id")?.into_bytes());
+        let client_secret = SecretVec::new(take_string(data, "client_secret")?.into_bytes());
         credential_text(&client_id, "client_id")?;
         credential_text(&client_secret, "client_secret")?;
         Ok(Self { client_id, client_secret })
@@ -64,16 +69,21 @@ impl DraftLoginCredentials {
     }
 }
 
-fn credential_text<'a>(secret: &'a SecretVec, field: &'static str) -> Result<&'a str, Error> {
-    let invalid = || Error::InvalidField(field);
-    if secret.is_empty() || secret.len() > MAX_CREDENTIAL_BYTES {
-        return Err(invalid());
-    }
-    let value = std::str::from_utf8(secret.as_bytes()).map_err(|_| invalid())?;
-    if value.chars().any(char::is_control) {
-        return Err(invalid());
-    }
+pub(crate) fn credential_text<'a>(
+    secret: &'a SecretVec,
+    field: &'static str,
+) -> Result<&'a str, Error> {
+    let value = std::str::from_utf8(secret.as_bytes()).map_err(|_| Error::InvalidField(field))?;
+    validate_credential_text(value, field)?;
     Ok(value)
+}
+
+pub(crate) fn validate_credential_text(value: &str, field: &'static str) -> Result<(), Error> {
+    if value.is_empty() || value.len() > MAX_CREDENTIAL_BYTES || value.chars().any(char::is_control)
+    {
+        return Err(Error::InvalidField(field));
+    }
+    Ok(())
 }
 
 /// HTTP syntax for the start and status routes after exact method/path dispatch.
@@ -180,7 +190,10 @@ pub struct DraftLoginAttempt {
     pub expires_at: String,
 }
 
-fn serialize_uuid<S: serde::Serializer>(id: &Uuid, serializer: S) -> Result<S::Ok, S::Error> {
+pub(crate) fn serialize_uuid<S: serde::Serializer>(
+    id: &Uuid,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
     serializer.collect_str(id)
 }
 
@@ -280,27 +293,7 @@ impl DraftLoginStarted {
         if self.attempt.status != DraftLoginStatus::Pending {
             return Err(Error::InvalidField("status"));
         }
-        validate_issuer(issuer)?;
-        let bad = Error::InvalidField("authorization_url");
-        let value =
-            std::str::from_utf8(self.authorization_url.as_bytes()).map_err(|_| bad.clone())?;
-        if value.contains(['\\', '#'])
-            || value.chars().any(|ch| ch.is_control() || ch.is_whitespace())
-        {
-            return Err(bad);
-        }
-        let (scheme, rest) = value.split_once("://").ok_or_else(|| bad.clone())?;
-        let authority = rest.split(['/', '?']).next().unwrap_or_default();
-        if !scheme.eq_ignore_ascii_case("https") || authority.is_empty() || authority.contains('@')
-        {
-            return Err(bad);
-        }
-        let url = Url::parse(value).map_err(|_| bad.clone())?;
-        let issuer = Url::parse(issuer).map_err(|_| bad.clone())?;
-        if url.origin() != issuer.origin() {
-            return Err(bad);
-        }
-        Ok(value)
+        validated_navigation(&self.authorization_url, issuer)
     }
 
     /// Emit a bounded, redacting start response for the original provider origin.
@@ -318,4 +311,28 @@ impl DraftLoginStarted {
             MAX_RESPONSE_BYTES,
         )?))
     }
+}
+
+pub(crate) fn validated_navigation<'a>(
+    navigation: &'a SecretVec,
+    issuer: &str,
+) -> Result<&'a str, Error> {
+    validate_issuer(issuer)?;
+    let bad = Error::InvalidField("authorization_url");
+    let value = std::str::from_utf8(navigation.as_bytes()).map_err(|_| bad.clone())?;
+    if value.contains(['\\', '#']) || value.chars().any(|ch| ch.is_control() || ch.is_whitespace())
+    {
+        return Err(bad);
+    }
+    let (scheme, rest) = value.split_once("://").ok_or_else(|| bad.clone())?;
+    let authority = rest.split(['/', '?']).next().unwrap_or_default();
+    if !scheme.eq_ignore_ascii_case("https") || authority.is_empty() || authority.contains('@') {
+        return Err(bad);
+    }
+    let url = Url::parse(value).map_err(|_| bad.clone())?;
+    let issuer = Url::parse(issuer).map_err(|_| bad.clone())?;
+    if url.origin() != issuer.origin() {
+        return Err(bad);
+    }
+    Ok(value)
 }

@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::{AccountBrowserCodecError, AccountBrowserFetchCredentials};
 
 /// Exact initial browser ceiling in byte order; never current membership or Cedar authority.
-pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 /// Registered coarse browser permissions, independent of Device/Operator registries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -22,6 +22,8 @@ pub enum AccountBrowserAccessScope {
     AccountRead,
     /// Exact `audit:read` browser permission; current `view_audit` remains mandatory.
     AuditRead,
+    /// Manage the verified Organization login connection.
+    AuthConnectionManage,
     /// Manage the untested issuer draft of an authorized Organization.
     AuthDraftsManage,
     /// Run a draft login test and read its status in the original browser family.
@@ -48,12 +50,13 @@ pub enum AccountBrowserAccessScope {
 
 impl AccountBrowserAccessScope {
     /// Every scope in canonical byte order.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::AccessRequestsDecide,
         Self::AccessRequestsRead,
         Self::AccessRequestsWrite,
         Self::AccountRead,
         Self::AuditRead,
+        Self::AuthConnectionManage,
         Self::AuthDraftsManage,
         Self::AuthTestRun,
         Self::InventoryRead,
@@ -75,6 +78,7 @@ impl AccountBrowserAccessScope {
             Self::AccessRequestsWrite => "access-requests:write",
             Self::AccountRead => "account:read",
             Self::AuditRead => "audit:read",
+            Self::AuthConnectionManage => "auth-connection:manage",
             Self::AuthDraftsManage => "auth-drafts:manage",
             Self::AuthTestRun => "auth-test:run",
             Self::InventoryRead => "inventory:read",
@@ -121,6 +125,18 @@ pub enum AccountBrowserAccessOperation {
     AuditEventList,
     /// `GET /api/v1/orgs/{org}/audit-events/verify`.
     AuditRangeVerify,
+    /// Read the current Organization connection.
+    AuthConnectionRead,
+    /// Start verification of a fresh activation candidate.
+    AuthActivationStart,
+    /// Read an activation in its original browser family.
+    AuthActivationRead,
+    /// Abandon an activation in its original browser family.
+    AuthActivationAbandon,
+    /// Confirm a verified activation and install the new revision.
+    AuthActivationConfirm,
+    /// Suspend the exact current active revision.
+    AuthConnectionSuspend,
     /// Create the Organization issuer draft when the slot is empty.
     AuthDraftCreate,
     /// Read the current Organization issuer draft.
@@ -256,7 +272,7 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 70] = [
+    pub const ALL: [Self; 76] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -266,6 +282,12 @@ impl AccountBrowserAccessOperation {
         Self::AccountProfileRead,
         Self::AuditEventList,
         Self::AuditRangeVerify,
+        Self::AuthConnectionRead,
+        Self::AuthActivationStart,
+        Self::AuthActivationRead,
+        Self::AuthActivationAbandon,
+        Self::AuthActivationConfirm,
+        Self::AuthConnectionSuspend,
         Self::AuthDraftCreate,
         Self::AuthDraftRead,
         Self::AuthDraftCancel,
@@ -343,6 +365,12 @@ impl AccountBrowserAccessOperation {
             Self::AccessRequestDecide => AnyScope(&[Scope::AccessRequestsDecide]),
             Self::AuditEventList | Self::AuditRangeVerify => AnyScope(&[Scope::AuditRead]),
             Self::AccountProfileRead => AnyScope(&[Scope::AccountRead]),
+            Self::AuthConnectionRead
+            | Self::AuthActivationStart
+            | Self::AuthActivationRead
+            | Self::AuthActivationAbandon
+            | Self::AuthActivationConfirm
+            | Self::AuthConnectionSuspend => AnyScope(&[Scope::AuthConnectionManage]),
             Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
                 AnyScope(&[Scope::AuthDraftsManage])
             }
@@ -413,6 +441,8 @@ impl AccountBrowserAccessOperation {
             | Self::AccessRequestRead
             | Self::AuthDraftRead
             | Self::AuthDraftTestRead
+            | Self::AuthConnectionRead
+            | Self::AuthActivationRead
             | Self::AuditEventList
             | Self::AuditRangeVerify
             | Self::AccountProfileRead
@@ -444,6 +474,9 @@ impl AccountBrowserAccessOperation {
             | Self::AccessRequestCancel
             | Self::AuthDraftCreate
             | Self::AuthDraftTestStart
+            | Self::AuthActivationStart
+            | Self::AuthActivationConfirm
+            | Self::AuthConnectionSuspend
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
@@ -469,6 +502,7 @@ impl AccountBrowserAccessOperation {
             | Self::OrganizationGroupDelete
             | Self::OrganizationPolicyDelete
             | Self::AuthDraftCancel
+            | Self::AuthActivationAbandon
             | Self::OrganizationGrantDelete => "DELETE",
             Self::InventoryHostReplace
             | Self::InventoryHostGroupReplace
@@ -492,6 +526,15 @@ impl AccountBrowserAccessOperation {
             Self::AccessRequestDecide => "/api/v1/orgs/{org}/access-requests/{id}/decisions",
             Self::AccessRequestCancel => "/api/v1/orgs/{org}/access-requests/{id}/cancel",
             Self::AccountProfileRead => "/api/v1/accounts/me",
+            Self::AuthConnectionRead => "/api/v1/orgs/{org}/auth-connection",
+            Self::AuthActivationStart => "/api/v1/orgs/{org}/auth-connection/activations",
+            Self::AuthActivationRead | Self::AuthActivationAbandon => {
+                "/api/v1/orgs/{org}/auth-connection/activations/{attempt}"
+            }
+            Self::AuthActivationConfirm => {
+                "/api/v1/orgs/{org}/auth-connection/activations/{attempt}/confirm"
+            }
+            Self::AuthConnectionSuspend => "/api/v1/orgs/{org}/auth-connection/suspend",
             Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
                 "/api/v1/orgs/{org}/auth-connection-draft"
             }
@@ -574,7 +617,9 @@ impl AccountBrowserAccessOperation {
     #[must_use]
     pub const fn fetch_credentials(self) -> AccountBrowserFetchCredentials {
         match self {
-            Self::AuthDraftTestStart => AccountBrowserFetchCredentials::SameOrigin,
+            Self::AuthDraftTestStart | Self::AuthActivationStart => {
+                AccountBrowserFetchCredentials::SameOrigin
+            }
             _ => AccountBrowserFetchCredentials::Omit,
         }
     }
@@ -589,6 +634,8 @@ impl AccountBrowserAccessOperation {
                 | Self::AccessRequestCancel
                 | Self::AuthDraftCreate
                 | Self::AuthDraftCancel
+                | Self::AuthActivationConfirm
+                | Self::AuthConnectionSuspend
                 | Self::InventoryImportCreate
                 | Self::InventoryHostCreate
                 | Self::InventoryHostGroupCreate

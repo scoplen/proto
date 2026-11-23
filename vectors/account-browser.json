@@ -462,7 +462,7 @@
       "id": "account-browser-scope-v1",
       "kind": "account.browser.scope",
       "input": "initial",
-      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage"
+      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage"
     },
     {
       "id": "account-browser-operation-77-v1",
@@ -1050,6 +1050,78 @@
       "id": "account-browser-operation-test-login-denied-174-v1",
       "kind": "account.browser.operation.reject",
       "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft/test-login/{attempt}/\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-175-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection\"}",
+      "expected": "{\"scopes\":[\"auth-connection:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-176-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/auth-connection/activations\"}",
+      "expected": "{\"scopes\":[\"auth-connection:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-177-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection/activations/{attempt}\"}",
+      "expected": "{\"scopes\":[\"auth-connection:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-178-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/auth-connection/activations/{attempt}\"}",
+      "expected": "{\"scopes\":[\"auth-connection:manage\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-179-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/auth-connection/activations/{attempt}/confirm\"}",
+      "expected": "{\"scopes\":[\"auth-connection:manage\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-180-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/auth-connection/suspend\"}",
+      "expected": "{\"scopes\":[\"auth-connection:manage\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-connection-denied-181-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/auth-connection\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-connection-denied-182-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/auth-connection\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-connection-denied-183-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection/activations\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-connection-denied-184-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"PATCH\",\"path\":\"/api/v1/orgs/{org}/auth-connection/activations/{attempt}\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-connection-denied-185-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/auth-connection/activations/{id}/confirm\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-connection-denied-186-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection/suspend\"}",
       "expected": "rejected"
     }
   ]

@@ -121,7 +121,8 @@ fn snippet_operations_keep_the_real_family_through_refresh_and_check_current_acc
 #[test]
 fn older_family_refresh_retains_its_scope_ceiling_and_fresh_login_acquires_draft_operations() {
     let mut previous = peer();
-    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.replace(" auth-drafts:manage auth-test:run", "");
+    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE
+        .replace(" auth-connection:manage auth-drafts:manage auth-test:run", "");
     previous.retain_scope_ceiling(&old).unwrap();
     assert!(previous.retain_scope_ceiling(INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE).is_err());
     previous
@@ -145,7 +146,9 @@ fn older_family_refresh_retains_its_scope_ceiling_and_fresh_login_acquires_draft
 #[test]
 fn draft_management_scope_does_not_gain_login_test_operations_on_refresh() {
     let mut previous = peer();
-    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.replace(" auth-test:run", "");
+    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE
+        .replace(" auth-connection:manage", "")
+        .replace(" auth-test:run", "");
     previous.retain_scope_ceiling(&old).unwrap();
     previous
         .rotate(b"{}", &refresh(2), &access(3), &refresh(4), JKT, ORIGIN, "rotation", 1100)
@@ -161,6 +164,39 @@ fn draft_management_scope_does_not_gain_login_test_operations_on_refresh() {
             Err(ReferenceAccountBrowserError::Denied)
         );
         current.authorize(&access(1), JKT, Some(ORIGIN), operation, proof, 1101).unwrap();
+    }
+}
+
+#[test]
+fn draft_scope_cannot_activate_connections_after_refresh() {
+    use AccountBrowserAccessOperation as Operation;
+    let mut previous = peer();
+    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.replace(" auth-connection:manage", "");
+    previous.retain_scope_ceiling(&old).unwrap();
+    previous
+        .rotate(b"{}", &refresh(2), &access(3), &refresh(4), JKT, ORIGIN, "rotation", 1100)
+        .unwrap();
+    previous
+        .authorize(&access(3), JKT, Some(ORIGIN), Operation::AuthDraftTestStart, "old-test", 1101)
+        .unwrap();
+    let mut current = peer();
+    for (index, operation) in [
+        Operation::AuthConnectionRead,
+        Operation::AuthActivationStart,
+        Operation::AuthActivationRead,
+        Operation::AuthActivationAbandon,
+        Operation::AuthActivationConfirm,
+        Operation::AuthConnectionSuspend,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let proof = format!("connection-{index}");
+        assert_eq!(
+            previous.authorize(&access(3), JKT, Some(ORIGIN), operation, &proof, 1101),
+            Err(ReferenceAccountBrowserError::Denied)
+        );
+        current.authorize(&access(1), JKT, Some(ORIGIN), operation, &proof, 1101).unwrap();
     }
 }
 

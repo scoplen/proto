@@ -30,7 +30,7 @@ add("logout-extension", "logout.response.reject", { revoked: true, extra: null }
 add("options-extension", "options.response", { ...options, extra: 1 }, options);
 add("options-request-field", "options.request.reject", { username: "alice", family_id: "chosen" });
 add("login-request-field", "login.request.reject", { ...login, device_id: "chosen" });
-add("scope", "scope", "initial", "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
+add("scope", "scope", "initial", "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
 const operation = (method, path, scopes, writerReceipt = false) => add(`operation-${vectors.length}`, "operation", { method, path }, { scopes, writerReceipt });
 operation("GET", "/api/v1/accounts/me", ["account:read"]);
 for (const [method, suffix, scopes] of [["POST", "", ["orgs:create"]], ["GET", "", ["orgs:read"]], ["GET", "/{org}", ["orgs:read"]], ["PATCH", "/{org}", ["orgs:write"]]]) operation(method, `/api/v1/orgs${suffix}`, scopes);
@@ -67,6 +67,16 @@ operation("GET", `${testLogin}/{attempt}`, ["auth-test:run"]);
 for (const [method, path] of [["GET", testLogin], ["POST", `${testLogin}/{attempt}`], ["GET", `${testLogin}/{id}`], ["GET", `${testLogin}/{attempt}/`]]) {
   add(`operation-test-login-denied-${vectors.length}`, "operation.reject", { method, path });
 }
+const connection = "/api/v1/orgs/{org}/auth-connection";
+for (const [method, suffix, receipt] of [
+  ["GET", "", false], ["POST", "/activations", false],
+  ["GET", "/activations/{attempt}", false], ["DELETE", "/activations/{attempt}", false],
+  ["POST", "/activations/{attempt}/confirm", true], ["POST", "/suspend", true],
+]) operation(method, connection + suffix, ["auth-connection:manage"], receipt);
+for (const [method, suffix] of [
+  ["POST", ""], ["DELETE", ""], ["GET", "/activations"],
+  ["PATCH", "/activations/{attempt}"], ["POST", "/activations/{id}/confirm"], ["GET", "/suspend"],
+]) add(`operation-connection-denied-${vectors.length}`, "operation.reject", { method, path: connection + suffix });
 
 const output = `${JSON.stringify({ format: "scoplen-test-vectors", version: 1, vectors }, null, 2)}\n`;
 const outputs = [["vectors/account-browser.json", output]];

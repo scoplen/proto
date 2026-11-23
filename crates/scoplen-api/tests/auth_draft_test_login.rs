@@ -140,7 +140,7 @@ fn status_and_start_responses_are_bound_to_original_context_and_provider_origin(
 }
 
 #[test]
-fn test_start_is_the_only_browser_business_operation_that_accepts_cookie_delivery() {
+fn only_oidc_starts_accept_browser_business_cookie_delivery() {
     use AccountBrowserAccessOperation::{AuthDraftTestRead, AuthDraftTestStart};
     for operation in [AuthDraftTestStart, AuthDraftTestRead] {
         assert_eq!(
@@ -161,6 +161,6 @@ fn test_start_is_the_only_browser_business_operation_that_accepts_cookie_deliver
             .into_iter()
             .filter(|op| op.fetch_credentials() == AccountBrowserFetchCredentials::SameOrigin)
             .collect::<Vec<_>>(),
-        [AuthDraftTestStart]
+        [AccountBrowserAccessOperation::AuthActivationStart, AuthDraftTestStart]
     );
 }

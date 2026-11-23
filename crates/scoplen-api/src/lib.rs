@@ -18,6 +18,7 @@ pub mod account_rate_reference;
 pub mod account_registration_reference;
 pub mod audit;
 pub mod auth;
+pub mod auth_connection;
 pub mod auth_connection_draft;
 pub mod certificate;
 pub mod certificate_reference;
