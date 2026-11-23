@@ -268,13 +268,13 @@ impl fmt::Debug for ConnectionTarget {
 }
 
 impl ConnectionTarget {
-    fn validate(&self) -> Result<(), Error> {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
         validate_issuer(&self.issuer)?;
         validate_credential_text(&self.client_id, "client_id")?;
         validate_space_id(&self.space_id)
     }
 
-    fn take(fields: &mut Map<String, Value>) -> Result<Self, Error> {
+    pub(crate) fn take(fields: &mut Map<String, Value>) -> Result<Self, Error> {
         let result = Self {
             issuer: take_string(fields, "issuer")?,
             client_id: take_string(fields, "client_id")?,

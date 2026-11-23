@@ -8,6 +8,11 @@ under Apache-2.0.
 
 ## Status
 
+D-170 adds the eight browser-only member-link operations and separate self and Owner
+withdrawal scopes. The `member_link` module validates empty requests, reviewed tags,
+original-writer confirmation keys and response binding to the Organization, Membership
+and attempt. The start response is the only link response with provider navigation.
+
 D-166 adds one untested issuer draft per Organization. The shared `auth_connection_draft`
 module validates the exact HTTPS issuer, request conditions, response metadata and Organization
 binding. Its reference peer exercises current Device and Account-browser authority,

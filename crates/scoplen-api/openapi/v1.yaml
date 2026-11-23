@@ -29987,6 +29987,11 @@
             },
             {
               "required": [
+                "connection"
+              ]
+            },
+            {
+              "required": [
                 "authorization_url"
               ]
             }

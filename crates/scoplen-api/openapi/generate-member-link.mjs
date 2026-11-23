@@ -45,8 +45,9 @@ const cookie = {
   description: "__Host-spl-auth-link-<state_digest>, using lowercase hex SHA-256 of the 32 decoded state bytes. Path=/; HttpOnly; Secure; SameSite=Lax; no Domain. Expiry is bounded by the attempt.",
 };
 const confidential = ["sub", "subject", "subject_digest", "subject_comparison", "comparison_value", "claims", "client_secret", "access_token", "refresh_token", "id_token"];
-function publicObject(fields, allowNavigation = false) {
-  const forbidden = allowNavigation ? confidential : [...confidential, "authorization_url"];
+function publicObject(fields, { allowNavigation = false, excluded = [] } = {}) {
+  const forbidden = [...confidential, ...excluded];
+  if (!allowNavigation) forbidden.push("authorization_url");
   return { ...object(fields, true), "x-scoplen-max-bytes": 8192,
     not: { anyOf: forbidden.map(name => ({ required: [name] })) } };
 }
@@ -74,7 +75,7 @@ export function memberLinkDefinitions() {
       client_id: { type: "string", minLength: 1, maxLength: 512, "x-scoplen-max-utf8-bytes": 512, pattern: "^[^\\u0000-\\u001f\\u007f-\\u009f]+$" },
       space_id: { type: "string", pattern: "^spc_[A-Za-z0-9_-]{1,92}$", minLength: 5, maxLength: 96 },
     }),
-    OrganizationMemberLinkStatus: publicObject(status),
+    OrganizationMemberLinkStatus: publicObject(status, { excluded: ["connection"] }),
     OrganizationSelfLinkStatus: publicObject({ ...status,
       connection: { anyOf: [schema("OrganizationLinkConnection"), { type: "null" }] },
     }),
@@ -84,7 +85,7 @@ export function memberLinkDefinitions() {
     OrganizationLinkAttemptStarted: publicObject({
       ...attemptFields, status: { type: "string", const: "pending" },
       authorization_url: { type: "string", format: "uri", pattern: "^[Hh][Tt][Tt][Pp][Ss]://" },
-    }, true),
+    }, { allowNavigation: true }),
   };
   const paths = {
     [root]: {
@@ -162,10 +163,13 @@ export interface OrganizationMemberLink extends OrganizationLinkContext {
 export interface OrganizationLinkConnection extends PublicLinkFields {
   id: string; etag: string; issuer: string; client_id: string; space_id: string; authorization_url?: never;
 }
-export interface OrganizationMemberLinkStatus extends OrganizationLinkContext {
+interface OrganizationLinkStatusFields extends OrganizationLinkContext {
   link: OrganizationMemberLink | null; authorization_url?: never;
 }
-export interface OrganizationSelfLinkStatus extends OrganizationMemberLinkStatus {
+export interface OrganizationMemberLinkStatus extends OrganizationLinkStatusFields {
+  connection?: never;
+}
+export interface OrganizationSelfLinkStatus extends OrganizationLinkStatusFields {
   connection: OrganizationLinkConnection | null;
 }
 interface OrganizationLinkAttemptFields extends OrganizationLinkContext {

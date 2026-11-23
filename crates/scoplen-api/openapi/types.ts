@@ -335,10 +335,13 @@ export interface OrganizationMemberLink extends OrganizationLinkContext {
 export interface OrganizationLinkConnection extends PublicLinkFields {
   id: string; etag: string; issuer: string; client_id: string; space_id: string; authorization_url?: never;
 }
-export interface OrganizationMemberLinkStatus extends OrganizationLinkContext {
+interface OrganizationLinkStatusFields extends OrganizationLinkContext {
   link: OrganizationMemberLink | null; authorization_url?: never;
 }
-export interface OrganizationSelfLinkStatus extends OrganizationMemberLinkStatus {
+export interface OrganizationMemberLinkStatus extends OrganizationLinkStatusFields {
+  connection?: never;
+}
+export interface OrganizationSelfLinkStatus extends OrganizationLinkStatusFields {
   connection: OrganizationLinkConnection | null;
 }
 interface OrganizationLinkAttemptFields extends OrganizationLinkContext {
