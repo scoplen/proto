@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 pub mod callback;
 pub mod reference;
+pub mod test_login;
 
 use crate::{
     certificate::valid_utc_timestamp,

@@ -2,7 +2,7 @@
 // D-140 reuses native password/browser DTOs while enforcing an independent endpoint profile.
 import { isDeepStrictEqual } from "node:util";
 
-export const initialAccountBrowserScope = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+export const initialAccountBrowserScope = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 export function accountBrowserOperations() {
   const operations = [];
@@ -38,6 +38,8 @@ export function accountBrowserOperations() {
     ["POST", "/{id}/decisions", "decide", true], ["POST", "/{id}/cancel", "write", true],
   ]) add(method, `/api/v1/orgs/{org}/access-requests${suffix}`, [`access-requests:${scope}`], writerReceipt);
   for (const method of ["POST", "GET", "DELETE"]) add(method, "/api/v1/orgs/{org}/auth-connection-draft", ["auth-drafts:manage"], method !== "GET");
+  add("POST", "/api/v1/orgs/{org}/auth-connection-draft/test-login", ["auth-test:run"]);
+  add("GET", "/api/v1/orgs/{org}/auth-connection-draft/test-login/{attempt}", ["auth-test:run"]);
   return operations;
 }
 

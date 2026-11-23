@@ -92,6 +92,7 @@ pub const ERROR_CODES: &[&str] = &[
     "certificate.quota_exceeded",
     "certificate.revoked",
     "gateway.invalid_request",
+    "organization.auth_provider_unavailable",
     "organization.commit_outcome_unknown",
     "organization.conflict",
     "organization.invalid_request",

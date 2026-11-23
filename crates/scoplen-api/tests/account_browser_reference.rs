@@ -121,7 +121,7 @@ fn snippet_operations_keep_the_real_family_through_refresh_and_check_current_acc
 #[test]
 fn older_family_refresh_retains_its_scope_ceiling_and_fresh_login_acquires_draft_operations() {
     let mut previous = peer();
-    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.replace(" auth-drafts:manage", "");
+    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.replace(" auth-drafts:manage auth-test:run", "");
     previous.retain_scope_ceiling(&old).unwrap();
     assert!(previous.retain_scope_ceiling(INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE).is_err());
     previous
@@ -132,6 +132,28 @@ fn older_family_refresh_retains_its_scope_ceiling_and_fresh_login_acquires_draft
         AccountBrowserAccessOperation::AuthDraftRead,
         AccountBrowserAccessOperation::AuthDraftCreate,
         AccountBrowserAccessOperation::AuthDraftCancel,
+    ] {
+        let proof = operation.http_method();
+        assert_eq!(
+            previous.authorize(&access(3), JKT, Some(ORIGIN), operation, proof, 1101),
+            Err(ReferenceAccountBrowserError::Denied)
+        );
+        current.authorize(&access(1), JKT, Some(ORIGIN), operation, proof, 1101).unwrap();
+    }
+}
+
+#[test]
+fn draft_management_scope_does_not_gain_login_test_operations_on_refresh() {
+    let mut previous = peer();
+    let old = INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE.replace(" auth-test:run", "");
+    previous.retain_scope_ceiling(&old).unwrap();
+    previous
+        .rotate(b"{}", &refresh(2), &access(3), &refresh(4), JKT, ORIGIN, "rotation", 1100)
+        .unwrap();
+    let mut current = peer();
+    for operation in [
+        AccountBrowserAccessOperation::AuthDraftTestStart,
+        AccountBrowserAccessOperation::AuthDraftTestRead,
     ] {
         let proof = operation.http_method();
         assert_eq!(

@@ -459,7 +459,7 @@ impl fmt::Debug for AccountBrowserProtectedHttpMetadata<'_> {
 
 impl AccountBrowserProtectedHttpMetadata<'_> {
     /// Validate the registered browser operation's lexical metadata before identity lookup.
-    /// The adapter rejects duplicate headers and uses credentials=omit for every business fetch.
+    /// The adapter rejects duplicate headers and follows the operation's fetch credential mode.
     /// # Errors
     /// Rejects wrong credential profile, missing/excessive proof or absent/mismatched Origin.
     pub fn validate(

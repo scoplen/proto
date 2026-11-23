@@ -14986,7 +14986,7 @@
         "x-scoplen-response-max-bytes": 8192,
         "x-scoplen-problem-max-bytes": 4096,
         "x-scoplen-fetch-credentials": "same-origin",
-        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
         "parameters": [
           {
             "name": "Origin",
@@ -16169,6 +16169,364 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Bounded Organization problem without issuer or draft metadata.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-connection-draft/test-login": {
+      "post": {
+        "operationId": "startOrganizationAuthDraftLoginTest",
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-test:run",
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-required-membership-roles-any": [
+          "owner",
+          "administrator"
+        ],
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "same-origin",
+        "x-scoplen-request-max-bytes": 4096,
+        "description": "Require exact trusted Origin and a current browser family with DPoP and current Organization authority. Check an approved provider before starting a test of the exact draft. Reject query and Idempotency-Key. A lost response must not be replayed. No membership, link or policy change.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[!#-~]*\"$",
+              "minLength": 2,
+              "maxLength": 256
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftLoginCredentials"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The pending attempt and its one-time provider navigation.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "Set-Cookie": {
+                "required": true,
+                "schema": {
+                  "type": "string"
+                },
+                "description": "__Host-spl-auth-test with Path=/, HttpOnly, Secure, SameSite=Lax, no Domain and a maximum age bounded by the attempt expiration."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftLoginStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "413": {
+            "$ref": "#/components/responses/GrantBodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/OrganizationContentType"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "Provider unavailable, storage rollback or unconfirmed start. Never return credentials or a correlation cookie on failure.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationAuthProviderUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/ProblemDetails"
+                        },
+                        {
+                          "properties": {
+                            "status": {
+                              "const": 503
+                            },
+                            "code": {
+                              "const": "organization.commit_outcome_unknown"
+                            },
+                            "changed": {
+                              "const": true
+                            },
+                            "retryable": {
+                              "const": false
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded Organization problem without issuer or draft metadata.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-connection-draft/test-login/{attempt}": {
+      "get": {
+        "operationId": "getOrganizationAuthDraftLoginTest",
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-test:run",
+        "x-scoplen-cedar-action": "manage_organization",
+        "x-scoplen-required-membership-roles-any": [
+          "owner",
+          "administrator"
+        ],
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-fetch-credentials": "omit",
+        "description": "Read the attempt in its original current browser family with DPoP and current Organization authority. Missing, foreign, expired and superseded attempts share a 404 response. No query, conditional, idempotency header or request body.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current status without credentials or provider claims.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftLoginAttempt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/OrganizationStorageUnavailable"
           },
           "default": {
             "description": "Bounded Organization problem without issuer or draft metadata.",
@@ -26361,6 +26719,142 @@
           }
         },
         "x-scoplen-max-bytes": 8192
+      },
+      "DraftLoginCredentials": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "client_id",
+          "client_secret"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "x-scoplen-max-utf8-bytes": 512,
+            "writeOnly": true
+          },
+          "client_secret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "x-scoplen-max-utf8-bytes": 512,
+            "writeOnly": true
+          }
+        },
+        "x-scoplen-max-bytes": 4096
+      },
+      "DraftLoginAttempt": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "organization_id",
+          "draft_generation",
+          "status",
+          "expires_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "draft_generation": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified",
+              "failed"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          }
+        },
+        "not": {
+          "required": [
+            "authorization_url"
+          ]
+        },
+        "x-scoplen-max-bytes": 8192
+      },
+      "DraftLoginStarted": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "organization_id",
+          "draft_generation",
+          "status",
+          "expires_at",
+          "authorization_url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "draft_generation": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "status": {
+            "type": "string",
+            "const": "pending"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          },
+          "authorization_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "One-time HTTPS navigation at the approved provider origin. Contains the original state and nonce."
+          }
+        },
+        "x-scoplen-max-bytes": 8192
+      },
+      "OrganizationAuthProviderUnavailableProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProblemDetails"
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 503
+              },
+              "code": {
+                "const": "organization.auth_provider_unavailable"
+              },
+              "changed": {
+                "const": false
+              }
+            }
+          }
+        ]
       }
     }
   },
@@ -26902,6 +27396,22 @@
         "auth-drafts:manage"
       ],
       "writerReceipt": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/auth-connection-draft/test-login",
+      "scopes": [
+        "auth-test:run"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/auth-connection-draft/test-login/{attempt}",
+      "scopes": [
+        "auth-test:run"
+      ],
+      "writerReceipt": false
     }
   ]
 }

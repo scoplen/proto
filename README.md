@@ -16,6 +16,14 @@ Audit readers can filter its create and cancel events by the recorded draft gene
 `auth_connection_draft`. Upgrade readers before enabling this projection on the server.
 Activation requires a separate, explicitly reviewed enterprise connection operation.
 
+D-167 defines browser-only draft login start and status messages in the same module.
+Fresh Account-browser login grants `auth-test:run`; refresh preserves the original family
+ceiling. The request codec preserves confidential credentials and the response codec binds
+an attempt to its Organization and draft. The start response can set a callback correlation
+cookie and navigate to the approved issuer origin. Status responses carry no navigation URL.
+The callback codec requires the original issuer and its registered path before exposing an
+authorization code. The Server owns trust configuration, persistence, token exchange and audit.
+
 D-153 adds `parse_inventory_openssh` and `inventory_openssh_preview` to the same shared
 `inventory_import` module. One explicitly selected bounded UTF-8 source produces every
 ordered Ready or Blocked candidate; the new `parseInventoryOpenSsh` browser export forwards

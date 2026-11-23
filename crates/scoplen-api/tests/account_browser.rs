@@ -138,8 +138,8 @@ fn snippet_browser_operations_reuse_inventory_scopes_and_preserve_device_routes(
     use AccountBrowserAccessScope as Scope;
     use DeviceAccessOperation as Device;
 
-    assert_eq!(Browser::ALL.len(), 68);
-    assert_eq!(Scope::ALL.len(), 15);
+    assert_eq!(Browser::ALL.len(), 70);
+    assert_eq!(Scope::ALL.len(), 16);
     let collection = "/api/v1/orgs/{org}/snippets";
     let item = "/api/v1/orgs/{org}/snippets/{id}";
     for (browser, device, method, path, scope, receipt) in [

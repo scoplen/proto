@@ -4,10 +4,10 @@
 use scoplen_model::validate_uuid_v7;
 use uuid::Uuid;
 
-use super::AccountBrowserCodecError;
+use super::{AccountBrowserCodecError, AccountBrowserFetchCredentials};
 
 /// Exact initial browser ceiling in byte order; never current membership or Cedar authority.
-pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
+pub const INITIAL_ACCOUNT_BROWSER_ACCESS_SCOPE: &str = "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage";
 
 /// Registered coarse browser permissions, independent of Device/Operator registries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -24,6 +24,8 @@ pub enum AccountBrowserAccessScope {
     AuditRead,
     /// Manage the untested issuer draft of an authorized Organization.
     AuthDraftsManage,
+    /// Run a draft login test and read its status in the original browser family.
+    AuthTestRun,
     /// Exact `inventory:read` browser permission.
     InventoryRead,
     /// Exact `inventory:write` browser permission.
@@ -46,13 +48,14 @@ pub enum AccountBrowserAccessScope {
 
 impl AccountBrowserAccessScope {
     /// Every scope in canonical byte order.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::AccessRequestsDecide,
         Self::AccessRequestsRead,
         Self::AccessRequestsWrite,
         Self::AccountRead,
         Self::AuditRead,
         Self::AuthDraftsManage,
+        Self::AuthTestRun,
         Self::InventoryRead,
         Self::InventoryWrite,
         Self::OrganizationCreate,
@@ -73,6 +76,7 @@ impl AccountBrowserAccessScope {
             Self::AccountRead => "account:read",
             Self::AuditRead => "audit:read",
             Self::AuthDraftsManage => "auth-drafts:manage",
+            Self::AuthTestRun => "auth-test:run",
             Self::InventoryRead => "inventory:read",
             Self::InventoryWrite => "inventory:write",
             Self::OrganizationCreate => "orgs:create",
@@ -123,6 +127,10 @@ pub enum AccountBrowserAccessOperation {
     AuthDraftRead,
     /// Cancel the current generation of the Organization issuer draft.
     AuthDraftCancel,
+    /// Start a confidential login test on a current draft generation.
+    AuthDraftTestStart,
+    /// Read an attempt in its original browser family.
+    AuthDraftTestRead,
     /// `POST /api/v1/orgs`.
     OrganizationCreate,
     /// `GET /api/v1/orgs`.
@@ -248,7 +256,7 @@ pub enum AccountBrowserAccessRequirement {
 
 impl AccountBrowserAccessOperation {
     /// Every operation in this finite browser registry.
-    pub const ALL: [Self; 68] = [
+    pub const ALL: [Self; 70] = [
         Self::AccessRequestCheck,
         Self::AccessRequestCreate,
         Self::AccessRequestList,
@@ -261,6 +269,8 @@ impl AccountBrowserAccessOperation {
         Self::AuthDraftCreate,
         Self::AuthDraftRead,
         Self::AuthDraftCancel,
+        Self::AuthDraftTestStart,
+        Self::AuthDraftTestRead,
         Self::OrganizationCreate,
         Self::OrganizationList,
         Self::OrganizationRead,
@@ -336,6 +346,7 @@ impl AccountBrowserAccessOperation {
             Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
                 AnyScope(&[Scope::AuthDraftsManage])
             }
+            Self::AuthDraftTestStart | Self::AuthDraftTestRead => AnyScope(&[Scope::AuthTestRun]),
             Self::OrganizationCreate => AnyScope(&[Scope::OrganizationCreate]),
             Self::OrganizationList | Self::OrganizationRead => AnyScope(&[Scope::OrganizationRead]),
             Self::OrganizationUpdate => AnyScope(&[Scope::OrganizationWrite]),
@@ -401,6 +412,7 @@ impl AccountBrowserAccessOperation {
             Self::AccessRequestList
             | Self::AccessRequestRead
             | Self::AuthDraftRead
+            | Self::AuthDraftTestRead
             | Self::AuditEventList
             | Self::AuditRangeVerify
             | Self::AccountProfileRead
@@ -431,6 +443,7 @@ impl AccountBrowserAccessOperation {
             | Self::AccessRequestDecide
             | Self::AccessRequestCancel
             | Self::AuthDraftCreate
+            | Self::AuthDraftTestStart
             | Self::OrganizationCreate
             | Self::TeamInvitationCreate
             | Self::TeamInvitationAccept
@@ -481,6 +494,10 @@ impl AccountBrowserAccessOperation {
             Self::AccountProfileRead => "/api/v1/accounts/me",
             Self::AuthDraftCreate | Self::AuthDraftRead | Self::AuthDraftCancel => {
                 "/api/v1/orgs/{org}/auth-connection-draft"
+            }
+            Self::AuthDraftTestStart => "/api/v1/orgs/{org}/auth-connection-draft/test-login",
+            Self::AuthDraftTestRead => {
+                "/api/v1/orgs/{org}/auth-connection-draft/test-login/{attempt}"
             }
             Self::AuditEventList => "/api/v1/orgs/{org}/audit-events",
             Self::AuditRangeVerify => "/api/v1/orgs/{org}/audit-events/verify",
@@ -552,6 +569,14 @@ impl AccountBrowserAccessOperation {
         Self::ALL.into_iter().find(|operation| {
             operation.http_method() == method && operation.route_template() == template
         })
+    }
+    /// The start response sets the callback correlation cookie. Other reads and writes omit cookies.
+    #[must_use]
+    pub const fn fetch_credentials(self) -> AccountBrowserFetchCredentials {
+        match self {
+            Self::AuthDraftTestStart => AccountBrowserFetchCredentials::SameOrigin,
+            _ => AccountBrowserFetchCredentials::Omit,
+        }
     }
     /// Whether this mutation's exact receipt binds the real browser writer/family.
     /// Team receipts remain Account-scoped and return false.

@@ -64,10 +64,60 @@ export function authDraftDefinitions() {
   return { schemas, paths };
 }
 
+export function authDraftTestDefinitions() {
+  const credential = { type: "string", minLength: 1, maxLength: 512, "x-scoplen-max-utf8-bytes": 512, writeOnly: true };
+  const attemptFields = { id: uuid, organization_id: uuid, draft_generation: uuid, status: { type: "string", enum: ["pending", "verified", "failed"] }, expires_at: time };
+  const schemas = {
+    DraftLoginCredentials: { ...object({ client_id: credential, client_secret: credential }, false), "x-scoplen-max-bytes": 4096 },
+    DraftLoginAttempt: { ...object(attemptFields, true), not: { required: ["authorization_url"] }, "x-scoplen-max-bytes": 8192 },
+    DraftLoginStarted: { ...object({ ...attemptFields, status: { type: "string", const: "pending" }, authorization_url: { type: "string", format: "uri", description: "One-time HTTPS navigation at the approved provider origin. Contains the original state and nonce." } }, true), "x-scoplen-max-bytes": 8192 },
+    OrganizationAuthProviderUnavailableProblem: { allOf: [schema("ProblemDetails"), { properties: { status: { const: 503 }, code: { const: "organization.auth_provider_unavailable" }, changed: { const: false } } }] },
+  };
+  const browser = {
+    security: [{ accountBrowserAccess: [], dpopProof: [] }],
+    "x-scoplen-required-browser-scope": "auth-test:run",
+    "x-scoplen-cedar-action": "manage_organization",
+    "x-scoplen-required-membership-roles-any": ["owner", "administrator"],
+    "x-scoplen-response-max-bytes": 8192, "x-scoplen-problem-max-bytes": 4096,
+  };
+  const responseBody = (name, responseHeaders, description) => ({ description, headers: responseHeaders, content: { "application/json": { schema: schema(name) } } });
+  const cookie = { required: true, schema: { type: "string" }, description: "__Host-spl-auth-test with Path=/, HttpOnly, Secure, SameSite=Lax, no Domain and a maximum age bounded by the attempt expiration." };
+  const startPath = "/orgs/{org}/auth-connection-draft/test-login";
+  const paths = {
+    [startPath]: { post: {
+      operationId: "startOrganizationAuthDraftLoginTest", ...browser,
+      "x-scoplen-fetch-credentials": "same-origin", "x-scoplen-request-max-bytes": 4096,
+      description: "Require exact trusted Origin and a current browser family with DPoP and current Organization authority. Check an approved provider before starting a test of the exact draft. Reject query and Idempotency-Key. A lost response must not be replayed. No membership, link or policy change.",
+      parameters: [org, header("If-Match", strongTag), header("Origin", { type: "string", format: "uri" })],
+      requestBody: { required: true, content: { "application/json": { schema: schema("DraftLoginCredentials") } } },
+      responses: {
+        201: responseBody("DraftLoginStarted", { ...headers, "Set-Cookie": cookie }, "The pending attempt and its one-time provider navigation."),
+        ...failures, 409: response("OrganizationConflict"), 412: response("OrganizationPreconditionFailed"),
+        413: response("GrantBodyTooLarge"), 415: response("OrganizationContentType"),
+        428: response("OrganizationPreconditionRequired"), 429: response("GroupPolicyRateLimited"),
+        503: { description: "Provider unavailable, storage rollback or unconfirmed start. Never return credentials or a correlation cookie on failure.", headers,
+          content: { "application/problem+json": { schema: { oneOf: [schema("OrganizationAuthProviderUnavailableProblem"), schema("OrganizationStorageUnavailableProblem"),
+            { allOf: [schema("ProblemDetails"), { properties: { status: { const: 503 }, code: { const: "organization.commit_outcome_unknown" }, changed: { const: true }, retryable: { const: false } } }] },
+          ] } } } },
+      },
+    } },
+    [`${startPath}/{attempt}`]: { get: {
+      operationId: "getOrganizationAuthDraftLoginTest", ...browser,
+      "x-scoplen-fetch-credentials": "omit",
+      description: "Read the attempt in its original current browser family with DPoP and current Organization authority. Missing, foreign, expired and superseded attempts share a 404 response. No query, conditional, idempotency header or request body.",
+      parameters: [org, { name: "attempt", in: "path", required: true, schema: uuid }],
+      responses: { 200: responseBody("DraftLoginAttempt", headers, "Current status without credentials or provider claims."),
+        ...failures, 503: response("OrganizationStorageUnavailable") },
+    } },
+  };
+  return { schemas, paths };
+}
+
 export function generateAuthDraftTypes(document) {
-  const { schemas, paths } = authDraftDefinitions();
-  for (const [name, value] of Object.entries(schemas)) if (!isDeepStrictEqual(document.components.schemas[name], value)) throw new Error(`D-166 schema drift: ${name}`);
-  for (const [name, value] of Object.entries(paths)) if (!isDeepStrictEqual(document.paths[name], value)) throw new Error(`D-166 operation drift: ${name}`);
+  for (const [decision, { schemas, paths }] of [["D-166", authDraftDefinitions()], ["D-167", authDraftTestDefinitions()]]) {
+    for (const [name, value] of Object.entries(schemas)) if (!isDeepStrictEqual(document.components.schemas[name], value)) throw new Error(`${decision} schema drift: ${name}`);
+    for (const [name, value] of Object.entries(paths)) if (!isDeepStrictEqual(document.paths[name], value)) throw new Error(`${decision} operation drift: ${name}`);
+  }
   return `export interface AuthConnectionDraftCreate { data: { issuer: string } }
 export interface AuthConnectionDraftResource {
   id: string;
@@ -77,5 +127,25 @@ export interface AuthConnectionDraftResource {
   data: { organization_id: string; issuer: string; [key: string]: unknown };
   [key: string]: unknown;
 }
+export interface DraftLoginCredentials { client_id: string; client_secret: string }
+export interface DraftLoginAttempt {
+  id: string;
+  organization_id: string;
+  draft_generation: string;
+  status: "pending" | "verified" | "failed";
+  expires_at: string;
+  authorization_url?: never;
+  [key: string]: unknown;
+}
+export interface DraftLoginStarted {
+  id: string;
+  organization_id: string;
+  draft_generation: string;
+  status: "pending";
+  expires_at: string;
+  authorization_url: string;
+  [key: string]: unknown;
+}
+export type OrganizationAuthProviderUnavailableProblem = ProblemDetails & { status: 503; code: "organization.auth_provider_unavailable"; changed: false };
 `;
 }

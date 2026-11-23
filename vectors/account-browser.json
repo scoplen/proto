@@ -462,7 +462,7 @@
       "id": "account-browser-scope-v1",
       "kind": "account.browser.scope",
       "input": "initial",
-      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage"
+      "expected": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage"
     },
     {
       "id": "account-browser-operation-77-v1",
@@ -1015,6 +1015,42 @@
       "kind": "account.browser.operation",
       "input": "{\"method\":\"DELETE\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft\"}",
       "expected": "{\"scopes\":[\"auth-drafts:manage\"],\"writerReceipt\":true}"
+    },
+    {
+      "id": "account-browser-operation-169-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft/test-login\"}",
+      "expected": "{\"scopes\":[\"auth-test:run\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-170-v1",
+      "kind": "account.browser.operation",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft/test-login/{attempt}\"}",
+      "expected": "{\"scopes\":[\"auth-test:run\"],\"writerReceipt\":false}"
+    },
+    {
+      "id": "account-browser-operation-test-login-denied-171-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft/test-login\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-test-login-denied-172-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"POST\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft/test-login/{attempt}\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-test-login-denied-173-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft/test-login/{id}\"}",
+      "expected": "rejected"
+    },
+    {
+      "id": "account-browser-operation-test-login-denied-174-v1",
+      "kind": "account.browser.operation.reject",
+      "input": "{\"method\":\"GET\",\"path\":\"/api/v1/orgs/{org}/auth-connection-draft/test-login/{attempt}/\"}",
+      "expected": "rejected"
     }
   ]
 }
