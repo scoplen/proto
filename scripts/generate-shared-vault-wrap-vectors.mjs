@@ -18,6 +18,20 @@ function integer(length, number) {
 function uuid(last) {
   return `00000000-0000-7000-8000-${last.toString(16).padStart(12, "0")}`;
 }
+function cborHead(major, value) {
+  if (value < 24) return Buffer.of(major << 5 | value);
+  if (value <= 255) return Buffer.of(major << 5 | 24, value);
+  throw new Error("fixture field exceeds the one-byte CBOR length profile");
+}
+function cbor(value) {
+  if (typeof value === "number") return cborHead(0, value);
+  if (typeof value === "string") return join(cborHead(3, value.length), ascii(value));
+  if (Buffer.isBuffer(value)) return join(cborHead(2, value.length), value);
+  if (Array.isArray(value)) return join(cborHead(4, value.length), ...value.map(cbor));
+  const pairs = Object.entries(value).map(([key, item]) => [cbor(key), cbor(item)]);
+  pairs.sort(([a], [b]) => Buffer.compare(a, b));
+  return join(cborHead(5, pairs.length), ...pairs.flat());
+}
 const uuidBytes = value => hex(value.replaceAll("-", ""));
 const privateKey = (oid, seed) => createPrivateKey({
   key: join(hex(`302e020100300506032b65${oid}04220420`), seed), format: "der", type: "pkcs8",
@@ -71,6 +85,19 @@ const header = join(Buffer.of(1), integer(8, 42));
 const digest = createHash("sha256").update(bytes).digest();
 const authority = join(ascii("spl-shared-vault-authority-v1"), header, uuidBytes(admission), context, authorKem, digest);
 const receipt = join(header, sign(null, authority, audit));
+const publication = (account, membership, revision, signing, kem) => ({
+  account_id: uuidBytes(account), membership_id: uuidBytes(membership), revision,
+  signing_public_key: signing, kem_public_key: kem,
+});
+const delivery = cbor({
+  organization: uuidBytes(organization), vault_id: uuidBytes(vault), account_id: uuidBytes(recipientAccount),
+  membership_id: uuidBytes(recipientMember), admission_id: uuidBytes(admission),
+  keys: [{
+    epoch: 8, operation: 2, author: publication(authorAccount, authorMember, 11, authorSigning, authorKem),
+    recipient: publication(recipientAccount, recipientMember, 12, recipientSigningBytes, recipientKem),
+    authority_receipt: receipt, wrapped_vault_key: bytes,
+  }],
+});
 const document = {
   format: "scoplen-test-vectors",
   version: 1,
@@ -85,15 +112,24 @@ const document = {
     kind: "crypto.shared-vault-authority-open",
     input: [admission, toHex(authorKem), toHex(publicBytes(createPublicKey(audit))), toHex(receipt)].join("|"),
     expected: toHex(digest),
+  }, {
+    id: "sync-shared-vault-key-delivery-v1",
+    kind: "sync.vaults.shared-key-delivery",
+    input: toHex(delivery),
+    expected: toHex(plaintext),
   }],
 };
 const output = `${JSON.stringify(document, null, 2)}\n`;
 const path = new URL("../vectors/shared-vault-wrap.json", import.meta.url);
 const receiptSeed = new URL("../fuzz/corpus/crypto_decoders/seed-shared-vault-authority-receipt", import.meta.url);
+const deliverySeed = new URL("../fuzz/corpus/sync_control/seed-shared-vault-key-delivery", import.meta.url);
+const taggedDelivery = join(Buffer.of(17), delivery);
 if (process.argv.includes("--check")) {
   assert.equal((await readFile(path, "utf8")).replaceAll("\r\n", "\n"), output);
   assert.deepEqual(await readFile(receiptSeed), receipt);
+  assert.deepEqual(await readFile(deliverySeed), taggedDelivery);
 } else {
   await writeFile(path, output);
   await writeFile(receiptSeed, receipt);
+  await writeFile(deliverySeed, taggedDelivery);
 }

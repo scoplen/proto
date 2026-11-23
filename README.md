@@ -15,10 +15,11 @@ and response binding. Both recipient reads require the existing `sync:write` Dev
 `scoplen_crypto::SharedVaultKeyWrap` seals, verifies and opens the D-171 K-2 artifact using
 independently reviewed author and recipient facts. `SharedVaultAuthorityReceipt` additionally
 checks the deployment audit signature and the caller's last verified receipt for the admission
-and epoch before opening. Run
+and epoch before opening. `SyncSharedVaultKeyDelivery` carries the current admission and the
+historical evidence for every served epoch in the Organization-owned key response. Run
 `node scripts/generate-shared-vault-wrap-vectors.mjs --check` to check the independently
-generated known-answer vectors. Production use requires current admission and author history
-delivery, durable receipt pins, authorization and rotation in the consumers.
+generated known-answer vectors. Production use requires consumer adoption, durable receipt pins,
+authorization and rotation.
 
 D-170 adds the eight browser-only member-link operations and separate self and Owner
 withdrawal scopes. The `member_link` module validates empty requests, reviewed tags,

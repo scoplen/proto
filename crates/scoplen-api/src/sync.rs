@@ -16,10 +16,14 @@ use uuid::Uuid;
 use crate::ProblemDetails;
 
 mod organization_view;
+mod shared_vault_key_delivery;
 mod shared_vault_recipients;
 pub use organization_view::{
     SyncOrganizationAckRequest, SyncOrganizationAckResponse, SyncOrganizationViewQuery,
     SyncOrganizationViewResponse,
+};
+pub use shared_vault_key_delivery::{
+    SyncSharedVaultKey, SyncSharedVaultKeyDelivery, SyncSharedVaultKeyPublication,
 };
 pub use shared_vault_recipients::{
     MAX_SYNC_VAULT_RECIPIENTS, MAX_SYNC_VAULT_RECIPIENTS_BODY_BYTES, SyncVaultRecipient,
@@ -640,7 +644,7 @@ impl SyncVaultKey {
     }
 }
 
-/// Successful response from `GET /sync/v1/vaults/{vault}/keys`.
+/// Opaque Personal key response. Organization-owned Shared keys use [`SyncSharedVaultKeyDelivery`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyncVaultKeysResponse {
     /// Non-retired wrapped keys, sorted by ascending epoch.
