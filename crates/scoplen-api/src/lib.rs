@@ -113,6 +113,7 @@ pub const ERROR_CODES: &[&str] = &[
     "sync.quota_exceeded",
     "sync.rate_limited",
     "sync.read_only",
+    "sync.rotation_required",
     "sync.storage_unavailable",
     "sync.view_changed",
 ];
@@ -465,6 +466,7 @@ mod tests {
         assert!(ErrorCode::new("sync.object_not_found").expect("registered code").is_known());
         assert!(ErrorCode::new("sync.quota_exceeded").expect("registered code").is_known());
         assert!(ErrorCode::new("sync.rate_limited").expect("registered code").is_known());
+        assert!(ErrorCode::new("sync.rotation_required").expect("registered code").is_known());
         assert!(ErrorCode::new("sync.storage_unavailable").expect("registered code").is_known());
         let code = ErrorCode::new("future.new_code").expect("syntactically valid unknown code");
         assert!(!code.is_known());

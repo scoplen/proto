@@ -276,18 +276,27 @@ fn profiles_are_separate_and_secrets_are_redacted() {
         "certificates:issue",
         "keys:read",
         "sync:read",
+        "sync:write",
         "personal-invitation:issue",
         "*",
         "orgs:read-extra",
     ] {
         assert!(AccountBrowserAccessScope::from_token(forbidden).is_none());
     }
-    assert_eq!(DeviceAccessOperation::ALL.len(), 99);
-    let krl = DeviceAccessOperation::UserCaKrlRead;
-    assert!(
-        AccountBrowserAccessOperation::from_route(krl.http_method(), krl.route_template())
+    assert_eq!(DeviceAccessOperation::ALL.len(), 101);
+    for operation in [
+        DeviceAccessOperation::UserCaKrlRead,
+        DeviceAccessOperation::VaultRecipientRosterRead,
+        DeviceAccessOperation::VaultRecipientRead,
+    ] {
+        assert!(
+            AccountBrowserAccessOperation::from_route(
+                operation.http_method(),
+                operation.route_template(),
+            )
             .is_none()
-    );
+        );
+    }
     assert!(INITIAL_DEVICE_ACCESS_SCOPE.contains("keys:write"));
     let access = AccountBrowserAccessToken::from_random_bytes(&[7; 32]);
     let refresh = AccountBrowserRefreshToken::from_random_bytes(&[7; 32]);

@@ -16,8 +16,18 @@ fn request() -> SyncPublishVaultEpochRequest {
     SyncPublishVaultEpochRequest {
         epoch: 2,
         wrapped_keys: vec![
-            SyncVaultEpochWrap { account_id: account(1), wrapped_vault_key: vec![1, 2] },
-            SyncVaultEpochWrap { account_id: account(2), wrapped_vault_key: vec![3, 4] },
+            SyncVaultEpochWrap {
+                account_id: account(1),
+                membership_id: account(3),
+                recipient_key_revision: 9,
+                wrapped_vault_key: vec![1, 2],
+            },
+            SyncVaultEpochWrap {
+                account_id: account(2),
+                membership_id: account(4),
+                recipient_key_revision: 10,
+                wrapped_vault_key: vec![3, 4],
+            },
         ],
     }
 }
@@ -91,6 +101,12 @@ fn shared_vault_epoch_codecs_reject_invalid_order_fields_and_bounds() {
     invalid.wrapped_keys[1].account_id = invalid.wrapped_keys[0].account_id;
     assert!(invalid.to_cbor().is_err(), "duplicate accounts");
     invalid = request();
+    invalid.wrapped_keys[1].membership_id = invalid.wrapped_keys[0].membership_id;
+    assert!(invalid.to_cbor().is_err(), "duplicate Memberships");
+    invalid = request();
+    invalid.wrapped_keys[0].recipient_key_revision = 0;
+    assert!(invalid.to_cbor().is_err(), "zero reviewed revision");
+    invalid = request();
     invalid.epoch = 0;
     assert!(invalid.to_cbor().is_err(), "zero epoch");
     invalid = request();
@@ -121,6 +137,8 @@ fn shared_vault_epoch_codecs_reject_invalid_order_fields_and_bounds() {
                     u8::try_from(index / 256).expect("bounded high byte"),
                     u8::try_from(index % 256).expect("bounded low byte"),
                 ]),
+                membership_id: account(3),
+                recipient_key_revision: 1,
                 wrapped_vault_key: vec![1],
             })
             .collect(),
@@ -172,6 +190,13 @@ fn published_shared_vault_epoch_vectors_match_public_codecs() {
                                 entry["account_id"].as_str().expect("account id"),
                             )
                             .expect("account UUID"),
+                            membership_id: Uuid::parse_str(
+                                entry["membership_id"].as_str().expect("Membership id"),
+                            )
+                            .expect("Membership UUID"),
+                            recipient_key_revision: entry["recipient_key_revision"]
+                                .as_u64()
+                                .expect("revision"),
                             wrapped_vault_key: decode_hex(
                                 entry["wrapped_vault_key"].as_str().expect("wrapped key"),
                             ),
