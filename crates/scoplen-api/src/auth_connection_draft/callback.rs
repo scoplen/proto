@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! D-167 issuer-specific OIDC authorization response intake.
+//! Issuer-specific OIDC authorization response intake.
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use scoplen_crypto::{SecretBytes, SecretVec};
@@ -70,6 +70,26 @@ pub fn activation_cookie_name(state: &SecretBytes<32>) -> String {
 /// # Errors
 /// Rejects oversized queries or a missing, ambiguous, or invalid state.
 pub fn activation_cookie_name_from_query(query: &str) -> Result<String, InvalidCallback> {
+    callback_state(query).map(|state| activation_cookie_name(&state))
+}
+
+/// Name the distinct D-170 member-link cookie for a fresh state value.
+#[must_use]
+pub fn member_link_cookie_name(state: &SecretBytes<32>) -> String {
+    let digest = Sha256::digest(state.as_bytes());
+    format!("__Host-spl-auth-link-{digest:x}")
+}
+
+/// Select the member-link cookie name from exactly one canonical state parameter.
+/// The receiver still verifies the durable link purpose, browser binding, and callback.
+///
+/// # Errors
+/// Rejects oversized queries or a missing, ambiguous, or invalid state.
+pub fn member_link_cookie_name_from_query(query: &str) -> Result<String, InvalidCallback> {
+    callback_state(query).map(|state| member_link_cookie_name(&state))
+}
+
+fn callback_state(query: &str) -> Result<SecretBytes<32>, InvalidCallback> {
     if query.len() > MAX_QUERY_BYTES {
         return Err(InvalidCallback);
     }
@@ -83,7 +103,7 @@ pub fn activation_cookie_name_from_query(query: &str) -> Result<String, InvalidC
             state = Some(random_value(decode_form(value)?.as_bytes())?);
         }
     }
-    state.as_ref().map(activation_cookie_name).ok_or(InvalidCallback)
+    state.ok_or(InvalidCallback)
 }
 
 impl<'a> Callback<'a> {

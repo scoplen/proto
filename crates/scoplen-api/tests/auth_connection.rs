@@ -8,7 +8,10 @@ use scoplen_api::{
     },
     auth_connection_draft::{
         DraftRequestError,
-        callback::{activation_cookie_name, activation_cookie_name_from_query},
+        callback::{
+            activation_cookie_name, activation_cookie_name_from_query, member_link_cookie_name,
+            member_link_cookie_name_from_query,
+        },
         test_login::DraftLoginStatus,
     },
 };
@@ -306,6 +309,30 @@ fn activation_callback_cookie_name_is_state_specific_and_rejects_ambiguous_state
         format!("state={encoded}&extra={}", "x".repeat(8192)),
     ] {
         assert!(activation_cookie_name_from_query(&query).is_err());
+    }
+}
+
+#[test]
+fn member_link_callback_cookie_is_distinct_and_uses_only_canonical_state() {
+    let state = SecretBytes::from_slice(&(0..32).collect::<Vec<u8>>()).unwrap();
+    let encoded = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
+    let name =
+        "__Host-spl-auth-link-630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd";
+    assert_eq!(member_link_cookie_name(&state), name);
+    assert_ne!(activation_cookie_name(&state), name);
+    assert_ne!(member_link_cookie_name(&SecretBytes::from_slice(&[5; 32]).unwrap()), name);
+    for query in
+        [format!("code=opaque&state={encoded}"), format!("error=access_denied&%73tate={encoded}")]
+    {
+        assert_eq!(member_link_cookie_name_from_query(&query).unwrap(), name);
+    }
+    for query in [
+        "code=opaque".to_owned(),
+        format!("state={encoded}&%73tate={encoded}"),
+        format!("state={encoded}%3D"),
+        format!("state={encoded}&extra={}", "x".repeat(8192)),
+    ] {
+        assert!(member_link_cookie_name_from_query(&query).is_err());
     }
 }
 
