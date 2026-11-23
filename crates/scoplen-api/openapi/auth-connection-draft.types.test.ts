@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { AuthConnectionDraftCreate, AuthConnectionDraftResource, DraftLoginAttempt, DraftLoginCredentials, DraftLoginStarted, components } from "./index";
 import type { AuthConnectionActivation, AuthConnectionActivationStarted, AuthConnectionCandidate, AuthConnectionCondition, AuthConnectionResource } from "./index";
+import type { OrganizationLinkAttempt, OrganizationLinkAttemptStarted, OrganizationMemberLink, OrganizationSelfLinkStatus } from "./index";
 
 const input: AuthConnectionDraftCreate = { data: { issuer: "https://issuer.example/tenant/" } };
 const typedInput: components["schemas"]["AuthConnectionDraftCreate"] = input;
@@ -10,6 +11,20 @@ const item: AuthConnectionDraftResource = {
   data: { organization_id: "0191d3e0-8000-7000-8000-000000000001", issuer: input.data.issuer },
 };
 const typedResult: components["schemas"]["AuthConnectionDraftResource"] = item;
+const binding = { organization_id: item.data.organization_id, membership_id: generation };
+const link: OrganizationMemberLink = { ...binding, id: generation, etag: item.etag, created_at: item.created_at };
+const memberStatus: OrganizationSelfLinkStatus = { ...binding, connection: null, link };
+const linkAttempt: OrganizationLinkAttempt = {
+  ...binding, id: generation, connection_revision: generation, status: "verified", expires_at: item.created_at,
+};
+const linkStart: OrganizationLinkAttemptStarted = {
+  ...linkAttempt, status: "pending", authorization_url: "https://issuer.example/authorize?state=fixture",
+};
+// @ts-expect-error The verified subject is never in a link resource.
+const leakedSubject: OrganizationMemberLink = { ...link, sub: "fixture" };
+// @ts-expect-error Status lookups must not disclose the original navigation.
+const leakedNavigation: OrganizationLinkAttempt = linkStart;
+void [memberStatus, leakedSubject, leakedNavigation];
 // @ts-expect-error A draft accepts only the issuer.
 const credential: AuthConnectionDraftCreate = { data: { issuer: input.data.issuer, client_secret: "" } };
 // @ts-expect-error The server assigns every generation.

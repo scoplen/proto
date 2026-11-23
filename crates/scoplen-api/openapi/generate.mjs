@@ -16,6 +16,7 @@ import { generateAuditTypes } from "./generate-audit.mjs";
 import { generateGrantTypes } from "./generate-grants.mjs";
 import { generateAuthDraftTypes } from "./generate-auth-connection-draft.mjs";
 import { generateAuthConnectionTypes } from "./generate-auth-connection.mjs";
+import { generateMemberLinkTypes } from "./generate-member-link.mjs";
 import { generateAccessRequestTypes } from "./generate-access-requests.mjs";
 
 const root = new URL(".", import.meta.url);
@@ -636,8 +637,15 @@ const connectionEnd = "// END GENERATED AuthConnection";
 const connectionBegin = completeDraftTypes.indexOf(connectionStart);
 const connectionFinish = completeDraftTypes.indexOf(connectionEnd, connectionBegin + connectionStart.length);
 if (connectionBegin < 0 || connectionFinish < 0) throw new Error("types.ts lacks AuthConnection markers");
-const completeTypes = completeDraftTypes.slice(0, connectionBegin + connectionStart.length) +
+const completeConnectionTypes = completeDraftTypes.slice(0, connectionBegin + connectionStart.length) +
   generateAuthConnectionTypes(document) + completeDraftTypes.slice(connectionFinish);
+const linkStart = "// BEGIN GENERATED OrganizationMemberLink\n";
+const linkEnd = "// END GENERATED OrganizationMemberLink";
+const linkBegin = completeConnectionTypes.indexOf(linkStart);
+const linkFinish = completeConnectionTypes.indexOf(linkEnd, linkBegin + linkStart.length);
+if (linkBegin < 0 || linkFinish < 0) throw new Error("types.ts lacks OrganizationMemberLink markers");
+const completeTypes = completeConnectionTypes.slice(0, linkBegin + linkStart.length) +
+  generateMemberLinkTypes(document) + completeConnectionTypes.slice(linkFinish);
 const outputs = [[new URL("generated-paths.ts", root), generatedPaths], [typesUrl, completeTypes]];
 if (process.argv.includes("--check")) {
   for (const [url, expected] of outputs) {

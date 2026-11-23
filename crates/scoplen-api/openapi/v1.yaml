@@ -14986,7 +14986,7 @@
         "x-scoplen-response-max-bytes": 8192,
         "x-scoplen-problem-max-bytes": 4096,
         "x-scoplen-fetch-credentials": "same-origin",
-        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
+        "x-scoplen-initial-browser-scope": "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-links:self auth-links:withdraw auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage",
         "parameters": [
           {
             "name": "Origin",
@@ -17622,6 +17622,1314 @@
           },
           "default": {
             "description": "Bounded Organization problem without connection data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-link": {
+      "get": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:self",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "getOrganizationSelfAuthLink",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Read the current Account's Membership link and active revision. Validate Origin when supplied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current self status.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSelfLinkStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OrganizationStorageUnavailable"
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:self",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 0,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "unlinkOrganizationSelfAuthLink",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Unlink the reviewed association and invalidate its external evidence in an audited transaction.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Association withdrawn. Empty body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "Unconfirmed write. Read current state or let the unknown attempt expire.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-link/attempts": {
+      "post": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:self",
+        "x-scoplen-fetch-credentials": "same-origin",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-original-password-max-age-seconds": 300,
+        "operationId": "startOrganizationAuthLinkAttempt",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Resolve the caller's own active Membership and original recent password proof. Pin the active revision and link generation. Construct navigation without provider egress. A lost start is never replayed.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Pending attempt and one-time provider navigation.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "Set-Cookie": {
+                "required": true,
+                "schema": {
+                  "type": "string"
+                },
+                "description": "__Host-spl-auth-link-<state_digest>, using lowercase hex SHA-256 of the 32 decoded state bytes. Path=/; HttpOnly; Secure; SameSite=Lax; no Domain. Expiry is bounded by the attempt."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationLinkAttemptStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "Unconfirmed write. Read current state or let the unknown attempt expire.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-link/attempts/{attempt}": {
+      "get": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:self",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "getOrganizationAuthLinkAttempt",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Read the original family's attempt. A claimed exchange reads as pending. Validate Origin when supplied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original attempt status.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationLinkAttempt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OrganizationStorageUnavailable"
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:self",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 0,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "abandonOrganizationAuthLinkAttempt",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Abandon the original family's attempt, including during exchange.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Attempt abandoned. Empty body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "Unconfirmed write. Read current state or let the unknown attempt expire.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/auth-link/attempts/{attempt}/confirm": {
+      "post": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:self",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "x-scoplen-original-password-max-age-seconds": 300,
+        "operationId": "confirmOrganizationAuthLinkAttempt",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Confirm one verified human subject in the original eligible family and active revision. Bind the original request to a 24-hour writer receipt.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Original immutable link. HTTP and body ETags quote its ID.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "ETag": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OrganizationConflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "Recover only through the eligible original writer receipt.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{org}/members/{membership}/auth-link": {
+      "get": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:withdraw",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 8192,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "getOrganizationNamedMemberAuthLink",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Only an authorized Owner may inspect the named current Membership's public link. Validate Origin when supplied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "membership",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current named-member status.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberLinkStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/OrganizationStorageUnavailable"
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "accountBrowserAccess": [],
+            "dpopProof": []
+          }
+        ],
+        "x-scoplen-required-browser-scope": "auth-links:withdraw",
+        "x-scoplen-required-membership-roles-any": [
+          "owner"
+        ],
+        "x-scoplen-cedar-action": "manage_members",
+        "x-scoplen-fetch-credentials": "omit",
+        "x-scoplen-request-max-bytes": 0,
+        "x-scoplen-response-max-bytes": 0,
+        "x-scoplen-problem-max-bytes": 4096,
+        "operationId": "withdrawOrganizationNamedMemberAuthLink",
+        "description": "Require a live Account-browser family, exact request DPoP and active current membership. Recheck authority in the state transaction before protected lookups. No body, Content-Type or query. Only an authorized Owner may withdraw the named current Membership's reviewed link.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "membership",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser Origin."
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Association withdrawn. Empty body.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OrganizationInvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/OrganizationAuthenticationRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/OrganizationDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrganizationNotFound"
+          },
+          "412": {
+            "$ref": "#/components/responses/OrganizationPreconditionFailed"
+          },
+          "428": {
+            "$ref": "#/components/responses/OrganizationPreconditionRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/GroupPolicyRateLimited"
+          },
+          "503": {
+            "description": "Unconfirmed write. Read current state or let the unknown attempt expire.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Pragma": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-cache"
+                }
+              },
+              "X-Request-ID": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrganizationStorageUnavailableProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrganizationUpdateCommitOutcomeUnknownProblem"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Bounded problem without membership link or provider data.",
             "headers": {
               "Cache-Control": {
                 "required": true,
@@ -28393,6 +29701,610 @@
             }
           }
         ]
+      },
+      "OrganizationMemberLink": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "etag",
+          "created_at",
+          "organization_id",
+          "membership_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "etag": {
+            "type": "string",
+            "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-scoplen-max-bytes": 8192,
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sub"
+              ]
+            },
+            {
+              "required": [
+                "subject"
+              ]
+            },
+            {
+              "required": [
+                "subject_digest"
+              ]
+            },
+            {
+              "required": [
+                "subject_comparison"
+              ]
+            },
+            {
+              "required": [
+                "comparison_value"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "authorization_url"
+              ]
+            }
+          ]
+        }
+      },
+      "OrganizationLinkConnection": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "etag",
+          "issuer",
+          "client_id",
+          "space_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "etag": {
+            "type": "string",
+            "pattern": "^\"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"$"
+          },
+          "issuer": {
+            "type": "string",
+            "format": "iri",
+            "pattern": "^[Hh][Tt][Tt][Pp][Ss]://",
+            "maxLength": 2048,
+            "x-scoplen-max-utf8-bytes": 2048,
+            "description": "Exact HTTPS issuer bound to the active connection."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "x-scoplen-max-utf8-bytes": 512,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "space_id": {
+            "type": "string",
+            "pattern": "^spc_[A-Za-z0-9_-]{1,92}$",
+            "minLength": 5,
+            "maxLength": 96
+          }
+        },
+        "x-scoplen-max-bytes": 8192,
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sub"
+              ]
+            },
+            {
+              "required": [
+                "subject"
+              ]
+            },
+            {
+              "required": [
+                "subject_digest"
+              ]
+            },
+            {
+              "required": [
+                "subject_comparison"
+              ]
+            },
+            {
+              "required": [
+                "comparison_value"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "authorization_url"
+              ]
+            }
+          ]
+        }
+      },
+      "OrganizationMemberLinkStatus": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "organization_id",
+          "membership_id",
+          "link"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationMemberLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 8192,
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sub"
+              ]
+            },
+            {
+              "required": [
+                "subject"
+              ]
+            },
+            {
+              "required": [
+                "subject_digest"
+              ]
+            },
+            {
+              "required": [
+                "subject_comparison"
+              ]
+            },
+            {
+              "required": [
+                "comparison_value"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "authorization_url"
+              ]
+            }
+          ]
+        }
+      },
+      "OrganizationSelfLinkStatus": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "organization_id",
+          "membership_id",
+          "link",
+          "connection"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationMemberLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationLinkConnection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 8192,
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sub"
+              ]
+            },
+            {
+              "required": [
+                "subject"
+              ]
+            },
+            {
+              "required": [
+                "subject_digest"
+              ]
+            },
+            {
+              "required": [
+                "subject_comparison"
+              ]
+            },
+            {
+              "required": [
+                "comparison_value"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "authorization_url"
+              ]
+            }
+          ]
+        }
+      },
+      "OrganizationLinkAttempt": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "organization_id",
+          "membership_id",
+          "id",
+          "connection_revision",
+          "expires_at",
+          "status"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "connection_revision": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified",
+              "failed"
+            ]
+          }
+        },
+        "x-scoplen-max-bytes": 8192,
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sub"
+              ]
+            },
+            {
+              "required": [
+                "subject"
+              ]
+            },
+            {
+              "required": [
+                "subject_digest"
+              ]
+            },
+            {
+              "required": [
+                "subject_comparison"
+              ]
+            },
+            {
+              "required": [
+                "comparison_value"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            },
+            {
+              "required": [
+                "authorization_url"
+              ]
+            }
+          ]
+        }
+      },
+      "OrganizationLinkAttemptStarted": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "organization_id",
+          "membership_id",
+          "id",
+          "connection_revision",
+          "expires_at",
+          "status",
+          "authorization_url"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "connection_revision": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]+)?Z$"
+          },
+          "status": {
+            "type": "string",
+            "const": "pending"
+          },
+          "authorization_url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^[Hh][Tt][Tt][Pp][Ss]://"
+          }
+        },
+        "x-scoplen-max-bytes": 8192,
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sub"
+              ]
+            },
+            {
+              "required": [
+                "subject"
+              ]
+            },
+            {
+              "required": [
+                "subject_digest"
+              ]
+            },
+            {
+              "required": [
+                "subject_comparison"
+              ]
+            },
+            {
+              "required": [
+                "comparison_value"
+              ]
+            },
+            {
+              "required": [
+                "claims"
+              ]
+            },
+            {
+              "required": [
+                "client_secret"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "refresh_token"
+              ]
+            },
+            {
+              "required": [
+                "id_token"
+              ]
+            }
+          ]
+        }
       }
     }
   },
@@ -28998,6 +30910,70 @@
         "auth-connection:manage"
       ],
       "writerReceipt": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/auth-link",
+      "scopes": [
+        "auth-links:self"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/auth-link",
+      "scopes": [
+        "auth-links:self"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/auth-link/attempts",
+      "scopes": [
+        "auth-links:self"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/auth-link/attempts/{attempt}",
+      "scopes": [
+        "auth-links:self"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/auth-link/attempts/{attempt}",
+      "scopes": [
+        "auth-links:self"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{org}/auth-link/attempts/{attempt}/confirm",
+      "scopes": [
+        "auth-links:self"
+      ],
+      "writerReceipt": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{org}/members/{membership}/auth-link",
+      "scopes": [
+        "auth-links:withdraw"
+      ],
+      "writerReceipt": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{org}/members/{membership}/auth-link",
+      "scopes": [
+        "auth-links:withdraw"
+      ],
+      "writerReceipt": false
     }
   ]
 }

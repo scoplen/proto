@@ -9,8 +9,8 @@ const authored = JSON.parse(await readFile(new URL("v1.yaml", import.meta.url), 
 test("D-140 exact four endpoints reuse shared shapes and independent principal", async () => {
   const expected = accountBrowserDefinitions();
   assert.equal(Object.keys(expected.paths).length, 4);
-  assert.equal(expected.operations.length, 75);
-  assert.equal(new Set(expected.operations.map(({ method, path }) => `${method} ${path}`)).size, 75);
+  assert.equal(expected.operations.length, 83);
+  assert.equal(new Set(expected.operations.map(({ method, path }) => `${method} ${path}`)).size, 83);
   const types = generateAccountBrowserTypes(authored);
   assert.match(types, /AccountBrowserPasswordLoginRequest = AccountPasswordLoginRequest/);
   assert.match(types, /AccountBrowserLogoutResponse = OperatorLogoutResponse/);
@@ -18,13 +18,13 @@ test("D-140 exact four endpoints reuse shared shapes and independent principal",
   const declarations = await readFile(new URL("types.ts", import.meta.url), "utf8");
   for (const name of ["AccountBrowserPasswordOptionsRequest", "AccountBrowserPasswordOptionsResponse", "AccountBrowserPasswordLoginRequest", "AccountBrowserPasswordLoginResponse", "AccountBrowserRefreshRequest", "AccountBrowserRefreshResponse", "AccountBrowserLogoutRequest", "AccountBrowserLogoutResponse", "initialAccountBrowserScope", "accountBrowserOperations"]) assert.ok(index.includes(name), `public export ${name}`);
   for (const name of Object.keys(expected.schemas)) assert.ok(declarations.includes(`${name}: ${name};`), `components schema ${name}`);
-  assert.equal(initialAccountBrowserScope.split(" ").length, 17);
+  assert.equal(initialAccountBrowserScope.split(" ").length, 19);
   assert.equal(authored.paths["/auth/accounts/browser/password/login"].post["x-scoplen-initial-browser-scope"], initialAccountBrowserScope);
   const refresh = authored.paths["/auth/accounts/browser/refresh"].post;
   assert.equal(refresh["x-scoplen-initial-browser-scope"], undefined);
   assert.equal(refresh["x-scoplen-refresh-scope-ceiling"], "original-family");
   for (const kind of ["trust-records", "gateway-networks", "certificate-authorities", "certificates", "/sync/", "/admin/", "devices"]) assert.ok(expected.operations.every(operation => !operation.path.includes(kind)));
-  assert.equal(expected.operations.filter(operation => operation.writerReceipt).length, 16);
+  assert.equal(expected.operations.filter(operation => operation.writerReceipt).length, 17);
 });
 
 test("D-155 adds exactly five existing Snippet routes with unchanged inventory scopes", () => {
@@ -36,7 +36,7 @@ test("D-155 adds exactly five existing Snippet routes with unchanged inventory s
     { method: "PUT", path: "/api/v1/orgs/{org}/snippets/{id}", scopes: ["inventory:write"], writerReceipt: false },
     { method: "DELETE", path: "/api/v1/orgs/{org}/snippets/{id}", scopes: ["inventory:write"], writerReceipt: false },
   ]);
-  assert.equal(initialAccountBrowserScope, "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
+  assert.equal(initialAccountBrowserScope, "access-requests:decide access-requests:read access-requests:write account:read audit:read auth-connection:manage auth-drafts:manage auth-links:self auth-links:withdraw auth-test:run inventory:read inventory:write orgs:create orgs:read orgs:write policies:read policies:write teams:join teams:manage");
 });
 
 test("D-140 generator rejects byte limits, profile, cookie, scopes and writer drift", () => {

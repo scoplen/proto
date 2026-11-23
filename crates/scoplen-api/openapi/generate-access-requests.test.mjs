@@ -93,7 +93,7 @@ test("D-150 registers current Device/browser authority and only three original w
   assert.equal(browser.length, 6);
   const prefix = ["access-requests:decide", "access-requests:read", "access-requests:write"];
   for (const scope of [initialAccountBrowserScope, initialTeamDeviceScope]) assert.deepEqual(scope.split(" ").slice(0, 3), prefix);
-  assert.equal(initialAccountBrowserScope.split(" ").length, 17);
+  assert.equal(initialAccountBrowserScope.split(" ").length, 19);
   assert.equal(initialTeamDeviceScope.split(" ").length, 22);
   for (const [path, methods] of Object.entries(paths)) for (const [method, operation] of Object.entries(methods)) {
     const scope = method === "get" ? "access-requests:read" : path === decisions ? "access-requests:decide" : "access-requests:write";
