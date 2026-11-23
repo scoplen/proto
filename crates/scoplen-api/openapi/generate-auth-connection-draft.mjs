@@ -42,6 +42,8 @@ const writeFailures = {
 };
 const resource = { description: "Original generation, UTC timestamps and exact issuer. The strong HTTP ETag equals the body etag and quotes the generation UUID. Read the singleton for its current status.", headers: { ...headers, ETag: { required: true, schema: tag } }, content: { "application/json": { schema: schema("AuthConnectionDraftResource") } } };
 
+export { header, headers, issuer, key, object, org, response, schema, tag, time, uuid };
+
 export function authDraftDefinitions() {
   const schemas = {
     AuthConnectionDraftCreate: { ...object({ data: object({ issuer }, false) }, false), "x-scoplen-max-bytes": 4096 },

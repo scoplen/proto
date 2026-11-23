@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { AuthConnectionDraftCreate, AuthConnectionDraftResource, DraftLoginAttempt, DraftLoginCredentials, DraftLoginStarted, components } from "./index";
+import type { AuthConnectionActivation, AuthConnectionActivationStarted, AuthConnectionCandidate, AuthConnectionCondition, AuthConnectionResource } from "./index";
 
 const input: AuthConnectionDraftCreate = { data: { issuer: "https://issuer.example/tenant/" } };
 const typedInput: components["schemas"]["AuthConnectionDraftCreate"] = input;
@@ -28,3 +29,32 @@ const unsafeStatus: DraftLoginAttempt = started;
 // @ts-expect-error Start always returns a pending attempt.
 const alreadyVerified: DraftLoginStarted = { ...started, status: "verified" };
 void [typedLogin, typedStatus, typedStarted, modifiedLogin, unsafeStatus, alreadyVerified];
+
+const candidate: AuthConnectionCandidate = { ...login, draft_generation: generation, space_id: "spc_team" };
+const typedCandidate: components["schemas"]["AuthConnectionCandidate"] = candidate;
+const connection: AuthConnectionResource = {
+  id: generation, etag: item.etag, created_at: item.created_at, updated_at: item.created_at,
+  data: { organization_id: item.data.organization_id, status: "active", issuer: item.data.issuer, client_id: login.client_id, space_id: candidate.space_id },
+};
+const typedConnection: components["schemas"]["AuthConnectionResource"] = connection;
+const attempt: AuthConnectionActivation = { ...status, status: "verified", expected_revision: null, issuer: connection.data.issuer, client_id: login.client_id, space_id: candidate.space_id };
+const typedAttempt: components["schemas"]["AuthConnectionActivation"] = attempt;
+const navigating: AuthConnectionActivationStarted = { ...attempt, status: "pending", authorization_url: started.authorization_url };
+const typedNavigation: components["schemas"]["AuthConnectionActivationStarted"] = navigating;
+const expectedEmpty: AuthConnectionCondition = { "If-None-Match": "*" };
+const expectedRevision: AuthConnectionCondition = { "If-Match": item.etag };
+const installed: components["schemas"]["AuthConnectionActiveResource"] = { ...connection, data: { ...connection.data, status: "active" } };
+const suspended: components["schemas"]["AuthConnectionSuspendedResource"] = { ...connection, data: { ...connection.data, status: "suspended" } };
+// @ts-expect-error Only confirmation of a suspension can return this receipt.
+const wrongTransition: typeof installed = suspended;
+// @ts-expect-error A family may supply exactly one expected connection head.
+const conflictingHeads: AuthConnectionCondition = { "If-Match": item.etag, "If-None-Match": "*" };
+// @ts-expect-error A GET representation cannot carry the one-time navigation.
+const unsafeAttempt: AuthConnectionActivation = navigating;
+// @ts-expect-error Access tokens cannot appear as resource extensions.
+const disclosed: AuthConnectionResource = { ...connection, access_token: "disallowed" };
+// @ts-expect-error A provider secret cannot appear in connection metadata.
+const nestedDisclosure: AuthConnectionResource = { ...connection, data: { ...connection.data, client_secret: "disallowed" } };
+// @ts-expect-error A caller may not override the draft's issuer on activation.
+const modifiedCandidate: AuthConnectionCandidate = { ...candidate, issuer: item.data.issuer };
+void [typedCandidate, typedConnection, typedAttempt, typedNavigation, expectedEmpty, expectedRevision, installed, suspended, wrongTransition, conflictingHeads, unsafeAttempt, disclosed, nestedDisclosure, modifiedCandidate];
