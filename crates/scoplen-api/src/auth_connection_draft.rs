@@ -6,6 +6,7 @@ use std::fmt;
 use serde::Serialize;
 use uuid::Uuid;
 
+pub mod callback;
 pub mod reference;
 
 use crate::{
